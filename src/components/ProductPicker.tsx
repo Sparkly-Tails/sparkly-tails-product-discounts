@@ -15,6 +15,7 @@ export default function ProductPicker({
   const [open, setOpen] = useState(false)
   const [searching, setSearching] = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const generationRef = useRef(0)
 
   function handleQueryChange(value: string) {
     setQuery(value)
@@ -27,11 +28,17 @@ export default function ProductPicker({
     }
 
     setSearching(true)
+    // Capture the generation number for this search before scheduling
+    const generation = ++generationRef.current
+
     debounceRef.current = setTimeout(async () => {
       const matches = await searchProductsAction(value)
-      setResults(matches)
-      setSearching(false)
-      setOpen(true)
+      // Only apply results if this is still the current generation
+      if (generation === generationRef.current) {
+        setResults(matches)
+        setSearching(false)
+        setOpen(true)
+      }
     }, 300)
   }
 
