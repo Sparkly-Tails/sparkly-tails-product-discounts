@@ -24,6 +24,7 @@ export default function ProductPicker({
     if (value.trim().length < 2) {
       setResults([])
       setSearching(false)
+      ++generationRef.current
       return
     }
 
