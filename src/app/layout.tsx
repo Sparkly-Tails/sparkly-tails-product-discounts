@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
-import Script from "next/script";
 import AuthTokenInit from "@/components/AuthTokenInit";
 import packageJson from "../../package.json";
 import "./globals.css";
@@ -19,7 +18,10 @@ export default async function RootLayout({
     <html lang="en">
       <head>
         <meta name="shopify-api-key" content={process.env.NEXT_PUBLIC_SHOPIFY_API_KEY} />
-        <Script src="https://cdn.shopify.com/shopifycloud/app-bridge.js" strategy="beforeInteractive" />
+        {/* Plain <script>, not next/script — Shopify requires App Bridge to be
+            the literal first <script> tag with no async/defer/type=module.
+            next/script's beforeInteractive strategy doesn't guarantee that. */}
+        <script src="https://cdn.shopify.com/shopifycloud/app-bridge.js"></script>
       </head>
       <body>
         <AuthTokenInit initialToken={authToken} />
