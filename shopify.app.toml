@@ -4,11 +4,11 @@ client_id = "3bc42b167b3cd419df0317756ac2cc79"
 name = "st-product-discounts"
 application_url = "https://sparkly-tails-product-discounts.vercel.app"
 embedded = true
-use_legacy_install_flow = true
 
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
 scopes = "read_products,write_discounts,read_discounts"
+use_legacy_install_flow = true
 
 [webhooks]
 api_version = "2026-10"
