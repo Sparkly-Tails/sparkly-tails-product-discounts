@@ -59,7 +59,9 @@ async function verifyTokenWithMaxAge(
   const parts = token.split('|')
   if (parts.length !== 3) return false
   const [shop, ts, sig] = parts
-  if (Date.now() - parseInt(ts) > maxAgeMs) return false
+  const parsedTs = parseInt(ts)
+  if (!Number.isFinite(parsedTs)) return false
+  if (Date.now() - parsedTs > maxAgeMs) return false
   const expected = await hmacSha256(secret, `${shop}|${ts}`)
   return timingSafeEqual(expected, sig)
 }

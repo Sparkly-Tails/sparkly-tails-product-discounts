@@ -42,6 +42,12 @@ describe('makeSessionToken / verifyUrlToken', () => {
     expect(await verifyUrlToken('not-a-real-token', 'test-secret')).toBe(false)
   })
 
+  it('rejects a token with a non-numeric timestamp segment', async () => {
+    expect(
+      await verifyUrlToken('shop.example.com|not-a-number|somesignature', 'test-secret'),
+    ).toBe(false)
+  })
+
   it('rejects a token older than the 10-minute window', async () => {
     const shop = 'test.myshopify.com'
     const enc = new TextEncoder()
