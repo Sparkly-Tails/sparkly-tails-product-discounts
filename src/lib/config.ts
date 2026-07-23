@@ -15,7 +15,7 @@ export interface Config {
   products: ProductDiscount[]
 }
 
-const NAMESPACE = 'sparkly_tiers'
+const NAMESPACE = 'sparkly_product_discounts'
 
 async function getShopId(): Promise<string> {
   const data = await shopifyQuery<{ shop: { id: string } }>(

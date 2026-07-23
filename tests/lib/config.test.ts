@@ -42,7 +42,7 @@ describe('saveConfig', () => {
         metafields: [
           expect.objectContaining({
             ownerId: 'gid://shopify/Shop/1',
-            namespace: 'sparkly_tiers',
+            namespace: 'sparkly_product_discounts',
             key: 'config',
             type: 'json',
             value: JSON.stringify(config),
