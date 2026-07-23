@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { createDiscount, updateTiers, setStatus, deleteDiscount } from '@/actions/discountActions'
 import * as configLib from '@/lib/config'
 import * as authRedirect from '@/lib/auth-redirect'
+import * as productTiers from '@/lib/product-tiers'
 
 vi.mock('@/lib/auth-redirect', () => ({ redirectWithToken: vi.fn() }))
 
@@ -58,6 +59,7 @@ describe('updateTiers', () => {
       products: [{ productId: 'gid://shopify/Product/111', status: 'live', tiers: [{ minQty: 5, percentOff: 10 }] }],
     })
     const saveSpy = vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
+    vi.spyOn(productTiers, 'syncProductTierMetafield').mockResolvedValue()
 
     const formData = new FormData()
     formData.set('tier-0-minQty', '3')
@@ -83,6 +85,38 @@ describe('updateTiers', () => {
     formData.set('tier-0-percentOff', '10')
     await expect(updateTiers('gid://shopify/Product/999', formData)).rejects.toThrow('not found')
   })
+
+  it('re-syncs the per-product metafield when the discount is already live', async () => {
+    vi.spyOn(configLib, 'getConfig').mockResolvedValue({
+      products: [{ productId: 'gid://shopify/Product/111', status: 'live', tiers: [{ minQty: 5, percentOff: 10 }] }],
+    })
+    vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
+    const syncSpy = vi.spyOn(productTiers, 'syncProductTierMetafield').mockResolvedValue()
+
+    const formData = new FormData()
+    formData.set('tier-0-minQty', '3')
+    formData.set('tier-0-percentOff', '5')
+
+    await updateTiers('gid://shopify/Product/111', formData)
+
+    expect(syncSpy).toHaveBeenCalledWith('gid://shopify/Product/111', [{ minQty: 3, percentOff: 5 }])
+  })
+
+  it('does not sync the per-product metafield when the discount is still draft', async () => {
+    vi.spyOn(configLib, 'getConfig').mockResolvedValue({
+      products: [{ productId: 'gid://shopify/Product/111', status: 'draft', tiers: [{ minQty: 5, percentOff: 10 }] }],
+    })
+    vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
+    const syncSpy = vi.spyOn(productTiers, 'syncProductTierMetafield').mockResolvedValue()
+
+    const formData = new FormData()
+    formData.set('tier-0-minQty', '3')
+    formData.set('tier-0-percentOff', '5')
+
+    await updateTiers('gid://shopify/Product/111', formData)
+
+    expect(syncSpy).not.toHaveBeenCalled()
+  })
 })
 
 describe('setStatus', () => {
@@ -93,12 +127,37 @@ describe('setStatus', () => {
       products: [{ productId: 'gid://shopify/Product/111', status: 'draft', tiers: [{ minQty: 5, percentOff: 10 }] }],
     })
     const saveSpy = vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
+    vi.spyOn(productTiers, 'syncProductTierMetafield').mockResolvedValue()
 
     await setStatus('gid://shopify/Product/111', 'live')
 
     expect(saveSpy).toHaveBeenCalledWith({
       products: [{ productId: 'gid://shopify/Product/111', status: 'live', tiers: [{ minQty: 5, percentOff: 10 }] }],
     })
+  })
+
+  it('writes the per-product metafield when flipping to live', async () => {
+    vi.spyOn(configLib, 'getConfig').mockResolvedValue({
+      products: [{ productId: 'gid://shopify/Product/111', status: 'draft', tiers: [{ minQty: 5, percentOff: 10 }] }],
+    })
+    vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
+    const syncSpy = vi.spyOn(productTiers, 'syncProductTierMetafield').mockResolvedValue()
+
+    await setStatus('gid://shopify/Product/111', 'live')
+
+    expect(syncSpy).toHaveBeenCalledWith('gid://shopify/Product/111', [{ minQty: 5, percentOff: 10 }])
+  })
+
+  it('deletes the per-product metafield when flipping to draft', async () => {
+    vi.spyOn(configLib, 'getConfig').mockResolvedValue({
+      products: [{ productId: 'gid://shopify/Product/111', status: 'live', tiers: [{ minQty: 5, percentOff: 10 }] }],
+    })
+    vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
+    const syncSpy = vi.spyOn(productTiers, 'syncProductTierMetafield').mockResolvedValue()
+
+    await setStatus('gid://shopify/Product/111', 'draft')
+
+    expect(syncSpy).toHaveBeenCalledWith('gid://shopify/Product/111', null)
   })
 })
 
@@ -113,11 +172,24 @@ describe('deleteDiscount', () => {
       ],
     })
     const saveSpy = vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
+    vi.spyOn(productTiers, 'syncProductTierMetafield').mockResolvedValue()
 
     await deleteDiscount('gid://shopify/Product/111')
 
     expect(saveSpy).toHaveBeenCalledWith({
       products: [{ productId: 'gid://shopify/Product/222', status: 'draft', tiers: [] }],
     })
+  })
+
+  it('deletes the per-product metafield', async () => {
+    vi.spyOn(configLib, 'getConfig').mockResolvedValue({
+      products: [{ productId: 'gid://shopify/Product/111', status: 'live', tiers: [] }],
+    })
+    vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
+    const syncSpy = vi.spyOn(productTiers, 'syncProductTierMetafield').mockResolvedValue()
+
+    await deleteDiscount('gid://shopify/Product/111')
+
+    expect(syncSpy).toHaveBeenCalledWith('gid://shopify/Product/111', null)
   })
 })

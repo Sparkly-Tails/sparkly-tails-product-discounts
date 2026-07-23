@@ -2,6 +2,7 @@
 
 import { getConfig, saveConfig, type Tier, type ProductDiscount } from '@/lib/config'
 import { redirectWithToken } from '@/lib/auth-redirect'
+import { syncProductTierMetafield } from '@/lib/product-tiers'
 
 function parseTiersFromForm(formData: FormData): Tier[] {
   const tiers: Tier[] = []
@@ -47,6 +48,10 @@ export async function updateTiers(productId: string, formData: FormData): Promis
   discount.tiers = tiers
   await saveConfig(config)
 
+  if (discount.status === 'live') {
+    await syncProductTierMetafield(productId, tiers)
+  }
+
   await redirectWithToken(`/discounts/${encodeURIComponent(productId)}`)
 }
 
@@ -58,6 +63,8 @@ export async function setStatus(productId: string, status: 'draft' | 'live'): Pr
   discount.status = status
   await saveConfig(config)
 
+  await syncProductTierMetafield(productId, status === 'live' ? discount.tiers : null)
+
   await redirectWithToken(`/discounts/${encodeURIComponent(productId)}`)
 }
 
@@ -65,6 +72,8 @@ export async function deleteDiscount(productId: string): Promise<void> {
   const config = await getConfig()
   const remaining = config.products.filter((p) => p.productId !== productId)
   await saveConfig({ products: remaining })
+
+  await syncProductTierMetafield(productId, null)
 
   await redirectWithToken('/')
 }
