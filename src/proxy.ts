@@ -49,7 +49,7 @@ export async function proxy(req: NextRequest) {
       return new NextResponse('HMAC verification failed', { status: 403 })
     }
 
-    if (searchParams.has('host')) {
+    if (process.env.SHOPIFY_ACCESS_TOKEN) {
       return nextWithFreshToken(req, shop, secret)
     }
 
