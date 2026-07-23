@@ -27,5 +27,15 @@ export async function GET(req: NextRequest) {
   oauthUrl.searchParams.set('scope', scopes)
   oauthUrl.searchParams.set('redirect_uri', callbackUrl)
 
+  // Embedded loads run inside an iframe. A normal 3xx redirect just
+  // navigates the iframe itself, and Shopify's OAuth grant screen refuses
+  // to be framed — so break out to the top-level window first.
+  if (searchParams.get('embedded') === '1') {
+    return new NextResponse(
+      `<!DOCTYPE html><html><body><script>window.top.location.href = ${JSON.stringify(oauthUrl.toString())}</script></body></html>`,
+      { status: 200, headers: { 'Content-Type': 'text/html' } },
+    )
+  }
+
   return NextResponse.redirect(oauthUrl.toString())
 }
