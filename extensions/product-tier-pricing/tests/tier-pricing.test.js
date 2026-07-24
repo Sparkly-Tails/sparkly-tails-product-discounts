@@ -1,0 +1,73 @@
+const test = require('node:test')
+const assert = require('node:assert/strict')
+const { computeTierState } = require('../assets/tier-pricing.js')
+
+test('below every tier: no discount, lists every tier as a delta from current quantity', () => {
+  const tiers = [{ minQty: 7, percentOff: 5 }, { minQty: 14, percentOff: 10 }]
+  const result = computeTierState(tiers, 3)
+
+  assert.equal(result.percentOff, 0)
+  assert.equal(result.nextTier, null)
+  assert.deepEqual(result.remainingTiers, [
+    { minQty: 7, percentOff: 5, delta: 4 },
+    { minQty: 14, percentOff: 10, delta: 11 },
+  ])
+})
+
+test('between tiers: applies the lower tier, nudges toward the single next tier only', () => {
+  const tiers = [{ minQty: 7, percentOff: 5 }, { minQty: 14, percentOff: 10 }]
+  const result = computeTierState(tiers, 9)
+
+  assert.equal(result.percentOff, 5)
+  assert.deepEqual(result.nextTier, { minQty: 14, percentOff: 10, delta: 5 })
+  assert.equal(result.remainingTiers, null)
+})
+
+test('at the highest tier: applies it, no nudge left', () => {
+  const tiers = [{ minQty: 7, percentOff: 5 }, { minQty: 14, percentOff: 10 }]
+  const result = computeTierState(tiers, 20)
+
+  assert.equal(result.percentOff, 10)
+  assert.equal(result.nextTier, null)
+  assert.equal(result.remainingTiers, null)
+})
+
+test('exactly at a threshold counts as reached', () => {
+  const tiers = [{ minQty: 7, percentOff: 5 }, { minQty: 14, percentOff: 10 }]
+  const result = computeTierState(tiers, 14)
+
+  assert.equal(result.percentOff, 10)
+  assert.equal(result.nextTier, null)
+})
+
+test('single-tier product: below the tier', () => {
+  const result = computeTierState([{ minQty: 7, percentOff: 5 }], 2)
+
+  assert.equal(result.percentOff, 0)
+  assert.equal(result.nextTier, null)
+  assert.deepEqual(result.remainingTiers, [{ minQty: 7, percentOff: 5, delta: 5 }])
+})
+
+test('single-tier product: at the tier, never produces a next-tier state', () => {
+  const result = computeTierState([{ minQty: 7, percentOff: 5 }], 7)
+
+  assert.equal(result.percentOff, 5)
+  assert.equal(result.nextTier, null)
+  assert.equal(result.remainingTiers, null)
+})
+
+test('empty tiers array is a safe no-op', () => {
+  const result = computeTierState([], 5)
+
+  assert.equal(result.percentOff, 0)
+  assert.equal(result.nextTier, null)
+  assert.deepEqual(result.remainingTiers, [])
+})
+
+test('handles tiers passed out of order', () => {
+  const tiers = [{ minQty: 14, percentOff: 10 }, { minQty: 7, percentOff: 5 }]
+  const result = computeTierState(tiers, 9)
+
+  assert.equal(result.percentOff, 5)
+  assert.deepEqual(result.nextTier, { minQty: 14, percentOff: 10, delta: 5 })
+})
