@@ -1,0 +1,15 @@
+/* extensions/product-tier-pricing/assets/tier-pricing.css */
+.sparkly-tier-pricing__price {
+  font-weight: 600;
+}
+
+.sparkly-tier-pricing__price s {
+  font-weight: 400;
+  opacity: 0.6;
+  margin-right: 0.5em;
+}
+
+.sparkly-tier-pricing__message {
+  font-size: 0.9em;
+  opacity: 0.8;
+}
