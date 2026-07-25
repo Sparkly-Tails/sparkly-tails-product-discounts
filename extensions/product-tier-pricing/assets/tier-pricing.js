@@ -93,6 +93,18 @@ if (typeof document !== 'undefined') {
       if (quantityInput) {
         quantityInput.addEventListener('input', () => renderTierPricing(container, tiers, moneyFormat))
         quantityInput.addEventListener('change', () => renderTierPricing(container, tiers, moneyFormat))
+
+        // The theme's +/- quantity stepper sets `.value` programmatically
+        // (via stepUp()/stepDown() or a direct assignment) without dispatching
+        // an `input`/`change` event, so the listeners above never fire for
+        // stepper clicks. Poll for a value change as a theme-agnostic fallback.
+        let lastQuantity = quantityInput.value
+        setInterval(() => {
+          if (quantityInput.value !== lastQuantity) {
+            lastQuantity = quantityInput.value
+            renderTierPricing(container, tiers, moneyFormat)
+          }
+        }, 200)
       }
 
       document.addEventListener('variant:change', (event) => {
