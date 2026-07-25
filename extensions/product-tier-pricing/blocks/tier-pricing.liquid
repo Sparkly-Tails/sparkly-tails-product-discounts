@@ -11,7 +11,7 @@
     class="sparkly-tier-pricing"
     data-sparkly-tier-pricing
     data-tiers='{{ tiers_metafield.value | json }}'
-    data-base-price="{{ product.selected_or_first_available_variant.price | json }}"
+    data-base-price="{{ product.selected_or_first_available_variant.price | divided_by: 100.0 | json }}"
     data-money-format='{{ shop.money_format | json }}'
   >
     <p class="sparkly-tier-pricing__price" data-tier-pricing-price>

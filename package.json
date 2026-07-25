@@ -1,6 +1,6 @@
 {
   "name": "sparkly-tails-product-discounts",
-  "version": "0.13.12",
+  "version": "0.13.13",
   "private": true,
   "engines": {
     "node": ">=20.9.0"

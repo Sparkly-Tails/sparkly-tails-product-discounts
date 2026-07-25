@@ -53,20 +53,29 @@ if (typeof document !== 'undefined') {
 
     const state = computeTierState(tiers, quantity)
 
+    let discounted
     if (state.percentOff > 0) {
-      const discounted = basePrice * (1 - state.percentOff / 100)
+      discounted = basePrice * (1 - state.percentOff / 100)
       priceEl.innerHTML =
         '<s>' + formatMoney(basePrice, moneyFormat) + '</s> ' + formatMoney(discounted, moneyFormat)
     } else {
       priceEl.textContent = formatMoney(basePrice, moneyFormat)
     }
 
-    if (state.remainingTiers && state.remainingTiers.length > 0) {
+    if (state.percentOff > 0) {
+      const savings = basePrice - discounted
+      const discountLine = 'Discount ' + state.percentOff + '% off (-' + formatMoney(savings, moneyFormat) + ')'
+
+      if (state.nextTier) {
+        messageEl.innerHTML =
+          discountLine + '<br>Add ' + state.nextTier.delta + ' more for ' + state.nextTier.percentOff + '% Off'
+      } else {
+        messageEl.textContent = discountLine
+      }
+    } else if (state.remainingTiers && state.remainingTiers.length > 0) {
       messageEl.textContent = state.remainingTiers
         .map((t) => 'Add ' + t.delta + ' for ' + t.percentOff + '% Off')
         .join(' or ')
-    } else if (state.nextTier) {
-      messageEl.textContent = 'Add ' + state.nextTier.delta + ' more for ' + state.nextTier.percentOff + '% Off'
     } else {
       messageEl.textContent = ''
     }
