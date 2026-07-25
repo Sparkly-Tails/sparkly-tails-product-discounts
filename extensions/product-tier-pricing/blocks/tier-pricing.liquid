@@ -22,7 +22,6 @@
   data-base-price="{{ product.selected_or_first_available_variant.price | divided_by: 100.0 | json }}"
   data-money-format='{{ shop.money_format | json }}'
   style="--sparkly-tier-price-font-size: {{ block.settings.price_font_size }}px;"
-  {{ block.shopify_attributes }}
 >
   <p class="sparkly-tier-pricing__price" data-tier-pricing-price>
     {{ product.selected_or_first_available_variant.price | money }}
@@ -31,11 +30,11 @@
 </div>
 
 {%- if block.settings.custom_css != blank -%}
-  {% style %}
+  <style>
     #sparkly-tier-pricing-{{ block.id }} {
       {{ block.settings.custom_css }}
     }
-  {% endstyle %}
+  </style>
 {%- endif -%}
 
 {% schema %}
