@@ -1,3 +1,6 @@
 {
-  "name": "Tier pricing"
+  "name": "Tier pricing",
+  "price_font_size_label": "Price font size",
+  "custom_css_label": "Custom CSS",
+  "custom_css_info": "Advanced. Applies only to this block."
 }

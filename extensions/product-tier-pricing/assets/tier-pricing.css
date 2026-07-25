@@ -1,6 +1,7 @@
 /* extensions/product-tier-pricing/assets/tier-pricing.css */
 .sparkly-tier-pricing__price {
-  font-weight: 600;
+  font-size: var(--sparkly-tier-price-font-size, 2.75rem);
+  font-weight: var(--font-weight-body-bold, 500);
 }
 
 .sparkly-tier-pricing__price s {
