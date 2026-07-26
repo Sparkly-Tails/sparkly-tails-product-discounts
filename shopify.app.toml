@@ -7,7 +7,7 @@ embedded = true
 
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
-scopes = "read_products,write_discounts,read_discounts"
+scopes = "read_products,write_products,write_discounts,read_discounts"
 use_legacy_install_flow = true
 
 [webhooks]
