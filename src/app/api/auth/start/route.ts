@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
   }
 
   const callbackUrl = new URL('/api/auth/callback', req.url).toString()
-  const scopes = 'read_products,write_discounts,read_discounts'
+  const scopes = 'read_products,write_products,write_discounts,read_discounts'
 
   const oauthUrl = new URL(`https://${shop}/admin/oauth/authorize`)
   oauthUrl.searchParams.set('client_id', apiKey)

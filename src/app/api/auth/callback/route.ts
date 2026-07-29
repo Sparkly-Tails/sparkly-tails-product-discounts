@@ -38,6 +38,6 @@ export async function GET(req: NextRequest) {
   console.log('[auth/callback] Copy this into SHOPIFY_ACCESS_TOKEN in Vercel env vars:')
   console.log('[auth/callback] ACCESS_TOKEN=' + access_token)
 
-  const adminUrl = `https://${shop}/admin`
-  return NextResponse.redirect(adminUrl)
+  const appUrl = `https://${shop}/admin/apps/${apiKey}`
+  return NextResponse.redirect(appUrl)
 }
