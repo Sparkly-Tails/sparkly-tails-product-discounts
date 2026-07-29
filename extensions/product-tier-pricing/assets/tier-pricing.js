@@ -107,12 +107,23 @@ if (typeof document !== 'undefined') {
         }, 200)
       }
 
-      document.addEventListener('variant:change', (event) => {
-        if (event.detail && event.detail.variant && typeof event.detail.variant.price === 'number') {
-          container.dataset.basePrice = String(event.detail.variant.price / 100)
-        }
-        renderTierPricing(container, tiers, moneyFormat)
-      })
+      // This theme's <product-variants> custom element dispatches a plain
+      // Event('VARIANT_CHANGE') on itself (not document, and it doesn't
+      // bubble, since it's constructed without {bubbles: true}) — not the
+      // generic "variant:change" CustomEvent-on-document convention some
+      // themes use. Variant data lives at event.target.currentVariant, not
+      // event.detail.variant. See assets/component-product-form.js
+      // (ProductVariants.onVariantChange) in the theme.
+      const productVariantsEl = document.querySelector('product-variants')
+      if (productVariantsEl) {
+        productVariantsEl.addEventListener('VARIANT_CHANGE', (event) => {
+          const variant = event.target.currentVariant
+          if (variant && typeof variant.price === 'number') {
+            container.dataset.basePrice = String(variant.price / 100)
+          }
+          renderTierPricing(container, tiers, moneyFormat)
+        })
+      }
     })
   }
 
