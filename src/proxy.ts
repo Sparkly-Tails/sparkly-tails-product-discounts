@@ -59,8 +59,24 @@ export async function proxy(req: NextRequest) {
   }
 
   const urlToken = searchParams.get('stt')
-  if (urlToken && (await verifyUrlToken(urlToken, secret))) {
-    return nextWithFreshToken(req, shop, secret)
+  if (urlToken) {
+    const valid = await verifyUrlToken(urlToken, secret)
+    if (valid) {
+      return nextWithFreshToken(req, shop, secret)
+    }
+    const parts = urlToken.split('|')
+    console.log('[proxy] stt present but failed verification', {
+      pathname,
+      method: req.method,
+      partsCount: parts.length,
+      ageMs: parts[1] && Number.isFinite(parseInt(parts[1])) ? Date.now() - parseInt(parts[1]) : 'unparseable',
+    })
+  } else {
+    console.log('[proxy] no stt param on request', {
+      pathname,
+      method: req.method,
+      search: searchParams.toString(),
+    })
   }
 
   return new NextResponse(
