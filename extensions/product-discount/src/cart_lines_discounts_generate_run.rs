@@ -93,7 +93,7 @@ fn cart_lines_discounts_generate_run(
     Ok(schema::CartLinesDiscountsGenerateRunResult {
         operations: vec![schema::CartOperation::ProductDiscountsAdd(
             schema::ProductDiscountsAddOperation {
-                selection_strategy: schema::ProductDiscountSelectionStrategy::First,
+                selection_strategy: schema::ProductDiscountSelectionStrategy::All,
                 candidates,
             },
         )],
@@ -292,7 +292,19 @@ mod tests {
         )?;
         assert_eq!(result.operations.len(), 1);
         match &result.operations[0] {
-            schema::CartOperation::ProductDiscountsAdd(op) => assert_eq!(op.candidates.len(), 2),
+            schema::CartOperation::ProductDiscountsAdd(op) => {
+                assert_eq!(op.candidates.len(), 2);
+                // selection_strategy::First would make Shopify apply only one
+                // of these two candidates and silently drop the other one at
+                // checkout — confirmed live: two different products, each
+                // above their own threshold, in the same cart, and only the
+                // first one in cart order actually got discounted. All is
+                // required whenever more than one product can qualify at once.
+                assert_eq!(
+                    op.selection_strategy,
+                    schema::ProductDiscountSelectionStrategy::All
+                );
+            }
             _ => panic!("expected ProductDiscountsAdd"),
         }
         Ok(())
