@@ -124,6 +124,30 @@ if (typeof document !== 'undefined') {
           renderTierPricing(container, tiers, moneyFormat)
         })
       }
+
+      // Loop Subscriptions' one-time/subscribe toggle doesn't change the
+      // variant, and only fires Loop's own undocumented internal events
+      // (onsite-event-publish, triggering-state-update) — not a stable
+      // contract to hook directly. Loop already renders the correct
+      // per-unit price for whichever purchase option is selected, so poll
+      // that instead, same theme/app-agnostic approach as the quantity
+      // poll above. Re-queried every tick (not cached at init) since the
+      // Loop widget can render after this script runs.
+      let lastLoopPriceText = null
+      setInterval(() => {
+        const loopPriceEl = document.querySelector(
+          '.loop-w-btn-group-purchase-option-selected .loop-w-btn-group-purchase-option-price',
+        )
+        if (!loopPriceEl) return
+        const text = loopPriceEl.textContent
+        if (text === lastLoopPriceText) return
+        lastLoopPriceText = text
+        const match = text.match(/\d+\.\d{2}|\d+/)
+        if (match) {
+          container.dataset.basePrice = match[0]
+          renderTierPricing(container, tiers, moneyFormat)
+        }
+      }, 200)
     })
   }
 
