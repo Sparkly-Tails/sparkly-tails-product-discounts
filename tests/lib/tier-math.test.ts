@@ -37,4 +37,15 @@ describe('totalAtThreshold', () => {
   it('rounds the fallback total to 2 decimal places', () => {
     expect(totalAtThreshold(1.49, { minQty: 7, percentOff: 5 })).toBeCloseTo(9.94, 2)
   })
+
+  it('clamps an anchor price above sticker price down to the full undiscounted total', () => {
+    // 5 * 2.00 = 10.00 full price — a merchant fat-fingering anchorPrice: 50
+    // must not have this preview show 50; the Function refuses to produce a
+    // negative discount, so the customer is actually charged the full 10.00.
+    expect(totalAtThreshold(2.0, { minQty: 5, percentOff: 10, anchorPrice: 50 })).toBe(10.0)
+  })
+
+  it('clamps a negative anchor price up to 0', () => {
+    expect(totalAtThreshold(2.0, { minQty: 5, percentOff: 10, anchorPrice: -5 })).toBe(0)
+  })
 })

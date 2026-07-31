@@ -40,14 +40,20 @@ function computeTierState(tiers, quantity) {
 // at the tier's normal percentOff rate — mirrors the Function's
 // FixedAmount discount_amount math exactly (see
 // extensions/product-discount/src/cart_lines_discounts_generate_run.rs) so
-// the live preview always matches what checkout will actually charge.
+// the live preview always matches what checkout will actually charge. The
+// Function clamps its discount to never go negative (never charge more than
+// sticker price); clamp the same way here, or a misconfigured anchor above
+// the full price would render as a fake "discount" that's actually a markup
+// (a strikethrough original price lower than the "sale" price next to it).
 function perUnitPrice(basePrice, quantity, state) {
   if (state.anchorPrice == null) {
     return basePrice * (1 - state.percentOff / 100)
   }
   const extraUnits = quantity - state.minQty
   const totalPaid = state.anchorPrice + extraUnits * basePrice * (1 - state.percentOff / 100)
-  return totalPaid / quantity
+  const fullPrice = basePrice * quantity
+  const clampedTotalPaid = Math.min(Math.max(totalPaid, 0), fullPrice)
+  return clampedTotalPaid / quantity
 }
 
 if (typeof module !== 'undefined' && module.exports) {

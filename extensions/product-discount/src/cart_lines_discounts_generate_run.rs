@@ -92,6 +92,12 @@ fn cart_lines_discounts_generate_run(
                     // min_qty*unit_price).
                     let discount_amount = (unit_price * tier.min_qty as f64) - anchor_price
                         + extra_units * unit_price * (tier.percent_off / 100.0);
+                    // Round to whole pence before clamping — this is real
+                    // money, and TS/JS both round explicitly elsewhere in
+                    // this codebase, so this f64 arithmetic shouldn't be the
+                    // one place relying on Shopify's own downstream rounding
+                    // to paper over floating-point remainders.
+                    let discount_amount = (discount_amount * 100.0).round() / 100.0;
                     let discount_amount = discount_amount.max(0.0);
                     schema::ProductDiscountCandidateValue::FixedAmount(
                         schema::ProductDiscountCandidateFixedAmount {
@@ -506,6 +512,59 @@ mod tests {
             schema::CartOperation::ProductDiscountsAdd(op) => match &op.candidates[0].value {
                 schema::ProductDiscountCandidateValue::FixedAmount(f) => {
                     assert_eq!(f.amount.0, 0.0);
+                }
+                _ => panic!("expected a FixedAmount value when anchor_price is set"),
+            },
+            _ => panic!("expected ProductDiscountsAdd"),
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn rounds_the_discount_amount_to_whole_pence() -> Result<()> {
+        // unit_price=1.10, min_qty=3, percent_off=33.33, anchor=2.00, qty=4
+        // (1 extra unit) produces a raw discount_amount of 1.66663 before
+        // rounding — hand-derived independently of the implementation (see
+        // project memory) to confirm this isn't just checking the formula
+        // against itself. Every other test in this file happens to use
+        // inputs that multiply out to a clean 2-decimal result, which is
+        // exactly how an unrounded f64 remainder could have shipped unnoticed.
+        let result = run_function_with_input(
+            cart_lines_discounts_generate_run,
+            r#"{
+                "cart": {
+                    "lines": [
+                        {
+                            "id": "gid://shopify/CartLine/0",
+                            "quantity": 4,
+                            "cost": { "amountPerQuantity": { "amount": "1.10" } },
+                            "merchandise": {
+                                "__typename": "ProductVariant",
+                                "product": { "id": "gid://shopify/Product/1" }
+                            }
+                        }
+                    ]
+                },
+                "shop": {
+                    "metafield": {
+                        "jsonValue": {
+                            "products": [
+                                {
+                                    "productId": "gid://shopify/Product/1",
+                                    "status": "live",
+                                    "tiers": [{ "minQty": 3, "percentOff": 33.33, "anchorPrice": 2.00 }]
+                                }
+                            ]
+                        }
+                    }
+                },
+                "discount": { "discountClasses": ["PRODUCT"] }
+            }"#,
+        )?;
+        match &result.operations[0] {
+            schema::CartOperation::ProductDiscountsAdd(op) => match &op.candidates[0].value {
+                schema::ProductDiscountCandidateValue::FixedAmount(f) => {
+                    assert_eq!(f.amount.0, 1.67, "expected the rounded 1.67, got {}", f.amount.0);
                 }
                 _ => panic!("expected a FixedAmount value when anchor_price is set"),
             },

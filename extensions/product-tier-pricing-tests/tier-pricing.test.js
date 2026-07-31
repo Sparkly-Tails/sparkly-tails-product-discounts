@@ -101,3 +101,11 @@ test('perUnitPrice: accrues extra units at the percent rate above minQty', () =>
   const result = perUnitPrice(2.0, 7, state)
   assert.ok(Math.abs(result - 12.1 / 7) < 1e-9, `got ${result}`)
 })
+
+test('perUnitPrice: clamps an anchor above sticker price down to full price, never a markup', () => {
+  // full price 5*2.00=10.00 — anchorPrice of 50 must not render as "was
+  // £2.00, now £10.00 (a markup)". The Function refuses to produce a
+  // negative discount, so the true charge is full price; mirror that here.
+  const state = { percentOff: 10, anchorPrice: 50, minQty: 5 }
+  assert.equal(perUnitPrice(2.0, 5, state), 2.0)
+})

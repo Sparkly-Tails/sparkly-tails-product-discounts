@@ -14,11 +14,22 @@ export function resultingPrice(basePrice: number, percentOff: number): number {
  * tier has an anchorPrice set, that exact total is used (e.g. £10.00 instead
  * of a percentage's rounded £10.01) — otherwise it's the per-unit resulting
  * price times minQty, rounded to 2 decimal places.
+ *
+ * A misconfigured anchorPrice (negative, or higher than the plain undiscounted
+ * total) is clamped to the undiscounted price, mirroring the safety clamp the
+ * Discount Function applies at checkout — without this, a merchant could set
+ * an anchor above sticker price and this preview would show that wrong,
+ * too-high total instead of what the customer will actually be charged (full
+ * price, since the Function refuses to produce a negative discount).
  */
 export function totalAtThreshold(
   basePrice: number,
   tier: { minQty: number; percentOff: number; anchorPrice?: number },
 ): number {
-  if (tier.anchorPrice != null) return tier.anchorPrice
+  if (tier.anchorPrice != null) {
+    const fullPrice = Math.round(basePrice * tier.minQty * 100) / 100
+    const clamped = Math.min(Math.max(tier.anchorPrice, 0), fullPrice)
+    return Math.round(clamped * 100) / 100
+  }
   return Math.round(resultingPrice(basePrice, tier.percentOff) * tier.minQty * 100) / 100
 }
