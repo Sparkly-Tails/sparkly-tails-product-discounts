@@ -6,6 +6,8 @@ function computeTierState(tiers, quantity) {
   if (reached.length === 0) {
     return {
       percentOff: 0,
+      anchorPrice: null,
+      minQty: null,
       nextTier: null,
       remainingTiers: notReached.map((t) => ({
         minQty: t.minQty,
@@ -15,22 +17,41 @@ function computeTierState(tiers, quantity) {
     }
   }
 
-  const percentOff = reached[reached.length - 1].percentOff
+  const reachedTier = reached[reached.length - 1]
+  const percentOff = reachedTier.percentOff
+  const anchorPrice = reachedTier.anchorPrice != null ? reachedTier.anchorPrice : null
 
   if (notReached.length === 0) {
-    return { percentOff, nextTier: null, remainingTiers: null }
+    return { percentOff, anchorPrice, minQty: reachedTier.minQty, nextTier: null, remainingTiers: null }
   }
 
   const next = notReached[0]
   return {
     percentOff,
+    anchorPrice,
+    minQty: reachedTier.minQty,
     nextTier: { minQty: next.minQty, percentOff: next.percentOff, delta: next.minQty - quantity },
     remainingTiers: null,
   }
 }
 
+// Blended per-unit price when a tier has an anchorPrice: anchorPrice covers
+// the first minQty units exactly, and every unit beyond that still accrues
+// at the tier's normal percentOff rate — mirrors the Function's
+// FixedAmount discount_amount math exactly (see
+// extensions/product-discount/src/cart_lines_discounts_generate_run.rs) so
+// the live preview always matches what checkout will actually charge.
+function perUnitPrice(basePrice, quantity, state) {
+  if (state.anchorPrice == null) {
+    return basePrice * (1 - state.percentOff / 100)
+  }
+  const extraUnits = quantity - state.minQty
+  const totalPaid = state.anchorPrice + extraUnits * basePrice * (1 - state.percentOff / 100)
+  return totalPaid / quantity
+}
+
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { computeTierState }
+  module.exports = { computeTierState, perUnitPrice }
 }
 
 // Append to extensions/product-tier-pricing/assets/tier-pricing.js,
@@ -55,7 +76,7 @@ if (typeof document !== 'undefined') {
 
     let discounted
     if (state.percentOff > 0) {
-      discounted = basePrice * (1 - state.percentOff / 100)
+      discounted = perUnitPrice(basePrice, quantity, state)
       priceEl.innerHTML =
         '<s>' + formatMoney(basePrice, moneyFormat) + '</s> ' + formatMoney(discounted, moneyFormat)
     } else {

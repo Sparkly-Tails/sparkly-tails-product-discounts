@@ -2,7 +2,7 @@ import { headers } from 'next/headers'
 import { notFound } from 'next/navigation'
 import { getConfig } from '@/lib/config'
 import { getProductInfo } from '@/lib/products'
-import { resultingPrice } from '@/lib/tier-math'
+import { resultingPrice, totalAtThreshold } from '@/lib/tier-math'
 import { updateTiers, setStatus, deleteDiscount } from '@/actions/discountActions'
 import TierFields from '@/components/TierFields'
 import ConfirmForm from '@/components/ConfirmForm'
@@ -55,7 +55,8 @@ export default async function DiscountPage({
               <tr className="text-left border-b border-line">
                 <th className="py-1">Min qty</th>
                 <th className="py-1">% off</th>
-                <th className="py-1">Price</th>
+                <th className="py-1">Per-unit price</th>
+                <th className="py-1">Total at min qty</th>
               </tr>
             </thead>
             <tbody>
@@ -64,6 +65,10 @@ export default async function DiscountPage({
                   <td className="py-1">{tier.minQty}+</td>
                   <td className="py-1">{tier.percentOff}%</td>
                   <td className="py-1">£{resultingPrice(info.basePrice, tier.percentOff).toFixed(2)}</td>
+                  <td className="py-1">
+                    £{totalAtThreshold(info.basePrice, tier).toFixed(2)}
+                    {tier.anchorPrice != null && <span className="text-muted text-xs"> (anchored)</span>}
+                  </td>
                 </tr>
               ))}
             </tbody>

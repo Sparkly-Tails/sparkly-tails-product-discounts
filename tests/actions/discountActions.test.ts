@@ -26,6 +26,33 @@ describe('createDiscount', () => {
     expect(authRedirect.redirectWithToken).toHaveBeenCalledWith('/discounts/gid%3A%2F%2Fshopify%2FProduct%2F111')
   })
 
+  it('includes anchorPrice when provided, omits it when blank', async () => {
+    vi.spyOn(configLib, 'getConfig').mockResolvedValue({ products: [] })
+    const saveSpy = vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
+
+    const formData = new FormData()
+    formData.set('productId', 'gid://shopify/Product/111')
+    formData.set('tier-0-minQty', '7')
+    formData.set('tier-0-percentOff', '5')
+    formData.set('tier-0-anchorPrice', '10.00')
+    formData.set('tier-1-minQty', '14')
+    formData.set('tier-1-percentOff', '10')
+    formData.set('tier-1-anchorPrice', '')
+
+    await createDiscount(formData)
+
+    expect(saveSpy).toHaveBeenCalledWith({
+      products: [{
+        productId: 'gid://shopify/Product/111',
+        status: 'draft',
+        tiers: [
+          { minQty: 7, percentOff: 5, anchorPrice: 10 },
+          { minQty: 14, percentOff: 10 },
+        ],
+      }],
+    })
+  })
+
   it('throws when no product is selected', async () => {
     const formData = new FormData()
     formData.set('tier-0-minQty', '5')

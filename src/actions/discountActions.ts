@@ -12,7 +12,13 @@ function parseTiersFromForm(formData: FormData): Tier[] {
     const rawPercentOff = Number(formData.get(`tier-${i}-percentOff`))
     const percentOff = Math.round(rawPercentOff * 10) / 10
     if (minQty > 0 && percentOff >= 0) {
-      tiers.push({ minQty, percentOff })
+      const tier: Tier = { minQty, percentOff }
+      const rawAnchorPrice = formData.get(`tier-${i}-anchorPrice`)
+      if (rawAnchorPrice != null && String(rawAnchorPrice).trim() !== '') {
+        const anchorPrice = Math.round(Number(rawAnchorPrice) * 100) / 100
+        if (anchorPrice > 0) tier.anchorPrice = anchorPrice
+      }
+      tiers.push(tier)
     }
     i++
   }

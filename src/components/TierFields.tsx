@@ -2,20 +2,22 @@
 
 import { useState } from 'react'
 
-type TierRow = { key: string; minQty: string; percentOff: string }
+type TierRow = { key: string; minQty: string; percentOff: string; anchorPrice: string }
 
-function makeRow(minQty = '', percentOff = ''): TierRow {
-  return { key: crypto.randomUUID(), minQty, percentOff }
+function makeRow(minQty = '', percentOff = '', anchorPrice = ''): TierRow {
+  return { key: crypto.randomUUID(), minQty, percentOff, anchorPrice }
 }
 
 export default function TierFields({
   initial,
 }: {
-  initial?: { minQty: number; percentOff: number }[]
+  initial?: { minQty: number; percentOff: number; anchorPrice?: number }[]
 }) {
   const [rows, setRows] = useState<TierRow[]>(() =>
     initial && initial.length > 0
-      ? initial.map((t) => makeRow(String(t.minQty), String(t.percentOff)))
+      ? initial.map((t) =>
+          makeRow(String(t.minQty), String(t.percentOff), t.anchorPrice != null ? String(t.anchorPrice) : ''),
+        )
       : [makeRow()],
   )
 
@@ -27,7 +29,7 @@ export default function TierFields({
     setRows((prev) => (prev.length <= 1 ? prev : prev.filter((r) => r.key !== key)))
   }
 
-  function updateRow(key: string, field: 'minQty' | 'percentOff', value: string) {
+  function updateRow(key: string, field: 'minQty' | 'percentOff' | 'anchorPrice', value: string) {
     setRows((prev) => prev.map((r) => (r.key === key ? { ...r, [field]: value } : r)))
   }
 
@@ -63,6 +65,20 @@ export default function TierFields({
             value={row.percentOff}
             onChange={(e) => updateRow(row.key, 'percentOff', e.target.value)}
             className="border border-line rounded px-3 py-2 w-40 transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:border-accent"
+          />
+          <label htmlFor={`tier-${i}-anchorPrice`} className="sr-only">
+            Tier {i + 1} anchor price (optional)
+          </label>
+          <input
+            id={`tier-${i}-anchorPrice`}
+            name={`tier-${i}-anchorPrice`}
+            type="number"
+            min="0"
+            step="0.01"
+            placeholder="Anchor price (optional, e.g. 10.00)"
+            value={row.anchorPrice}
+            onChange={(e) => updateRow(row.key, 'anchorPrice', e.target.value)}
+            className="border border-line rounded px-3 py-2 w-52 transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:border-accent"
           />
           <button
             type="button"

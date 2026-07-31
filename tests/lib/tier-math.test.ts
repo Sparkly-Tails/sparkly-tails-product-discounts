@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { resultingPrice } from '@/lib/tier-math'
+import { resultingPrice, totalAtThreshold } from '@/lib/tier-math'
 
 describe('resultingPrice', () => {
   it('computes a simple percentage off', () => {
@@ -21,5 +21,20 @@ describe('resultingPrice', () => {
 
   it('returns 0 at 100% off', () => {
     expect(resultingPrice(20.0, 100)).toBe(0)
+  })
+})
+
+describe('totalAtThreshold', () => {
+  it('uses the anchor price when set, ignoring the percentage math entirely', () => {
+    // 1.49 at 5% off * 7 would be 9.91 (or 10.01 depending on rounding order) — anchor overrides it to a clean £10
+    expect(totalAtThreshold(1.49, { minQty: 7, percentOff: 5, anchorPrice: 10.0 })).toBe(10.0)
+  })
+
+  it('falls back to per-unit price times minQty when no anchor is set', () => {
+    expect(totalAtThreshold(10.0, { minQty: 5, percentOff: 10 })).toBe(45.0)
+  })
+
+  it('rounds the fallback total to 2 decimal places', () => {
+    expect(totalAtThreshold(1.49, { minQty: 7, percentOff: 5 })).toBeCloseTo(9.94, 2)
   })
 })

@@ -3,6 +3,14 @@ import { shopifyQuery } from '@/lib/shopify-client'
 export interface Tier {
   minQty: number
   percentOff: number
+  /**
+   * Optional exact total price to charge for minQty units (e.g. £10.00 for
+   * 7 tins instead of the percentage's rounded £10.01). Units beyond minQty
+   * still accrue at the normal percentOff per-unit rate — only the price at
+   * exactly minQty is anchored. Omitted entirely when not set, in which case
+   * this tier behaves exactly as a plain percentage-off tier always has.
+   */
+  anchorPrice?: number
 }
 
 export interface ProductDiscount {
