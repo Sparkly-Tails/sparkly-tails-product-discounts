@@ -2,7 +2,8 @@
 
 import { getConfig, saveConfig, isProductAvailable, type Tier, type ProductDiscount, type GroupDiscount } from '@/lib/config'
 import { redirectWithToken } from '@/lib/auth-redirect'
-import { syncProductTierMetafield } from '@/lib/product-tiers'
+import { syncProductTierMetafield, syncGroupTierMetafield } from '@/lib/product-tiers'
+import { getGroupProductInfo } from '@/lib/products'
 
 function parseTiersFromForm(formData: FormData): Tier[] {
   const tiers: Tier[] = []
@@ -117,4 +118,96 @@ export async function createGroup(formData: FormData): Promise<void> {
   await saveConfig({ ...config, groups: [...config.groups, newGroup] })
 
   await redirectWithToken(`/discounts/groups/${encodeURIComponent(groupId)}`)
+}
+
+async function syncGroupMetafields(group: GroupDiscount): Promise<void> {
+  const members = await getGroupProductInfo(group.productIds)
+  await Promise.all(
+    group.productIds.map((productId) => {
+      const siblings = members
+        .filter((m) => m.productId !== productId)
+        .map((m) => ({ title: m.title, handle: m.handle }))
+      return syncGroupTierMetafield(productId, { tiers: group.tiers, siblings })
+    }),
+  )
+}
+
+async function clearGroupMetafields(productIds: string[]): Promise<void> {
+  await Promise.all(productIds.map((productId) => syncGroupTierMetafield(productId, null)))
+}
+
+export async function updateGroupProducts(groupId: string, formData: FormData): Promise<void> {
+  const productIds = parseGroupProductIdsFromForm(formData)
+  if (productIds.length < 2) throw new Error('A group needs at least 2 products')
+
+  const config = await getConfig()
+  const group = config.groups.find((g) => g.groupId === groupId)
+  if (!group) throw new Error(`Group ${groupId} not found`)
+
+  for (const productId of productIds) {
+    if (!isProductAvailable(config, productId, groupId)) {
+      throw new Error(`Product ${productId} already has a discount or belongs to another group`)
+    }
+  }
+
+  const removedProductIds = group.productIds.filter((id) => !productIds.includes(id))
+  group.productIds = productIds
+  await saveConfig(config)
+
+  if (group.status === 'live') {
+    if (removedProductIds.length > 0) {
+      await clearGroupMetafields(removedProductIds)
+    }
+    await syncGroupMetafields(group)
+  }
+
+  await redirectWithToken(`/discounts/groups/${encodeURIComponent(groupId)}`)
+}
+
+export async function updateGroupTiers(groupId: string, formData: FormData): Promise<void> {
+  const tiers = parseTiersFromForm(formData)
+  if (tiers.length === 0) throw new Error('At least one tier is required')
+
+  const config = await getConfig()
+  const group = config.groups.find((g) => g.groupId === groupId)
+  if (!group) throw new Error(`Group ${groupId} not found`)
+
+  group.tiers = tiers
+  await saveConfig(config)
+
+  if (group.status === 'live') {
+    await syncGroupMetafields(group)
+  }
+
+  await redirectWithToken(`/discounts/groups/${encodeURIComponent(groupId)}`)
+}
+
+export async function setGroupStatus(groupId: string, status: 'draft' | 'live'): Promise<void> {
+  const config = await getConfig()
+  const group = config.groups.find((g) => g.groupId === groupId)
+  if (!group) throw new Error(`Group ${groupId} not found`)
+
+  group.status = status
+  await saveConfig(config)
+
+  if (status === 'live') {
+    await syncGroupMetafields(group)
+  } else {
+    await clearGroupMetafields(group.productIds)
+  }
+
+  await redirectWithToken(`/discounts/groups/${encodeURIComponent(groupId)}`)
+}
+
+export async function deleteGroup(groupId: string): Promise<void> {
+  const config = await getConfig()
+  const group = config.groups.find((g) => g.groupId === groupId)
+  if (!group) throw new Error(`Group ${groupId} not found`)
+
+  const remaining = config.groups.filter((g) => g.groupId !== groupId)
+  await saveConfig({ ...config, groups: remaining })
+
+  await clearGroupMetafields(group.productIds)
+
+  await redirectWithToken('/')
 }
