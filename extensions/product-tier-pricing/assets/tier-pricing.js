@@ -56,8 +56,14 @@ function perUnitPrice(basePrice, quantity, state) {
   return clampedTotalPaid / quantity
 }
 
+function sumGroupQuantityInCart(cartItems, handles) {
+  return cartItems
+    .filter((item) => handles.includes(item.handle))
+    .reduce((sum, item) => sum + item.quantity, 0)
+}
+
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { computeTierState, perUnitPrice }
+  module.exports = { computeTierState, perUnitPrice, sumGroupQuantityInCart }
 }
 
 // Append to extensions/product-tier-pricing/assets/tier-pricing.js,
