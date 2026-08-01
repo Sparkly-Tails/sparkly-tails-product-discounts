@@ -14,7 +14,7 @@ describe('createDiscount', () => {
   beforeEach(() => vi.restoreAllMocks())
 
   it('adds a new product discount with parsed tiers', async () => {
-    vi.spyOn(configLib, 'getConfig').mockResolvedValue({ products: [] })
+    vi.spyOn(configLib, 'getConfig').mockResolvedValue({ products: [], groups: [] })
     const saveSpy = vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
 
     const formData = new FormData()
@@ -26,12 +26,13 @@ describe('createDiscount', () => {
 
     expect(saveSpy).toHaveBeenCalledWith({
       products: [{ productId: 'gid://shopify/Product/111', status: 'draft', tiers: [{ minQty: 5, percentOff: 10 }] }],
+      groups: [],
     })
     expect(authRedirect.redirectWithToken).toHaveBeenCalledWith('/discounts/gid%3A%2F%2Fshopify%2FProduct%2F111')
   })
 
   it('includes anchorPrice when provided, omits it when blank', async () => {
-    vi.spyOn(configLib, 'getConfig').mockResolvedValue({ products: [] })
+    vi.spyOn(configLib, 'getConfig').mockResolvedValue({ products: [], groups: [] })
     const saveSpy = vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
 
     const formData = new FormData()
@@ -54,6 +55,7 @@ describe('createDiscount', () => {
           { minQty: 14, percentOff: 10 },
         ],
       }],
+      groups: [],
     })
   })
 
@@ -73,12 +75,25 @@ describe('createDiscount', () => {
   it('throws when the product already has a discount configured', async () => {
     vi.spyOn(configLib, 'getConfig').mockResolvedValue({
       products: [{ productId: 'gid://shopify/Product/111', status: 'draft', tiers: [] }],
+      groups: [],
     })
     const formData = new FormData()
     formData.set('productId', 'gid://shopify/Product/111')
     formData.set('tier-0-minQty', '5')
     formData.set('tier-0-percentOff', '10')
-    await expect(createDiscount(formData)).rejects.toThrow('already has a discount configured')
+    await expect(createDiscount(formData)).rejects.toThrow('already has a discount or belongs to a group')
+  })
+
+  it('rejects a product that already belongs to a group', async () => {
+    vi.spyOn(configLib, 'getConfig').mockResolvedValue({
+      products: [],
+      groups: [{ groupId: 'grp_a', name: 'A', status: 'draft', productIds: ['gid://shopify/Product/1'], tiers: [] }],
+    })
+    const formData = new FormData()
+    formData.set('productId', 'gid://shopify/Product/1')
+    formData.set('tier-0-minQty', '5')
+    formData.set('tier-0-percentOff', '10')
+    await expect(createDiscount(formData)).rejects.toThrow('already has a discount or belongs to a group')
   })
 
   it('preserves existing groups when saving a new standalone discount', async () => {

@@ -45,8 +45,8 @@ export async function createDiscount(formData: FormData): Promise<void> {
   if (tiers.length === 0) throw new Error('At least one tier is required')
 
   const config = await getConfig()
-  if (config.products.some((p) => p.productId === productId)) {
-    throw new Error(`Product ${productId} already has a discount configured`)
+  if (!isProductAvailable(config, productId)) {
+    throw new Error(`Product ${productId} already has a discount or belongs to a group`)
   }
 
   const newDiscount: ProductDiscount = { productId, status: 'draft', tiers }
