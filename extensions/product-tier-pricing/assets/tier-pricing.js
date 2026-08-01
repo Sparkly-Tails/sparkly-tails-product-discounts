@@ -77,12 +77,13 @@ if (typeof document !== 'undefined') {
     return format.replace(/\{\{\s*amount\s*\}\}/, withDecimals)
   }
 
-  function renderTierPricing(container, tiers, moneyFormat) {
+  function renderTierPricing(container, tiers, moneyFormat, quantityOverride) {
     const priceEl = container.querySelector('[data-tier-pricing-price]')
     const messageEl = container.querySelector('[data-tier-pricing-message]')
     const basePrice = Number(container.dataset.basePrice)
     const quantityInput = document.querySelector('input[name="quantity"]')
-    const quantity = quantityInput ? Number(quantityInput.value) || 1 : 1
+    const selectorQuantity = quantityInput ? Number(quantityInput.value) || 1 : 1
+    const quantity = quantityOverride != null ? quantityOverride : selectorQuantity
 
     const state = computeTierState(tiers, quantity)
 
@@ -114,39 +115,87 @@ if (typeof document !== 'undefined') {
     }
   }
 
+  async function fetchCart() {
+    const res = await fetch('/cart.js')
+    return res.json()
+  }
+
+  function renderGroupLinks(container, siblings) {
+    const linksEl = container.querySelector('[data-tier-pricing-group-links]')
+    if (!linksEl) return
+    if (!siblings || siblings.length === 0) {
+      linksEl.innerHTML = ''
+      return
+    }
+    linksEl.innerHTML = siblings
+      .map((s) => '<a href="/products/' + s.handle + '">' + s.title + '</a>')
+      .join(', ')
+  }
+
   function initTierPricing() {
     const containers = document.querySelectorAll('[data-sparkly-tier-pricing]')
     containers.forEach((container) => {
-      const tiers = JSON.parse(container.dataset.tiers).tiers
+      const standaloneTiers = JSON.parse(container.dataset.tiers).tiers
       const moneyFormat = JSON.parse(container.dataset.moneyFormat)
+      const group = JSON.parse(container.dataset.group)
+      const productHandle = JSON.parse(container.dataset.productHandle)
+      const tiers = group ? group.tiers : standaloneTiers
 
-      renderTierPricing(container, tiers, moneyFormat)
+      function currentSelectorQuantity() {
+        const quantityInput = document.querySelector('input[name="quantity"]')
+        return quantityInput ? Number(quantityInput.value) || 1 : 1
+      }
+
+      // Group mode needs the combined quantity of every group product
+      // already in the cart (this product's own line included) plus
+      // whatever's set in the quantity selector but not yet added — plain
+      // single-product mode just renders with the selector value, same as
+      // before this feature.
+      async function renderWithGroupAwareness() {
+        if (!group) {
+          renderTierPricing(container, tiers, moneyFormat)
+          return
+        }
+        const handles = [productHandle].concat(group.siblings.map((s) => s.handle))
+        let cartQuantity = 0
+        try {
+          const cart = await fetchCart()
+          cartQuantity = sumGroupQuantityInCart(cart.items, handles)
+        } catch {
+          cartQuantity = 0
+        }
+        const effectiveQuantity = cartQuantity + currentSelectorQuantity()
+        renderTierPricing(container, tiers, moneyFormat, effectiveQuantity)
+        renderGroupLinks(container, group.siblings)
+      }
+
+      renderWithGroupAwareness()
 
       const quantityInput = document.querySelector('input[name="quantity"]')
       if (quantityInput) {
-        quantityInput.addEventListener('input', () => renderTierPricing(container, tiers, moneyFormat))
-        quantityInput.addEventListener('change', () => renderTierPricing(container, tiers, moneyFormat))
+        quantityInput.addEventListener('input', renderWithGroupAwareness)
+        quantityInput.addEventListener('change', renderWithGroupAwareness)
 
         // The theme's +/- quantity stepper sets `.value` programmatically
-        // (via stepUp()/stepDown() or a direct assignment) without dispatching
-        // an `input`/`change` event, so the listeners above never fire for
-        // stepper clicks. Poll for a value change as a theme-agnostic fallback.
+        // without dispatching an `input`/`change` event, so the listeners
+        // above never fire for stepper clicks. Poll for a value change as a
+        // theme-agnostic fallback.
         let lastQuantity = quantityInput.value
         setInterval(() => {
           if (quantityInput.value !== lastQuantity) {
             lastQuantity = quantityInput.value
-            renderTierPricing(container, tiers, moneyFormat)
+            renderWithGroupAwareness()
           }
         }, 200)
       }
 
       // This theme's <product-variants> custom element dispatches a plain
       // Event('VARIANT_CHANGE') on itself (not document, and it doesn't
-      // bubble, since it's constructed without {bubbles: true}) — not the
-      // generic "variant:change" CustomEvent-on-document convention some
-      // themes use. Variant data lives at event.target.currentVariant, not
-      // event.detail.variant. See assets/component-product-form.js
-      // (ProductVariants.onVariantChange) in the theme.
+      // bubble) — not the generic "variant:change" CustomEvent-on-document
+      // convention some themes use. Variant data lives at
+      // event.target.currentVariant. See
+      // assets/component-product-form.js (ProductVariants.onVariantChange)
+      // in the theme.
       const productVariantsEl = document.querySelector('product-variants')
       if (productVariantsEl) {
         productVariantsEl.addEventListener('VARIANT_CHANGE', (event) => {
@@ -154,18 +203,15 @@ if (typeof document !== 'undefined') {
           if (variant && typeof variant.price === 'number') {
             container.dataset.basePrice = String(variant.price / 100)
           }
-          renderTierPricing(container, tiers, moneyFormat)
+          renderWithGroupAwareness()
         })
       }
 
       // Loop Subscriptions' one-time/subscribe toggle doesn't change the
-      // variant, and only fires Loop's own undocumented internal events
-      // (onsite-event-publish, triggering-state-update) — not a stable
-      // contract to hook directly. Loop already renders the correct
-      // per-unit price for whichever purchase option is selected, so poll
-      // that instead, same theme/app-agnostic approach as the quantity
-      // poll above. Re-queried every tick (not cached at init) since the
-      // Loop widget can render after this script runs.
+      // variant, and only fires Loop's own undocumented internal events —
+      // not a stable contract to hook directly. Loop already renders the
+      // correct per-unit price for whichever purchase option is selected,
+      // so poll that instead.
       let lastLoopPriceText = null
       setInterval(() => {
         const loopPriceEl = document.querySelector(
@@ -178,9 +224,18 @@ if (typeof document !== 'undefined') {
         const match = text.match(/\d+\.\d{2}|\d+/)
         if (match) {
           container.dataset.basePrice = match[0]
-          renderTierPricing(container, tiers, moneyFormat)
+          renderWithGroupAwareness()
         }
       }, 200)
+
+      // Group mode's whole point is reacting to OTHER group products being
+      // added to the cart from elsewhere on the page (or the cart drawer)
+      // while this page is open — there's no local DOM event for that, so
+      // poll /cart.js. Only active in group mode; plain single-product
+      // pages get no extra network traffic.
+      if (group) {
+        setInterval(renderWithGroupAwareness, 1000)
+      }
     })
   }
 

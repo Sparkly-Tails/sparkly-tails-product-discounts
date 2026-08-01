@@ -14,3 +14,12 @@
   font-size: 0.9em;
   opacity: 0.8;
 }
+
+.sparkly-tier-pricing__group-links {
+  font-size: 0.85em;
+  opacity: 0.75;
+}
+
+.sparkly-tier-pricing__group-links a {
+  text-decoration: underline;
+}
