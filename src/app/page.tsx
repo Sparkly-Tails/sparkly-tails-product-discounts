@@ -47,6 +47,39 @@ export default async function Home() {
           ))}
         </ul>
       )}
+
+      <div className="flex items-center justify-between mb-6 mt-12">
+        <h2 className="text-2xl font-semibold">Group Discounts</h2>
+        <AuthLink
+          href="/discounts/groups/new"
+          token={token}
+          className="bg-accent hover:bg-accent-hover text-white px-4 py-3 rounded transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+        >
+          Add group
+        </AuthLink>
+      </div>
+
+      {config.groups.length === 0 ? (
+        <p className="text-muted">No group discounts yet.</p>
+      ) : (
+        <ul className="divide-y divide-line">
+          {config.groups.map((group) => (
+            <li key={group.groupId} className="py-4">
+              <AuthLink
+                href={`/discounts/groups/${encodeURIComponent(group.groupId)}`}
+                token={token}
+                className="font-medium hover:underline transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded"
+              >
+                {group.name}
+              </AuthLink>
+              <p className="text-sm text-muted">
+                {group.status} · {group.productIds.length} product{group.productIds.length === 1 ? '' : 's'} ·{' '}
+                {group.tiers.length} tier{group.tiers.length === 1 ? '' : 's'}
+              </p>
+            </li>
+          ))}
+        </ul>
+      )}
     </main>
   )
 }

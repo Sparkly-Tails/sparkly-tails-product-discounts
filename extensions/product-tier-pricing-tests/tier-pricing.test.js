@@ -1,6 +1,6 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
-const { computeTierState, perUnitPrice } = require('../product-tier-pricing/assets/tier-pricing.js')
+const { computeTierState, perUnitPrice, sumGroupQuantityInCart } = require('../product-tier-pricing/assets/tier-pricing.js')
 
 test('below every tier: no discount, lists every tier as a delta from current quantity', () => {
   const tiers = [{ minQty: 7, percentOff: 5 }, { minQty: 14, percentOff: 10 }]
@@ -108,4 +108,23 @@ test('perUnitPrice: clamps an anchor above sticker price down to full price, nev
   // negative discount, so the true charge is full price; mirror that here.
   const state = { percentOff: 10, anchorPrice: 50, minQty: 5 }
   assert.equal(perUnitPrice(2.0, 5, state), 2.0)
+})
+
+test('sumGroupQuantityInCart: sums quantities of cart items matching the given handles', () => {
+  const items = [
+    { handle: 'tuna-soup', quantity: 3 },
+    { handle: 'chicken-soup', quantity: 2 },
+    { handle: 'unrelated-product', quantity: 5 },
+  ]
+  const result = sumGroupQuantityInCart(items, ['tuna-soup', 'chicken-soup', 'ocean-soup'])
+  assert.equal(result, 5)
+})
+
+test('sumGroupQuantityInCart: returns 0 for an empty cart', () => {
+  assert.equal(sumGroupQuantityInCart([], ['tuna-soup']), 0)
+})
+
+test('sumGroupQuantityInCart: ignores items whose handle is not in the list', () => {
+  const items = [{ handle: 'unrelated', quantity: 10 }]
+  assert.equal(sumGroupQuantityInCart(items, ['tuna-soup']), 0)
 })
