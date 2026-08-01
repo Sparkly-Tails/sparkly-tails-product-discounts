@@ -127,8 +127,10 @@ if (typeof document !== 'undefined') {
       const group = JSON.parse(container.dataset.group)
       const productHandle = JSON.parse(container.dataset.productHandle)
       const tiers = group ? group.tiers : standaloneTiers
+      let selectorConsumed = false
 
       function currentSelectorQuantity() {
+        if (selectorConsumed) return 0
         const quantityInput = document.querySelector('input[name="quantity"]')
         return quantityInput ? Number(quantityInput.value) || 1 : 1
       }
@@ -155,16 +157,30 @@ if (typeof document !== 'undefined') {
 
       const quantityInput = document.querySelector('input[name="quantity"]')
       if (quantityInput) {
-        quantityInput.addEventListener('input', renderWithGroupAwareness)
-        quantityInput.addEventListener('change', renderWithGroupAwareness)
+        quantityInput.addEventListener('input', () => {
+          selectorConsumed = false
+          renderWithGroupAwareness()
+        })
+        quantityInput.addEventListener('change', () => {
+          selectorConsumed = false
+          renderWithGroupAwareness()
+        })
 
         let lastQuantity = quantityInput.value
         setInterval(() => {
           if (quantityInput.value !== lastQuantity) {
             lastQuantity = quantityInput.value
+            selectorConsumed = false
             renderWithGroupAwareness()
           }
         }, 200)
+      }
+
+      const addToCartForm = document.querySelector('form[action*="/cart/add"]')
+      if (addToCartForm) {
+        addToCartForm.addEventListener('submit', () => {
+          selectorConsumed = true
+        })
       }
 
       const productVariantsEl = document.querySelector('product-variants')
