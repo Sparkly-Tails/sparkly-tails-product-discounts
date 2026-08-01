@@ -35,16 +35,6 @@ function computeTierState(tiers, quantity) {
   }
 }
 
-// Blended per-unit price when a tier has an anchorPrice: anchorPrice covers
-// the first minQty units exactly, and every unit beyond that still accrues
-// at the tier's normal percentOff rate — mirrors the Function's
-// FixedAmount discount_amount math exactly (see
-// extensions/product-discount/src/cart_lines_discounts_generate_run.rs) so
-// the live preview always matches what checkout will actually charge. The
-// Function clamps its discount to never go negative (never charge more than
-// sticker price); clamp the same way here, or a misconfigured anchor above
-// the full price would render as a fake "discount" that's actually a markup
-// (a strikethrough original price lower than the "sale" price next to it).
 function perUnitPrice(basePrice, quantity, state) {
   if (state.anchorPrice == null) {
     return basePrice * (1 - state.percentOff / 100)
@@ -65,11 +55,6 @@ function sumGroupQuantityInCart(cartItems, handles) {
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = { computeTierState, perUnitPrice, sumGroupQuantityInCart }
 }
-
-// Append to extensions/product-tier-pricing/assets/tier-pricing.js,
-// AFTER the `if (typeof module !== 'undefined' ...)` guard from Task 4.
-// This part only runs in the browser (document is undefined in Node.js),
-// so it's safe to reference `document`/`window` unconditionally below.
 
 if (typeof document !== 'undefined') {
   function formatMoney(amount, format) {
@@ -148,11 +133,6 @@ if (typeof document !== 'undefined') {
         return quantityInput ? Number(quantityInput.value) || 1 : 1
       }
 
-      // Group mode needs the combined quantity of every group product
-      // already in the cart (this product's own line included) plus
-      // whatever's set in the quantity selector but not yet added — plain
-      // single-product mode just renders with the selector value, same as
-      // before this feature.
       async function renderWithGroupAwareness() {
         if (!group) {
           renderTierPricing(container, tiers, moneyFormat)
@@ -178,10 +158,6 @@ if (typeof document !== 'undefined') {
         quantityInput.addEventListener('input', renderWithGroupAwareness)
         quantityInput.addEventListener('change', renderWithGroupAwareness)
 
-        // The theme's +/- quantity stepper sets `.value` programmatically
-        // without dispatching an `input`/`change` event, so the listeners
-        // above never fire for stepper clicks. Poll for a value change as a
-        // theme-agnostic fallback.
         let lastQuantity = quantityInput.value
         setInterval(() => {
           if (quantityInput.value !== lastQuantity) {
@@ -191,13 +167,6 @@ if (typeof document !== 'undefined') {
         }, 200)
       }
 
-      // This theme's <product-variants> custom element dispatches a plain
-      // Event('VARIANT_CHANGE') on itself (not document, and it doesn't
-      // bubble) — not the generic "variant:change" CustomEvent-on-document
-      // convention some themes use. Variant data lives at
-      // event.target.currentVariant. See
-      // assets/component-product-form.js (ProductVariants.onVariantChange)
-      // in the theme.
       const productVariantsEl = document.querySelector('product-variants')
       if (productVariantsEl) {
         productVariantsEl.addEventListener('VARIANT_CHANGE', (event) => {
@@ -209,11 +178,6 @@ if (typeof document !== 'undefined') {
         })
       }
 
-      // Loop Subscriptions' one-time/subscribe toggle doesn't change the
-      // variant, and only fires Loop's own undocumented internal events —
-      // not a stable contract to hook directly. Loop already renders the
-      // correct per-unit price for whichever purchase option is selected,
-      // so poll that instead.
       let lastLoopPriceText = null
       setInterval(() => {
         const loopPriceEl = document.querySelector(
@@ -230,11 +194,6 @@ if (typeof document !== 'undefined') {
         }
       }, 200)
 
-      // Group mode's whole point is reacting to OTHER group products being
-      // added to the cart from elsewhere on the page (or the cart drawer)
-      // while this page is open — there's no local DOM event for that, so
-      // poll /cart.js. Only active in group mode; plain single-product
-      // pages get no extra network traffic.
       if (group) {
         setInterval(renderWithGroupAwareness, 1000)
       }
