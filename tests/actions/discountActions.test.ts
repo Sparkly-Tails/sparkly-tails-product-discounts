@@ -358,6 +358,36 @@ describe('createGroup', () => {
     formData.set('tier-0-percentOff', '10')
     await expect(createGroup(formData)).rejects.toThrow('already has a discount or belongs to another group')
   })
+
+  it('dedupes a product id submitted more than once in the form', async () => {
+    vi.spyOn(configLib, 'getConfig').mockResolvedValue({ products: [], groups: [] })
+    const saveSpy = vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
+    vi.spyOn(crypto, 'randomUUID').mockReturnValue('22222222-2222-2222-2222-222222222222')
+
+    const formData = formWithProducts([
+      'gid://shopify/Product/1',
+      'gid://shopify/Product/1',
+      'gid://shopify/Product/2',
+    ])
+    formData.set('name', 'Soups')
+    formData.set('tier-0-minQty', '7')
+    formData.set('tier-0-percentOff', '10')
+
+    await createGroup(formData)
+
+    expect(saveSpy).toHaveBeenCalledWith({
+      products: [],
+      groups: [
+        {
+          groupId: 'grp_22222222-2222-2222-2222-222222222222',
+          name: 'Soups',
+          status: 'draft',
+          productIds: ['gid://shopify/Product/1', 'gid://shopify/Product/2'],
+          tiers: [{ minQty: 7, percentOff: 10 }],
+        },
+      ],
+    })
+  })
 })
 
 describe('updateGroupTiers', () => {

@@ -123,13 +123,15 @@ if (typeof document !== 'undefined') {
   function renderGroupLinks(container, siblings) {
     const linksEl = container.querySelector('[data-tier-pricing-group-links]')
     if (!linksEl) return
-    if (!siblings || siblings.length === 0) {
-      linksEl.innerHTML = ''
-      return
-    }
-    linksEl.innerHTML = siblings
-      .map((s) => '<a href="/products/' + s.handle + '">' + s.title + '</a>')
-      .join(', ')
+    linksEl.textContent = ''
+    if (!siblings || siblings.length === 0) return
+    siblings.forEach((s, i) => {
+      if (i > 0) linksEl.appendChild(document.createTextNode(', '))
+      const a = document.createElement('a')
+      a.href = '/products/' + s.handle
+      a.textContent = s.title
+      linksEl.appendChild(a)
+    })
   }
 
   function initTierPricing() {

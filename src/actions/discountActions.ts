@@ -31,7 +31,7 @@ function parseGroupProductIdsFromForm(formData: FormData): string[] {
   let i = 0
   while (formData.has(`product-${i}-id`)) {
     const id = String(formData.get(`product-${i}-id`) ?? '').trim()
-    if (id) ids.push(id)
+    if (id && !ids.includes(id)) ids.push(id)
     i++
   }
   return ids
@@ -122,18 +122,21 @@ export async function createGroup(formData: FormData): Promise<void> {
 
 async function syncGroupMetafields(group: GroupDiscount): Promise<void> {
   const members = await getGroupProductInfo(group.productIds)
-  await Promise.all(
-    group.productIds.map((productId) => {
-      const siblings = members
-        .filter((m) => m.productId !== productId)
-        .map((m) => ({ title: m.title, handle: m.handle }))
-      return syncGroupTierMetafield(productId, { tiers: group.tiers, siblings })
-    }),
+  const resolvedIds = new Set(members.map((m) => m.productId))
+  await Promise.allSettled(
+    group.productIds
+      .filter((productId) => resolvedIds.has(productId))
+      .map((productId) => {
+        const siblings = members
+          .filter((m) => m.productId !== productId)
+          .map((m) => ({ title: m.title, handle: m.handle }))
+        return syncGroupTierMetafield(productId, { tiers: group.tiers, siblings })
+      }),
   )
 }
 
 async function clearGroupMetafields(productIds: string[]): Promise<void> {
-  await Promise.all(productIds.map((productId) => syncGroupTierMetafield(productId, null)))
+  await Promise.allSettled(productIds.map((productId) => syncGroupTierMetafield(productId, null)))
 }
 
 export async function updateGroupProducts(groupId: string, formData: FormData): Promise<void> {
