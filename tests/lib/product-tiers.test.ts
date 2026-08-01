@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { syncProductTierMetafield } from '@/lib/product-tiers'
+import { syncProductTierMetafield, syncGroupTierMetafield } from '@/lib/product-tiers'
 import * as shopifyClient from '@/lib/shopify-client'
 
 describe('syncProductTierMetafield', () => {
@@ -65,5 +65,65 @@ describe('syncProductTierMetafield', () => {
     })
 
     await expect(syncProductTierMetafield('gid://shopify/Product/1', null)).rejects.toThrow('Not found')
+  })
+})
+
+describe('syncGroupTierMetafield', () => {
+  beforeEach(() => vi.restoreAllMocks())
+
+  it('writes the group tiers + siblings JSON to the product metafield', async () => {
+    const querySpy = vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({
+      metafieldsSet: { userErrors: [] },
+    })
+
+    await syncGroupTierMetafield('gid://shopify/Product/1', {
+      tiers: [{ minQty: 7, percentOff: 10 }],
+      siblings: [{ title: 'Chicken Soup', handle: 'chicken-soup' }],
+    })
+
+    expect(querySpy).toHaveBeenCalledWith(
+      expect.stringContaining('metafieldsSet'),
+      {
+        metafields: [
+          {
+            ownerId: 'gid://shopify/Product/1',
+            namespace: 'sparkly_product_discounts',
+            key: 'group',
+            type: 'json',
+            value: JSON.stringify({
+              tiers: [{ minQty: 7, percentOff: 10 }],
+              siblings: [{ title: 'Chicken Soup', handle: 'chicken-soup' }],
+            }),
+          },
+        ],
+      },
+    )
+  })
+
+  it('deletes the metafield when data is null', async () => {
+    const querySpy = vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({
+      metafieldsDelete: { userErrors: [] },
+    })
+
+    await syncGroupTierMetafield('gid://shopify/Product/1', null)
+
+    expect(querySpy).toHaveBeenCalledWith(
+      expect.stringContaining('metafieldsDelete'),
+      {
+        metafields: [
+          { ownerId: 'gid://shopify/Product/1', namespace: 'sparkly_product_discounts', key: 'group' },
+        ],
+      },
+    )
+  })
+
+  it('throws when metafieldsSet reports userErrors', async () => {
+    vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({
+      metafieldsSet: { userErrors: [{ field: ['value'], message: 'Invalid JSON' }] },
+    })
+
+    await expect(
+      syncGroupTierMetafield('gid://shopify/Product/1', { tiers: [], siblings: [] }),
+    ).rejects.toThrow('Invalid JSON')
   })
 })
