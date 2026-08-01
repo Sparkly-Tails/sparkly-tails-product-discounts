@@ -19,8 +19,17 @@ export interface ProductDiscount {
   tiers: Tier[]
 }
 
+export interface GroupDiscount {
+  groupId: string
+  name: string
+  status: 'draft' | 'live'
+  productIds: string[]
+  tiers: Tier[]
+}
+
 export interface Config {
   products: ProductDiscount[]
+  groups: GroupDiscount[]
 }
 
 const NAMESPACE = 'sparkly_product_discounts'
@@ -45,10 +54,11 @@ export async function getConfig(): Promise<Config> {
   )
 
   if (!data.shop.metafield) {
-    return { products: [] }
+    return { products: [], groups: [] }
   }
 
-  return JSON.parse(data.shop.metafield.value) as Config
+  const parsed = JSON.parse(data.shop.metafield.value) as Partial<Config>
+  return { products: parsed.products ?? [], groups: parsed.groups ?? [] }
 }
 
 export async function saveConfig(config: Config): Promise<void> {
@@ -80,4 +90,14 @@ export async function saveConfig(config: Config): Promise<void> {
       data.metafieldsSet.userErrors.map((e) => e.message).join('; '),
     )
   }
+}
+
+/**
+ * True when productId isn't already claimed by a standalone discount or by
+ * any group other than excludeGroupId — pass the group's own id when
+ * validating an in-progress edit so it doesn't flag its own members.
+ */
+export function isProductAvailable(config: Config, productId: string, excludeGroupId?: string): boolean {
+  if (config.products.some((p) => p.productId === productId)) return false
+  return !config.groups.some((g) => g.groupId !== excludeGroupId && g.productIds.includes(productId))
 }
