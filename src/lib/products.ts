@@ -65,3 +65,57 @@ export async function getProductInfo(productId: string): Promise<ProductInfo | n
     basePrice: parseFloat(firstVariant.price),
   }
 }
+
+export interface GroupProductInfo {
+  productId: string
+  title: string
+  basePrice: number
+  handle: string
+}
+
+/**
+ * Batch title/price/handle lookup for group membership. Silently skips any
+ * id that no longer resolves to a product or has no variant, mirroring
+ * getProductInfo's null-on-missing behavior rather than throwing — a stale
+ * id in a group shouldn't take down the whole group's admin page.
+ */
+export async function getGroupProductInfo(productIds: string[]): Promise<GroupProductInfo[]> {
+  if (productIds.length === 0) return []
+
+  const data = await shopifyQuery<{
+    nodes: ({
+      id: string
+      title: string
+      handle: string
+      variants: { edges: { node: { price: string } }[] }
+    } | null)[]
+  }>(
+    `query getGroupProductInfo($ids: [ID!]!) {
+      nodes(ids: $ids) {
+        ... on Product {
+          id
+          title
+          handle
+          variants(first: 1) {
+            edges { node { price } }
+          }
+        }
+      }
+    }`,
+    { ids: productIds },
+  )
+
+  const results: GroupProductInfo[] = []
+  for (const node of data.nodes) {
+    if (!node) continue
+    const firstVariant = node.variants.edges[0]?.node
+    if (!firstVariant) continue
+    results.push({
+      productId: node.id,
+      title: node.title,
+      handle: node.handle,
+      basePrice: parseFloat(firstVariant.price),
+    })
+  }
+  return results
+}

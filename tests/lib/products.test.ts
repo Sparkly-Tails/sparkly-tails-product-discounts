@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { searchProducts, getProductInfo } from '@/lib/products'
+import { searchProducts, getProductInfo, getGroupProductInfo } from '@/lib/products'
 import * as shopifyClient from '@/lib/shopify-client'
 
 describe('searchProducts', () => {
@@ -50,5 +50,48 @@ describe('getProductInfo', () => {
       product: { title: 'Empty Product', variants: { edges: [] } },
     })
     expect(await getProductInfo('gid://shopify/Product/222')).toBeNull()
+  })
+})
+
+describe('getGroupProductInfo', () => {
+  beforeEach(() => vi.restoreAllMocks())
+
+  it('returns title, price, and handle for each product', async () => {
+    vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({
+      nodes: [
+        {
+          id: 'gid://shopify/Product/1',
+          title: 'Tuna Soup',
+          handle: 'tuna-soup',
+          variants: { edges: [{ node: { price: '1.49' } }] },
+        },
+        {
+          id: 'gid://shopify/Product/2',
+          title: 'Chicken Soup',
+          handle: 'chicken-soup',
+          variants: { edges: [{ node: { price: '1.49' } }] },
+        },
+      ],
+    })
+
+    const result = await getGroupProductInfo(['gid://shopify/Product/1', 'gid://shopify/Product/2'])
+    expect(result).toEqual([
+      { productId: 'gid://shopify/Product/1', title: 'Tuna Soup', handle: 'tuna-soup', basePrice: 1.49 },
+      { productId: 'gid://shopify/Product/2', title: 'Chicken Soup', handle: 'chicken-soup', basePrice: 1.49 },
+    ])
+  })
+
+  it('skips products that no longer exist or have no variants', async () => {
+    vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({
+      nodes: [null, { id: 'gid://shopify/Product/2', title: 'No Variant', handle: 'no-variant', variants: { edges: [] } }],
+    })
+    const result = await getGroupProductInfo(['gid://shopify/Product/999', 'gid://shopify/Product/2'])
+    expect(result).toEqual([])
+  })
+
+  it('returns an empty array without calling shopifyQuery for an empty id list', async () => {
+    const spy = vi.spyOn(shopifyClient, 'shopifyQuery')
+    expect(await getGroupProductInfo([])).toEqual([])
+    expect(spy).not.toHaveBeenCalled()
   })
 })
