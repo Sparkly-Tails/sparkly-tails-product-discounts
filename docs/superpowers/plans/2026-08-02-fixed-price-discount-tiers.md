@@ -1853,9 +1853,89 @@ Add to the same `#[cfg(test)] mod tests` block, after Task 9's tests:
 Run: `cargo test`
 Expected: FAIL — the group loop's `tier.anchor_price` match has no fixed-price branch yet, so a fixed-price group tier currently falls through to the plain-`Percentage` path using `percent_off.unwrap_or(0.0)` (i.e. 0%), producing no real discount and the wrong candidate value type.
 
-- [ ] **Step 3: Implement**
+- [ ] **Step 3: Extract the largest-remainder split into a shared helper**
 
-In the group evaluation loop, replace the `match tier.anchor_price { None => { ... } Some(anchor_price) => { ... } }` block with a fixed-price check wrapping the existing match:
+Task 10 needs the *same* largest-remainder split logic that the anchor-price branch already has, for the new fixed-price branch. Rather than duplicating that ~20-line block verbatim a second time, extract it into a private module-level helper first, then point both branches at it.
+
+Add this function above `#[shopify_function]` `fn cart_lines_discounts_generate_run`, right after the `Config` struct's closing brace:
+
+```rust
+/// Splits a total discount amount across cart lines proportional to each
+/// line's quantity share, in whole pence, using the largest-remainder
+/// method: floor every line's exact share first, then hand out the
+/// leftover pence one at a time to the lines with the largest fractional
+/// remainder, ties broken toward the earliest line by order in
+/// `quantities`. Deliberately NOT "round each share independently, then
+/// dump the whole leftover onto one line" — that approach can go negative.
+/// `discount_amount_total` must already be clamped to >= 0.
+fn split_discount_by_largest_remainder(discount_amount_total: f64, quantities: &[i32]) -> Vec<i64> {
+    let total_quantity: i32 = quantities.iter().sum();
+    let total_pence = (discount_amount_total * 100.0).round() as i64;
+    let shares: Vec<f64> = quantities
+        .iter()
+        .map(|qty| discount_amount_total * (*qty as f64 / total_quantity as f64) * 100.0)
+        .collect();
+    let mut pence_per_line: Vec<i64> = shares.iter().map(|s| s.floor() as i64).collect();
+
+    let floor_sum: i64 = pence_per_line.iter().sum();
+    let remainder = total_pence - floor_sum;
+    if remainder > 0 {
+        let mut order: Vec<usize> = (0..shares.len()).collect();
+        order.sort_by(|&a, &b| {
+            let frac_a = shares[a] - pence_per_line[a] as f64;
+            let frac_b = shares[b] - pence_per_line[b] as f64;
+            frac_b
+                .partial_cmp(&frac_a)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then(a.cmp(&b))
+        });
+        for &idx in order.iter().take(remainder as usize) {
+            pence_per_line[idx] += 1;
+        }
+    }
+    pence_per_line
+}
+```
+
+Now replace the anchor-price branch's own inline split block with a call to this helper. Find this code inside `Some(anchor_price) => { ... }`:
+
+```rust
+                    let total_pence = (discount_amount_total * 100.0).round() as i64;
+                    let shares: Vec<f64> = line_quantities
+                        .iter()
+                        .map(|qty| discount_amount_total * (*qty as f64 / total_quantity as f64) * 100.0)
+                        .collect();
+                    let mut pence_per_line: Vec<i64> = shares.iter().map(|s| s.floor() as i64).collect();
+
+                    let floor_sum: i64 = pence_per_line.iter().sum();
+                    let remainder = total_pence - floor_sum;
+                    if remainder > 0 {
+                        let mut order: Vec<usize> = (0..shares.len()).collect();
+                        order.sort_by(|&a, &b| {
+                            let frac_a = shares[a] - pence_per_line[a] as f64;
+                            let frac_b = shares[b] - pence_per_line[b] as f64;
+                            frac_b
+                                .partial_cmp(&frac_a)
+                                .unwrap_or(std::cmp::Ordering::Equal)
+                                .then(a.cmp(&b))
+                        });
+                        for &idx in order.iter().take(remainder as usize) {
+                            pence_per_line[idx] += 1;
+                        }
+                    }
+```
+
+Replace it with:
+
+```rust
+                    let pence_per_line = split_discount_by_largest_remainder(discount_amount_total, &line_quantities);
+```
+
+Run `cargo test` now (before adding the fixed-price branch) to confirm this pure refactor changed nothing: all pre-existing tests, including `assigns_the_largest_remainder_pence_by_fractional_share_not_by_quantity` and `splits_an_anchored_group_discount_proportionally_with_penny_remainder_to_the_earliest_line`, must still pass unchanged.
+
+- [ ] **Step 4: Add the fixed-price branch, reusing the same helper**
+
+In the group evaluation loop, replace the `match tier.anchor_price { None => { ... } Some(anchor_price) => { ... } }` block (now with its split logic reduced to the one-line helper call from Step 3) with a fixed-price check wrapping the existing match:
 
 ```rust
         if let Some(fixed_price) = tier.fixed_price {
@@ -1866,29 +1946,7 @@ In the group evaluation loop, replace the `match tier.anchor_price { None => { .
             let discount_amount_total = ((line_unit_price - fixed_price) * total_quantity as f64 * 100.0).round() / 100.0;
             let discount_amount_total = discount_amount_total.max(0.0);
 
-            let total_pence = (discount_amount_total * 100.0).round() as i64;
-            let shares: Vec<f64> = line_quantities
-                .iter()
-                .map(|qty| discount_amount_total * (*qty as f64 / total_quantity as f64) * 100.0)
-                .collect();
-            let mut pence_per_line: Vec<i64> = shares.iter().map(|s| s.floor() as i64).collect();
-
-            let floor_sum: i64 = pence_per_line.iter().sum();
-            let remainder = total_pence - floor_sum;
-            if remainder > 0 {
-                let mut order: Vec<usize> = (0..shares.len()).collect();
-                order.sort_by(|&a, &b| {
-                    let frac_a = shares[a] - pence_per_line[a] as f64;
-                    let frac_b = shares[b] - pence_per_line[b] as f64;
-                    frac_b
-                        .partial_cmp(&frac_a)
-                        .unwrap_or(std::cmp::Ordering::Equal)
-                        .then(a.cmp(&b))
-                });
-                for &idx in order.iter().take(remainder as usize) {
-                    pence_per_line[idx] += 1;
-                }
-            }
+            let pence_per_line = split_discount_by_largest_remainder(discount_amount_total, &line_quantities);
 
             for (id, pence) in line_ids.iter().zip(pence_per_line.iter()) {
                 if *pence == 0 {
@@ -1940,37 +1998,7 @@ In the group evaluation loop, replace the `match tier.anchor_price { None => { .
                     let discount_amount_total = (discount_amount_total * 100.0).round() / 100.0;
                     let discount_amount_total = discount_amount_total.max(0.0);
 
-                    // Split proportionally by quantity share, in whole pence,
-                    // using the largest-remainder method: floor every line's
-                    // exact share first, then hand out the leftover pence one at
-                    // a time to the lines with the largest fractional
-                    // remainder, ties broken toward the earliest line by cart
-                    // order. Deliberately NOT "round each share independently,
-                    // then dump the whole leftover onto one line" — that
-                    // approach can go negative.
-                    let total_pence = (discount_amount_total * 100.0).round() as i64;
-                    let shares: Vec<f64> = line_quantities
-                        .iter()
-                        .map(|qty| discount_amount_total * (*qty as f64 / total_quantity as f64) * 100.0)
-                        .collect();
-                    let mut pence_per_line: Vec<i64> = shares.iter().map(|s| s.floor() as i64).collect();
-
-                    let floor_sum: i64 = pence_per_line.iter().sum();
-                    let remainder = total_pence - floor_sum;
-                    if remainder > 0 {
-                        let mut order: Vec<usize> = (0..shares.len()).collect();
-                        order.sort_by(|&a, &b| {
-                            let frac_a = shares[a] - pence_per_line[a] as f64;
-                            let frac_b = shares[b] - pence_per_line[b] as f64;
-                            frac_b
-                                .partial_cmp(&frac_a)
-                                .unwrap_or(std::cmp::Ordering::Equal)
-                                .then(a.cmp(&b))
-                        });
-                        for &idx in order.iter().take(remainder as usize) {
-                            pence_per_line[idx] += 1;
-                        }
-                    }
+                    let pence_per_line = split_discount_by_largest_remainder(discount_amount_total, &line_quantities);
 
                     for (id, pence) in line_ids.iter().zip(pence_per_line.iter()) {
                         if *pence == 0 {
@@ -1998,12 +2026,12 @@ In the group evaluation loop, replace the `match tier.anchor_price { None => { .
 
 (This whole block replaces the existing `match tier.anchor_price { None => {...} Some(anchor_price) => {...} }` — the surrounding `let tier = match best_tier {...}` above it and the loop's closing brace below it are unchanged.)
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [ ] **Step 5: Run tests to verify they pass**
 
 Run: `cargo test`
 Expected: PASS — all tests, including the 6 new ones from Tasks 9 and 10 plus every pre-existing test in this file.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
 git add extensions/product-discount/src/cart_lines_discounts_generate_run.rs
