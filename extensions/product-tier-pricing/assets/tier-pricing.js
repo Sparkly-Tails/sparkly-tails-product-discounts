@@ -212,6 +212,12 @@ if (typeof document !== 'undefined') {
 
       if (group) {
         setInterval(renderWithGroupAwareness, 1000)
+
+        document.addEventListener('visibilitychange', () => {
+          if (document.visibilityState === 'visible') {
+            renderWithGroupAwareness()
+          }
+        })
       }
     })
   }
