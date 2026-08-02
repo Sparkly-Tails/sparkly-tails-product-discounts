@@ -127,14 +127,13 @@ if (typeof document !== 'undefined') {
       const group = JSON.parse(container.dataset.group)
       const productHandle = JSON.parse(container.dataset.productHandle)
       const tiers = group ? group.tiers : standaloneTiers
-      let consumedBaseline = 0
 
-      function currentSelectorQuantity() {
-        const quantityInput = document.querySelector('input[name="quantity"]')
-        const value = quantityInput ? Number(quantityInput.value) || 1 : 1
-        return Math.max(0, value - consumedBaseline)
-      }
-
+      // Group mode always reflects the REAL cart, never the on-page
+      // quantity selector — the selector's value isn't in the cart until
+      // Add to Cart is actually submitted, and this theme doesn't reset it
+      // afterwards, so treating it as "pending" caused the discount to
+      // show for quantities that were never really in the cart. Simpler
+      // and correct: only ever trust what /cart.js reports.
       async function renderWithGroupAwareness() {
         if (!group) {
           renderTierPricing(container, tiers, moneyFormat)
@@ -148,8 +147,7 @@ if (typeof document !== 'undefined') {
         } catch {
           cartQuantity = 0
         }
-        const effectiveQuantity = cartQuantity + currentSelectorQuantity()
-        renderTierPricing(container, tiers, moneyFormat, effectiveQuantity)
+        renderTierPricing(container, tiers, moneyFormat, cartQuantity)
         renderGroupLinks(container, group.siblings)
       }
 
@@ -163,10 +161,12 @@ if (typeof document !== 'undefined') {
         // This theme's +/- stepper buttons set the input's value
         // programmatically without dispatching input/change on it, so we
         // hook the buttons' own click events directly instead of polling
-        // for a value change. Scoped to this quantity widget (not
-        // document-wide) since the cart drawer's own per-line steppers use
-        // the same aria-labels. Deferred one tick so we read the value
-        // after the theme's own click handler has updated it.
+        // for a value change. Only affects the standalone (non-group)
+        // price preview now — group mode ignores the selector entirely.
+        // Scoped to this quantity widget (not document-wide) since the
+        // cart drawer's own per-line steppers use the same aria-labels.
+        // Deferred one tick so we read the value after the theme's own
+        // click handler has updated it.
         const quantityScope = quantityInput.closest('product-quantity') || quantityInput.closest('form') || document
         quantityScope.querySelectorAll('button[aria-label="Increase quantity"], button[aria-label="Decrease quantity"]').forEach((btn) => {
           btn.addEventListener('click', () => setTimeout(renderWithGroupAwareness, 0))
@@ -175,8 +175,12 @@ if (typeof document !== 'undefined') {
 
       const addToCartForm = document.querySelector('form[action*="/cart/add"]')
       if (addToCartForm) {
+        // Best-effort immediate re-check after a real submission, so the
+        // group price doesn't wait for the next poll tick. If /cart/add.js
+        // hasn't finished yet this briefly under-counts, never over-counts,
+        // and self-corrects on the next poll or visibilitychange.
         addToCartForm.addEventListener('submit', () => {
-          consumedBaseline = quantityInput ? Number(quantityInput.value) || 1 : 0
+          renderWithGroupAwareness()
         })
       }
 
