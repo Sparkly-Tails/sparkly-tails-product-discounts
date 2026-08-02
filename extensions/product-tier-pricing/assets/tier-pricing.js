@@ -127,12 +127,12 @@ if (typeof document !== 'undefined') {
       const group = JSON.parse(container.dataset.group)
       const productHandle = JSON.parse(container.dataset.productHandle)
       const tiers = group ? group.tiers : standaloneTiers
-      let selectorConsumed = false
+      let consumedBaseline = 0
 
       function currentSelectorQuantity() {
-        if (selectorConsumed) return 0
         const quantityInput = document.querySelector('input[name="quantity"]')
-        return quantityInput ? Number(quantityInput.value) || 1 : 1
+        const value = quantityInput ? Number(quantityInput.value) || 1 : 1
+        return Math.max(0, value - consumedBaseline)
       }
 
       async function renderWithGroupAwareness() {
@@ -157,29 +157,26 @@ if (typeof document !== 'undefined') {
 
       const quantityInput = document.querySelector('input[name="quantity"]')
       if (quantityInput) {
-        quantityInput.addEventListener('input', () => {
-          selectorConsumed = false
-          renderWithGroupAwareness()
-        })
-        quantityInput.addEventListener('change', () => {
-          selectorConsumed = false
-          renderWithGroupAwareness()
-        })
+        quantityInput.addEventListener('input', renderWithGroupAwareness)
+        quantityInput.addEventListener('change', renderWithGroupAwareness)
 
-        let lastQuantity = quantityInput.value
-        setInterval(() => {
-          if (quantityInput.value !== lastQuantity) {
-            lastQuantity = quantityInput.value
-            selectorConsumed = false
-            renderWithGroupAwareness()
-          }
-        }, 200)
+        // This theme's +/- stepper buttons set the input's value
+        // programmatically without dispatching input/change on it, so we
+        // hook the buttons' own click events directly instead of polling
+        // for a value change. Scoped to this quantity widget (not
+        // document-wide) since the cart drawer's own per-line steppers use
+        // the same aria-labels. Deferred one tick so we read the value
+        // after the theme's own click handler has updated it.
+        const quantityScope = quantityInput.closest('product-quantity') || quantityInput.closest('form') || document
+        quantityScope.querySelectorAll('button[aria-label="Increase quantity"], button[aria-label="Decrease quantity"]').forEach((btn) => {
+          btn.addEventListener('click', () => setTimeout(renderWithGroupAwareness, 0))
+        })
       }
 
       const addToCartForm = document.querySelector('form[action*="/cart/add"]')
       if (addToCartForm) {
         addToCartForm.addEventListener('submit', () => {
-          selectorConsumed = true
+          consumedBaseline = quantityInput ? Number(quantityInput.value) || 1 : 0
         })
       }
 
