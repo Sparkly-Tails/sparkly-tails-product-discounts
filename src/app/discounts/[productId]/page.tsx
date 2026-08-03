@@ -2,10 +2,12 @@ import { headers } from 'next/headers'
 import { notFound } from 'next/navigation'
 import { getConfig } from '@/lib/config'
 import { getProductInfo } from '@/lib/products'
-import { resultingPrice, totalAtThreshold } from '@/lib/tier-math'
+import { resultingPrice, totalAtThreshold, clampedFixedPrice, totalAtThresholdFixed } from '@/lib/tier-math'
 import { updateTiers, setStatus, deleteDiscount } from '@/actions/discountActions'
 import TierFields from '@/components/TierFields'
+import FixedPriceTierFields from '@/components/FixedPriceTierFields'
 import ConfirmForm from '@/components/ConfirmForm'
+import AuthLink from '@/components/AuthLink'
 
 export default async function DiscountPage({
   params,
@@ -14,7 +16,7 @@ export default async function DiscountPage({
 }) {
   const { productId: encodedProductId } = await params
   const productId = decodeURIComponent(encodedProductId)
-  await headers()
+  const token = (await headers()).get('x-auth-token') ?? ''
 
   const config = await getConfig()
   const discount = config.products.find((p) => p.productId === productId)
@@ -29,15 +31,31 @@ export default async function DiscountPage({
 
   return (
     <main className="p-8 max-w-2xl mx-auto">
+      <AuthLink
+        href="/"
+        token={token}
+        className="text-sm text-accent hover:underline transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded inline-block mb-4"
+      >
+        ← Back to discounts
+      </AuthLink>
+
       <h1 className="text-2xl font-semibold mb-2">
         {info ? info.title : `${productId} — not found`}
       </h1>
-      <p className="text-sm text-muted mb-6">{discount.status}</p>
+      <p className="text-sm text-muted mb-6">
+        {discount.status} · {discount.pricingMode === 'fixed' ? 'Fixed price' : 'Percentage'}
+      </p>
 
       <section className="mb-8">
         <h2 className="font-medium mb-2">Tiers</h2>
         <form action={updateTiersWithId} className="space-y-3">
-          <TierFields initial={discount.tiers.map((t) => ({ minQty: t.minQty, percentOff: t.percentOff ?? 0, anchorPrice: t.anchorPrice }))} />
+          {discount.pricingMode === 'fixed' ? (
+            <FixedPriceTierFields
+              initial={discount.tiers.map((t) => ({ minQty: t.minQty, fixedPrice: t.fixedPrice ?? 0 }))}
+            />
+          ) : (
+            <TierFields initial={discount.tiers.map((t) => ({ minQty: t.minQty, percentOff: t.percentOff ?? 0, anchorPrice: t.anchorPrice }))} />
+          )}
           <button
             type="submit"
             className="bg-surface border border-line hover:bg-line px-4 py-3 rounded text-sm transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
@@ -47,7 +65,33 @@ export default async function DiscountPage({
         </form>
       </section>
 
-      {info && (
+      {info && discount.pricingMode === 'fixed' && (
+        <section className="mb-8">
+          <h2 className="font-medium mb-2">Resulting prices</h2>
+          <table className="w-full text-sm border-collapse">
+            <thead>
+              <tr className="text-left border-b border-line">
+                <th className="py-1">Min qty</th>
+                <th className="py-1">Price each</th>
+                <th className="py-1">Total at min qty</th>
+              </tr>
+            </thead>
+            <tbody>
+              {discount.tiers.map((tier) => (
+                <tr key={tier.minQty} className="border-b border-line">
+                  <td className="py-1">{tier.minQty}+</td>
+                  <td className="py-1">£{clampedFixedPrice(info.basePrice, tier.fixedPrice ?? 0).toFixed(2)}</td>
+                  <td className="py-1">
+                    £{totalAtThresholdFixed(info.basePrice, { minQty: tier.minQty, fixedPrice: tier.fixedPrice ?? 0 }).toFixed(2)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      )}
+
+      {info && discount.pricingMode === 'percent' && (
         <section className="mb-8">
           <h2 className="font-medium mb-2">Resulting prices</h2>
           <table className="w-full text-sm border-collapse">
