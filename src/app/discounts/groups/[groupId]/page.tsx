@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation'
 import { getConfig } from '@/lib/config'
 import { getGroupProductInfo } from '@/lib/products'
 import { resultingPrice, totalAtThreshold, clampedFixedPrice, totalAtThresholdFixed } from '@/lib/tier-math'
-import { updateGroupProducts, updateGroupTiers, setGroupStatus, deleteGroup } from '@/actions/discountActions'
+import { updateGroupProducts, updateGroupTiers, updateGroupTitle, setGroupStatus, deleteGroup } from '@/actions/discountActions'
 import GroupProductPicker from '@/components/GroupProductPicker'
 import TierFields from '@/components/TierFields'
 import FixedPriceTierFields from '@/components/FixedPriceTierFields'
@@ -28,6 +28,7 @@ export default async function GroupPage({
 
   const updateProductsWithId = updateGroupProducts.bind(null, groupId)
   const updateTiersWithId = updateGroupTiers.bind(null, groupId)
+  const updateTitleWithId = updateGroupTitle.bind(null, groupId)
   const goLive = setGroupStatus.bind(null, groupId, 'live')
   const goDraft = setGroupStatus.bind(null, groupId, 'draft')
   const remove = deleteGroup.bind(null, groupId)
@@ -46,6 +47,29 @@ export default async function GroupPage({
       <p className="text-sm text-muted mb-6">
         {group.status} · {group.pricingMode === 'fixed' ? 'Fixed price' : 'Percentage'}
       </p>
+
+      <section className="mb-8">
+        <h2 className="font-medium mb-2">Title</h2>
+        <form action={updateTitleWithId} className="flex gap-2">
+          <label htmlFor="title" className="sr-only">
+            Title
+          </label>
+          <input
+            id="title"
+            name="title"
+            type="text"
+            required
+            defaultValue={group.title}
+            className="flex-1 border border-line rounded px-3 py-2 text-sm transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:border-accent"
+          />
+          <button
+            type="submit"
+            className="bg-surface border border-line hover:bg-line px-4 py-3 rounded text-sm transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          >
+            Save title
+          </button>
+        </form>
+      </section>
 
       <section className="mb-8">
         <h2 className="font-medium mb-2">Products</h2>
