@@ -6,11 +6,20 @@ use shopify_function::Result;
 #[shopify_function(rename_all = "camelCase")]
 pub struct Tier {
     min_qty: i32,
-    percent_off: f64,
+    #[shopify_function(default)]
+    percent_off: Option<f64>,
     /// Optional exact total price for min_qty units (e.g. 10.00 for 7 units
     /// instead of a percentage's rounded 10.01). Absent entirely for a plain
-    /// percentage-off tier, which keeps behaving exactly as before.
+    /// percentage-off tier, which keeps behaving exactly as before. percent
+    /// mode only.
+    #[shopify_function(default)]
     anchor_price: Option<f64>,
+    /// Absolute price per unit for a fixed-price tier — every unit in the
+    /// reached tier is charged this price directly. fixed mode only,
+    /// mutually exclusive with percent_off/anchor_price (enforced by the
+    /// admin app that writes this config, not by this struct).
+    #[shopify_function(default)]
+    fixed_price: Option<f64>,
 }
 
 #[derive(Deserialize, Default, PartialEq)]
@@ -84,56 +93,86 @@ fn cart_lines_discounts_generate_run(
             .max_by_key(|t| t.min_qty);
 
         if let Some(tier) = best_tier {
-            let value = match tier.anchor_price {
-                Some(anchor_price) => {
-                    // Anchor the total for min_qty units to an exact price
-                    // (e.g. £10.00 instead of a percentage's rounded
-                    // £10.01); units beyond min_qty still accrue at the
-                    // tier's normal per-unit percentage rate. Expressed as a
-                    // single FixedAmount off the whole line, computed here,
-                    // so Shopify's own percentage rounding never has a
-                    // chance to drift the anchored total off by a penny.
-                    let unit_price = line.cost().amount_per_quantity().amount().as_f64();
-                    let extra_units = (quantity - tier.min_qty) as f64;
-                    // Derivation: total_paid should be anchor_price +
-                    // extra_units * unit_price * (1 - percent_off/100).
-                    // discount_amount = full_price - total_paid, which
-                    // simplifies to the line below (the qty*unit_price and
-                    // -extra_units*unit_price terms cancel down to
-                    // min_qty*unit_price).
-                    let discount_amount = (unit_price * tier.min_qty as f64) - anchor_price
-                        + extra_units * unit_price * (tier.percent_off / 100.0);
-                    // Round to whole pence before clamping — this is real
-                    // money, and TS/JS both round explicitly elsewhere in
-                    // this codebase, so this f64 arithmetic shouldn't be the
-                    // one place relying on Shopify's own downstream rounding
-                    // to paper over floating-point remainders.
-                    let discount_amount = (discount_amount * 100.0).round() / 100.0;
-                    let discount_amount = discount_amount.max(0.0);
-                    schema::ProductDiscountCandidateValue::FixedAmount(
-                        schema::ProductDiscountCandidateFixedAmount {
-                            amount: Decimal(discount_amount),
-                            applies_to_each_item: Some(false),
-                        },
-                    )
-                }
-                None => schema::ProductDiscountCandidateValue::Percentage(schema::Percentage {
-                    value: Decimal(tier.percent_off),
-                }),
-            };
+            if let Some(fixed_price) = tier.fixed_price {
+                // Fixed-price tier: every unit in the reached tier is
+                // charged exactly fixed_price, clamped so a misconfigured
+                // price above sticker price can never produce a markup.
+                let unit_price = line.cost().amount_per_quantity().amount().as_f64();
+                let discount_amount_per_unit = (unit_price - fixed_price).max(0.0);
+                let discount_amount = (discount_amount_per_unit * quantity as f64 * 100.0).round() / 100.0;
 
-            candidates.push(schema::ProductDiscountCandidate {
-                targets: vec![schema::ProductDiscountCandidateTarget::CartLine(
-                    schema::CartLineTarget {
-                        id: line.id().clone(),
-                        quantity: None,
-                    },
-                )],
-                message: Some(format!("{}% off", tier.percent_off)),
-                value,
-                associated_discount_code: None,
-                prerequisites: None,
-            });
+                if discount_amount > 0.0 {
+                    candidates.push(schema::ProductDiscountCandidate {
+                        targets: vec![schema::ProductDiscountCandidateTarget::CartLine(
+                            schema::CartLineTarget {
+                                id: line.id().clone(),
+                                quantity: None,
+                            },
+                        )],
+                        message: Some(format!("£{:.2} each", fixed_price)),
+                        value: schema::ProductDiscountCandidateValue::FixedAmount(
+                            schema::ProductDiscountCandidateFixedAmount {
+                                amount: Decimal(discount_amount),
+                                applies_to_each_item: Some(false),
+                            },
+                        ),
+                        associated_discount_code: None,
+                        prerequisites: None,
+                    });
+                }
+            } else {
+                let percent_off = tier.percent_off.unwrap_or(0.0);
+                let value = match tier.anchor_price {
+                    Some(anchor_price) => {
+                        // Anchor the total for min_qty units to an exact price
+                        // (e.g. £10.00 instead of a percentage's rounded
+                        // £10.01); units beyond min_qty still accrue at the
+                        // tier's normal per-unit percentage rate. Expressed as a
+                        // single FixedAmount off the whole line, computed here,
+                        // so Shopify's own percentage rounding never has a
+                        // chance to drift the anchored total off by a penny.
+                        let unit_price = line.cost().amount_per_quantity().amount().as_f64();
+                        let extra_units = (quantity - tier.min_qty) as f64;
+                        // Derivation: total_paid should be anchor_price +
+                        // extra_units * unit_price * (1 - percent_off/100).
+                        // discount_amount = full_price - total_paid, which
+                        // simplifies to the line below (the qty*unit_price and
+                        // -extra_units*unit_price terms cancel down to
+                        // min_qty*unit_price).
+                        let discount_amount = (unit_price * tier.min_qty as f64) - anchor_price
+                            + extra_units * unit_price * (percent_off / 100.0);
+                        // Round to whole pence before clamping — this is real
+                        // money, and TS/JS both round explicitly elsewhere in
+                        // this codebase, so this f64 arithmetic shouldn't be the
+                        // one place relying on Shopify's own downstream rounding
+                        // to paper over floating-point remainders.
+                        let discount_amount = (discount_amount * 100.0).round() / 100.0;
+                        let discount_amount = discount_amount.max(0.0);
+                        schema::ProductDiscountCandidateValue::FixedAmount(
+                            schema::ProductDiscountCandidateFixedAmount {
+                                amount: Decimal(discount_amount),
+                                applies_to_each_item: Some(false),
+                            },
+                        )
+                    }
+                    None => schema::ProductDiscountCandidateValue::Percentage(schema::Percentage {
+                        value: Decimal(percent_off),
+                    }),
+                };
+
+                candidates.push(schema::ProductDiscountCandidate {
+                    targets: vec![schema::ProductDiscountCandidateTarget::CartLine(
+                        schema::CartLineTarget {
+                            id: line.id().clone(),
+                            quantity: None,
+                        },
+                    )],
+                    message: Some(format!("{}% off", percent_off)),
+                    value,
+                    associated_discount_code: None,
+                    prerequisites: None,
+                });
+            }
         }
     }
 
@@ -190,6 +229,7 @@ fn cart_lines_discounts_generate_run(
             Some(t) => t,
             None => continue,
         };
+        let percent_off = tier.percent_off.unwrap_or(0.0);
 
         match tier.anchor_price {
             None => {
@@ -201,9 +241,9 @@ fn cart_lines_discounts_generate_run(
                         targets: vec![schema::ProductDiscountCandidateTarget::CartLine(
                             schema::CartLineTarget { id: id.clone(), quantity: None },
                         )],
-                        message: Some(format!("{}% off", tier.percent_off)),
+                        message: Some(format!("{}% off", percent_off)),
                         value: schema::ProductDiscountCandidateValue::Percentage(schema::Percentage {
-                            value: Decimal(tier.percent_off),
+                            value: Decimal(percent_off),
                         }),
                         associated_discount_code: None,
                         prerequisites: None,
@@ -216,7 +256,7 @@ fn cart_lines_discounts_generate_run(
                 // admin app guarantees every member shares one price).
                 let extra_units = (total_quantity - tier.min_qty) as f64;
                 let discount_amount_total = (line_unit_price * tier.min_qty as f64) - anchor_price
-                    + extra_units * line_unit_price * (tier.percent_off / 100.0);
+                    + extra_units * line_unit_price * (percent_off / 100.0);
                 let discount_amount_total = (discount_amount_total * 100.0).round() / 100.0;
                 let discount_amount_total = discount_amount_total.max(0.0);
 
@@ -276,7 +316,7 @@ fn cart_lines_discounts_generate_run(
                         targets: vec![schema::ProductDiscountCandidateTarget::CartLine(
                             schema::CartLineTarget { id: id.clone(), quantity: None },
                         )],
-                        message: Some(format!("{}% off", tier.percent_off)),
+                        message: Some(format!("{}% off", percent_off)),
                         value: schema::ProductDiscountCandidateValue::FixedAmount(
                             schema::ProductDiscountCandidateFixedAmount {
                                 amount: Decimal(*pence as f64 / 100.0),
@@ -1311,6 +1351,199 @@ mod tests {
                 let total: f64 = amounts.iter().sum();
                 assert!((total - 0.10).abs() < 1e-9, "amounts must sum exactly to the total discount, got {}", total);
             }
+            _ => panic!("expected ProductDiscountsAdd"),
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn applies_a_fixed_price_tier_as_a_fixed_amount_discount() -> Result<()> {
+        // basePrice 1.99, fixedPrice 1.50 at qty 3 → discount 0.49/unit * 3 = 1.47
+        let result = run_function_with_input(
+            cart_lines_discounts_generate_run,
+            r#"{
+                "cart": {
+                    "lines": [
+                        {
+                            "id": "gid://shopify/CartLine/0",
+                            "quantity": 3,
+                            "cost": { "amountPerQuantity": { "amount": "1.99" } },
+                            "merchandise": {
+                                "__typename": "ProductVariant",
+                                "product": { "id": "gid://shopify/Product/1" }
+                            }
+                        }
+                    ]
+                },
+                "shop": {
+                    "metafield": {
+                        "jsonValue": {
+                            "products": [
+                                {
+                                    "productId": "gid://shopify/Product/1",
+                                    "status": "live",
+                                    "tiers": [
+                                        { "minQty": 1, "fixedPrice": 1.70 },
+                                        { "minQty": 3, "fixedPrice": 1.50 }
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                },
+                "discount": { "discountClasses": ["PRODUCT"] }
+            }"#,
+        )?;
+        assert_eq!(result.operations.len(), 1);
+        match &result.operations[0] {
+            schema::CartOperation::ProductDiscountsAdd(op) => {
+                assert_eq!(op.candidates.len(), 1);
+                match &op.candidates[0].value {
+                    schema::ProductDiscountCandidateValue::FixedAmount(f) => {
+                        assert!((f.amount.0 - 1.47).abs() < 1e-9, "expected 1.47, got {}", f.amount.0);
+                    }
+                    _ => panic!("expected a FixedAmount value for a fixed-price tier"),
+                }
+            }
+            _ => panic!("expected ProductDiscountsAdd"),
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn uses_the_lower_reached_fixed_price_tier_between_thresholds() -> Result<()> {
+        // qty 2 hasn't reached the minQty:3 tier, so the minQty:1 tier (1.70)
+        // still governs the WHOLE quantity — same "highest reached tier"
+        // rule as percentage tiers. Discount = (1.99-1.70)*2 = 0.58.
+        let result = run_function_with_input(
+            cart_lines_discounts_generate_run,
+            r#"{
+                "cart": {
+                    "lines": [
+                        {
+                            "id": "gid://shopify/CartLine/0",
+                            "quantity": 2,
+                            "cost": { "amountPerQuantity": { "amount": "1.99" } },
+                            "merchandise": {
+                                "__typename": "ProductVariant",
+                                "product": { "id": "gid://shopify/Product/1" }
+                            }
+                        }
+                    ]
+                },
+                "shop": {
+                    "metafield": {
+                        "jsonValue": {
+                            "products": [
+                                {
+                                    "productId": "gid://shopify/Product/1",
+                                    "status": "live",
+                                    "tiers": [
+                                        { "minQty": 1, "fixedPrice": 1.70 },
+                                        { "minQty": 3, "fixedPrice": 1.50 }
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                },
+                "discount": { "discountClasses": ["PRODUCT"] }
+            }"#,
+        )?;
+        match &result.operations[0] {
+            schema::CartOperation::ProductDiscountsAdd(op) => match &op.candidates[0].value {
+                schema::ProductDiscountCandidateValue::FixedAmount(f) => {
+                    assert!((f.amount.0 - 0.58).abs() < 1e-9, "expected 0.58, got {}", f.amount.0);
+                }
+                _ => panic!("expected a FixedAmount value"),
+            },
+            _ => panic!("expected ProductDiscountsAdd"),
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn a_fixed_price_above_sticker_price_never_produces_a_markup() -> Result<()> {
+        // fixedPrice 5.00 on a 1.49 product must clamp to 0 discount, not a
+        // negative amount that would inflate the price the customer pays.
+        let result = run_function_with_input(
+            cart_lines_discounts_generate_run,
+            r#"{
+                "cart": {
+                    "lines": [
+                        {
+                            "id": "gid://shopify/CartLine/0",
+                            "quantity": 1,
+                            "cost": { "amountPerQuantity": { "amount": "1.49" } },
+                            "merchandise": {
+                                "__typename": "ProductVariant",
+                                "product": { "id": "gid://shopify/Product/1" }
+                            }
+                        }
+                    ]
+                },
+                "shop": {
+                    "metafield": {
+                        "jsonValue": {
+                            "products": [
+                                {
+                                    "productId": "gid://shopify/Product/1",
+                                    "status": "live",
+                                    "tiers": [{ "minQty": 1, "fixedPrice": 5.00 }]
+                                }
+                            ]
+                        }
+                    }
+                },
+                "discount": { "discountClasses": ["PRODUCT"] }
+            }"#,
+        )?;
+        assert_eq!(result.operations.len(), 0, "a clamped-to-zero discount must emit no candidates and no operations, same as any other zero-discount cart");
+        Ok(())
+    }
+
+    #[test]
+    fn defaults_fixed_price_to_none_when_the_stored_config_predates_the_field() -> Result<()> {
+        // No "fixedPrice" key at all in the tier — must not error, for
+        // backward compatibility with configs saved before this feature.
+        let result = run_function_with_input(
+            cart_lines_discounts_generate_run,
+            r#"{
+                "cart": {
+                    "lines": [
+                        {
+                            "id": "gid://shopify/CartLine/0",
+                            "quantity": 5,
+                            "cost": { "amountPerQuantity": { "amount": "1.49" } },
+                            "merchandise": {
+                                "__typename": "ProductVariant",
+                                "product": { "id": "gid://shopify/Product/1" }
+                            }
+                        }
+                    ]
+                },
+                "shop": {
+                    "metafield": {
+                        "jsonValue": {
+                            "products": [
+                                {
+                                    "productId": "gid://shopify/Product/1",
+                                    "status": "live",
+                                    "tiers": [{ "minQty": 5, "percentOff": 10.0 }]
+                                }
+                            ]
+                        }
+                    }
+                },
+                "discount": { "discountClasses": ["PRODUCT"] }
+            }"#,
+        )?;
+        assert_eq!(result.operations.len(), 1);
+        match &result.operations[0] {
+            schema::CartOperation::ProductDiscountsAdd(op) => match &op.candidates[0].value {
+                schema::ProductDiscountCandidateValue::Percentage(p) => assert_eq!(p.value.0, 10.0),
+                _ => panic!("expected Percentage — a tier with no fixedPrice key must behave exactly as before"),
+            },
             _ => panic!("expected ProductDiscountsAdd"),
         }
         Ok(())
