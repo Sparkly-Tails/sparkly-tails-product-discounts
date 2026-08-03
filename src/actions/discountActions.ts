@@ -114,7 +114,8 @@ export async function createGroup(formData: FormData): Promise<void> {
   const productIds = parseGroupProductIdsFromForm(formData)
   if (productIds.length < 2) throw new Error('A group needs at least 2 products')
 
-  const tiers = parseTiersFromForm(formData)
+  const pricingMode: 'percent' | 'fixed' = formData.get('pricingMode') === 'fixed' ? 'fixed' : 'percent'
+  const tiers = parseTiersFromForm(formData, pricingMode)
   if (tiers.length === 0) throw new Error('At least one tier is required')
 
   const config = await getConfig()
@@ -125,7 +126,7 @@ export async function createGroup(formData: FormData): Promise<void> {
   }
 
   const groupId = `grp_${crypto.randomUUID()}`
-  const newGroup: GroupDiscount = { groupId, name, status: 'draft', pricingMode: 'percent', productIds, tiers }
+  const newGroup: GroupDiscount = { groupId, name, status: 'draft', pricingMode, productIds, tiers }
   await saveConfig({ ...config, groups: [...config.groups, newGroup] })
 
   await redirectWithToken(`/discounts/groups/${encodeURIComponent(groupId)}`)
@@ -179,12 +180,12 @@ export async function updateGroupProducts(groupId: string, formData: FormData): 
 }
 
 export async function updateGroupTiers(groupId: string, formData: FormData): Promise<void> {
-  const tiers = parseTiersFromForm(formData)
-  if (tiers.length === 0) throw new Error('At least one tier is required')
-
   const config = await getConfig()
   const group = config.groups.find((g) => g.groupId === groupId)
   if (!group) throw new Error(`Group ${groupId} not found`)
+
+  const tiers = parseTiersFromForm(formData, group.pricingMode)
+  if (tiers.length === 0) throw new Error('At least one tier is required')
 
   group.tiers = tiers
   await saveConfig(config)

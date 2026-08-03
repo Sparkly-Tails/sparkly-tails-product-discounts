@@ -520,6 +520,39 @@ describe('createGroup', () => {
       ],
     })
   })
+
+  it('creates a fixed-price group when pricingMode is fixed', async () => {
+    vi.spyOn(configLib, 'getConfig').mockResolvedValue({ products: [], groups: [] })
+    const saveSpy = vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
+    vi.spyOn(crypto, 'randomUUID').mockReturnValue('22222222-2222-2222-2222-222222222222')
+
+    const formData = new FormData()
+    formData.set('product-0-id', 'gid://shopify/Product/1')
+    formData.set('product-1-id', 'gid://shopify/Product/2')
+    formData.set('name', 'Mix & Match Soups')
+    formData.set('pricingMode', 'fixed')
+    formData.set('tier-0-minQty', '1')
+    formData.set('tier-0-fixedPrice', '1.70')
+    formData.set('tier-1-minQty', '3')
+    formData.set('tier-1-fixedPrice', '1.50')
+
+    await createGroup(formData)
+
+    expect(saveSpy).toHaveBeenCalledWith({
+      products: [],
+      groups: [{
+        groupId: 'grp_22222222-2222-2222-2222-222222222222',
+        name: 'Mix & Match Soups',
+        status: 'draft',
+        pricingMode: 'fixed',
+        productIds: ['gid://shopify/Product/1', 'gid://shopify/Product/2'],
+        tiers: [
+          { minQty: 1, fixedPrice: 1.70 },
+          { minQty: 3, fixedPrice: 1.50 },
+        ],
+      }],
+    })
+  })
 })
 
 describe('updateGroupTiers', () => {
@@ -595,6 +628,25 @@ describe('updateGroupTiers', () => {
     await updateGroupTiers('grp_a', formData)
 
     expect(syncSpy).not.toHaveBeenCalled()
+  })
+
+  it('parses fixed-price tiers when the stored group is fixed mode', async () => {
+    vi.spyOn(configLib, 'getConfig').mockResolvedValue({
+      products: [],
+      groups: [{ groupId: 'grp_a', name: 'Soups', status: 'draft', pricingMode: 'fixed', productIds: ['gid://shopify/Product/1', 'gid://shopify/Product/2'], tiers: [{ minQty: 1, fixedPrice: 2.00 }] }],
+    })
+    const saveSpy = vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
+
+    const formData = new FormData()
+    formData.set('tier-0-minQty', '1')
+    formData.set('tier-0-fixedPrice', '1.70')
+
+    await updateGroupTiers('grp_a', formData)
+
+    expect(saveSpy).toHaveBeenCalledWith({
+      products: [],
+      groups: [{ groupId: 'grp_a', name: 'Soups', status: 'draft', pricingMode: 'fixed', productIds: ['gid://shopify/Product/1', 'gid://shopify/Product/2'], tiers: [{ minQty: 1, fixedPrice: 1.70 }] }],
+    })
   })
 })
 
