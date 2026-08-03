@@ -59,6 +59,76 @@ describe('createDiscount', () => {
     })
   })
 
+  it('creates a fixed-price discount when pricingMode is fixed', async () => {
+    vi.spyOn(configLib, 'getConfig').mockResolvedValue({ products: [], groups: [] })
+    const saveSpy = vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
+
+    const formData = new FormData()
+    formData.set('productId', 'gid://shopify/Product/111')
+    formData.set('pricingMode', 'fixed')
+    formData.set('tier-0-minQty', '1')
+    formData.set('tier-0-fixedPrice', '1.70')
+    formData.set('tier-1-minQty', '3')
+    formData.set('tier-1-fixedPrice', '1.50')
+
+    await createDiscount(formData)
+
+    expect(saveSpy).toHaveBeenCalledWith({
+      products: [{
+        productId: 'gid://shopify/Product/111',
+        status: 'draft',
+        pricingMode: 'fixed',
+        tiers: [
+          { minQty: 1, fixedPrice: 1.70 },
+          { minQty: 3, fixedPrice: 1.50 },
+        ],
+      }],
+      groups: [],
+    })
+  })
+
+  it('ignores percentOff/anchorPrice fields entirely when pricingMode is fixed', async () => {
+    vi.spyOn(configLib, 'getConfig').mockResolvedValue({ products: [], groups: [] })
+    const saveSpy = vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
+
+    const formData = new FormData()
+    formData.set('productId', 'gid://shopify/Product/111')
+    formData.set('pricingMode', 'fixed')
+    formData.set('tier-0-minQty', '1')
+    formData.set('tier-0-fixedPrice', '1.70')
+    formData.set('tier-0-percentOff', '50')
+    formData.set('tier-0-anchorPrice', '99.00')
+
+    await createDiscount(formData)
+
+    expect(saveSpy).toHaveBeenCalledWith({
+      products: [{
+        productId: 'gid://shopify/Product/111',
+        status: 'draft',
+        pricingMode: 'fixed',
+        tiers: [{ minQty: 1, fixedPrice: 1.70 }],
+      }],
+      groups: [],
+    })
+  })
+
+  it('defaults to percent mode when pricingMode is not provided', async () => {
+    vi.spyOn(configLib, 'getConfig').mockResolvedValue({ products: [], groups: [] })
+    const saveSpy = vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
+
+    const formData = new FormData()
+    formData.set('productId', 'gid://shopify/Product/111')
+    formData.set('tier-0-minQty', '5')
+    formData.set('tier-0-percentOff', '10')
+
+    await createDiscount(formData)
+
+    expect(saveSpy).toHaveBeenCalledWith({
+      products: [{ productId: 'gid://shopify/Product/111', status: 'draft', pricingMode: 'percent', tiers: [{ minQty: 5, percentOff: 10 }] }],
+      groups: [],
+    })
+  })
+
   it('throws when no product is selected', async () => {
     const formData = new FormData()
     formData.set('tier-0-minQty', '5')
@@ -186,6 +256,57 @@ describe('updateTiers', () => {
     await updateTiers('gid://shopify/Product/111', formData)
 
     expect(syncSpy).not.toHaveBeenCalled()
+  })
+
+  it('parses fixed-price tiers when the stored discount is fixed mode', async () => {
+    vi.spyOn(configLib, 'getConfig').mockResolvedValue({
+      products: [{ productId: 'gid://shopify/Product/111', status: 'live', pricingMode: 'fixed', tiers: [{ minQty: 1, fixedPrice: 2.00 }] }],
+      groups: [],
+    })
+    const saveSpy = vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
+    vi.spyOn(productTiers, 'syncProductTierMetafield').mockResolvedValue()
+
+    const formData = new FormData()
+    formData.set('tier-0-minQty', '1')
+    formData.set('tier-0-fixedPrice', '1.70')
+    formData.set('tier-1-minQty', '3')
+    formData.set('tier-1-fixedPrice', '1.50')
+
+    await updateTiers('gid://shopify/Product/111', formData)
+
+    expect(saveSpy).toHaveBeenCalledWith({
+      products: [{
+        productId: 'gid://shopify/Product/111',
+        status: 'live',
+        pricingMode: 'fixed',
+        tiers: [
+          { minQty: 1, fixedPrice: 1.70 },
+          { minQty: 3, fixedPrice: 1.50 },
+        ],
+      }],
+      groups: [],
+    })
+  })
+
+  it('ignores a pricingMode field in the form when updating tiers — mode is locked to the stored value', async () => {
+    vi.spyOn(configLib, 'getConfig').mockResolvedValue({
+      products: [{ productId: 'gid://shopify/Product/111', status: 'live', pricingMode: 'percent', tiers: [{ minQty: 5, percentOff: 10 }] }],
+      groups: [],
+    })
+    const saveSpy = vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
+    vi.spyOn(productTiers, 'syncProductTierMetafield').mockResolvedValue()
+
+    const formData = new FormData()
+    formData.set('pricingMode', 'fixed')
+    formData.set('tier-0-minQty', '7')
+    formData.set('tier-0-percentOff', '20')
+
+    await updateTiers('gid://shopify/Product/111', formData)
+
+    expect(saveSpy).toHaveBeenCalledWith({
+      products: [{ productId: 'gid://shopify/Product/111', status: 'live', pricingMode: 'percent', tiers: [{ minQty: 7, percentOff: 20 }] }],
+      groups: [],
+    })
   })
 })
 

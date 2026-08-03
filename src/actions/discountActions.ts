@@ -5,21 +5,31 @@ import { redirectWithToken } from '@/lib/auth-redirect'
 import { syncProductTierMetafield, syncGroupTierMetafield } from '@/lib/product-tiers'
 import { getGroupProductInfo } from '@/lib/products'
 
-function parseTiersFromForm(formData: FormData): Tier[] {
+function parseTiersFromForm(formData: FormData, pricingMode: 'percent' | 'fixed'): Tier[] {
   const tiers: Tier[] = []
   let i = 0
   while (formData.has(`tier-${i}-minQty`)) {
     const minQty = Number(formData.get(`tier-${i}-minQty`))
-    const rawPercentOff = Number(formData.get(`tier-${i}-percentOff`))
-    const percentOff = Math.round(rawPercentOff * 10) / 10
-    if (minQty > 0 && percentOff >= 0) {
-      const tier: Tier = { minQty, percentOff }
-      const rawAnchorPrice = formData.get(`tier-${i}-anchorPrice`)
-      if (rawAnchorPrice != null && String(rawAnchorPrice).trim() !== '') {
-        const anchorPrice = Math.round(Number(rawAnchorPrice) * 100) / 100
-        if (anchorPrice > 0) tier.anchorPrice = anchorPrice
+    if (minQty > 0) {
+      if (pricingMode === 'fixed') {
+        const rawFixedPrice = formData.get(`tier-${i}-fixedPrice`)
+        const fixedPrice = Math.round(Number(rawFixedPrice) * 100) / 100
+        if (fixedPrice > 0) {
+          tiers.push({ minQty, fixedPrice })
+        }
+      } else {
+        const rawPercentOff = Number(formData.get(`tier-${i}-percentOff`))
+        const percentOff = Math.round(rawPercentOff * 10) / 10
+        if (percentOff >= 0) {
+          const tier: Tier = { minQty, percentOff }
+          const rawAnchorPrice = formData.get(`tier-${i}-anchorPrice`)
+          if (rawAnchorPrice != null && String(rawAnchorPrice).trim() !== '') {
+            const anchorPrice = Math.round(Number(rawAnchorPrice) * 100) / 100
+            if (anchorPrice > 0) tier.anchorPrice = anchorPrice
+          }
+          tiers.push(tier)
+        }
       }
-      tiers.push(tier)
     }
     i++
   }
@@ -41,7 +51,8 @@ export async function createDiscount(formData: FormData): Promise<void> {
   const productId = String(formData.get('productId') ?? '').trim()
   if (!productId) throw new Error('A product is required')
 
-  const tiers = parseTiersFromForm(formData)
+  const pricingMode: 'percent' | 'fixed' = formData.get('pricingMode') === 'fixed' ? 'fixed' : 'percent'
+  const tiers = parseTiersFromForm(formData, pricingMode)
   if (tiers.length === 0) throw new Error('At least one tier is required')
 
   const config = await getConfig()
@@ -49,19 +60,19 @@ export async function createDiscount(formData: FormData): Promise<void> {
     throw new Error(`Product ${productId} already has a discount or belongs to a group`)
   }
 
-  const newDiscount: ProductDiscount = { productId, status: 'draft', pricingMode: 'percent', tiers }
+  const newDiscount: ProductDiscount = { productId, status: 'draft', pricingMode, tiers }
   await saveConfig({ ...config, products: [...config.products, newDiscount] })
 
   await redirectWithToken(`/discounts/${encodeURIComponent(productId)}`)
 }
 
 export async function updateTiers(productId: string, formData: FormData): Promise<void> {
-  const tiers = parseTiersFromForm(formData)
-  if (tiers.length === 0) throw new Error('At least one tier is required')
-
   const config = await getConfig()
   const discount = config.products.find((p) => p.productId === productId)
   if (!discount) throw new Error(`Discount for product ${productId} not found`)
+
+  const tiers = parseTiersFromForm(formData, discount.pricingMode)
+  if (tiers.length === 0) throw new Error('At least one tier is required')
 
   discount.tiers = tiers
   await saveConfig(config)
