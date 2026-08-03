@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation'
 import { getConfig } from '@/lib/config'
 import { getProductInfo } from '@/lib/products'
 import { resultingPrice, totalAtThreshold, clampedFixedPrice, totalAtThresholdFixed } from '@/lib/tier-math'
-import { updateTiers, setStatus, deleteDiscount } from '@/actions/discountActions'
+import { updateTiers, updateTitle, setStatus, deleteDiscount } from '@/actions/discountActions'
 import TierFields from '@/components/TierFields'
 import FixedPriceTierFields from '@/components/FixedPriceTierFields'
 import ConfirmForm from '@/components/ConfirmForm'
@@ -25,6 +25,7 @@ export default async function DiscountPage({
   const info = await getProductInfo(productId)
 
   const updateTiersWithId = updateTiers.bind(null, productId)
+  const updateTitleWithId = updateTitle.bind(null, productId)
   const goLive = setStatus.bind(null, productId, 'live')
   const goDraft = setStatus.bind(null, productId, 'draft')
   const remove = deleteDiscount.bind(null, productId)
@@ -45,6 +46,29 @@ export default async function DiscountPage({
       <p className="text-sm text-muted mb-6">
         {discount.status} · {discount.pricingMode === 'fixed' ? 'Fixed price' : 'Percentage'}
       </p>
+
+      <section className="mb-8">
+        <h2 className="font-medium mb-2">Title</h2>
+        <form action={updateTitleWithId} className="flex gap-2">
+          <label htmlFor="title" className="sr-only">
+            Title
+          </label>
+          <input
+            id="title"
+            name="title"
+            type="text"
+            required
+            defaultValue={discount.title}
+            className="flex-1 border border-line rounded px-3 py-2 text-sm transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:border-accent"
+          />
+          <button
+            type="submit"
+            className="bg-surface border border-line hover:bg-line px-4 py-3 rounded text-sm transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          >
+            Save title
+          </button>
+        </form>
+      </section>
 
       <section className="mb-8">
         <h2 className="font-medium mb-2">Tiers</h2>
