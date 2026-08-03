@@ -22,7 +22,7 @@ describe('addGroupProductAction', () => {
   it('rejects a product that already has a standalone discount', async () => {
     vi.spyOn(products, 'getProductInfo').mockResolvedValue({ title: 'Tuna Soup', basePrice: 1.49 })
     vi.spyOn(configLib, 'getConfig').mockResolvedValue({
-      products: [{ productId: 'gid://shopify/Product/1', status: 'draft', pricingMode: 'percent', tiers: [] }],
+      products: [{ productId: 'gid://shopify/Product/1', status: 'draft', pricingMode: 'percent', title: 'Some Title', tiers: [] }],
       groups: [],
     })
     const result = await addGroupProductAction('gid://shopify/Product/1', null)
@@ -33,7 +33,7 @@ describe('addGroupProductAction', () => {
     vi.spyOn(products, 'getProductInfo').mockResolvedValue({ title: 'Tuna Soup', basePrice: 1.49 })
     vi.spyOn(configLib, 'getConfig').mockResolvedValue({
       products: [],
-      groups: [{ groupId: 'grp_other', name: 'Other', status: 'draft', pricingMode: 'percent', productIds: ['gid://shopify/Product/1'], tiers: [] }],
+      groups: [{ groupId: 'grp_other', name: 'Other', status: 'draft', pricingMode: 'percent', title: 'Some Title', productIds: ['gid://shopify/Product/1'], tiers: [] }],
     })
     const result = await addGroupProductAction('gid://shopify/Product/1', null)
     expect(result).toEqual({ ok: false, error: 'This product already has a discount or belongs to another group' })
@@ -43,7 +43,7 @@ describe('addGroupProductAction', () => {
     vi.spyOn(products, 'getProductInfo').mockResolvedValue({ title: 'Tuna Soup', basePrice: 1.49 })
     vi.spyOn(configLib, 'getConfig').mockResolvedValue({
       products: [],
-      groups: [{ groupId: 'grp_a', name: 'A', status: 'draft', pricingMode: 'percent', productIds: ['gid://shopify/Product/1'], tiers: [] }],
+      groups: [{ groupId: 'grp_a', name: 'A', status: 'draft', pricingMode: 'percent', title: 'Some Title', productIds: ['gid://shopify/Product/1'], tiers: [] }],
     })
     const result = await addGroupProductAction('gid://shopify/Product/1', 1.49, 'grp_a')
     expect(result).toEqual({ ok: true, product: { id: 'gid://shopify/Product/1', title: 'Tuna Soup', price: 1.49 } })
