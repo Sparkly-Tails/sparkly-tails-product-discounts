@@ -41,7 +41,7 @@ export default async function Home() {
                 {row.title}
               </AuthLink>
               <p className="text-sm text-muted">
-                {row.status} · {row.tiers.length} tier{row.tiers.length === 1 ? '' : 's'}
+                {row.status} · {row.pricingMode === 'fixed' ? 'Fixed price' : 'Percentage'} · {row.tiers.length} tier{row.tiers.length === 1 ? '' : 's'}
               </p>
             </li>
           ))}
@@ -73,7 +73,7 @@ export default async function Home() {
                 {group.name}
               </AuthLink>
               <p className="text-sm text-muted">
-                {group.status} · {group.productIds.length} product{group.productIds.length === 1 ? '' : 's'} ·{' '}
+                {group.status} · {group.pricingMode === 'fixed' ? 'Fixed price' : 'Percentage'} · {group.productIds.length} product{group.productIds.length === 1 ? '' : 's'} ·{' '}
                 {group.tiers.length} tier{group.tiers.length === 1 ? '' : 's'}
               </p>
             </li>
