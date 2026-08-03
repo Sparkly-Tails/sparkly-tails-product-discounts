@@ -49,24 +49,27 @@ export default async function DiscountPage({
 
       <section className="mb-8">
         <h2 className="font-medium mb-2">Title</h2>
-        <form action={updateTitleWithId} className="flex gap-2">
-          <label htmlFor="title" className="sr-only">
-            Title
-          </label>
-          <input
-            id="title"
-            name="title"
-            type="text"
-            required
-            defaultValue={discount.title}
-            className="flex-1 border border-line rounded px-3 py-2 text-sm transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:border-accent"
-          />
-          <button
-            type="submit"
-            className="bg-surface border border-line hover:bg-line px-4 py-3 rounded text-sm transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-          >
-            Save title
-          </button>
+        <form action={updateTitleWithId} className="space-y-2">
+          <div className="flex gap-2">
+            <label htmlFor="title" className="sr-only">
+              Title
+            </label>
+            <input
+              id="title"
+              name="title"
+              type="text"
+              required
+              defaultValue={discount.title}
+              className="flex-1 border border-line rounded px-3 py-2 text-sm transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:border-accent"
+            />
+            <button
+              type="submit"
+              className="bg-surface border border-line hover:bg-line px-4 py-3 rounded text-sm transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            >
+              Save title
+            </button>
+          </div>
+          <p className="text-xs text-muted mt-2">Shown to customers in the storefront widget's promo text.</p>
         </form>
       </section>
 

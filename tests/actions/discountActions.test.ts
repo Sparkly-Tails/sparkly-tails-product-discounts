@@ -384,7 +384,7 @@ describe('updateTitle', () => {
       products: [{ productId: 'gid://shopify/Product/111', status: 'draft', pricingMode: 'percent', title: 'Old Title', tiers: [] }],
       groups: [],
     })
-    vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
+    const saveSpy = vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
     const syncSpy = vi.spyOn(productTiers, 'syncProductTierMetafield').mockResolvedValue()
 
     const formData = new FormData()
@@ -392,6 +392,10 @@ describe('updateTitle', () => {
 
     await updateTitle('gid://shopify/Product/111', formData)
 
+    expect(saveSpy).toHaveBeenCalledWith({
+      products: [{ productId: 'gid://shopify/Product/111', status: 'draft', pricingMode: 'percent', title: 'New Title', tiers: [] }],
+      groups: [],
+    })
     expect(syncSpy).not.toHaveBeenCalled()
   })
 
@@ -512,6 +516,11 @@ describe('deleteDiscount', () => {
       products: [],
       groups: [{ groupId: 'grp_a', name: 'A', status: 'live', pricingMode: 'percent', title: '', productIds: ['gid://shopify/Product/9'], tiers: [] }],
     })
+  })
+
+  it('throws when the product does not exist', async () => {
+    vi.spyOn(configLib, 'getConfig').mockResolvedValue({ products: [], groups: [] })
+    await expect(deleteDiscount('gid://shopify/Product/999')).rejects.toThrow('not found')
   })
 })
 
@@ -846,7 +855,7 @@ describe('updateGroupTitle', () => {
       products: [],
       groups: [{ groupId: 'grp_a', name: 'Soups', status: 'draft', pricingMode: 'percent', title: 'Old Title', productIds: ['gid://shopify/Product/1', 'gid://shopify/Product/2'], tiers: [] }],
     })
-    vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
+    const saveSpy = vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
     const syncSpy = vi.spyOn(productTiers, 'syncGroupTierMetafield').mockResolvedValue()
 
     const formData = new FormData()
@@ -854,6 +863,10 @@ describe('updateGroupTitle', () => {
 
     await updateGroupTitle('grp_a', formData)
 
+    expect(saveSpy).toHaveBeenCalledWith({
+      products: [],
+      groups: [{ groupId: 'grp_a', name: 'Soups', status: 'draft', pricingMode: 'percent', title: 'New Title', productIds: ['gid://shopify/Product/1', 'gid://shopify/Product/2'], tiers: [] }],
+    })
     expect(syncSpy).not.toHaveBeenCalled()
   })
 
