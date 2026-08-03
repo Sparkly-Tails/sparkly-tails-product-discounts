@@ -24,6 +24,7 @@ export interface ProductDiscount {
   productId: string
   status: 'draft' | 'live'
   pricingMode: 'percent' | 'fixed'
+  title: string
   tiers: Tier[]
 }
 
@@ -33,6 +34,7 @@ export interface GroupDiscount {
   status: 'draft' | 'live'
   productIds: string[]
   pricingMode: 'percent' | 'fixed'
+  title: string
   tiers: Tier[]
 }
 
@@ -70,8 +72,8 @@ export async function getConfig(): Promise<Config> {
     products?: Partial<ProductDiscount>[]
     groups?: Partial<GroupDiscount>[]
   }
-  const products = (parsed.products ?? []).map((p) => ({ pricingMode: 'percent' as const, ...p })) as ProductDiscount[]
-  const groups = (parsed.groups ?? []).map((g) => ({ pricingMode: 'percent' as const, ...g })) as GroupDiscount[]
+  const products = (parsed.products ?? []).map((p) => ({ pricingMode: 'percent' as const, title: '', ...p })) as ProductDiscount[]
+  const groups = (parsed.groups ?? []).map((g) => ({ pricingMode: 'percent' as const, title: g.name ?? '', ...g })) as GroupDiscount[]
   return { products, groups }
 }
 

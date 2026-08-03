@@ -10,7 +10,7 @@ export default async function Home() {
   const rows = await Promise.all(
     config.products.map(async (p) => {
       const info = await getProductInfo(p.productId)
-      return { ...p, title: info?.title ?? `${p.productId} — not found` }
+      return { ...p, productTitle: info?.title ?? `${p.productId} — not found` }
     }),
   )
 
@@ -38,7 +38,7 @@ export default async function Home() {
                 token={token}
                 className="font-medium hover:underline transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded"
               >
-                {row.title}
+                {row.productTitle}
               </AuthLink>
               <p className="text-sm text-muted">
                 {row.status} · {row.pricingMode === 'fixed' ? 'Fixed price' : 'Percentage'} · {row.tiers.length} tier{row.tiers.length === 1 ? '' : 's'}

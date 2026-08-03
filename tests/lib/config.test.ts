@@ -12,7 +12,7 @@ describe('getConfig', () => {
 
     const config = await getConfig()
     expect(config).toEqual({
-      products: [{ productId: 'gid://shopify/Product/1', status: 'live', pricingMode: 'percent', tiers: [{ minQty: 5, percentOff: 10 }] }],
+      products: [{ productId: 'gid://shopify/Product/1', status: 'live', pricingMode: 'percent', title: '', tiers: [{ minQty: 5, percentOff: 10 }] }],
       groups: [],
     })
   })
@@ -51,7 +51,7 @@ describe('getConfig', () => {
     const config = await getConfig()
     expect(config).toEqual({
       products: [],
-      groups: [{ ...stored.groups[0], pricingMode: 'percent' }],
+      groups: [{ ...stored.groups[0], pricingMode: 'percent', title: 'Soups' }],
     })
   })
 
@@ -88,7 +88,44 @@ describe('getConfig', () => {
       shop: { metafield: { value: JSON.stringify(stored) } },
     })
     const config = await getConfig()
-    expect(config.products[0]).toEqual(stored.products[0])
+    expect(config.products[0]).toEqual({ ...stored.products[0], title: '' })
+  })
+
+  it('defaults title to an empty string for a product discount stored before this field existed', async () => {
+    const stored = {
+      products: [{ productId: 'gid://shopify/Product/1', status: 'live', pricingMode: 'percent', tiers: [{ minQty: 5, percentOff: 10 }] }],
+      groups: [],
+    }
+    vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({
+      shop: { metafield: { value: JSON.stringify(stored) } },
+    })
+    const config = await getConfig()
+    expect(config.products[0].title).toBe('')
+  })
+
+  it('defaults title to the group\'s existing name for a group discount stored before this field existed', async () => {
+    const stored = {
+      products: [],
+      groups: [{ groupId: 'grp_1', name: 'Soups', status: 'live', pricingMode: 'percent', productIds: ['gid://shopify/Product/1', 'gid://shopify/Product/2'], tiers: [{ minQty: 7, percentOff: 10 }] }],
+    }
+    vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({
+      shop: { metafield: { value: JSON.stringify(stored) } },
+    })
+    const config = await getConfig()
+    expect(config.groups[0].title).toBe('Soups')
+  })
+
+  it('preserves an explicit title over the backfilled default', async () => {
+    const stored = {
+      products: [{ productId: 'gid://shopify/Product/1', status: 'live', pricingMode: 'percent', title: 'Canagan Tuna Soup', tiers: [{ minQty: 5, percentOff: 10 }] }],
+      groups: [{ groupId: 'grp_1', name: 'Soups', status: 'live', pricingMode: 'percent', title: 'Canagan treat', productIds: ['gid://shopify/Product/1'], tiers: [{ minQty: 7, percentOff: 10 }] }],
+    }
+    vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({
+      shop: { metafield: { value: JSON.stringify(stored) } },
+    })
+    const config = await getConfig()
+    expect(config.products[0].title).toBe('Canagan Tuna Soup')
+    expect(config.groups[0].title).toBe('Canagan treat')
   })
 })
 
@@ -100,7 +137,7 @@ describe('saveConfig', () => {
     shopIdSpy.mockResolvedValueOnce({ shop: { id: 'gid://shopify/Shop/1' } })
     shopIdSpy.mockResolvedValueOnce({ metafieldsSet: { userErrors: [] } })
 
-    const config: Config = { products: [{ productId: 'gid://shopify/Product/1', status: 'draft', pricingMode: 'percent', tiers: [] }], groups: [] }
+    const config: Config = { products: [{ productId: 'gid://shopify/Product/1', status: 'draft', pricingMode: 'percent', title: 'Some Title', tiers: [] }], groups: [] }
     await saveConfig(config)
 
     expect(shopIdSpy).toHaveBeenCalledTimes(2)
@@ -131,9 +168,9 @@ describe('saveConfig', () => {
 
 describe('isProductAvailable', () => {
   const baseConfig: Config = {
-    products: [{ productId: 'gid://shopify/Product/1', status: 'draft', pricingMode: 'percent', tiers: [] }],
+    products: [{ productId: 'gid://shopify/Product/1', status: 'draft', pricingMode: 'percent', title: 'Some Title', tiers: [] }],
     groups: [
-      { groupId: 'grp_a', name: 'A', status: 'draft', pricingMode: 'percent', productIds: ['gid://shopify/Product/2'], tiers: [] },
+      { groupId: 'grp_a', name: 'A', status: 'draft', pricingMode: 'percent', title: 'Some Title', productIds: ['gid://shopify/Product/2'], tiers: [] },
     ],
   }
 

@@ -51,6 +51,9 @@ export async function createDiscount(formData: FormData): Promise<void> {
   const productId = String(formData.get('productId') ?? '').trim()
   if (!productId) throw new Error('A product is required')
 
+  const title = String(formData.get('title') ?? '').trim()
+  if (!title) throw new Error('A title is required')
+
   const pricingMode: 'percent' | 'fixed' = formData.get('pricingMode') === 'fixed' ? 'fixed' : 'percent'
   const tiers = parseTiersFromForm(formData, pricingMode)
   if (tiers.length === 0) throw new Error('At least one tier is required')
@@ -60,8 +63,26 @@ export async function createDiscount(formData: FormData): Promise<void> {
     throw new Error(`Product ${productId} already has a discount or belongs to a group`)
   }
 
-  const newDiscount: ProductDiscount = { productId, status: 'draft', pricingMode, tiers }
+  const newDiscount: ProductDiscount = { productId, status: 'draft', pricingMode, title, tiers }
   await saveConfig({ ...config, products: [...config.products, newDiscount] })
+
+  await redirectWithToken(`/discounts/${encodeURIComponent(productId)}`)
+}
+
+export async function updateTitle(productId: string, formData: FormData): Promise<void> {
+  const title = String(formData.get('title') ?? '').trim()
+  if (!title) throw new Error('A title is required')
+
+  const config = await getConfig()
+  const discount = config.products.find((p) => p.productId === productId)
+  if (!discount) throw new Error(`Discount for product ${productId} not found`)
+
+  discount.title = title
+  await saveConfig(config)
+
+  if (discount.status === 'live') {
+    await syncProductTierMetafield(productId, discount.tiers, title)
+  }
 
   await redirectWithToken(`/discounts/${encodeURIComponent(productId)}`)
 }
@@ -78,7 +99,7 @@ export async function updateTiers(productId: string, formData: FormData): Promis
   await saveConfig(config)
 
   if (discount.status === 'live') {
-    await syncProductTierMetafield(productId, tiers)
+    await syncProductTierMetafield(productId, tiers, discount.title)
   }
 
   await redirectWithToken(`/discounts/${encodeURIComponent(productId)}`)
@@ -92,17 +113,20 @@ export async function setStatus(productId: string, status: 'draft' | 'live'): Pr
   discount.status = status
   await saveConfig(config)
 
-  await syncProductTierMetafield(productId, status === 'live' ? discount.tiers : null)
+  await syncProductTierMetafield(productId, status === 'live' ? discount.tiers : null, discount.title)
 
   await redirectWithToken(`/discounts/${encodeURIComponent(productId)}`)
 }
 
 export async function deleteDiscount(productId: string): Promise<void> {
   const config = await getConfig()
+  const discount = config.products.find((p) => p.productId === productId)
+  if (!discount) throw new Error(`Discount for product ${productId} not found`)
+
   const remaining = config.products.filter((p) => p.productId !== productId)
   await saveConfig({ ...config, products: remaining })
 
-  await syncProductTierMetafield(productId, null)
+  await syncProductTierMetafield(productId, null, discount.title)
 
   await redirectWithToken('/')
 }
@@ -110,6 +134,9 @@ export async function deleteDiscount(productId: string): Promise<void> {
 export async function createGroup(formData: FormData): Promise<void> {
   const name = String(formData.get('name') ?? '').trim()
   if (!name) throw new Error('A group name is required')
+
+  const title = String(formData.get('title') ?? '').trim()
+  if (!title) throw new Error('A title is required')
 
   const productIds = parseGroupProductIdsFromForm(formData)
   if (productIds.length < 2) throw new Error('A group needs at least 2 products')
@@ -126,7 +153,7 @@ export async function createGroup(formData: FormData): Promise<void> {
   }
 
   const groupId = `grp_${crypto.randomUUID()}`
-  const newGroup: GroupDiscount = { groupId, name, status: 'draft', pricingMode, productIds, tiers }
+  const newGroup: GroupDiscount = { groupId, name, status: 'draft', pricingMode, title, productIds, tiers }
   await saveConfig({ ...config, groups: [...config.groups, newGroup] })
 
   await redirectWithToken(`/discounts/groups/${encodeURIComponent(groupId)}`)
@@ -142,7 +169,7 @@ async function syncGroupMetafields(group: GroupDiscount): Promise<void> {
         const siblings = members
           .filter((m) => m.productId !== productId)
           .map((m) => ({ title: m.title, handle: m.handle }))
-        return syncGroupTierMetafield(productId, { tiers: group.tiers, siblings })
+        return syncGroupTierMetafield(productId, { title: group.title, tiers: group.tiers, siblings })
       }),
   )
 }
@@ -188,6 +215,24 @@ export async function updateGroupTiers(groupId: string, formData: FormData): Pro
   if (tiers.length === 0) throw new Error('At least one tier is required')
 
   group.tiers = tiers
+  await saveConfig(config)
+
+  if (group.status === 'live') {
+    await syncGroupMetafields(group)
+  }
+
+  await redirectWithToken(`/discounts/groups/${encodeURIComponent(groupId)}`)
+}
+
+export async function updateGroupTitle(groupId: string, formData: FormData): Promise<void> {
+  const title = String(formData.get('title') ?? '').trim()
+  if (!title) throw new Error('A title is required')
+
+  const config = await getConfig()
+  const group = config.groups.find((g) => g.groupId === groupId)
+  if (!group) throw new Error(`Group ${groupId} not found`)
+
+  group.title = title
   await saveConfig(config)
 
   if (group.status === 'live') {
