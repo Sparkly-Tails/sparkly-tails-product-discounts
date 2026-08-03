@@ -5,3 +5,6 @@ node_modules
 .DS_Store
 target/
 extensions/*/target/
+
+# Local-only architecture reference — not for the remote repo yet
+/README.md
