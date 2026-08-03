@@ -47,6 +47,42 @@ pub struct Config {
     groups: Vec<GroupConfig>,
 }
 
+/// Splits a total discount amount across cart lines proportional to each
+/// line's quantity share, in whole pence, using the largest-remainder
+/// method: floor every line's exact share first, then hand out the
+/// leftover pence one at a time to the lines with the largest fractional
+/// remainder, ties broken toward the earliest line by order in
+/// `quantities`. Deliberately NOT "round each share independently, then
+/// dump the whole leftover onto one line" — that approach can go negative.
+/// `discount_amount_total` must already be clamped to >= 0.
+fn split_discount_by_largest_remainder(discount_amount_total: f64, quantities: &[i32]) -> Vec<i64> {
+    let total_quantity: i32 = quantities.iter().sum();
+    let total_pence = (discount_amount_total * 100.0).round() as i64;
+    let shares: Vec<f64> = quantities
+        .iter()
+        .map(|qty| discount_amount_total * (*qty as f64 / total_quantity as f64) * 100.0)
+        .collect();
+    let mut pence_per_line: Vec<i64> = shares.iter().map(|s| s.floor() as i64).collect();
+
+    let floor_sum: i64 = pence_per_line.iter().sum();
+    let remainder = total_pence - floor_sum;
+    if remainder > 0 {
+        let mut order: Vec<usize> = (0..shares.len()).collect();
+        order.sort_by(|&a, &b| {
+            let frac_a = shares[a] - pence_per_line[a] as f64;
+            let frac_b = shares[b] - pence_per_line[b] as f64;
+            frac_b
+                .partial_cmp(&frac_a)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then(a.cmp(&b))
+        });
+        for &idx in order.iter().take(remainder as usize) {
+            pence_per_line[idx] += 1;
+        }
+    }
+    pence_per_line
+}
+
 #[shopify_function]
 fn cart_lines_discounts_generate_run(
     input: schema::cart_lines_discounts_generate_run::Input,
@@ -229,103 +265,96 @@ fn cart_lines_discounts_generate_run(
             Some(t) => t,
             None => continue,
         };
-        let percent_off = tier.percent_off.unwrap_or(0.0);
 
-        match tier.anchor_price {
-            None => {
-                // Plain percentage off — no split math needed, it's
-                // line-local by construction, so every matching line gets
-                // its own independent Percentage candidate.
-                for id in &line_ids {
-                    candidates.push(schema::ProductDiscountCandidate {
-                        targets: vec![schema::ProductDiscountCandidateTarget::CartLine(
-                            schema::CartLineTarget { id: id.clone(), quantity: None },
-                        )],
-                        message: Some(format!("{}% off", percent_off)),
-                        value: schema::ProductDiscountCandidateValue::Percentage(schema::Percentage {
-                            value: Decimal(percent_off),
-                        }),
-                        associated_discount_code: None,
-                        prerequisites: None,
-                    });
+        if let Some(fixed_price) = tier.fixed_price {
+            // Fixed-price group tier: same largest-remainder split as the
+            // anchored case below, but with a simpler total — every unit in
+            // the reached tier is charged the same flat price, so there's
+            // no "extra units beyond min_qty" distinction to compute.
+            let discount_amount_total = ((line_unit_price - fixed_price) * total_quantity as f64 * 100.0).round() / 100.0;
+            let discount_amount_total = discount_amount_total.max(0.0);
+
+            let pence_per_line = split_discount_by_largest_remainder(discount_amount_total, &line_quantities);
+
+            for (id, pence) in line_ids.iter().zip(pence_per_line.iter()) {
+                if *pence == 0 {
+                    continue;
                 }
+                candidates.push(schema::ProductDiscountCandidate {
+                    targets: vec![schema::ProductDiscountCandidateTarget::CartLine(
+                        schema::CartLineTarget { id: id.clone(), quantity: None },
+                    )],
+                    message: Some(format!("£{:.2} each", fixed_price)),
+                    value: schema::ProductDiscountCandidateValue::FixedAmount(
+                        schema::ProductDiscountCandidateFixedAmount {
+                            amount: Decimal(*pence as f64 / 100.0),
+                            applies_to_each_item: Some(false),
+                        },
+                    ),
+                    associated_discount_code: None,
+                    prerequisites: None,
+                });
             }
-            Some(anchor_price) => {
-                // Same anchor formula as the standalone case, generalized to
-                // the group's combined quantity and shared unit price (the
-                // admin app guarantees every member shares one price).
-                let extra_units = (total_quantity - tier.min_qty) as f64;
-                let discount_amount_total = (line_unit_price * tier.min_qty as f64) - anchor_price
-                    + extra_units * line_unit_price * (percent_off / 100.0);
-                let discount_amount_total = (discount_amount_total * 100.0).round() / 100.0;
-                let discount_amount_total = discount_amount_total.max(0.0);
-
-                // Split proportionally by quantity share, in whole pence,
-                // using the largest-remainder method: floor every line's
-                // exact share first, then hand out the leftover pence one at
-                // a time to the lines with the largest fractional
-                // remainder, ties broken toward the earliest line by cart
-                // order. This is deliberately NOT "round each share
-                // independently, then dump the whole leftover onto one
-                // line" — that approach can go negative. For example, 6
-                // lines sharing a 4-pence total discount each round their
-                // 0.666-pence share UP to 1 pence (6 pence allocated against
-                // a 4-pence total), forcing a -2 correction onto one line.
-                // Flooring first guarantees every line's floor is >= 0
-                // (since each share is >= 0, discount_amount_total having
-                // already been clamped above) and the floor sum can never
-                // exceed total_pence, so the remainder handed out afterward
-                // is always >= 0 and no line can go negative.
-                let total_pence = (discount_amount_total * 100.0).round() as i64;
-                let shares: Vec<f64> = line_quantities
-                    .iter()
-                    .map(|qty| discount_amount_total * (*qty as f64 / total_quantity as f64) * 100.0)
-                    .collect();
-                let mut pence_per_line: Vec<i64> = shares.iter().map(|s| s.floor() as i64).collect();
-
-                let floor_sum: i64 = pence_per_line.iter().sum();
-                let remainder = total_pence - floor_sum;
-                if remainder > 0 {
-                    let mut order: Vec<usize> = (0..shares.len()).collect();
-                    order.sort_by(|&a, &b| {
-                        let frac_a = shares[a] - pence_per_line[a] as f64;
-                        let frac_b = shares[b] - pence_per_line[b] as f64;
-                        frac_b
-                            .partial_cmp(&frac_a)
-                            .unwrap_or(std::cmp::Ordering::Equal)
-                            .then(a.cmp(&b))
-                    });
-                    for &idx in order.iter().take(remainder as usize) {
-                        pence_per_line[idx] += 1;
+        } else {
+            let percent_off = tier.percent_off.unwrap_or(0.0);
+            match tier.anchor_price {
+                None => {
+                    // Plain percentage off — no split math needed, it's
+                    // line-local by construction, so every matching line gets
+                    // its own independent Percentage candidate.
+                    for id in &line_ids {
+                        candidates.push(schema::ProductDiscountCandidate {
+                            targets: vec![schema::ProductDiscountCandidateTarget::CartLine(
+                                schema::CartLineTarget { id: id.clone(), quantity: None },
+                            )],
+                            message: Some(format!("{}% off", percent_off)),
+                            value: schema::ProductDiscountCandidateValue::Percentage(schema::Percentage {
+                                value: Decimal(percent_off),
+                            }),
+                            associated_discount_code: None,
+                            prerequisites: None,
+                        });
                     }
                 }
+                Some(anchor_price) => {
+                    // Same anchor formula as the standalone case, generalized to
+                    // the group's combined quantity and shared unit price (the
+                    // admin app guarantees every member shares one price).
+                    let extra_units = (total_quantity - tier.min_qty) as f64;
+                    let discount_amount_total = (line_unit_price * tier.min_qty as f64) - anchor_price
+                        + extra_units * line_unit_price * (percent_off / 100.0);
+                    let discount_amount_total = (discount_amount_total * 100.0).round() / 100.0;
+                    let discount_amount_total = discount_amount_total.max(0.0);
 
-                for (id, pence) in line_ids.iter().zip(pence_per_line.iter()) {
-                    // A zero-pence share is a pure no-op — skip it rather
-                    // than emitting a zero-amount FixedAmount candidate.
-                    // Shopify's function-result validation may reject a
-                    // zero-amount candidate outright, which would fail the
-                    // ENTIRE discount operation (every candidate in the
-                    // cart, not just this line), and even if accepted it
-                    // would show as "X% off — £0.00" at checkout, which
-                    // reads as a bug to the customer.
-                    if *pence == 0 {
-                        continue;
+                    let pence_per_line = split_discount_by_largest_remainder(discount_amount_total, &line_quantities);
+
+                    for (id, pence) in line_ids.iter().zip(pence_per_line.iter()) {
+                        // A zero-pence share is a pure no-op — skip it rather
+                        // than emitting a zero-amount FixedAmount candidate.
+                        // Shopify's function-result validation may reject a
+                        // zero-amount candidate outright, which would fail the
+                        // ENTIRE discount operation (every candidate in the
+                        // cart, not just this line), and even if accepted it
+                        // would show as "X% off — £0.00" at checkout, which
+                        // reads as a bug to the customer.
+                        if *pence == 0 {
+                            continue;
+                        }
+                        candidates.push(schema::ProductDiscountCandidate {
+                            targets: vec![schema::ProductDiscountCandidateTarget::CartLine(
+                                schema::CartLineTarget { id: id.clone(), quantity: None },
+                            )],
+                            message: Some(format!("{}% off", percent_off)),
+                            value: schema::ProductDiscountCandidateValue::FixedAmount(
+                                schema::ProductDiscountCandidateFixedAmount {
+                                    amount: Decimal(*pence as f64 / 100.0),
+                                    applies_to_each_item: Some(false),
+                                },
+                            ),
+                            associated_discount_code: None,
+                            prerequisites: None,
+                        });
                     }
-                    candidates.push(schema::ProductDiscountCandidate {
-                        targets: vec![schema::ProductDiscountCandidateTarget::CartLine(
-                            schema::CartLineTarget { id: id.clone(), quantity: None },
-                        )],
-                        message: Some(format!("{}% off", percent_off)),
-                        value: schema::ProductDiscountCandidateValue::FixedAmount(
-                            schema::ProductDiscountCandidateFixedAmount {
-                                amount: Decimal(*pence as f64 / 100.0),
-                                applies_to_each_item: Some(false),
-                            },
-                        ),
-                        associated_discount_code: None,
-                        prerequisites: None,
-                    });
                 }
             }
         }
@@ -1546,6 +1575,121 @@ mod tests {
             },
             _ => panic!("expected ProductDiscountsAdd"),
         }
+        Ok(())
+    }
+
+    #[test]
+    fn applies_a_fixed_price_group_tier_split_across_matching_lines() -> Result<()> {
+        // 2 lines, qty 1 + qty 2 = 3 total, reaching minQty:3 (fixedPrice
+        // 1.50). unit_price 1.99: discount_amount_total = (1.99-1.50)*3 =
+        // 1.47. Split by quantity share: line0 (qty1) gets 1/3 = 49p, line1
+        // (qty2) gets 2/3 = 98p — no remainder to distribute (49+98=147).
+        let result = run_function_with_input(
+            cart_lines_discounts_generate_run,
+            r#"{
+                "cart": {
+                    "lines": [
+                        {
+                            "id": "gid://shopify/CartLine/0",
+                            "quantity": 1,
+                            "cost": { "amountPerQuantity": { "amount": "1.99" } },
+                            "merchandise": {
+                                "__typename": "ProductVariant",
+                                "product": { "id": "gid://shopify/Product/1" }
+                            }
+                        },
+                        {
+                            "id": "gid://shopify/CartLine/1",
+                            "quantity": 2,
+                            "cost": { "amountPerQuantity": { "amount": "1.99" } },
+                            "merchandise": {
+                                "__typename": "ProductVariant",
+                                "product": { "id": "gid://shopify/Product/2" }
+                            }
+                        }
+                    ]
+                },
+                "shop": {
+                    "metafield": {
+                        "jsonValue": {
+                            "products": [],
+                            "groups": [
+                                {
+                                    "groupId": "grp_1",
+                                    "status": "live",
+                                    "productIds": ["gid://shopify/Product/1", "gid://shopify/Product/2"],
+                                    "tiers": [
+                                        { "minQty": 1, "fixedPrice": 1.70 },
+                                        { "minQty": 3, "fixedPrice": 1.50 }
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                },
+                "discount": { "discountClasses": ["PRODUCT"] }
+            }"#,
+        )?;
+        assert_eq!(result.operations.len(), 1);
+        match &result.operations[0] {
+            schema::CartOperation::ProductDiscountsAdd(op) => {
+                assert_eq!(op.candidates.len(), 2);
+                let amounts: Vec<f64> = op
+                    .candidates
+                    .iter()
+                    .map(|c| match &c.value {
+                        schema::ProductDiscountCandidateValue::FixedAmount(f) => f.amount.0,
+                        _ => panic!("expected a FixedAmount value for a fixed-price group tier"),
+                    })
+                    .collect();
+                assert_eq!(amounts, vec![0.49, 0.98]);
+                let total: f64 = amounts.iter().sum();
+                assert!((total - 1.47).abs() < 1e-9, "amounts must sum exactly to the total discount, got {}", total);
+            }
+            _ => panic!("expected ProductDiscountsAdd"),
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn a_fixed_price_group_discount_never_produces_a_markup() -> Result<()> {
+        // fixedPrice 5.00 on 1.99 products must clamp to 0, not a negative
+        // total that would try to split a markup across the lines.
+        let result = run_function_with_input(
+            cart_lines_discounts_generate_run,
+            r#"{
+                "cart": {
+                    "lines": [
+                        {
+                            "id": "gid://shopify/CartLine/0",
+                            "quantity": 2,
+                            "cost": { "amountPerQuantity": { "amount": "1.99" } },
+                            "merchandise": {
+                                "__typename": "ProductVariant",
+                                "product": { "id": "gid://shopify/Product/1" }
+                            }
+                        }
+                    ]
+                },
+                "shop": {
+                    "metafield": {
+                        "jsonValue": {
+                            "products": [],
+                            "groups": [
+                                {
+                                    "groupId": "grp_1",
+                                    "status": "live",
+                                    "productIds": ["gid://shopify/Product/1"],
+                                    "tiers": [{ "minQty": 1, "fixedPrice": 5.00 }]
+                                }
+                            ]
+                        }
+                    }
+                },
+                "discount": { "discountClasses": ["PRODUCT"] }
+            }"#,
+        )?;
+        assert_eq!(result.operations.len(), 0);
         Ok(())
     }
 }
