@@ -2,20 +2,28 @@ import { shopifyQuery } from '@/lib/shopify-client'
 
 export interface Tier {
   minQty: number
-  percentOff: number
+  percentOff?: number
   /**
    * Optional exact total price to charge for minQty units (e.g. £10.00 for
    * 7 tins instead of the percentage's rounded £10.01). Units beyond minQty
    * still accrue at the normal percentOff per-unit rate — only the price at
-   * exactly minQty is anchored. Omitted entirely when not set, in which case
-   * this tier behaves exactly as a plain percentage-off tier always has.
+   * exactly minQty is anchored. percent mode only.
    */
   anchorPrice?: number
+  /**
+   * Absolute price per unit for a fixed-price tier (e.g. £1.50) — every
+   * unit in the reached tier is charged this price directly, no percentage
+   * involved. fixed mode only. Mutually exclusive with percentOff/
+   * anchorPrice, enforced by the admin actions that construct a Tier, not
+   * by this type.
+   */
+  fixedPrice?: number
 }
 
 export interface ProductDiscount {
   productId: string
   status: 'draft' | 'live'
+  pricingMode: 'percent' | 'fixed'
   tiers: Tier[]
 }
 
@@ -24,6 +32,7 @@ export interface GroupDiscount {
   name: string
   status: 'draft' | 'live'
   productIds: string[]
+  pricingMode: 'percent' | 'fixed'
   tiers: Tier[]
 }
 
@@ -57,8 +66,13 @@ export async function getConfig(): Promise<Config> {
     return { products: [], groups: [] }
   }
 
-  const parsed = JSON.parse(data.shop.metafield.value) as Partial<Config>
-  return { products: parsed.products ?? [], groups: parsed.groups ?? [] }
+  const parsed = JSON.parse(data.shop.metafield.value) as {
+    products?: Partial<ProductDiscount>[]
+    groups?: Partial<GroupDiscount>[]
+  }
+  const products = (parsed.products ?? []).map((p) => ({ pricingMode: 'percent' as const, ...p })) as ProductDiscount[]
+  const groups = (parsed.groups ?? []).map((g) => ({ pricingMode: 'percent' as const, ...g })) as GroupDiscount[]
+  return { products, groups }
 }
 
 export async function saveConfig(config: Config): Promise<void> {

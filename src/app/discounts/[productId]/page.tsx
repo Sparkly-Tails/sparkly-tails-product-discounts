@@ -37,7 +37,7 @@ export default async function DiscountPage({
       <section className="mb-8">
         <h2 className="font-medium mb-2">Tiers</h2>
         <form action={updateTiersWithId} className="space-y-3">
-          <TierFields initial={discount.tiers} />
+          <TierFields initial={discount.tiers.map((t) => ({ minQty: t.minQty, percentOff: t.percentOff ?? 0, anchorPrice: t.anchorPrice }))} />
           <button
             type="submit"
             className="bg-surface border border-line hover:bg-line px-4 py-3 rounded text-sm transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
@@ -64,9 +64,9 @@ export default async function DiscountPage({
                 <tr key={tier.minQty} className="border-b border-line">
                   <td className="py-1">{tier.minQty}+</td>
                   <td className="py-1">{tier.percentOff}%</td>
-                  <td className="py-1">£{resultingPrice(info.basePrice, tier.percentOff).toFixed(2)}</td>
+                  <td className="py-1">£{resultingPrice(info.basePrice, tier.percentOff ?? 0).toFixed(2)}</td>
                   <td className="py-1">
-                    £{totalAtThreshold(info.basePrice, tier).toFixed(2)}
+                    £{totalAtThreshold(info.basePrice, { minQty: tier.minQty, percentOff: tier.percentOff ?? 0, anchorPrice: tier.anchorPrice }).toFixed(2)}
                     {tier.anchorPrice != null && <span className="text-muted text-xs"> (anchored)</span>}
                   </td>
                 </tr>

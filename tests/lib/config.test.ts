@@ -12,7 +12,7 @@ describe('getConfig', () => {
 
     const config = await getConfig()
     expect(config).toEqual({
-      products: [{ productId: 'gid://shopify/Product/1', status: 'live', tiers: [{ minQty: 5, percentOff: 10 }] }],
+      products: [{ productId: 'gid://shopify/Product/1', status: 'live', pricingMode: 'percent', tiers: [{ minQty: 5, percentOff: 10 }] }],
       groups: [],
     })
   })
@@ -49,7 +49,46 @@ describe('getConfig', () => {
       shop: { metafield: { value: JSON.stringify(stored) } },
     })
     const config = await getConfig()
-    expect(config).toEqual(stored)
+    expect(config).toEqual({
+      products: [],
+      groups: [{ ...stored.groups[0], pricingMode: 'percent' }],
+    })
+  })
+
+  it('defaults pricingMode to percent for a product discount stored before this field existed', async () => {
+    const stored = {
+      products: [{ productId: 'gid://shopify/Product/1', status: 'live', tiers: [{ minQty: 5, percentOff: 10 }] }],
+      groups: [],
+    }
+    vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({
+      shop: { metafield: { value: JSON.stringify(stored) } },
+    })
+    const config = await getConfig()
+    expect(config.products[0].pricingMode).toBe('percent')
+  })
+
+  it('defaults pricingMode to percent for a group discount stored before this field existed', async () => {
+    const stored = {
+      products: [],
+      groups: [{ groupId: 'grp_1', name: 'Soups', status: 'live', productIds: ['gid://shopify/Product/1', 'gid://shopify/Product/2'], tiers: [{ minQty: 7, percentOff: 10 }] }],
+    }
+    vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({
+      shop: { metafield: { value: JSON.stringify(stored) } },
+    })
+    const config = await getConfig()
+    expect(config.groups[0].pricingMode).toBe('percent')
+  })
+
+  it('preserves an explicit pricingMode of fixed', async () => {
+    const stored = {
+      products: [{ productId: 'gid://shopify/Product/1', status: 'live', pricingMode: 'fixed', tiers: [{ minQty: 1, fixedPrice: 1.70 }, { minQty: 3, fixedPrice: 1.50 }] }],
+      groups: [],
+    }
+    vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({
+      shop: { metafield: { value: JSON.stringify(stored) } },
+    })
+    const config = await getConfig()
+    expect(config.products[0]).toEqual(stored.products[0])
   })
 })
 
@@ -61,7 +100,7 @@ describe('saveConfig', () => {
     shopIdSpy.mockResolvedValueOnce({ shop: { id: 'gid://shopify/Shop/1' } })
     shopIdSpy.mockResolvedValueOnce({ metafieldsSet: { userErrors: [] } })
 
-    const config: Config = { products: [{ productId: 'gid://shopify/Product/1', status: 'draft', tiers: [] }], groups: [] }
+    const config: Config = { products: [{ productId: 'gid://shopify/Product/1', status: 'draft', pricingMode: 'percent', tiers: [] }], groups: [] }
     await saveConfig(config)
 
     expect(shopIdSpy).toHaveBeenCalledTimes(2)
@@ -92,9 +131,9 @@ describe('saveConfig', () => {
 
 describe('isProductAvailable', () => {
   const baseConfig: Config = {
-    products: [{ productId: 'gid://shopify/Product/1', status: 'draft', tiers: [] }],
+    products: [{ productId: 'gid://shopify/Product/1', status: 'draft', pricingMode: 'percent', tiers: [] }],
     groups: [
-      { groupId: 'grp_a', name: 'A', status: 'draft', productIds: ['gid://shopify/Product/2'], tiers: [] },
+      { groupId: 'grp_a', name: 'A', status: 'draft', pricingMode: 'percent', productIds: ['gid://shopify/Product/2'], tiers: [] },
     ],
   }
 

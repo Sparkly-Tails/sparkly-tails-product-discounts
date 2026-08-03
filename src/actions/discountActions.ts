@@ -49,7 +49,7 @@ export async function createDiscount(formData: FormData): Promise<void> {
     throw new Error(`Product ${productId} already has a discount or belongs to a group`)
   }
 
-  const newDiscount: ProductDiscount = { productId, status: 'draft', tiers }
+  const newDiscount: ProductDiscount = { productId, status: 'draft', pricingMode: 'percent', tiers }
   await saveConfig({ ...config, products: [...config.products, newDiscount] })
 
   await redirectWithToken(`/discounts/${encodeURIComponent(productId)}`)
@@ -114,7 +114,7 @@ export async function createGroup(formData: FormData): Promise<void> {
   }
 
   const groupId = `grp_${crypto.randomUUID()}`
-  const newGroup: GroupDiscount = { groupId, name, status: 'draft', productIds, tiers }
+  const newGroup: GroupDiscount = { groupId, name, status: 'draft', pricingMode: 'percent', productIds, tiers }
   await saveConfig({ ...config, groups: [...config.groups, newGroup] })
 
   await redirectWithToken(`/discounts/groups/${encodeURIComponent(groupId)}`)
