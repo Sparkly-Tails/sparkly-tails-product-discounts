@@ -33,3 +33,25 @@ export function totalAtThreshold(
   }
   return Math.round(resultingPrice(basePrice, tier.percentOff) * tier.minQty * 100) / 100
 }
+
+/**
+ * The price per unit for a fixed-price tier, clamped to the product's
+ * actual base price. A fixedPrice above sticker price would otherwise
+ * preview (and, without this clamp existing symmetrically in the Discount
+ * Function, could imply) charging MORE than the product normally costs —
+ * the Function refuses to produce a negative discount, so this preview
+ * must always show that same clamped reality.
+ */
+export function clampedFixedPrice(basePrice: number, fixedPrice: number): number {
+  const clamped = Math.min(Math.max(fixedPrice, 0), basePrice)
+  return Math.round(clamped * 100) / 100
+}
+
+/**
+ * The total price a customer pays for exactly minQty units of a
+ * fixed-price tier — the clamped per-unit price times minQty, rounded to
+ * 2 decimal places.
+ */
+export function totalAtThresholdFixed(basePrice: number, tier: { minQty: number; fixedPrice: number }): number {
+  return Math.round(clampedFixedPrice(basePrice, tier.fixedPrice) * tier.minQty * 100) / 100
+}

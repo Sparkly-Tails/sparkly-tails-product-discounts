@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { resultingPrice, totalAtThreshold } from '@/lib/tier-math'
+import { resultingPrice, totalAtThreshold, clampedFixedPrice, totalAtThresholdFixed } from '@/lib/tier-math'
 
 describe('resultingPrice', () => {
   it('computes a simple percentage off', () => {
@@ -47,5 +47,41 @@ describe('totalAtThreshold', () => {
 
   it('clamps a negative anchor price up to 0', () => {
     expect(totalAtThreshold(2.0, { minQty: 5, percentOff: 10, anchorPrice: -5 })).toBe(0)
+  })
+})
+
+describe('clampedFixedPrice', () => {
+  it('returns the fixed price as-is when below the base price', () => {
+    expect(clampedFixedPrice(1.99, 1.50)).toBe(1.50)
+  })
+
+  it('clamps a fixed price above the base price down to the base price', () => {
+    // A merchant fat-fingering fixedPrice: 5.00 on a £1.49 product must not
+    // preview a markup — the Function refuses to produce a negative
+    // discount, so the customer is actually charged the normal £1.49.
+    expect(clampedFixedPrice(1.49, 5.00)).toBe(1.49)
+  })
+
+  it('clamps a negative fixed price up to 0', () => {
+    expect(clampedFixedPrice(1.49, -1)).toBe(0)
+  })
+
+  it('rounds to 2 decimal places', () => {
+    // 1.005 itself sits on a binary floating-point representation boundary
+    // (it's actually stored as ~1.00499999999999989) and would round down —
+    // the same class of trap the resultingPrice tests avoid by using
+    // 1.4501 instead of a bare .xx5 value. 1.0051 tests the same rounding
+    // behavior unambiguously.
+    expect(clampedFixedPrice(10.0, 1.0051)).toBeCloseTo(1.01, 2)
+  })
+})
+
+describe('totalAtThresholdFixed', () => {
+  it('multiplies the clamped per-unit price by minQty', () => {
+    expect(totalAtThresholdFixed(1.99, { minQty: 3, fixedPrice: 1.50 })).toBe(4.50)
+  })
+
+  it('uses the clamped price, not the raw one, when fixedPrice exceeds the base price', () => {
+    expect(totalAtThresholdFixed(1.49, { minQty: 3, fixedPrice: 5.00 })).toBeCloseTo(4.47, 2)
   })
 })
