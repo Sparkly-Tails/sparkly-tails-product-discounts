@@ -1,6 +1,6 @@
 import { createGroup } from '@/actions/discountActions'
 import GroupProductPicker from '@/components/GroupProductPicker'
-import TierFields from '@/components/TierFields'
+import PricingModeTierFields from '@/components/PricingModeTierFields'
 
 export default function NewGroupPage() {
   return (
@@ -29,7 +29,7 @@ export default function NewGroupPage() {
 
         <div>
           <p className="block text-sm font-medium mb-2">Tiers</p>
-          <TierFields />
+          <PricingModeTierFields />
           <p className="text-xs text-muted mt-2">
             Tiers apply to the combined quantity of every product in the group.
           </p>

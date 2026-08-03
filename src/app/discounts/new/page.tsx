@@ -1,6 +1,6 @@
 import { createDiscount } from '@/actions/discountActions'
 import ProductPicker from '@/components/ProductPicker'
-import TierFields from '@/components/TierFields'
+import PricingModeTierFields from '@/components/PricingModeTierFields'
 
 export default function NewDiscountPage() {
   return (
@@ -15,11 +15,7 @@ export default function NewDiscountPage() {
 
         <div>
           <p className="block text-sm font-medium mb-2">Tiers</p>
-          <TierFields />
-          <p className="text-xs text-muted mt-2">
-            Enter percent-off directly. The next screen shows the actual
-            resulting price before you go live.
-          </p>
+          <PricingModeTierFields />
         </div>
 
         <button
