@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import {
-  createDiscount, updateTiers, setStatus, deleteDiscount,
-  createGroup, updateGroupProducts, updateGroupTiers, setGroupStatus, deleteGroup,
+  createDiscount, updateTiers, updateTitle, setStatus, deleteDiscount,
+  createGroup, updateGroupProducts, updateGroupTiers, updateGroupTitle, setGroupStatus, deleteGroup,
 } from '@/actions/discountActions'
 import * as configLib from '@/lib/config'
 import * as authRedirect from '@/lib/auth-redirect'
@@ -19,16 +19,54 @@ describe('createDiscount', () => {
 
     const formData = new FormData()
     formData.set('productId', 'gid://shopify/Product/111')
+    formData.set('title', 'Tuna Soup')
     formData.set('tier-0-minQty', '5')
     formData.set('tier-0-percentOff', '10')
 
     await createDiscount(formData)
 
     expect(saveSpy).toHaveBeenCalledWith({
-      products: [{ productId: 'gid://shopify/Product/111', status: 'draft', pricingMode: 'percent', title: '', tiers: [{ minQty: 5, percentOff: 10 }] }],
+      products: [{ productId: 'gid://shopify/Product/111', status: 'draft', pricingMode: 'percent', title: 'Tuna Soup', tiers: [{ minQty: 5, percentOff: 10 }] }],
       groups: [],
     })
     expect(authRedirect.redirectWithToken).toHaveBeenCalledWith('/discounts/gid%3A%2F%2Fshopify%2FProduct%2F111')
+  })
+
+  it('requires a non-blank title', async () => {
+    vi.spyOn(configLib, 'getConfig').mockResolvedValue({ products: [], groups: [] })
+
+    const formData = new FormData()
+    formData.set('productId', 'gid://shopify/Product/111')
+    formData.set('title', '   ')
+    formData.set('tier-0-minQty', '5')
+    formData.set('tier-0-percentOff', '10')
+
+    await expect(createDiscount(formData)).rejects.toThrow('A title is required')
+  })
+
+  it('saves the trimmed title alongside a new discount', async () => {
+    vi.spyOn(configLib, 'getConfig').mockResolvedValue({ products: [], groups: [] })
+    const saveSpy = vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
+
+    const formData = new FormData()
+    formData.set('productId', 'gid://shopify/Product/111')
+    formData.set('title', '  Canagan Tuna Soup  ')
+    formData.set('pricingMode', 'percent')
+    formData.set('tier-0-minQty', '5')
+    formData.set('tier-0-percentOff', '10')
+
+    await createDiscount(formData)
+
+    expect(saveSpy).toHaveBeenCalledWith({
+      products: [{
+        productId: 'gid://shopify/Product/111',
+        status: 'draft',
+        pricingMode: 'percent',
+        title: 'Canagan Tuna Soup',
+        tiers: [{ minQty: 5, percentOff: 10 }],
+      }],
+      groups: [],
+    })
   })
 
   it('includes anchorPrice when provided, omits it when blank', async () => {
@@ -37,6 +75,7 @@ describe('createDiscount', () => {
 
     const formData = new FormData()
     formData.set('productId', 'gid://shopify/Product/111')
+    formData.set('title', 'Tuna Soup')
     formData.set('tier-0-minQty', '7')
     formData.set('tier-0-percentOff', '5')
     formData.set('tier-0-anchorPrice', '10.00')
@@ -49,7 +88,7 @@ describe('createDiscount', () => {
     expect(saveSpy).toHaveBeenCalledWith({
       products: [{
         productId: 'gid://shopify/Product/111',
-        status: 'draft', pricingMode: 'percent', title: '',
+        status: 'draft', pricingMode: 'percent', title: 'Tuna Soup',
         tiers: [
           { minQty: 7, percentOff: 5, anchorPrice: 10 },
           { minQty: 14, percentOff: 10 },
@@ -65,6 +104,7 @@ describe('createDiscount', () => {
 
     const formData = new FormData()
     formData.set('productId', 'gid://shopify/Product/111')
+    formData.set('title', 'Tuna Soup')
     formData.set('pricingMode', 'fixed')
     formData.set('tier-0-minQty', '1')
     formData.set('tier-0-fixedPrice', '1.70')
@@ -77,7 +117,7 @@ describe('createDiscount', () => {
       products: [{
         productId: 'gid://shopify/Product/111',
         status: 'draft',
-        pricingMode: 'fixed', title: '',
+        pricingMode: 'fixed', title: 'Tuna Soup',
         tiers: [
           { minQty: 1, fixedPrice: 1.70 },
           { minQty: 3, fixedPrice: 1.50 },
@@ -93,6 +133,7 @@ describe('createDiscount', () => {
 
     const formData = new FormData()
     formData.set('productId', 'gid://shopify/Product/111')
+    formData.set('title', 'Tuna Soup')
     formData.set('pricingMode', 'fixed')
     formData.set('tier-0-minQty', '1')
     formData.set('tier-0-fixedPrice', '1.70')
@@ -105,7 +146,7 @@ describe('createDiscount', () => {
       products: [{
         productId: 'gid://shopify/Product/111',
         status: 'draft',
-        pricingMode: 'fixed', title: '',
+        pricingMode: 'fixed', title: 'Tuna Soup',
         tiers: [{ minQty: 1, fixedPrice: 1.70 }],
       }],
       groups: [],
@@ -118,13 +159,14 @@ describe('createDiscount', () => {
 
     const formData = new FormData()
     formData.set('productId', 'gid://shopify/Product/111')
+    formData.set('title', 'Tuna Soup')
     formData.set('tier-0-minQty', '5')
     formData.set('tier-0-percentOff', '10')
 
     await createDiscount(formData)
 
     expect(saveSpy).toHaveBeenCalledWith({
-      products: [{ productId: 'gid://shopify/Product/111', status: 'draft', pricingMode: 'percent', title: '', tiers: [{ minQty: 5, percentOff: 10 }] }],
+      products: [{ productId: 'gid://shopify/Product/111', status: 'draft', pricingMode: 'percent', title: 'Tuna Soup', tiers: [{ minQty: 5, percentOff: 10 }] }],
       groups: [],
     })
   })
@@ -139,6 +181,7 @@ describe('createDiscount', () => {
   it('throws when no valid tier is provided', async () => {
     const formData = new FormData()
     formData.set('productId', 'gid://shopify/Product/111')
+    formData.set('title', 'Tuna Soup')
     await expect(createDiscount(formData)).rejects.toThrow('At least one tier is required')
   })
 
@@ -149,6 +192,7 @@ describe('createDiscount', () => {
     })
     const formData = new FormData()
     formData.set('productId', 'gid://shopify/Product/111')
+    formData.set('title', 'Tuna Soup')
     formData.set('tier-0-minQty', '5')
     formData.set('tier-0-percentOff', '10')
     await expect(createDiscount(formData)).rejects.toThrow('already has a discount or belongs to a group')
@@ -161,6 +205,7 @@ describe('createDiscount', () => {
     })
     const formData = new FormData()
     formData.set('productId', 'gid://shopify/Product/1')
+    formData.set('title', 'Tuna Soup')
     formData.set('tier-0-minQty', '5')
     formData.set('tier-0-percentOff', '10')
     await expect(createDiscount(formData)).rejects.toThrow('already has a discount or belongs to a group')
@@ -175,13 +220,14 @@ describe('createDiscount', () => {
 
     const formData = new FormData()
     formData.set('productId', 'gid://shopify/Product/111')
+    formData.set('title', 'Tuna Soup')
     formData.set('tier-0-minQty', '5')
     formData.set('tier-0-percentOff', '10')
 
     await createDiscount(formData)
 
     expect(saveSpy).toHaveBeenCalledWith({
-      products: [{ productId: 'gid://shopify/Product/111', status: 'draft', pricingMode: 'percent', title: '', tiers: [{ minQty: 5, percentOff: 10 }] }],
+      products: [{ productId: 'gid://shopify/Product/111', status: 'draft', pricingMode: 'percent', title: 'Tuna Soup', tiers: [{ minQty: 5, percentOff: 10 }] }],
       groups: [{ groupId: 'grp_a', name: 'A', status: 'live', pricingMode: 'percent', title: '', productIds: ['gid://shopify/Product/9'], tiers: [] }],
     })
   })
@@ -310,6 +356,67 @@ describe('updateTiers', () => {
   })
 })
 
+describe('updateTitle', () => {
+  beforeEach(() => vi.restoreAllMocks())
+
+  it('updates the title of an existing standalone discount and re-syncs the metafield when live', async () => {
+    vi.spyOn(configLib, 'getConfig').mockResolvedValue({
+      products: [{ productId: 'gid://shopify/Product/111', status: 'live', pricingMode: 'percent', title: 'Old Title', tiers: [{ minQty: 5, percentOff: 10 }] }],
+      groups: [],
+    })
+    const saveSpy = vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
+    const syncSpy = vi.spyOn(productTiers, 'syncProductTierMetafield').mockResolvedValue()
+
+    const formData = new FormData()
+    formData.set('title', 'New Title')
+
+    await updateTitle('gid://shopify/Product/111', formData)
+
+    expect(saveSpy).toHaveBeenCalledWith({
+      products: [{ productId: 'gid://shopify/Product/111', status: 'live', pricingMode: 'percent', title: 'New Title', tiers: [{ minQty: 5, percentOff: 10 }] }],
+      groups: [],
+    })
+    expect(syncSpy).toHaveBeenCalledWith('gid://shopify/Product/111', [{ minQty: 5, percentOff: 10 }], 'New Title')
+  })
+
+  it('does not sync the metafield when the discount is draft', async () => {
+    vi.spyOn(configLib, 'getConfig').mockResolvedValue({
+      products: [{ productId: 'gid://shopify/Product/111', status: 'draft', pricingMode: 'percent', title: 'Old Title', tiers: [] }],
+      groups: [],
+    })
+    vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
+    const syncSpy = vi.spyOn(productTiers, 'syncProductTierMetafield').mockResolvedValue()
+
+    const formData = new FormData()
+    formData.set('title', 'New Title')
+
+    await updateTitle('gid://shopify/Product/111', formData)
+
+    expect(syncSpy).not.toHaveBeenCalled()
+  })
+
+  it('throws when the title is blank', async () => {
+    vi.spyOn(configLib, 'getConfig').mockResolvedValue({
+      products: [{ productId: 'gid://shopify/Product/111', status: 'draft', pricingMode: 'percent', title: 'Old Title', tiers: [] }],
+      groups: [],
+    })
+
+    const formData = new FormData()
+    formData.set('title', '  ')
+
+    await expect(updateTitle('gid://shopify/Product/111', formData)).rejects.toThrow('A title is required')
+  })
+
+  it('throws when the discount does not exist', async () => {
+    vi.spyOn(configLib, 'getConfig').mockResolvedValue({ products: [], groups: [] })
+
+    const formData = new FormData()
+    formData.set('title', 'New Title')
+
+    await expect(updateTitle('gid://shopify/Product/999', formData)).rejects.toThrow('not found')
+  })
+})
+
 describe('setStatus', () => {
   beforeEach(() => vi.restoreAllMocks())
 
@@ -424,6 +531,7 @@ describe('createGroup', () => {
 
     const formData = formWithProducts(['gid://shopify/Product/1', 'gid://shopify/Product/2'])
     formData.set('name', 'Mix & Match Soups')
+    formData.set('title', 'Mix & Match Soups')
     formData.set('tier-0-minQty', '7')
     formData.set('tier-0-percentOff', '10')
 
@@ -435,7 +543,7 @@ describe('createGroup', () => {
         {
           groupId: 'grp_11111111-1111-1111-1111-111111111111',
           name: 'Mix & Match Soups',
-          status: 'draft', pricingMode: 'percent', title: '',
+          status: 'draft', pricingMode: 'percent', title: 'Mix & Match Soups',
           productIds: ['gid://shopify/Product/1', 'gid://shopify/Product/2'],
           tiers: [{ minQty: 7, percentOff: 10 }],
         },
@@ -444,6 +552,45 @@ describe('createGroup', () => {
     expect(authRedirect.redirectWithToken).toHaveBeenCalledWith(
       '/discounts/groups/grp_11111111-1111-1111-1111-111111111111',
     )
+  })
+
+  it('requires a non-blank title', async () => {
+    vi.spyOn(configLib, 'getConfig').mockResolvedValue({ products: [], groups: [] })
+
+    const formData = formWithProducts(['gid://shopify/Product/1', 'gid://shopify/Product/2'])
+    formData.set('name', 'Mix & Match Soups')
+    formData.set('title', '   ')
+    formData.set('tier-0-minQty', '7')
+    formData.set('tier-0-percentOff', '10')
+
+    await expect(createGroup(formData)).rejects.toThrow('A title is required')
+  })
+
+  it('saves the trimmed title alongside a new group', async () => {
+    vi.spyOn(configLib, 'getConfig').mockResolvedValue({ products: [], groups: [] })
+    const saveSpy = vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
+    vi.spyOn(crypto, 'randomUUID').mockReturnValue('11111111-1111-1111-1111-111111111111')
+
+    const formData = formWithProducts(['gid://shopify/Product/1', 'gid://shopify/Product/2'])
+    formData.set('name', 'Mix & Match Soups')
+    formData.set('title', '  Mix & Match Soup Bundle  ')
+    formData.set('tier-0-minQty', '7')
+    formData.set('tier-0-percentOff', '10')
+
+    await createGroup(formData)
+
+    expect(saveSpy).toHaveBeenCalledWith({
+      products: [],
+      groups: [
+        {
+          groupId: 'grp_11111111-1111-1111-1111-111111111111',
+          name: 'Mix & Match Soups',
+          status: 'draft', pricingMode: 'percent', title: 'Mix & Match Soup Bundle',
+          productIds: ['gid://shopify/Product/1', 'gid://shopify/Product/2'],
+          tiers: [{ minQty: 7, percentOff: 10 }],
+        },
+      ],
+    })
   })
 
   it('throws when the name is blank', async () => {
@@ -456,6 +603,7 @@ describe('createGroup', () => {
   it('throws when fewer than 2 products are provided', async () => {
     const formData = formWithProducts(['gid://shopify/Product/1'])
     formData.set('name', 'Solo')
+    formData.set('title', 'Solo')
     formData.set('tier-0-minQty', '7')
     formData.set('tier-0-percentOff', '10')
     await expect(createGroup(formData)).rejects.toThrow('at least 2 products')
@@ -464,6 +612,7 @@ describe('createGroup', () => {
   it('throws when no valid tier is provided', async () => {
     const formData = formWithProducts(['gid://shopify/Product/1', 'gid://shopify/Product/2'])
     formData.set('name', 'Soups')
+    formData.set('title', 'Soups')
     await expect(createGroup(formData)).rejects.toThrow('At least one tier is required')
   })
 
@@ -474,6 +623,7 @@ describe('createGroup', () => {
     })
     const formData = formWithProducts(['gid://shopify/Product/1', 'gid://shopify/Product/2'])
     formData.set('name', 'Soups')
+    formData.set('title', 'Soups')
     formData.set('tier-0-minQty', '7')
     formData.set('tier-0-percentOff', '10')
     await expect(createGroup(formData)).rejects.toThrow('already has a discount or belongs to another group')
@@ -486,6 +636,7 @@ describe('createGroup', () => {
     })
     const formData = formWithProducts(['gid://shopify/Product/1', 'gid://shopify/Product/2'])
     formData.set('name', 'Soups')
+    formData.set('title', 'Soups')
     formData.set('tier-0-minQty', '7')
     formData.set('tier-0-percentOff', '10')
     await expect(createGroup(formData)).rejects.toThrow('already has a discount or belongs to another group')
@@ -502,6 +653,7 @@ describe('createGroup', () => {
       'gid://shopify/Product/2',
     ])
     formData.set('name', 'Soups')
+    formData.set('title', 'Soups')
     formData.set('tier-0-minQty', '7')
     formData.set('tier-0-percentOff', '10')
 
@@ -513,7 +665,7 @@ describe('createGroup', () => {
         {
           groupId: 'grp_22222222-2222-2222-2222-222222222222',
           name: 'Soups',
-          status: 'draft', pricingMode: 'percent', title: '',
+          status: 'draft', pricingMode: 'percent', title: 'Soups',
           productIds: ['gid://shopify/Product/1', 'gid://shopify/Product/2'],
           tiers: [{ minQty: 7, percentOff: 10 }],
         },
@@ -530,6 +682,7 @@ describe('createGroup', () => {
     formData.set('product-0-id', 'gid://shopify/Product/1')
     formData.set('product-1-id', 'gid://shopify/Product/2')
     formData.set('name', 'Mix & Match Soups')
+    formData.set('title', 'Mix & Match Soups')
     formData.set('pricingMode', 'fixed')
     formData.set('tier-0-minQty', '1')
     formData.set('tier-0-fixedPrice', '1.70')
@@ -544,7 +697,7 @@ describe('createGroup', () => {
         groupId: 'grp_22222222-2222-2222-2222-222222222222',
         name: 'Mix & Match Soups',
         status: 'draft',
-        pricingMode: 'fixed', title: '',
+        pricingMode: 'fixed', title: 'Mix & Match Soups',
         productIds: ['gid://shopify/Product/1', 'gid://shopify/Product/2'],
         tiers: [
           { minQty: 1, fixedPrice: 1.70 },
@@ -647,6 +800,78 @@ describe('updateGroupTiers', () => {
       products: [],
       groups: [{ groupId: 'grp_a', name: 'Soups', status: 'draft', pricingMode: 'fixed', title: '', productIds: ['gid://shopify/Product/1', 'gid://shopify/Product/2'], tiers: [{ minQty: 1, fixedPrice: 1.70 }] }],
     })
+  })
+})
+
+describe('updateGroupTitle', () => {
+  beforeEach(() => vi.restoreAllMocks())
+
+  it('updates the title of an existing group and re-syncs the metafields when live', async () => {
+    vi.spyOn(configLib, 'getConfig').mockResolvedValue({
+      products: [],
+      groups: [{ groupId: 'grp_a', name: 'Soups', status: 'live', pricingMode: 'percent', title: 'Old Title', productIds: ['gid://shopify/Product/1', 'gid://shopify/Product/2'], tiers: [{ minQty: 5, percentOff: 10 }] }],
+    })
+    const saveSpy = vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
+    vi.spyOn(products, 'getGroupProductInfo').mockResolvedValue([
+      { productId: 'gid://shopify/Product/1', title: 'Tuna', handle: 'tuna', basePrice: 1.49 },
+      { productId: 'gid://shopify/Product/2', title: 'Chicken', handle: 'chicken', basePrice: 1.49 },
+    ])
+    const syncSpy = vi.spyOn(productTiers, 'syncGroupTierMetafield').mockResolvedValue()
+
+    const formData = new FormData()
+    formData.set('title', 'New Title')
+
+    await updateGroupTitle('grp_a', formData)
+
+    expect(saveSpy).toHaveBeenCalledWith({
+      products: [],
+      groups: [{ groupId: 'grp_a', name: 'Soups', status: 'live', pricingMode: 'percent', title: 'New Title', productIds: ['gid://shopify/Product/1', 'gid://shopify/Product/2'], tiers: [{ minQty: 5, percentOff: 10 }] }],
+    })
+    expect(syncSpy).toHaveBeenCalledWith('gid://shopify/Product/1', {
+      tiers: [{ minQty: 5, percentOff: 10 }],
+      siblings: [{ title: 'Chicken', handle: 'chicken' }],
+    })
+    expect(syncSpy).toHaveBeenCalledWith('gid://shopify/Product/2', {
+      tiers: [{ minQty: 5, percentOff: 10 }],
+      siblings: [{ title: 'Tuna', handle: 'tuna' }],
+    })
+  })
+
+  it('does not sync metafields when the group is draft', async () => {
+    vi.spyOn(configLib, 'getConfig').mockResolvedValue({
+      products: [],
+      groups: [{ groupId: 'grp_a', name: 'Soups', status: 'draft', pricingMode: 'percent', title: 'Old Title', productIds: ['gid://shopify/Product/1', 'gid://shopify/Product/2'], tiers: [] }],
+    })
+    vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
+    const syncSpy = vi.spyOn(productTiers, 'syncGroupTierMetafield').mockResolvedValue()
+
+    const formData = new FormData()
+    formData.set('title', 'New Title')
+
+    await updateGroupTitle('grp_a', formData)
+
+    expect(syncSpy).not.toHaveBeenCalled()
+  })
+
+  it('throws when the title is blank', async () => {
+    vi.spyOn(configLib, 'getConfig').mockResolvedValue({
+      products: [],
+      groups: [{ groupId: 'grp_a', name: 'Soups', status: 'draft', pricingMode: 'percent', title: 'Old Title', productIds: ['gid://shopify/Product/1', 'gid://shopify/Product/2'], tiers: [] }],
+    })
+
+    const formData = new FormData()
+    formData.set('title', '  ')
+
+    await expect(updateGroupTitle('grp_a', formData)).rejects.toThrow('A title is required')
+  })
+
+  it('throws when the group does not exist', async () => {
+    vi.spyOn(configLib, 'getConfig').mockResolvedValue({ products: [], groups: [] })
+
+    const formData = new FormData()
+    formData.set('title', 'New Title')
+
+    await expect(updateGroupTitle('grp_missing', formData)).rejects.toThrow('not found')
   })
 })
 
