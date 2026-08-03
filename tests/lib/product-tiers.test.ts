@@ -10,7 +10,7 @@ describe('syncProductTierMetafield', () => {
       metafieldsSet: { userErrors: [] },
     })
 
-    await syncProductTierMetafield('gid://shopify/Product/1', [{ minQty: 7, percentOff: 5 }])
+    await syncProductTierMetafield('gid://shopify/Product/1', [{ minQty: 7, percentOff: 5 }], 'Chicken Soup')
 
     expect(querySpy).toHaveBeenCalledWith(
       expect.stringContaining('metafieldsSet'),
@@ -21,7 +21,7 @@ describe('syncProductTierMetafield', () => {
             namespace: 'sparkly_product_discounts',
             key: 'tiers',
             type: 'json',
-            value: JSON.stringify({ tiers: [{ minQty: 7, percentOff: 5 }] }),
+            value: JSON.stringify({ title: 'Chicken Soup', tiers: [{ minQty: 7, percentOff: 5 }] }),
           },
         ],
       },
@@ -33,7 +33,7 @@ describe('syncProductTierMetafield', () => {
       metafieldsDelete: { userErrors: [] },
     })
 
-    await syncProductTierMetafield('gid://shopify/Product/1', null)
+    await syncProductTierMetafield('gid://shopify/Product/1', null, 'Chicken Soup')
 
     expect(querySpy).toHaveBeenCalledWith(
       expect.stringContaining('metafieldsDelete'),
@@ -55,7 +55,7 @@ describe('syncProductTierMetafield', () => {
     })
 
     await expect(
-      syncProductTierMetafield('gid://shopify/Product/1', [{ minQty: 5, percentOff: 10 }]),
+      syncProductTierMetafield('gid://shopify/Product/1', [{ minQty: 5, percentOff: 10 }], 'Chicken Soup'),
     ).rejects.toThrow('Invalid JSON')
   })
 
@@ -64,7 +64,26 @@ describe('syncProductTierMetafield', () => {
       metafieldsDelete: { userErrors: [{ field: ['metafields'], message: 'Not found' }] },
     })
 
-    await expect(syncProductTierMetafield('gid://shopify/Product/1', null)).rejects.toThrow('Not found')
+    await expect(syncProductTierMetafield('gid://shopify/Product/1', null, 'Chicken Soup')).rejects.toThrow('Not found')
+  })
+
+  it('includes the title in the synced tiers metafield JSON', async () => {
+    const spy = vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({
+      metafieldsSet: { userErrors: [] },
+    })
+
+    await syncProductTierMetafield('gid://shopify/Product/1', [{ minQty: 5, percentOff: 10 }], 'Canagan Tuna Soup')
+
+    expect(spy).toHaveBeenCalledWith(
+      expect.stringContaining('metafieldsSet'),
+      expect.objectContaining({
+        metafields: [
+          expect.objectContaining({
+            value: JSON.stringify({ title: 'Canagan Tuna Soup', tiers: [{ minQty: 5, percentOff: 10 }] }),
+          }),
+        ],
+      }),
+    )
   })
 })
 
@@ -77,6 +96,7 @@ describe('syncGroupTierMetafield', () => {
     })
 
     await syncGroupTierMetafield('gid://shopify/Product/1', {
+      title: 'Canagan treat',
       tiers: [{ minQty: 7, percentOff: 10 }],
       siblings: [{ title: 'Chicken Soup', handle: 'chicken-soup' }],
     })
@@ -91,6 +111,7 @@ describe('syncGroupTierMetafield', () => {
             key: 'group',
             type: 'json',
             value: JSON.stringify({
+              title: 'Canagan treat',
               tiers: [{ minQty: 7, percentOff: 10 }],
               siblings: [{ title: 'Chicken Soup', handle: 'chicken-soup' }],
             }),
@@ -123,7 +144,34 @@ describe('syncGroupTierMetafield', () => {
     })
 
     await expect(
-      syncGroupTierMetafield('gid://shopify/Product/1', { tiers: [], siblings: [] }),
+      syncGroupTierMetafield('gid://shopify/Product/1', { title: 'Canagan treat', tiers: [], siblings: [] }),
     ).rejects.toThrow('Invalid JSON')
+  })
+
+  it('includes the title in the synced group metafield JSON', async () => {
+    const spy = vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({
+      metafieldsSet: { userErrors: [] },
+    })
+
+    await syncGroupTierMetafield('gid://shopify/Product/1', {
+      title: 'Canagan treat',
+      tiers: [{ minQty: 7, percentOff: 10 }],
+      siblings: [{ title: 'Canagan Duck Pouch', handle: 'canagan-duck-pouch' }],
+    })
+
+    expect(spy).toHaveBeenCalledWith(
+      expect.stringContaining('metafieldsSet'),
+      expect.objectContaining({
+        metafields: [
+          expect.objectContaining({
+            value: JSON.stringify({
+              title: 'Canagan treat',
+              tiers: [{ minQty: 7, percentOff: 10 }],
+              siblings: [{ title: 'Canagan Duck Pouch', handle: 'canagan-duck-pouch' }],
+            }),
+          }),
+        ],
+      }),
+    )
   })
 })

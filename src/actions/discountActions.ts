@@ -99,7 +99,7 @@ export async function updateTiers(productId: string, formData: FormData): Promis
   await saveConfig(config)
 
   if (discount.status === 'live') {
-    await syncProductTierMetafield(productId, tiers)
+    await syncProductTierMetafield(productId, tiers, discount.title)
   }
 
   await redirectWithToken(`/discounts/${encodeURIComponent(productId)}`)
@@ -113,17 +113,20 @@ export async function setStatus(productId: string, status: 'draft' | 'live'): Pr
   discount.status = status
   await saveConfig(config)
 
-  await syncProductTierMetafield(productId, status === 'live' ? discount.tiers : null)
+  await syncProductTierMetafield(productId, status === 'live' ? discount.tiers : null, discount.title)
 
   await redirectWithToken(`/discounts/${encodeURIComponent(productId)}`)
 }
 
 export async function deleteDiscount(productId: string): Promise<void> {
   const config = await getConfig()
+  const discount = config.products.find((p) => p.productId === productId)
+  if (!discount) throw new Error(`Discount for product ${productId} not found`)
+
   const remaining = config.products.filter((p) => p.productId !== productId)
   await saveConfig({ ...config, products: remaining })
 
-  await syncProductTierMetafield(productId, null)
+  await syncProductTierMetafield(productId, null, discount.title)
 
   await redirectWithToken('/')
 }
@@ -166,7 +169,7 @@ async function syncGroupMetafields(group: GroupDiscount): Promise<void> {
         const siblings = members
           .filter((m) => m.productId !== productId)
           .map((m) => ({ title: m.title, handle: m.handle }))
-        return syncGroupTierMetafield(productId, { tiers: group.tiers, siblings })
+        return syncGroupTierMetafield(productId, { title: group.title, tiers: group.tiers, siblings })
       }),
   )
 }

@@ -3,7 +3,7 @@ import type { Tier } from '@/lib/config'
 
 const NAMESPACE = 'sparkly_product_discounts'
 
-export async function syncProductTierMetafield(productId: string, tiers: Tier[] | null): Promise<void> {
+export async function syncProductTierMetafield(productId: string, tiers: Tier[] | null, title: string): Promise<void> {
   if (tiers === null) {
     const data = await shopifyQuery<{
       metafieldsDelete: { userErrors: { field: string[]; message: string }[] }
@@ -41,7 +41,7 @@ export async function syncProductTierMetafield(productId: string, tiers: Tier[] 
           namespace: NAMESPACE,
           key: 'tiers',
           type: 'json',
-          value: JSON.stringify({ tiers }),
+          value: JSON.stringify({ title, tiers }),
         },
       ],
     },
@@ -53,6 +53,7 @@ export async function syncProductTierMetafield(productId: string, tiers: Tier[] 
 }
 
 export interface GroupTierSyncData {
+  title: string
   tiers: Tier[]
   siblings: { title: string; handle: string }[]
 }

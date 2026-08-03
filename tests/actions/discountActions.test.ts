@@ -284,7 +284,7 @@ describe('updateTiers', () => {
 
     await updateTiers('gid://shopify/Product/111', formData)
 
-    expect(syncSpy).toHaveBeenCalledWith('gid://shopify/Product/111', [{ minQty: 3, percentOff: 5 }])
+    expect(syncSpy).toHaveBeenCalledWith('gid://shopify/Product/111', [{ minQty: 3, percentOff: 5 }], '')
   })
 
   it('does not sync the per-product metafield when the discount is still draft', async () => {
@@ -446,7 +446,7 @@ describe('setStatus', () => {
 
     await setStatus('gid://shopify/Product/111', 'live')
 
-    expect(syncSpy).toHaveBeenCalledWith('gid://shopify/Product/111', [{ minQty: 5, percentOff: 10 }])
+    expect(syncSpy).toHaveBeenCalledWith('gid://shopify/Product/111', [{ minQty: 5, percentOff: 10 }], '')
   })
 
   it('deletes the per-product metafield when flipping to draft', async () => {
@@ -459,7 +459,7 @@ describe('setStatus', () => {
 
     await setStatus('gid://shopify/Product/111', 'draft')
 
-    expect(syncSpy).toHaveBeenCalledWith('gid://shopify/Product/111', null)
+    expect(syncSpy).toHaveBeenCalledWith('gid://shopify/Product/111', null, '')
   })
 })
 
@@ -495,7 +495,7 @@ describe('deleteDiscount', () => {
 
     await deleteDiscount('gid://shopify/Product/111')
 
-    expect(syncSpy).toHaveBeenCalledWith('gid://shopify/Product/111', null)
+    expect(syncSpy).toHaveBeenCalledWith('gid://shopify/Product/111', null, '')
   })
 
   it('preserves existing groups when deleting a standalone discount', async () => {
@@ -757,10 +757,12 @@ describe('updateGroupTiers', () => {
     await updateGroupTiers('grp_a', formData)
 
     expect(syncSpy).toHaveBeenCalledWith('gid://shopify/Product/1', {
+      title: '',
       tiers: [{ minQty: 3, percentOff: 5 }],
       siblings: [{ title: 'Chicken', handle: 'chicken' }],
     })
     expect(syncSpy).toHaveBeenCalledWith('gid://shopify/Product/2', {
+      title: '',
       tiers: [{ minQty: 3, percentOff: 5 }],
       siblings: [{ title: 'Tuna', handle: 'tuna' }],
     })
@@ -828,10 +830,12 @@ describe('updateGroupTitle', () => {
       groups: [{ groupId: 'grp_a', name: 'Soups', status: 'live', pricingMode: 'percent', title: 'New Title', productIds: ['gid://shopify/Product/1', 'gid://shopify/Product/2'], tiers: [{ minQty: 5, percentOff: 10 }] }],
     })
     expect(syncSpy).toHaveBeenCalledWith('gid://shopify/Product/1', {
+      title: 'New Title',
       tiers: [{ minQty: 5, percentOff: 10 }],
       siblings: [{ title: 'Chicken', handle: 'chicken' }],
     })
     expect(syncSpy).toHaveBeenCalledWith('gid://shopify/Product/2', {
+      title: 'New Title',
       tiers: [{ minQty: 5, percentOff: 10 }],
       siblings: [{ title: 'Tuna', handle: 'tuna' }],
     })
