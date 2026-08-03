@@ -64,8 +64,87 @@ function sumGroupQuantityInCart(cartItems, handles) {
     .reduce((sum, item) => sum + item.quantity, 0)
 }
 
+function unitPriceAtTier(basePrice, tier) {
+  if (tier.fixedPrice != null) {
+    return Math.min(Math.max(tier.fixedPrice, 0), basePrice)
+  }
+  return perUnitPrice(basePrice, tier.minQty, {
+    percentOff: tier.percentOff != null ? tier.percentOff : 0,
+    anchorPrice: tier.anchorPrice != null ? tier.anchorPrice : null,
+    fixedPrice: null,
+    minQty: tier.minQty,
+  })
+}
+
+function totalAtTier(basePrice, tier) {
+  return Math.round(unitPriceAtTier(basePrice, tier) * tier.minQty * 100) / 100
+}
+
+function computeProgressState(tiers, otherQty, addingQty) {
+  const sorted = tiers.slice().sort((a, b) => a.minQty - b.minQty)
+  const topThreshold = sorted[sorted.length - 1].minQty
+  const combinedQty = otherQty + addingQty
+  const tierState = computeTierState(sorted, combinedQty)
+
+  const cartPct = topThreshold > 0 ? Math.min(100, Math.round((otherQty / topThreshold) * 100)) : 0
+  const addedPctRaw = topThreshold > 0 ? Math.round((addingQty / topThreshold) * 100) : 0
+  const addedPct = Math.max(0, Math.min(100 - cartPct, addedPctRaw))
+  const rawCalloutPct = topThreshold > 0 ? Math.round((combinedQty / topThreshold) * 100) : 0
+  const calloutPct = Math.max(6, Math.min(94, rawCalloutPct))
+  const maxed = combinedQty >= topThreshold
+
+  const tierButtons = sorted.map((t) => ({ minQty: t.minQty, active: addingQty === t.minQty }))
+
+  let tempBox = null
+  for (let i = 0; i < sorted.length - 1; i++) {
+    if (addingQty > sorted[i].minQty && addingQty < sorted[i + 1].minQty) {
+      tempBox = { afterIndex: i, tier: sorted[i + 1] }
+      break
+    }
+  }
+
+  return { combinedQty, topThreshold, cartPct, addedPct, calloutPct, maxed, tierState, tierButtons, tempBox }
+}
+
+function formatCalloutText(progressState, tiers, basePrice, formatMoney) {
+  if (progressState.maxed) {
+    const topTier = tiers.slice().sort((a, b) => a.minQty - b.minQty).pop()
+    return progressState.combinedQty + ' combined · ' + formatMoney(unitPriceAtTier(basePrice, topTier)) + ' each'
+  }
+  const next = progressState.tierState.nextTier
+  return progressState.combinedQty + ' of ' + next.minQty + ' · ' + next.delta + ' more for ' + formatMoney(
+    next.fixedPrice != null ? next.fixedPrice : unitPriceAtTier(basePrice, { minQty: next.minQty, percentOff: next.percentOff, anchorPrice: null }),
+  )
+}
+
+function formatTempBoxLabel(progressState, basePrice, addingQty, formatMoney) {
+  if (!progressState.tempBox) return ''
+  const total = Math.round(unitPriceAtTier(basePrice, progressState.tempBox.tier) * addingQty * 100) / 100
+  return addingQty + 'x ' + formatMoney(total)
+}
+
+function buildPromoText(tiers, basePrice, formatMoney, isGroup, title) {
+  const sorted = tiers.slice().sort((a, b) => a.minQty - b.minQty)
+  const clauses = sorted.slice(1).map((t) => t.minQty + '+ unlocks ' + formatMoney(unitPriceAtTier(basePrice, t)) + ' each')
+  const hasTitle = title != null && title !== ''
+  const prefix = isGroup
+    ? (hasTitle ? 'Mix & match any ' + title + ' — ' : 'Mix & match — ')
+    : (hasTitle ? 'Buy more ' + title + ' — ' : 'Buy more, save more — ')
+  return prefix + clauses.join(', ')
+}
+
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { computeTierState, perUnitPrice, sumGroupQuantityInCart }
+  module.exports = {
+    computeTierState,
+    perUnitPrice,
+    sumGroupQuantityInCart,
+    unitPriceAtTier,
+    totalAtTier,
+    computeProgressState,
+    formatCalloutText,
+    formatTempBoxLabel,
+    buildPromoText,
+  }
 }
 
 if (typeof document !== 'undefined') {
