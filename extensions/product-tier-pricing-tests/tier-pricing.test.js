@@ -9,8 +9,8 @@ test('below every tier: no discount, lists every tier as a delta from current qu
   assert.equal(result.percentOff, 0)
   assert.equal(result.nextTier, null)
   assert.deepEqual(result.remainingTiers, [
-    { minQty: 7, percentOff: 5, delta: 4 },
-    { minQty: 14, percentOff: 10, delta: 11 },
+    { minQty: 7, percentOff: 5, fixedPrice: null, delta: 4 },
+    { minQty: 14, percentOff: 10, fixedPrice: null, delta: 11 },
   ])
 })
 
@@ -19,7 +19,7 @@ test('between tiers: applies the lower tier, nudges toward the single next tier 
   const result = computeTierState(tiers, 9)
 
   assert.equal(result.percentOff, 5)
-  assert.deepEqual(result.nextTier, { minQty: 14, percentOff: 10, delta: 5 })
+  assert.deepEqual(result.nextTier, { minQty: 14, percentOff: 10, fixedPrice: null, delta: 5 })
   assert.equal(result.remainingTiers, null)
 })
 
@@ -45,7 +45,7 @@ test('single-tier product: below the tier', () => {
 
   assert.equal(result.percentOff, 0)
   assert.equal(result.nextTier, null)
-  assert.deepEqual(result.remainingTiers, [{ minQty: 7, percentOff: 5, delta: 5 }])
+  assert.deepEqual(result.remainingTiers, [{ minQty: 7, percentOff: 5, fixedPrice: null, delta: 5 }])
 })
 
 test('single-tier product: at the tier, never produces a next-tier state', () => {
@@ -69,7 +69,7 @@ test('handles tiers passed out of order', () => {
   const result = computeTierState(tiers, 9)
 
   assert.equal(result.percentOff, 5)
-  assert.deepEqual(result.nextTier, { minQty: 14, percentOff: 10, delta: 5 })
+  assert.deepEqual(result.nextTier, { minQty: 14, percentOff: 10, fixedPrice: null, delta: 5 })
 })
 
 test('a tier with no anchorPrice reports anchorPrice: null', () => {
@@ -108,6 +108,36 @@ test('perUnitPrice: clamps an anchor above sticker price down to full price, nev
   // negative discount, so the true charge is full price; mirror that here.
   const state = { percentOff: 10, anchorPrice: 50, minQty: 5 }
   assert.equal(perUnitPrice(2.0, 5, state), 2.0)
+})
+
+test('computeTierState: a reached fixed-price tier reports fixedPrice, percentOff stays 0', () => {
+  const tiers = [{ minQty: 1, fixedPrice: 1.70 }, { minQty: 3, fixedPrice: 1.50 }]
+  const result = computeTierState(tiers, 3)
+
+  assert.equal(result.percentOff, 0)
+  assert.equal(result.fixedPrice, 1.50)
+  assert.equal(result.minQty, 3)
+})
+
+test('computeTierState: below the lowest fixed-price tier reports no discount and lists fixedPrice on remaining tiers', () => {
+  const tiers = [{ minQty: 3, fixedPrice: 1.50 }]
+  const result = computeTierState(tiers, 1)
+
+  assert.equal(result.fixedPrice, null)
+  assert.deepEqual(result.remainingTiers, [{ minQty: 3, percentOff: undefined, fixedPrice: 1.50, delta: 2 }])
+})
+
+test('computeTierState: between fixed-price tiers, nextTier carries the next fixedPrice', () => {
+  const tiers = [{ minQty: 1, fixedPrice: 1.70 }, { minQty: 3, fixedPrice: 1.50 }]
+  const result = computeTierState(tiers, 2)
+
+  assert.equal(result.fixedPrice, 1.70)
+  assert.deepEqual(result.nextTier, { minQty: 3, percentOff: undefined, fixedPrice: 1.50, delta: 1 })
+})
+
+test('perUnitPrice: a fixed-price state returns the fixed price directly, ignoring quantity', () => {
+  const state = { percentOff: 0, anchorPrice: null, fixedPrice: 1.50, minQty: 3 }
+  assert.equal(perUnitPrice(1.99, 5, state), 1.50)
 })
 
 test('sumGroupQuantityInCart: sums quantities of cart items matching the given handles', () => {

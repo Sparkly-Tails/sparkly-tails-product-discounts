@@ -7,35 +7,47 @@ function computeTierState(tiers, quantity) {
     return {
       percentOff: 0,
       anchorPrice: null,
+      fixedPrice: null,
       minQty: null,
       nextTier: null,
       remainingTiers: notReached.map((t) => ({
         minQty: t.minQty,
         percentOff: t.percentOff,
+        fixedPrice: t.fixedPrice != null ? t.fixedPrice : null,
         delta: t.minQty - quantity,
       })),
     }
   }
 
   const reachedTier = reached[reached.length - 1]
-  const percentOff = reachedTier.percentOff
+  const percentOff = reachedTier.percentOff != null ? reachedTier.percentOff : 0
   const anchorPrice = reachedTier.anchorPrice != null ? reachedTier.anchorPrice : null
+  const fixedPrice = reachedTier.fixedPrice != null ? reachedTier.fixedPrice : null
 
   if (notReached.length === 0) {
-    return { percentOff, anchorPrice, minQty: reachedTier.minQty, nextTier: null, remainingTiers: null }
+    return { percentOff, anchorPrice, fixedPrice, minQty: reachedTier.minQty, nextTier: null, remainingTiers: null }
   }
 
   const next = notReached[0]
   return {
     percentOff,
     anchorPrice,
+    fixedPrice,
     minQty: reachedTier.minQty,
-    nextTier: { minQty: next.minQty, percentOff: next.percentOff, delta: next.minQty - quantity },
+    nextTier: {
+      minQty: next.minQty,
+      percentOff: next.percentOff,
+      fixedPrice: next.fixedPrice != null ? next.fixedPrice : null,
+      delta: next.minQty - quantity,
+    },
     remainingTiers: null,
   }
 }
 
 function perUnitPrice(basePrice, quantity, state) {
+  if (state.fixedPrice != null) {
+    return state.fixedPrice
+  }
   if (state.anchorPrice == null) {
     return basePrice * (1 - state.percentOff / 100)
   }
@@ -73,7 +85,8 @@ if (typeof document !== 'undefined') {
     const state = computeTierState(tiers, quantity)
 
     let discounted
-    if (state.percentOff > 0) {
+    const isDiscounted = state.fixedPrice != null || state.percentOff > 0
+    if (isDiscounted) {
       discounted = perUnitPrice(basePrice, quantity, state)
       priceEl.innerHTML =
         '<s>' + formatMoney(basePrice, moneyFormat) + '</s> ' + formatMoney(discounted, moneyFormat)
@@ -81,19 +94,36 @@ if (typeof document !== 'undefined') {
       priceEl.textContent = formatMoney(basePrice, moneyFormat)
     }
 
-    if (state.percentOff > 0) {
+    if (state.fixedPrice != null) {
+      const priceLine = formatMoney(state.fixedPrice, moneyFormat) + ' each'
+      if (state.nextTier) {
+        const nextLabel =
+          state.nextTier.fixedPrice != null
+            ? formatMoney(state.nextTier.fixedPrice, moneyFormat) + ' each'
+            : state.nextTier.percentOff + '% Off'
+        messageEl.innerHTML = priceLine + '<br>Add ' + state.nextTier.delta + ' more for ' + nextLabel
+      } else {
+        messageEl.textContent = priceLine
+      }
+    } else if (state.percentOff > 0) {
       const savings = basePrice - discounted
       const discountLine = 'Discount ' + state.percentOff + '% off (-' + formatMoney(savings, moneyFormat) + ')'
 
       if (state.nextTier) {
-        messageEl.innerHTML =
-          discountLine + '<br>Add ' + state.nextTier.delta + ' more for ' + state.nextTier.percentOff + '% Off'
+        const nextLabel =
+          state.nextTier.fixedPrice != null
+            ? formatMoney(state.nextTier.fixedPrice, moneyFormat) + ' each'
+            : state.nextTier.percentOff + '% Off'
+        messageEl.innerHTML = discountLine + '<br>Add ' + state.nextTier.delta + ' more for ' + nextLabel
       } else {
         messageEl.textContent = discountLine
       }
     } else if (state.remainingTiers && state.remainingTiers.length > 0) {
       messageEl.textContent = state.remainingTiers
-        .map((t) => 'Add ' + t.delta + ' for ' + t.percentOff + '% Off')
+        .map((t) => {
+          const label = t.fixedPrice != null ? formatMoney(t.fixedPrice, moneyFormat) + ' each' : t.percentOff + '% Off'
+          return 'Add ' + t.delta + ' for ' + label
+        })
         .join(' or ')
     } else {
       messageEl.textContent = ''
