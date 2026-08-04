@@ -1,6 +1,9 @@
 {
   "name": "Tier pricing",
   "price_font_size_label": "Price font size",
+  "moss_color_label": "Progress bar / accent color",
+  "cream_color_label": "Tier card background color",
+  "sun_color_label": "\"Adding now\" bar segment color",
   "custom_css_label": "Custom CSS",
   "custom_css_info": "Advanced. Applies only to this block."
 }

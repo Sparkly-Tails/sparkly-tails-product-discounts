@@ -1,6 +1,6 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
-const { computeTierState, perUnitPrice, sumGroupQuantityInCart } = require('../product-tier-pricing/assets/tier-pricing.js')
+const { computeTierState, perUnitPrice, sumGroupQuantityInCart, unitPriceAtTier, totalAtTier, computeProgressState, formatCalloutText, formatTempBoxLabel, buildPromoText, computeOrderSummary, computeTierButtonsSignature } = require('../product-tier-pricing/assets/tier-pricing.js')
 
 test('below every tier: no discount, lists every tier as a delta from current quantity', () => {
   const tiers = [{ minQty: 7, percentOff: 5 }, { minQty: 14, percentOff: 10 }]
@@ -140,6 +140,11 @@ test('perUnitPrice: a fixed-price state returns the fixed price directly, ignori
   assert.equal(perUnitPrice(1.99, 5, state), 1.50)
 })
 
+test('perUnitPrice: a fixed price above base price clamps to base price, never a markup', () => {
+  const state = { percentOff: 0, anchorPrice: null, fixedPrice: 5.0, minQty: 3 }
+  assert.equal(perUnitPrice(1.49, 5, state), 1.49)
+})
+
 test('sumGroupQuantityInCart: sums quantities of cart items matching the given handles', () => {
   const items = [
     { handle: 'tuna-soup', quantity: 3 },
@@ -157,4 +162,239 @@ test('sumGroupQuantityInCart: returns 0 for an empty cart', () => {
 test('sumGroupQuantityInCart: ignores items whose handle is not in the list', () => {
   const items = [{ handle: 'unrelated', quantity: 10 }]
   assert.equal(sumGroupQuantityInCart(items, ['tuna-soup']), 0)
+})
+
+test('unitPriceAtTier: percent tier with no anchor returns basePrice minus percentOff', () => {
+  const tier = { minQty: 7, percentOff: 10 }
+  assert.equal(unitPriceAtTier(1.99, tier), 1.791)
+})
+
+test('unitPriceAtTier: anchor tier returns anchorPrice divided by minQty', () => {
+  const tier = { minQty: 7, percentOff: 5, anchorPrice: 10.0 }
+  assert.equal(unitPriceAtTier(1.49, tier), 10.0 / 7)
+})
+
+test('unitPriceAtTier: fixed tier returns the clamped fixed price directly', () => {
+  const tier = { minQty: 3, fixedPrice: 1.5 }
+  assert.equal(unitPriceAtTier(1.99, tier), 1.5)
+})
+
+test('unitPriceAtTier: fixed price above base price clamps to base price, never a markup', () => {
+  const tier = { minQty: 1, fixedPrice: 5.0 }
+  assert.equal(unitPriceAtTier(1.49, tier), 1.49)
+})
+
+test('totalAtTier: fixed tier multiplies clamped unit price by minQty, rounded to whole pence', () => {
+  const tier = { minQty: 3, fixedPrice: 1.5 }
+  assert.equal(totalAtTier(1.99, tier), 4.5)
+})
+
+test('totalAtTier: anchor tier returns exactly the anchorPrice (minQty units, no extra accrual)', () => {
+  const tier = { minQty: 7, percentOff: 5, anchorPrice: 10.0 }
+  assert.equal(totalAtTier(1.49, tier), 10.0)
+})
+
+test('computeProgressState: below the lowest tier, no segments filled, not maxed', () => {
+  const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 7, percentOff: 5 }, { minQty: 20, percentOff: 10 }]
+  const state = computeProgressState(tiers, 0, 1)
+
+  assert.equal(state.combinedQty, 1)
+  assert.equal(state.topThreshold, 20)
+  assert.equal(state.cartPct, 0)
+  assert.equal(state.addedPct, 5) // round(1/20*100)
+  assert.equal(state.maxed, false)
+})
+
+test('computeProgressState: otherQty contributes its own bar segment, excluded from addedPct', () => {
+  const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 7, percentOff: 5 }, { minQty: 20, percentOff: 10 }]
+  const state = computeProgressState(tiers, 2, 1)
+
+  assert.equal(state.combinedQty, 3)
+  assert.equal(state.cartPct, 10) // round(2/20*100)
+  assert.equal(state.addedPct, 5) // round(1/20*100)
+})
+
+test('computeProgressState: callout percent is clamped between 6 and 94', () => {
+  const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 20, percentOff: 10 }]
+  const almostNothing = computeProgressState(tiers, 0, 1)
+  assert.equal(almostNothing.calloutPct, 6)
+
+  const almostFull = computeProgressState(tiers, 0, 19)
+  assert.equal(almostFull.calloutPct, 94) // raw 95, clamped down
+})
+
+test('computeProgressState: reaching the top tier reports maxed and a 0 tierRemaining', () => {
+  const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 7, percentOff: 5 }, { minQty: 20, percentOff: 10 }]
+  const state = computeProgressState(tiers, 2, 18)
+
+  assert.equal(state.combinedQty, 20)
+  assert.equal(state.maxed, true)
+  assert.equal(state.tierState.nextTier, null)
+})
+
+test('computeProgressState: addedPct never exceeds the remaining room left by cartPct, even if otherQty alone already maxes the bar', () => {
+  const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 20, percentOff: 10 }]
+  const state = computeProgressState(tiers, 25, 3)
+
+  assert.equal(state.cartPct, 100)
+  assert.equal(state.addedPct, 0)
+  assert.equal(state.combinedQty, 28)
+  assert.equal(state.maxed, true)
+})
+
+test('computeProgressState: tierButtons marks exactly the button matching addingQty as active, ignoring otherQty', () => {
+  const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 7, percentOff: 5 }, { minQty: 20, percentOff: 10 }]
+  const state = computeProgressState(tiers, 5, 7)
+
+  assert.deepEqual(state.tierButtons, [
+    { minQty: 1, active: false },
+    { minQty: 7, active: true },
+    { minQty: 20, active: false },
+  ])
+})
+
+test('computeProgressState: tempBox appears between two tiers based on addingQty alone, not combinedQty', () => {
+  const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 7, percentOff: 5 }, { minQty: 20, percentOff: 10 }]
+  const between = computeProgressState(tiers, 10, 3) // addingQty 3 is between 1 and 7
+  assert.deepEqual(between.tempBox, { afterIndex: 0, tier: { minQty: 7, percentOff: 5 } })
+
+  const atExactTier = computeProgressState(tiers, 10, 7)
+  assert.equal(atExactTier.tempBox, null)
+
+  const pastTop = computeProgressState(tiers, 10, 25)
+  assert.equal(pastTop.tempBox, null)
+})
+
+test('computeProgressState: a single-tier discount has no tempBox and a top threshold equal to that one tier', () => {
+  const tiers = [{ minQty: 5, percentOff: 10 }]
+  const state = computeProgressState(tiers, 0, 2)
+
+  assert.equal(state.topThreshold, 5)
+  assert.equal(state.tempBox, null)
+  assert.deepEqual(state.tierButtons, [{ minQty: 5, active: false }])
+})
+
+test('computeTierButtonsSignature: differs when addingQty changes within the same inter-tier gap', () => {
+  const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 7, percentOff: 5 }, { minQty: 20, percentOff: 10 }]
+  const stateAt2 = computeProgressState(tiers, 0, 2)
+  const stateAt3 = computeProgressState(tiers, 0, 3)
+
+  // Both 2 and 3 sit strictly between tiers 1 and 7, so tierButtons/tempBox
+  // shape is identical — only addingQty differs.
+  assert.deepEqual(stateAt2.tierButtons, stateAt3.tierButtons)
+  assert.deepEqual(stateAt2.tempBox, stateAt3.tempBox)
+
+  const sigAt2 = computeTierButtonsSignature(stateAt2, 1.49, 2)
+  const sigAt3 = computeTierButtonsSignature(stateAt3, 1.49, 3)
+  assert.notEqual(sigAt2, sigAt3)
+})
+
+test('computeTierButtonsSignature: differs when basePrice changes (e.g. variant switch), even with identical tierButtons/tempBox/addingQty', () => {
+  const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 7, percentOff: 5 }, { minQty: 20, percentOff: 10 }]
+  const state = computeProgressState(tiers, 0, 3)
+
+  const sigOldPrice = computeTierButtonsSignature(state, 1.49, 3)
+  const sigNewPrice = computeTierButtonsSignature(state, 2.99, 3)
+  assert.notEqual(sigOldPrice, sigNewPrice)
+})
+
+test('computeTierButtonsSignature: identical state/addingQty/basePrice produce an equal signature, preserving poll-suppression', () => {
+  const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 7, percentOff: 5 }, { minQty: 20, percentOff: 10 }]
+  const stateA = computeProgressState(tiers, 0, 3)
+  const stateB = computeProgressState(tiers, 0, 3)
+
+  const sigA = computeTierButtonsSignature(stateA, 1.49, 3)
+  const sigB = computeTierButtonsSignature(stateB, 1.49, 3)
+  assert.equal(sigA, sigB)
+})
+
+function fmt(n) {
+  return '£' + n.toFixed(2)
+}
+
+test('formatCalloutText: below the top tier shows progress toward the next tier', () => {
+  const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 7, percentOff: 5 }, { minQty: 20, percentOff: 10 }]
+  const state = computeProgressState(tiers, 2, 1)
+  const text = formatCalloutText(state, tiers, 1.49, fmt)
+  assert.equal(text, '3 of 7 · 4 more for £1.42')
+})
+
+test('formatCalloutText: at the top tier shows the combined total and final price, no "more for"', () => {
+  const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 7, percentOff: 5 }, { minQty: 20, percentOff: 10 }]
+  const state = computeProgressState(tiers, 12, 8)
+  const text = formatCalloutText(state, tiers, 1.49, fmt)
+  assert.equal(text, '20 combined · £1.34 each')
+})
+
+test('formatCalloutText: next tier is a fixed price above base price, clamps to base price (never a markup)', () => {
+  const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 7, fixedPrice: 5.0 }, { minQty: 20, percentOff: 10 }]
+  const state = computeProgressState(tiers, 2, 1)
+  const text = formatCalloutText(state, tiers, 1.49, fmt)
+  assert.equal(text, '3 of 7 · 4 more for £1.49')
+})
+
+test('formatCalloutText: below every tier (no tier with minQty 1), falls back to remainingTiers instead of throwing on a null nextTier', () => {
+  const tiers = [{ minQty: 7, percentOff: 5 }, { minQty: 20, percentOff: 10 }]
+  const state = computeProgressState(tiers, 0, 1)
+  const text = formatCalloutText(state, tiers, 1.49, fmt)
+  assert.equal(text, '1 of 7 · 6 more for £1.42')
+})
+
+test('computeProgressState: below every tier (no tier with minQty 1) does not throw, and documents that nextTier is null while remainingTiers is populated', () => {
+  const tiers = [{ minQty: 7, percentOff: 5 }, { minQty: 20, percentOff: 10 }]
+  const state = computeProgressState(tiers, 0, 1)
+
+  assert.equal(state.combinedQty, 1)
+  assert.equal(state.maxed, false)
+  assert.equal(state.tierState.nextTier, null)
+  assert.deepEqual(state.tierState.remainingTiers, [
+    { minQty: 7, percentOff: 5, fixedPrice: null, delta: 6 },
+    { minQty: 20, percentOff: 10, fixedPrice: null, delta: 19 },
+  ])
+})
+
+test('formatTempBoxLabel: quantity, "x", the total at the next tier\'s blended rate — no "=" sign', () => {
+  const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 7, percentOff: 5 }, { minQty: 20, percentOff: 10 }]
+  const state = computeProgressState(tiers, 0, 5)
+  const label = formatTempBoxLabel(state, 1.49, 5, fmt)
+  // next tier is minQty 7 @ 5% off => unit 1.4155, 5 * 1.4155 = 7.0775 -> rounds to 7.08
+  assert.equal(label, '5x £7.08')
+})
+
+test('buildPromoText: group mode with a title uses "Mix & match any {title}"', () => {
+  const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 7, percentOff: 5 }, { minQty: 20, percentOff: 10 }]
+  const text = buildPromoText(tiers, 1.49, fmt, true, 'Canagan treat')
+  assert.equal(text, 'Mix & match any Canagan treat — 7+ unlocks £1.42 each, 20+ unlocks £1.34 each')
+})
+
+test('buildPromoText: group mode with no title falls back to generic copy', () => {
+  const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 7, percentOff: 5 }]
+  const text = buildPromoText(tiers, 1.49, fmt, true, undefined)
+  assert.equal(text, 'Mix & match — 7+ unlocks £1.42 each')
+})
+
+test('buildPromoText: standalone mode with a title uses "Buy more {title}"', () => {
+  const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 7, percentOff: 5 }]
+  const text = buildPromoText(tiers, 1.49, fmt, false, 'Canagan Tuna Soup')
+  assert.equal(text, 'Buy more Canagan Tuna Soup — 7+ unlocks £1.42 each')
+})
+
+test('buildPromoText: standalone mode with no title falls back to generic copy', () => {
+  const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 7, percentOff: 5 }]
+  const text = buildPromoText(tiers, 1.49, fmt, false, '')
+  assert.equal(text, 'Buy more, save more — 7+ unlocks £1.42 each')
+})
+
+test('computeOrderSummary: no discount, no savings line', () => {
+  const summary = computeOrderSummary(1.49, 3, 1.49)
+  assert.equal(summary.total, 4.47)
+  assert.equal(summary.fullPrice, 4.47)
+  assert.equal(summary.savings, 0)
+})
+
+test('computeOrderSummary: discounted unit price reports savings vs full price', () => {
+  const summary = computeOrderSummary(1.49, 5, 1.42)
+  assert.equal(summary.total, 7.1)
+  assert.equal(summary.fullPrice, 7.45)
+  assert.equal(summary.savings, 0.35)
 })

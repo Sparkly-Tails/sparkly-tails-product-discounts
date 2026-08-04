@@ -46,7 +46,7 @@ function computeTierState(tiers, quantity) {
 
 function perUnitPrice(basePrice, quantity, state) {
   if (state.fixedPrice != null) {
-    return state.fixedPrice
+    return Math.min(Math.max(state.fixedPrice, 0), basePrice)
   }
   if (state.anchorPrice == null) {
     return basePrice * (1 - state.percentOff / 100)
@@ -64,8 +64,103 @@ function sumGroupQuantityInCart(cartItems, handles) {
     .reduce((sum, item) => sum + item.quantity, 0)
 }
 
+function unitPriceAtTier(basePrice, tier) {
+  if (tier.fixedPrice != null) {
+    return Math.min(Math.max(tier.fixedPrice, 0), basePrice)
+  }
+  return perUnitPrice(basePrice, tier.minQty, {
+    percentOff: tier.percentOff != null ? tier.percentOff : 0,
+    anchorPrice: tier.anchorPrice != null ? tier.anchorPrice : null,
+    fixedPrice: null,
+    minQty: tier.minQty,
+  })
+}
+
+function totalAtTier(basePrice, tier) {
+  return Math.round(unitPriceAtTier(basePrice, tier) * tier.minQty * 100) / 100
+}
+
+function computeProgressState(tiers, otherQty, addingQty) {
+  const sorted = tiers.slice().sort((a, b) => a.minQty - b.minQty)
+  const topThreshold = sorted[sorted.length - 1].minQty
+  const combinedQty = otherQty + addingQty
+  const tierState = computeTierState(sorted, combinedQty)
+
+  const cartPct = topThreshold > 0 ? Math.min(100, Math.round((otherQty / topThreshold) * 100)) : 0
+  const addedPctRaw = topThreshold > 0 ? Math.round((addingQty / topThreshold) * 100) : 0
+  const addedPct = Math.max(0, Math.min(100 - cartPct, addedPctRaw))
+  const rawCalloutPct = topThreshold > 0 ? Math.round((combinedQty / topThreshold) * 100) : 0
+  const calloutPct = Math.max(6, Math.min(94, rawCalloutPct))
+  const maxed = combinedQty >= topThreshold
+
+  const tierButtons = sorted.map((t) => ({ minQty: t.minQty, active: addingQty === t.minQty }))
+
+  let tempBox = null
+  for (let i = 0; i < sorted.length - 1; i++) {
+    if (addingQty > sorted[i].minQty && addingQty < sorted[i + 1].minQty) {
+      tempBox = { afterIndex: i, tier: sorted[i + 1] }
+      break
+    }
+  }
+
+  return { combinedQty, topThreshold, cartPct, addedPct, calloutPct, maxed, tierState, tierButtons, tempBox }
+}
+
+function formatCalloutText(progressState, tiers, basePrice, formatMoney) {
+  if (progressState.maxed) {
+    const topTier = tiers.slice().sort((a, b) => a.minQty - b.minQty).pop()
+    return progressState.combinedQty + ' combined · ' + formatMoney(unitPriceAtTier(basePrice, topTier)) + ' each'
+  }
+  const ts = progressState.tierState
+  const next = ts.nextTier || (ts.remainingTiers && ts.remainingTiers[0])
+  return progressState.combinedQty + ' of ' + next.minQty + ' · ' + next.delta + ' more for ' + formatMoney(
+    unitPriceAtTier(basePrice, next),
+  )
+}
+
+function formatTempBoxLabel(progressState, basePrice, addingQty, formatMoney) {
+  if (!progressState.tempBox) return ''
+  const total = Math.round(unitPriceAtTier(basePrice, progressState.tempBox.tier) * addingQty * 100) / 100
+  return addingQty + 'x ' + formatMoney(total)
+}
+
+function computeOrderSummary(basePrice, addingQty, unitPrice) {
+  const total = Math.round(unitPrice * addingQty * 100) / 100
+  const fullPrice = Math.round(basePrice * addingQty * 100) / 100
+  const savings = Math.round((fullPrice - total) * 100) / 100
+  return { total, fullPrice, savings }
+}
+
+function buildPromoText(tiers, basePrice, formatMoney, isGroup, title) {
+  const sorted = tiers.slice().sort((a, b) => a.minQty - b.minQty)
+  const clauses = sorted.slice(1).map((t) => t.minQty + '+ unlocks ' + formatMoney(unitPriceAtTier(basePrice, t)) + ' each')
+  const hasTitle = title != null && title !== ''
+  const prefix = isGroup
+    ? (hasTitle ? 'Mix & match any ' + title + ' — ' : 'Mix & match — ')
+    : (hasTitle ? 'Buy more ' + title + ' — ' : 'Buy more, save more — ')
+  return prefix + clauses.join(', ')
+}
+
+function computeTierButtonsSignature(state, basePrice, addingQty) {
+  return JSON.stringify(state.tierButtons) + '|' +
+    (state.tempBox ? state.tempBox.afterIndex + ':' + state.tempBox.tier.minQty : 'none') +
+    '|' + addingQty + '|' + basePrice
+}
+
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { computeTierState, perUnitPrice, sumGroupQuantityInCart }
+  module.exports = {
+    computeTierState,
+    perUnitPrice,
+    sumGroupQuantityInCart,
+    unitPriceAtTier,
+    totalAtTier,
+    computeProgressState,
+    formatCalloutText,
+    formatTempBoxLabel,
+    buildPromoText,
+    computeOrderSummary,
+    computeTierButtonsSignature,
+  }
 }
 
 if (typeof document !== 'undefined') {
@@ -74,60 +169,161 @@ if (typeof document !== 'undefined') {
     return format.replace(/\{\{\s*amount\s*\}\}/, withDecimals)
   }
 
-  function renderTierPricing(container, tiers, moneyFormat, quantityOverride) {
+  function renderTierPricing(container, tiers, moneyFormat, otherQty, title, isGroup, tierButtonsSignatureRef) {
     const priceEl = container.querySelector('[data-tier-pricing-price]')
     const messageEl = container.querySelector('[data-tier-pricing-message]')
+    const promoEl = container.querySelector('[data-tier-pricing-promo]')
+    const cardEl = container.querySelector('[data-tier-pricing-card]')
     const basePrice = Number(container.dataset.basePrice)
     const quantityInput = document.querySelector('input[name="quantity"]')
-    const selectorQuantity = quantityInput ? Number(quantityInput.value) || 1 : 1
-    const quantity = quantityOverride != null ? quantityOverride : selectorQuantity
+    const addingQty = quantityInput ? Number(quantityInput.value) || 1 : 1
 
-    const state = computeTierState(tiers, quantity)
+    if (!tiers || tiers.length === 0) {
+      priceEl.textContent = formatMoney(basePrice, moneyFormat)
+      if (cardEl) cardEl.hidden = true
+      if (promoEl) promoEl.textContent = ''
+      messageEl.textContent = ''
+      return
+    }
 
-    let discounted
-    const isDiscounted = state.fixedPrice != null || state.percentOff > 0
+    const state = computeProgressState(tiers, otherQty || 0, addingQty)
+    // The price-per-unit AT THE CURRENT COMBINED QUANTITY (which may sit
+    // anywhere within the reached tier's range, not just at its own
+    // minQty) — reuse the existing perUnitPrice exactly as the standalone
+    // path always has, rather than unitPriceAtTier (Task 1), which is for
+    // "price at a SPECIFIC tier's own minQty" (tier buttons/labels), a
+    // different question that would silently mis-price anchor tiers here.
+    const unit = perUnitPrice(basePrice, state.combinedQty, state.tierState)
+    const isDiscounted = state.tierState.fixedPrice != null || state.tierState.percentOff > 0
+
     if (isDiscounted) {
-      discounted = perUnitPrice(basePrice, quantity, state)
-      priceEl.innerHTML =
-        '<s>' + formatMoney(basePrice, moneyFormat) + '</s> ' + formatMoney(discounted, moneyFormat)
+      priceEl.innerHTML = '<s>' + formatMoney(basePrice, moneyFormat) + '</s> ' + formatMoney(unit, moneyFormat)
     } else {
       priceEl.textContent = formatMoney(basePrice, moneyFormat)
     }
 
-    if (state.fixedPrice != null) {
-      const priceLine = formatMoney(state.fixedPrice, moneyFormat) + ' each'
-      if (state.nextTier) {
-        const nextLabel =
-          state.nextTier.fixedPrice != null
-            ? formatMoney(state.nextTier.fixedPrice, moneyFormat) + ' each'
-            : state.nextTier.percentOff + '% Off'
-        messageEl.innerHTML = priceLine + '<br>Add ' + state.nextTier.delta + ' more for ' + nextLabel
-      } else {
-        messageEl.textContent = priceLine
-      }
-    } else if (state.percentOff > 0) {
-      const savings = basePrice - discounted
-      const discountLine = 'Discount ' + state.percentOff + '% off (-' + formatMoney(savings, moneyFormat) + ')'
-
-      if (state.nextTier) {
-        const nextLabel =
-          state.nextTier.fixedPrice != null
-            ? formatMoney(state.nextTier.fixedPrice, moneyFormat) + ' each'
-            : state.nextTier.percentOff + '% Off'
-        messageEl.innerHTML = discountLine + '<br>Add ' + state.nextTier.delta + ' more for ' + nextLabel
-      } else {
-        messageEl.textContent = discountLine
-      }
-    } else if (state.remainingTiers && state.remainingTiers.length > 0) {
-      messageEl.textContent = state.remainingTiers
-        .map((t) => {
-          const label = t.fixedPrice != null ? formatMoney(t.fixedPrice, moneyFormat) + ' each' : t.percentOff + '% Off'
-          return 'Add ' + t.delta + ' for ' + label
-        })
-        .join(' or ')
-    } else {
-      messageEl.textContent = ''
+    if (promoEl) {
+      promoEl.textContent = tiers.length > 1 ? buildPromoText(tiers, basePrice, (n) => formatMoney(n, moneyFormat), isGroup, title) : ''
     }
+
+    if (cardEl) {
+      cardEl.hidden = false
+      renderProgressCard(container, state, tiers, basePrice, addingQty, moneyFormat, tierButtonsSignatureRef)
+    }
+
+    messageEl.textContent = formatCalloutText(state, tiers, basePrice, (n) => formatMoney(n, moneyFormat))
+
+    const totalEl = container.querySelector('[data-tier-pricing-total]')
+    const totalValueEl = container.querySelector('[data-tier-pricing-total-value]')
+    const totalBreakdownEl = container.querySelector('[data-tier-pricing-total-breakdown]')
+    if (totalEl) {
+      const summary = computeOrderSummary(basePrice, addingQty, unit)
+      totalEl.hidden = false
+      totalValueEl.textContent = 'Total ' + formatMoney(summary.total, moneyFormat)
+      const unitLabel = addingQty === 1 ? ' unit' : ' units'
+      let breakdown = addingQty + unitLabel + ' × ' + formatMoney(unit, moneyFormat)
+      if (summary.savings > 0) {
+        breakdown += ' · full price ' + formatMoney(summary.fullPrice, moneyFormat) + ' — you save ' + formatMoney(summary.savings, moneyFormat)
+      }
+      totalBreakdownEl.textContent = breakdown
+    }
+  }
+
+  function renderProgressCard(container, state, tiers, basePrice, addingQty, moneyFormat, tierButtonsSignatureRef) {
+    const calloutEl = container.querySelector('[data-tier-pricing-callout]')
+    const tickEl = container.querySelector('[data-tier-pricing-tick]')
+    const cartSegmentEl = container.querySelector('[data-tier-pricing-cart-segment]')
+    const addingSegmentEl = container.querySelector('[data-tier-pricing-adding-segment]')
+    const dotEl = container.querySelector('[data-tier-pricing-dot]')
+    const scaleEl = container.querySelector('[data-tier-pricing-scale]')
+    const tiersEl = container.querySelector('[data-tier-pricing-tiers]')
+
+    calloutEl.textContent = formatCalloutText(state, tiers, basePrice, (n) => formatMoney(n, moneyFormat))
+    calloutEl.style.left = state.calloutPct + '%'
+    tickEl.style.left = state.calloutPct + '%'
+    dotEl.style.left = state.calloutPct + '%'
+    cartSegmentEl.style.width = state.cartPct + '%'
+    addingSegmentEl.style.width = state.addedPct + '%'
+
+    const sorted = tiers.slice().sort((a, b) => a.minQty - b.minQty)
+    scaleEl.innerHTML = ''
+    const zeroLabel = document.createElement('span')
+    zeroLabel.textContent = '0'
+    scaleEl.appendChild(zeroLabel)
+    sorted.slice(1).forEach((t) => {
+      const label = document.createElement('span')
+      label.textContent = t.minQty + ' · ' + formatMoney(unitPriceAtTier(basePrice, t), moneyFormat) + ' ea'
+      scaleEl.appendChild(label)
+    })
+
+    // Rebuilding this section (tier buttons + the dashed temp-box) is
+    // destructive: it replays the temp-box's fade/scale-in animation and
+    // clears any focus the customer has placed on a tier button. In group
+    // mode this render runs on a 1-second poll, so we skip the rebuild
+    // entirely when nothing that affects it has actually changed since the
+    // last render. `tierButtonsSignatureRef.value` starts at null, which
+    // never equals a real (string) signature, so the very first render for
+    // this container always populates the buttons.
+    const tierButtonsSignature = computeTierButtonsSignature(state, basePrice, addingQty)
+    if (tierButtonsSignatureRef && tierButtonsSignatureRef.value === tierButtonsSignature) {
+      return
+    }
+    if (tierButtonsSignatureRef) {
+      tierButtonsSignatureRef.value = tierButtonsSignature
+    }
+
+    tiersEl.innerHTML = ''
+    state.tierButtons.forEach((btn, i) => {
+      const el = document.createElement('button')
+      el.type = 'button'
+      el.className = 'sparkly-tier-pricing__tier-btn' + (btn.active ? ' sparkly-tier-pricing__tier-btn--active' : '')
+      el.textContent = btn.minQty + ' x ' + formatMoney(totalAtTier(basePrice, sorted[i]), moneyFormat)
+      el.addEventListener('click', () => setQuantityInput(btn.minQty))
+      tiersEl.appendChild(el)
+
+      if (state.tempBox && state.tempBox.afterIndex === i) {
+        const temp = document.createElement('span')
+        temp.className = 'sparkly-tier-pricing__temp-btn'
+        temp.textContent = formatTempBoxLabel(state, basePrice, addingQty, (n) => formatMoney(n, moneyFormat))
+        tiersEl.appendChild(temp)
+      }
+    })
+  }
+
+  function setQuantityInput(value) {
+    const input = document.querySelector('input[name="quantity"]')
+    if (!input) return
+    input.value = String(value)
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    input.dispatchEvent(new Event('change', { bubbles: true }))
+  }
+
+  function renderMixMatchList(listEl, siblings) {
+    listEl.innerHTML = ''
+    siblings.forEach((s) => {
+      const row = document.createElement('a')
+      row.href = '/products/' + s.handle
+      row.className = 'sparkly-tier-pricing__list-item'
+
+      if (s.imageUrl) {
+        const img = document.createElement('img')
+        img.src = s.imageUrl
+        img.alt = s.title
+        img.className = 'sparkly-tier-pricing__list-thumb'
+        row.appendChild(img)
+      } else {
+        const placeholder = document.createElement('span')
+        placeholder.className = 'sparkly-tier-pricing__list-thumb sparkly-tier-pricing__list-thumb--placeholder'
+        row.appendChild(placeholder)
+      }
+
+      const name = document.createElement('span')
+      name.className = 'sparkly-tier-pricing__list-name'
+      name.textContent = s.title
+      row.appendChild(name)
+
+      listEl.appendChild(row)
+    })
   }
 
   async function fetchCart() {
@@ -135,50 +331,55 @@ if (typeof document !== 'undefined') {
     return res.json()
   }
 
-  function renderGroupLinks(container, siblings) {
-    const linksEl = container.querySelector('[data-tier-pricing-group-links]')
-    if (!linksEl) return
-    linksEl.textContent = ''
-    if (!siblings || siblings.length === 0) return
-    siblings.forEach((s, i) => {
-      if (i > 0) linksEl.appendChild(document.createTextNode(', '))
-      const a = document.createElement('a')
-      a.href = '/products/' + s.handle
-      a.textContent = s.title
-      linksEl.appendChild(a)
-    })
-  }
-
   function initTierPricing() {
     const containers = document.querySelectorAll('[data-sparkly-tier-pricing]')
     containers.forEach((container) => {
-      const standaloneTiers = JSON.parse(container.dataset.tiers).tiers
+      const standaloneData = JSON.parse(container.dataset.tiers)
       const moneyFormat = JSON.parse(container.dataset.moneyFormat)
       const group = JSON.parse(container.dataset.group)
       const productHandle = JSON.parse(container.dataset.productHandle)
-      const tiers = group ? group.tiers : standaloneTiers
+      const tiers = group ? group.tiers : standaloneData.tiers
+      const title = group ? group.title : standaloneData.title
 
-      // Group mode always reflects the REAL cart, never the on-page
-      // quantity selector — the selector's value isn't in the cart until
-      // Add to Cart is actually submitted, and this theme doesn't reset it
-      // afterwards, so treating it as "pending" caused the discount to
-      // show for quantities that were never really in the cart. Simpler
-      // and correct: only ever trust what /cart.js reports.
+      // Per-container signature of the last-rendered tier buttons/temp-box,
+      // used by renderProgressCard to skip rebuilding that section's DOM
+      // when nothing relevant changed (e.g. on every tick of the group-mode
+      // 1s cart poll below). null is a sentinel that can never equal a real
+      // (string) signature, so the first render always populates it.
+      const tierButtonsSignatureRef = { value: null }
+
+      // Group mode combines two sources: otherQty from the REAL cart (only
+      // sibling products, fetched fresh from /cart.js — this product's own
+      // cart-resident quantity is deliberately excluded, see the plan's
+      // "Combined-quantity formula" note) plus addingQty, the live on-page
+      // quantity selector value for this product. Standalone mode ignores
+      // the cart entirely and uses addingQty alone.
       async function renderWithGroupAwareness() {
         if (!group) {
-          renderTierPricing(container, tiers, moneyFormat)
+          renderTierPricing(container, tiers, moneyFormat, 0, title, false, tierButtonsSignatureRef)
           return
         }
-        const handles = [productHandle].concat(group.siblings.map((s) => s.handle))
-        let cartQuantity = 0
+        const siblingHandles = group.siblings.map((s) => s.handle)
+        let otherQty = 0
         try {
           const cart = await fetchCart()
-          cartQuantity = sumGroupQuantityInCart(cart.items, handles)
+          otherQty = sumGroupQuantityInCart(cart.items, siblingHandles)
         } catch {
-          cartQuantity = 0
+          otherQty = 0
         }
-        renderTierPricing(container, tiers, moneyFormat, cartQuantity)
-        renderGroupLinks(container, group.siblings)
+        renderTierPricing(container, tiers, moneyFormat, otherQty, title, true, tierButtonsSignatureRef)
+      }
+
+      const toggleEl = container.querySelector('[data-tier-pricing-toggle]')
+      const listEl = container.querySelector('[data-tier-pricing-list]')
+      if (toggleEl && listEl && group) {
+        let open = false
+        toggleEl.addEventListener('click', () => {
+          open = !open
+          listEl.hidden = !open
+          toggleEl.textContent = 'mix & match products ' + (open ? '▲' : '▼')
+          if (open) renderMixMatchList(listEl, group.siblings)
+        })
       }
 
       renderWithGroupAwareness()
@@ -191,8 +392,8 @@ if (typeof document !== 'undefined') {
         // This theme's +/- stepper buttons set the input's value
         // programmatically without dispatching input/change on it, so we
         // hook the buttons' own click events directly instead of polling
-        // for a value change. Only affects the standalone (non-group)
-        // price preview now — group mode ignores the selector entirely.
+        // for a value change. Affects both standalone and group mode now,
+        // since group mode also reads the selector as addingQty.
         // Scoped to this quantity widget (not document-wide) since the
         // cart drawer's own per-line steppers use the same aria-labels.
         // Deferred one tick so we read the value after the theme's own
