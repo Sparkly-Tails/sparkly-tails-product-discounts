@@ -31,6 +31,7 @@
 
 .sparkly-tier-pricing__price s {
   font-weight: 400;
+  font-size: 75%;
   opacity: 0.6;
   text-decoration: line-through;
 }

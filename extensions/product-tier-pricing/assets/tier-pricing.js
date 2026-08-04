@@ -195,7 +195,7 @@ if (typeof document !== 'undefined') {
     const isDiscounted = state.tierState.fixedPrice != null || state.tierState.percentOff > 0
 
     if (isDiscounted) {
-      priceEl.innerHTML = '<s>' + formatMoney(basePrice, moneyFormat) + '</s> ' + formatMoney(unit, moneyFormat)
+      priceEl.innerHTML = formatMoney(unit, moneyFormat) + ' <s>' + formatMoney(basePrice, moneyFormat) + '</s>'
     } else {
       priceEl.textContent = formatMoney(basePrice, moneyFormat)
     }
