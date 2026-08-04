@@ -123,6 +123,13 @@ function formatTempBoxLabel(progressState, basePrice, addingQty, formatMoney) {
   return addingQty + 'x ' + formatMoney(total)
 }
 
+function computeOrderSummary(basePrice, addingQty, unitPrice) {
+  const total = Math.round(unitPrice * addingQty * 100) / 100
+  const fullPrice = Math.round(basePrice * addingQty * 100) / 100
+  const savings = Math.round((fullPrice - total) * 100) / 100
+  return { total, fullPrice, savings }
+}
+
 function buildPromoText(tiers, basePrice, formatMoney, isGroup, title) {
   const sorted = tiers.slice().sort((a, b) => a.minQty - b.minQty)
   const clauses = sorted.slice(1).map((t) => t.minQty + '+ unlocks ' + formatMoney(unitPriceAtTier(basePrice, t)) + ' each')
@@ -144,6 +151,7 @@ if (typeof module !== 'undefined' && module.exports) {
     formatCalloutText,
     formatTempBoxLabel,
     buildPromoText,
+    computeOrderSummary,
   }
 }
 
@@ -196,6 +204,21 @@ if (typeof document !== 'undefined') {
     }
 
     messageEl.textContent = formatCalloutText(state, tiers, basePrice, (n) => formatMoney(n, moneyFormat))
+
+    const totalEl = container.querySelector('[data-tier-pricing-total]')
+    const totalValueEl = container.querySelector('[data-tier-pricing-total-value]')
+    const totalBreakdownEl = container.querySelector('[data-tier-pricing-total-breakdown]')
+    if (totalEl) {
+      const summary = computeOrderSummary(basePrice, addingQty, unit)
+      totalEl.hidden = false
+      totalValueEl.textContent = 'Total ' + formatMoney(summary.total, moneyFormat)
+      const unitLabel = addingQty === 1 ? ' unit' : ' units'
+      let breakdown = addingQty + unitLabel + ' × ' + formatMoney(unit, moneyFormat)
+      if (summary.savings > 0) {
+        breakdown += ' · full price ' + formatMoney(summary.fullPrice, moneyFormat) + ' — you save ' + formatMoney(summary.savings, moneyFormat)
+      }
+      totalBreakdownEl.textContent = breakdown
+    }
   }
 
   function renderProgressCard(container, state, tiers, basePrice, addingQty, moneyFormat) {

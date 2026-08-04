@@ -1,6 +1,6 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
-const { computeTierState, perUnitPrice, sumGroupQuantityInCart, unitPriceAtTier, totalAtTier, computeProgressState, formatCalloutText, formatTempBoxLabel, buildPromoText } = require('../product-tier-pricing/assets/tier-pricing.js')
+const { computeTierState, perUnitPrice, sumGroupQuantityInCart, unitPriceAtTier, totalAtTier, computeProgressState, formatCalloutText, formatTempBoxLabel, buildPromoText, computeOrderSummary } = require('../product-tier-pricing/assets/tier-pricing.js')
 
 test('below every tier: no discount, lists every tier as a delta from current quantity', () => {
   const tiers = [{ minQty: 7, percentOff: 5 }, { minQty: 14, percentOff: 10 }]
@@ -324,4 +324,18 @@ test('buildPromoText: standalone mode with no title falls back to generic copy',
   const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 7, percentOff: 5 }]
   const text = buildPromoText(tiers, 1.49, fmt, false, '')
   assert.equal(text, 'Buy more, save more — 7+ unlocks £1.42 each')
+})
+
+test('computeOrderSummary: no discount, no savings line', () => {
+  const summary = computeOrderSummary(1.49, 3, 1.49)
+  assert.equal(summary.total, 4.47)
+  assert.equal(summary.fullPrice, 4.47)
+  assert.equal(summary.savings, 0)
+})
+
+test('computeOrderSummary: discounted unit price reports savings vs full price', () => {
+  const summary = computeOrderSummary(1.49, 5, 1.42)
+  assert.equal(summary.total, 7.1)
+  assert.equal(summary.fullPrice, 7.45)
+  assert.equal(summary.savings, 0.35)
 })
