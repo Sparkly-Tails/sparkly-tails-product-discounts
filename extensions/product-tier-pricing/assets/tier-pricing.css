@@ -20,14 +20,19 @@
 
 .sparkly-tier-pricing__price {
   font-family: var(--font-stack-headings);
-  font-weight: var(--font-weight-body-bold, 700);
+  /* Hardcoded rather than var(--font-weight-body-bold): this theme sets
+     that var to 500 for body copy, which is lighter than the struck-out
+     price below it (600) and inverts the intended hierarchy — the
+     discounted price is the one that should read as bold/primary. */
+  font-weight: 700;
   font-size: var(--sparkly-tier-price-font-size, 2.5rem);
   color: var(--sparkly-tier-ink);
 }
 
 .sparkly-tier-pricing__price s {
-  font-weight: 600;
-  opacity: 0.75;
+  font-weight: 400;
+  font-size: 75%;
+  opacity: 0.6;
   text-decoration: line-through;
 }
 
@@ -210,28 +215,19 @@
   color: var(--sparkly-tier-ink);
 }
 
-.sparkly-tier-pricing__total {
-  min-height: 44px;
-  margin-top: 14px;
-}
-
-.sparkly-tier-pricing__total-value {
-  font-family: var(--font-stack-headings);
-  font-weight: 700;
-  font-size: 15px;
-  color: var(--sparkly-tier-moss, #434625);
-}
-
-.sparkly-tier-pricing__total-breakdown {
+.sparkly-tier-pricing__list-qty {
+  flex: none;
   font-family: var(--font-stack-body);
   font-size: 12px;
   color: var(--sparkly-tier-text-secondary);
-  margin-top: 2px;
+  white-space: nowrap;
 }
 
-.sparkly-tier-pricing__message {
-  font-size: 0.9em;
-  opacity: 0.8;
+.sparkly-tier-pricing__breakdown {
+  font-family: var(--font-stack-body);
+  font-size: 12px;
+  color: var(--sparkly-tier-text-secondary);
+  margin-bottom: 14px;
 }
 
 @keyframes sparklyTierFadeIn {

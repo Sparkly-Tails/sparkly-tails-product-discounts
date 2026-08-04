@@ -95,15 +95,36 @@ function computeProgressState(tiers, otherQty, addingQty) {
 
   const tierButtons = sorted.map((t) => ({ minQty: t.minQty, active: addingQty === t.minQty }))
 
+  // The dashed box previews the running total AT THE RATE ALREADY IN EFFECT
+  // for this in-between quantity — i.e. sorted[i], the lower/just-crossed
+  // boundary — not sorted[i + 1] (the not-yet-reached tier above it). This
+  // matches the design reference (mkV2 in widget-reference.dc.html): zone 1
+  // (qty strictly between the qty:1 anchor and the first real tier) prices
+  // at plain base rate, and each zone above prices at whichever tier's
+  // threshold the quantity has already passed.
   let tempBox = null
   for (let i = 0; i < sorted.length - 1; i++) {
     if (addingQty > sorted[i].minQty && addingQty < sorted[i + 1].minQty) {
-      tempBox = { afterIndex: i, tier: sorted[i + 1] }
+      tempBox = { afterIndex: i, tier: sorted[i] }
       break
     }
   }
 
   return { combinedQty, topThreshold, cartPct, addedPct, calloutPct, maxed, tierState, tierButtons, tempBox }
+}
+
+// Prepends a synthetic { minQty: 1, percentOff: 0 } tier when the config
+// doesn't already define one at quantity 1, so the tier-button row always
+// has a "1 x <base price>" anchor button and the dashed temp-box mechanism
+// covers the 2..first-tier-1 range too (previously that gap never rendered
+// a temp box, since the loop above needs at least two entries to bracket
+// a quantity between). Price-neutral: a 0%-off tier reached below any real
+// discount computes to the same base price computeTierState already
+// returns when no tier is reached at all.
+function withUnitAnchor(tiers) {
+  if (!tiers || tiers.length === 0) return tiers
+  if (tiers.some((t) => t.minQty === 1)) return tiers
+  return [{ minQty: 1, percentOff: 0 }].concat(tiers)
 }
 
 function formatCalloutText(progressState, tiers, basePrice, formatMoney) {
@@ -160,6 +181,7 @@ if (typeof module !== 'undefined' && module.exports) {
     buildPromoText,
     computeOrderSummary,
     computeTierButtonsSignature,
+    withUnitAnchor,
   }
 }
 
@@ -171,7 +193,6 @@ if (typeof document !== 'undefined') {
 
   function renderTierPricing(container, tiers, moneyFormat, otherQty, title, isGroup, tierButtonsSignatureRef) {
     const priceEl = container.querySelector('[data-tier-pricing-price]')
-    const messageEl = container.querySelector('[data-tier-pricing-message]')
     const promoEl = container.querySelector('[data-tier-pricing-promo]')
     const cardEl = container.querySelector('[data-tier-pricing-card]')
     const basePrice = Number(container.dataset.basePrice)
@@ -182,7 +203,6 @@ if (typeof document !== 'undefined') {
       priceEl.textContent = formatMoney(basePrice, moneyFormat)
       if (cardEl) cardEl.hidden = true
       if (promoEl) promoEl.textContent = ''
-      messageEl.textContent = ''
       return
     }
 
@@ -197,7 +217,7 @@ if (typeof document !== 'undefined') {
     const isDiscounted = state.tierState.fixedPrice != null || state.tierState.percentOff > 0
 
     if (isDiscounted) {
-      priceEl.innerHTML = '<s>' + formatMoney(basePrice, moneyFormat) + '</s> ' + formatMoney(unit, moneyFormat)
+      priceEl.innerHTML = formatMoney(unit, moneyFormat) + ' <s>' + formatMoney(basePrice, moneyFormat) + '</s>'
     } else {
       priceEl.textContent = formatMoney(basePrice, moneyFormat)
     }
@@ -211,21 +231,15 @@ if (typeof document !== 'undefined') {
       renderProgressCard(container, state, tiers, basePrice, addingQty, moneyFormat, tierButtonsSignatureRef)
     }
 
-    messageEl.textContent = formatCalloutText(state, tiers, basePrice, (n) => formatMoney(n, moneyFormat))
-
-    const totalEl = container.querySelector('[data-tier-pricing-total]')
-    const totalValueEl = container.querySelector('[data-tier-pricing-total-value]')
-    const totalBreakdownEl = container.querySelector('[data-tier-pricing-total-breakdown]')
-    if (totalEl) {
+    const breakdownEl = container.querySelector('[data-tier-pricing-breakdown]')
+    if (breakdownEl) {
       const summary = computeOrderSummary(basePrice, addingQty, unit)
-      totalEl.hidden = false
-      totalValueEl.textContent = 'Total ' + formatMoney(summary.total, moneyFormat)
       const unitLabel = addingQty === 1 ? ' unit' : ' units'
       let breakdown = addingQty + unitLabel + ' × ' + formatMoney(unit, moneyFormat)
       if (summary.savings > 0) {
         breakdown += ' · full price ' + formatMoney(summary.fullPrice, moneyFormat) + ' — you save ' + formatMoney(summary.savings, moneyFormat)
       }
-      totalBreakdownEl.textContent = breakdown
+      breakdownEl.textContent = breakdown
     }
   }
 
@@ -298,9 +312,11 @@ if (typeof document !== 'undefined') {
     input.dispatchEvent(new Event('change', { bubbles: true }))
   }
 
-  function renderMixMatchList(listEl, siblings) {
+  function renderMixMatchList(listEl, siblings, cartItems) {
     listEl.innerHTML = ''
     siblings.forEach((s) => {
+      const qty = sumGroupQuantityInCart(cartItems || [], [s.handle])
+
       const row = document.createElement('a')
       row.href = '/products/' + s.handle
       row.className = 'sparkly-tier-pricing__list-item'
@@ -322,6 +338,11 @@ if (typeof document !== 'undefined') {
       name.textContent = s.title
       row.appendChild(name)
 
+      const qtyLabel = document.createElement('span')
+      qtyLabel.className = 'sparkly-tier-pricing__list-qty'
+      qtyLabel.textContent = qty === 1 ? '1 in cart' : qty + ' in cart'
+      row.appendChild(qtyLabel)
+
       listEl.appendChild(row)
     })
   }
@@ -338,7 +359,10 @@ if (typeof document !== 'undefined') {
       const moneyFormat = JSON.parse(container.dataset.moneyFormat)
       const group = JSON.parse(container.dataset.group)
       const productHandle = JSON.parse(container.dataset.productHandle)
-      const tiers = group ? group.tiers : standaloneData.tiers
+      // withUnitAnchor adds the "buy 1 at base price" tier the merchandiser
+      // never has to configure explicitly — see its definition for why this
+      // is price-neutral and only affects the button row / temp-box range.
+      const tiers = withUnitAnchor(group ? group.tiers : standaloneData.tiers)
       const title = group ? group.title : standaloneData.title
 
       // Per-container signature of the last-rendered tier buttons/temp-box,
@@ -347,6 +371,12 @@ if (typeof document !== 'undefined') {
       // 1s cart poll below). null is a sentinel that can never equal a real
       // (string) signature, so the first render always populates it.
       const tierButtonsSignatureRef = { value: null }
+
+      // Last cart snapshot fetched by renderWithGroupAwareness, reused so the
+      // mix & match list can show each sibling's in-cart quantity without a
+      // separate fetch — kept fresh by the same poll/event triggers that
+      // already re-fetch the cart for the combined-quantity calculation.
+      let lastCartItems = []
 
       // Group mode combines two sources: otherQty from the REAL cart (only
       // sibling products, fetched fresh from /cart.js — this product's own
@@ -363,11 +393,15 @@ if (typeof document !== 'undefined') {
         let otherQty = 0
         try {
           const cart = await fetchCart()
+          lastCartItems = cart.items
           otherQty = sumGroupQuantityInCart(cart.items, siblingHandles)
         } catch {
           otherQty = 0
         }
         renderTierPricing(container, tiers, moneyFormat, otherQty, title, true, tierButtonsSignatureRef)
+        if (listEl && !listEl.hidden) {
+          renderMixMatchList(listEl, group.siblings, lastCartItems)
+        }
       }
 
       const toggleEl = container.querySelector('[data-tier-pricing-toggle]')
@@ -378,7 +412,7 @@ if (typeof document !== 'undefined') {
           open = !open
           listEl.hidden = !open
           toggleEl.textContent = 'mix & match products ' + (open ? '▲' : '▼')
-          if (open) renderMixMatchList(listEl, group.siblings)
+          if (open) renderMixMatchList(listEl, group.siblings, lastCartItems)
         })
       }
 
