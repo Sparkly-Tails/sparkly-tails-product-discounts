@@ -43,7 +43,7 @@
   data-product-handle='{{ product.handle | json | escape }}'
   data-base-price="{{ product.selected_or_first_available_variant.price | divided_by: 100.0 | json }}"
   data-money-format='{{ shop.money_format | json | escape }}'
-  style="--sparkly-tier-price-font-size: {{ block.settings.price_font_size }}px;"
+  style="--sparkly-tier-price-font-size: {{ block.settings.price_font_size }}px; --sparkly-tier-moss: {{ block.settings.moss_color }}; --sparkly-tier-cream: {{ block.settings.cream_color }}; --sparkly-tier-sun: {{ block.settings.sun_color }};"
 >
   <div class="sparkly-tier-pricing__price-row">
     <span class="sparkly-tier-pricing__price" data-tier-pricing-price>
@@ -131,6 +131,24 @@
       "step": 1,
       "unit": "px",
       "default": 44
+    },
+    {
+      "type": "color",
+      "id": "moss_color",
+      "label": "t:moss_color_label",
+      "default": "#434625"
+    },
+    {
+      "type": "color",
+      "id": "cream_color",
+      "label": "t:cream_color_label",
+      "default": "#f3ecd9"
+    },
+    {
+      "type": "color",
+      "id": "sun_color",
+      "label": "t:sun_color_label",
+      "default": "#ffdc4c"
     },
     {
       "type": "textarea",

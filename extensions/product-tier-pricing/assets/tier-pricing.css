@@ -1,13 +1,228 @@
 /* extensions/product-tier-pricing/assets/tier-pricing.css */
+
+.sparkly-tier-pricing {
+  --sparkly-tier-ink: var(--color-text-main, #2a2a22);
+  --sparkly-tier-text-secondary: var(--color-secondary-text-main, #5b5c4e);
+  --sparkly-tier-border: var(--color-borders-main, #ddd6c2);
+  --sparkly-tier-moss-tint: color-mix(in srgb, var(--sparkly-tier-moss, #434625) 15%, white);
+  --sparkly-tier-track: #fffdf6;
+  --sparkly-tier-radius: var(--border-radius-cards, 8px);
+  --sparkly-tier-ease: cubic-bezier(0.4, 0, 0.2, 1);
+  font-family: var(--font-stack-body);
+}
+
+.sparkly-tier-pricing__price-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
 .sparkly-tier-pricing__price {
-  font-size: var(--sparkly-tier-price-font-size, 2.75rem);
-  font-weight: var(--font-weight-body-bold, 500);
+  font-family: var(--font-stack-headings);
+  font-weight: var(--font-weight-body-bold, 700);
+  font-size: var(--sparkly-tier-price-font-size, 2.5rem);
+  color: var(--sparkly-tier-ink);
 }
 
 .sparkly-tier-pricing__price s {
-  font-weight: 400;
-  opacity: 0.6;
-  margin-right: 0.5em;
+  font-weight: 600;
+  opacity: 0.75;
+  text-decoration: line-through;
+}
+
+.sparkly-tier-pricing__each-label {
+  font-family: var(--font-stack-body);
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: var(--sparkly-tier-text-secondary);
+}
+
+.sparkly-tier-pricing__promo {
+  font-family: var(--font-stack-body);
+  font-size: 0.75rem;
+  color: var(--sparkly-tier-text-secondary);
+  margin: 0 0 10px;
+}
+
+.sparkly-tier-pricing__card {
+  background: var(--sparkly-tier-cream, #f3ecd9);
+  border-radius: var(--sparkly-tier-radius);
+  padding: 32px 16px 16px;
+  margin: 20px 0;
+}
+
+.sparkly-tier-pricing__bar-wrap {
+  position: relative;
+  margin-bottom: 8px;
+}
+
+.sparkly-tier-pricing__callout {
+  position: absolute;
+  bottom: 20px;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  background: var(--sparkly-tier-ink);
+  color: #fff;
+  font-family: var(--font-stack-body);
+  font-weight: 600;
+  font-size: 12px;
+  padding: 6px 10px;
+  border-radius: var(--sparkly-tier-radius);
+}
+
+.sparkly-tier-pricing__tick {
+  position: absolute;
+  bottom: 2px;
+  transform: translateX(-50%);
+  width: 1px;
+  height: 16px;
+  background: var(--sparkly-tier-ink);
+}
+
+.sparkly-tier-pricing__track {
+  height: 8px;
+  background: var(--sparkly-tier-track);
+  border-radius: 999px;
+  overflow: hidden;
+  display: flex;
+  position: relative;
+}
+
+.sparkly-tier-pricing__segment--cart {
+  height: 100%;
+  background: var(--sparkly-tier-moss, #434625);
+}
+
+.sparkly-tier-pricing__segment--adding {
+  height: 100%;
+  background: var(--sparkly-tier-sun, #ffdc4c);
+  transition: width 200ms var(--sparkly-tier-ease);
+}
+
+.sparkly-tier-pricing__dot {
+  position: absolute;
+  top: -2px;
+  transform: translateX(-50%);
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--sparkly-tier-ink);
+  border: 2px solid #fff;
+}
+
+.sparkly-tier-pricing__scale {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-stack-body);
+  font-size: 11px;
+  color: var(--sparkly-tier-text-secondary);
+  margin-bottom: 14px;
+}
+
+.sparkly-tier-pricing__tiers {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.sparkly-tier-pricing__tier-btn {
+  padding: 10px 16px;
+  border-radius: var(--sparkly-tier-radius);
+  font-family: var(--font-stack-body);
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  border: 1px solid var(--sparkly-tier-border);
+  background: #fff;
+  color: var(--sparkly-tier-ink);
+  transition: border-color 120ms ease, background-color 120ms ease;
+}
+
+.sparkly-tier-pricing__tier-btn--active {
+  border: 2px solid var(--sparkly-tier-moss, #434625);
+  background: var(--sparkly-tier-moss-tint);
+}
+
+.sparkly-tier-pricing__temp-btn {
+  padding: 10px 16px;
+  border-radius: var(--sparkly-tier-radius);
+  font-family: var(--font-stack-body);
+  font-weight: 600;
+  font-size: 13px;
+  cursor: default;
+  border: 2px dashed color-mix(in srgb, var(--sparkly-tier-moss, #434625) 80%, black);
+  background: #fff;
+  color: var(--sparkly-tier-ink);
+  animation: sparklyTierFadeIn 180ms var(--sparkly-tier-ease);
+}
+
+.sparkly-tier-pricing__toggle {
+  display: block;
+  border: none;
+  background: none;
+  padding: 10px 0 0;
+  margin: 0;
+  font-family: var(--font-stack-body);
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--sparkly-tier-moss, #434625);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.sparkly-tier-pricing__list {
+  margin-top: 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--sparkly-tier-border);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  animation: sparklyTierFadeIn 160ms var(--sparkly-tier-ease);
+}
+
+.sparkly-tier-pricing__list-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+  color: inherit;
+}
+
+.sparkly-tier-pricing__list-thumb {
+  width: 44px;
+  height: 44px;
+  flex: none;
+  border-radius: 8px;
+  object-fit: cover;
+  background: var(--sparkly-tier-cream, #f3ecd9);
+}
+
+.sparkly-tier-pricing__list-name {
+  flex: 1;
+  font-family: var(--font-stack-body);
+  font-size: 13px;
+  color: var(--sparkly-tier-ink);
+}
+
+.sparkly-tier-pricing__total {
+  min-height: 44px;
+  margin-top: 14px;
+}
+
+.sparkly-tier-pricing__total-value {
+  font-family: var(--font-stack-headings);
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--sparkly-tier-moss, #434625);
+}
+
+.sparkly-tier-pricing__total-breakdown {
+  font-family: var(--font-stack-body);
+  font-size: 12px;
+  color: var(--sparkly-tier-text-secondary);
+  margin-top: 2px;
 }
 
 .sparkly-tier-pricing__message {
@@ -15,11 +230,22 @@
   opacity: 0.8;
 }
 
-.sparkly-tier-pricing__group-links {
-  font-size: 0.85em;
-  opacity: 0.75;
+@keyframes sparklyTierFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
-.sparkly-tier-pricing__group-links a {
-  text-decoration: underline;
+@media (prefers-reduced-motion: reduce) {
+  .sparkly-tier-pricing__segment--adding,
+  .sparkly-tier-pricing__temp-btn,
+  .sparkly-tier-pricing__list {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }
