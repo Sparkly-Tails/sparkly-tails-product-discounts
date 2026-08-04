@@ -95,15 +95,36 @@ function computeProgressState(tiers, otherQty, addingQty) {
 
   const tierButtons = sorted.map((t) => ({ minQty: t.minQty, active: addingQty === t.minQty }))
 
+  // The dashed box previews the running total AT THE RATE ALREADY IN EFFECT
+  // for this in-between quantity — i.e. sorted[i], the lower/just-crossed
+  // boundary — not sorted[i + 1] (the not-yet-reached tier above it). This
+  // matches the design reference (mkV2 in widget-reference.dc.html): zone 1
+  // (qty strictly between the qty:1 anchor and the first real tier) prices
+  // at plain base rate, and each zone above prices at whichever tier's
+  // threshold the quantity has already passed.
   let tempBox = null
   for (let i = 0; i < sorted.length - 1; i++) {
     if (addingQty > sorted[i].minQty && addingQty < sorted[i + 1].minQty) {
-      tempBox = { afterIndex: i, tier: sorted[i + 1] }
+      tempBox = { afterIndex: i, tier: sorted[i] }
       break
     }
   }
 
   return { combinedQty, topThreshold, cartPct, addedPct, calloutPct, maxed, tierState, tierButtons, tempBox }
+}
+
+// Prepends a synthetic { minQty: 1, percentOff: 0 } tier when the config
+// doesn't already define one at quantity 1, so the tier-button row always
+// has a "1 x <base price>" anchor button and the dashed temp-box mechanism
+// covers the 2..first-tier-1 range too (previously that gap never rendered
+// a temp box, since the loop above needs at least two entries to bracket
+// a quantity between). Price-neutral: a 0%-off tier reached below any real
+// discount computes to the same base price computeTierState already
+// returns when no tier is reached at all.
+function withUnitAnchor(tiers) {
+  if (!tiers || tiers.length === 0) return tiers
+  if (tiers.some((t) => t.minQty === 1)) return tiers
+  return [{ minQty: 1, percentOff: 0 }].concat(tiers)
 }
 
 function formatCalloutText(progressState, tiers, basePrice, formatMoney) {
@@ -160,6 +181,7 @@ if (typeof module !== 'undefined' && module.exports) {
     buildPromoText,
     computeOrderSummary,
     computeTierButtonsSignature,
+    withUnitAnchor,
   }
 }
 
@@ -337,7 +359,10 @@ if (typeof document !== 'undefined') {
       const moneyFormat = JSON.parse(container.dataset.moneyFormat)
       const group = JSON.parse(container.dataset.group)
       const productHandle = JSON.parse(container.dataset.productHandle)
-      const tiers = group ? group.tiers : standaloneData.tiers
+      // withUnitAnchor adds the "buy 1 at base price" tier the merchandiser
+      // never has to configure explicitly — see its definition for why this
+      // is price-neutral and only affects the button row / temp-box range.
+      const tiers = withUnitAnchor(group ? group.tiers : standaloneData.tiers)
       const title = group ? group.title : standaloneData.title
 
       // Per-container signature of the last-rendered tier buttons/temp-box,

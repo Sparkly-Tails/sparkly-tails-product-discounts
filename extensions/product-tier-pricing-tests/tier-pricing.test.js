@@ -1,6 +1,6 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
-const { computeTierState, perUnitPrice, sumGroupQuantityInCart, unitPriceAtTier, totalAtTier, computeProgressState, formatCalloutText, formatTempBoxLabel, buildPromoText, computeOrderSummary, computeTierButtonsSignature } = require('../product-tier-pricing/assets/tier-pricing.js')
+const { computeTierState, perUnitPrice, sumGroupQuantityInCart, unitPriceAtTier, totalAtTier, computeProgressState, formatCalloutText, formatTempBoxLabel, buildPromoText, computeOrderSummary, computeTierButtonsSignature, withUnitAnchor } = require('../product-tier-pricing/assets/tier-pricing.js')
 
 test('below every tier: no discount, lists every tier as a delta from current quantity', () => {
   const tiers = [{ minQty: 7, percentOff: 5 }, { minQty: 14, percentOff: 10 }]
@@ -256,13 +256,21 @@ test('computeProgressState: tierButtons marks exactly the button matching adding
 test('computeProgressState: tempBox appears between two tiers based on addingQty alone, not combinedQty', () => {
   const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 7, percentOff: 5 }, { minQty: 20, percentOff: 10 }]
   const between = computeProgressState(tiers, 10, 3) // addingQty 3 is between 1 and 7
-  assert.deepEqual(between.tempBox, { afterIndex: 0, tier: { minQty: 7, percentOff: 5 } })
+  // tier is the lower/already-crossed boundary (the qty:1 anchor here), not
+  // the not-yet-reached tier above it — see withUnitAnchor's doc comment.
+  assert.deepEqual(between.tempBox, { afterIndex: 0, tier: { minQty: 1, percentOff: 0 } })
 
   const atExactTier = computeProgressState(tiers, 10, 7)
   assert.equal(atExactTier.tempBox, null)
 
   const pastTop = computeProgressState(tiers, 10, 25)
   assert.equal(pastTop.tempBox, null)
+})
+
+test('computeProgressState: tempBox between two real (already-configured) tiers prices at the lower, already-active one', () => {
+  const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 7, percentOff: 5 }, { minQty: 20, percentOff: 10 }]
+  const between = computeProgressState(tiers, 0, 10) // addingQty 10 is between 7 and 20
+  assert.deepEqual(between.tempBox, { afterIndex: 1, tier: { minQty: 7, percentOff: 5 } })
 })
 
 test('computeProgressState: a single-tier discount has no tempBox and a top threshold equal to that one tier', () => {
@@ -353,12 +361,42 @@ test('computeProgressState: below every tier (no tier with minQty 1) does not th
   ])
 })
 
-test('formatTempBoxLabel: quantity, "x", the total at the next tier\'s blended rate — no "=" sign', () => {
+test('formatTempBoxLabel: quantity, "x", the running total at the already-active (lower) tier\'s rate — no "=" sign', () => {
   const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 7, percentOff: 5 }, { minQty: 20, percentOff: 10 }]
   const state = computeProgressState(tiers, 0, 5)
   const label = formatTempBoxLabel(state, 1.49, 5, fmt)
-  // next tier is minQty 7 @ 5% off => unit 1.4155, 5 * 1.4155 = 7.0775 -> rounds to 7.08
-  assert.equal(label, '5x £7.08')
+  // 5 sits between the qty:1 anchor (0% off) and the 7-tier — no discount
+  // is active yet, so the preview is 5 units at plain base price: 5 * 1.49 = 7.45
+  assert.equal(label, '5x £7.45')
+})
+
+test('formatTempBoxLabel: between two real tiers, previews at the lower tier\'s already-unlocked rate', () => {
+  const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 7, percentOff: 5 }, { minQty: 20, percentOff: 10 }]
+  const state = computeProgressState(tiers, 0, 10)
+  const label = formatTempBoxLabel(state, 1.49, 10, fmt)
+  // 10 sits between the 7-tier (5% off, already active) and the 20-tier —
+  // preview uses the 7-tier's unlocked rate: unit 1.4155, 10 * 1.4155 = 14.155 -> 14.16
+  assert.equal(label, '10x £14.16')
+})
+
+test('withUnitAnchor: prepends a { minQty: 1, percentOff: 0 } tier when none is configured', () => {
+  const tiers = [{ minQty: 7, percentOff: 5 }, { minQty: 20, percentOff: 10 }]
+  assert.deepEqual(withUnitAnchor(tiers), [
+    { minQty: 1, percentOff: 0 },
+    { minQty: 7, percentOff: 5 },
+    { minQty: 20, percentOff: 10 },
+  ])
+})
+
+test('withUnitAnchor: leaves an already-configured minQty:1 tier untouched, no duplicate', () => {
+  const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 7, percentOff: 5 }]
+  assert.deepEqual(withUnitAnchor(tiers), tiers)
+})
+
+test('withUnitAnchor: passes through empty/missing tiers unchanged', () => {
+  assert.equal(withUnitAnchor([]).length, 0)
+  assert.equal(withUnitAnchor(null), null)
+  assert.equal(withUnitAnchor(undefined), undefined)
 })
 
 test('buildPromoText: group mode with a title uses "Mix & match any {title}"', () => {
