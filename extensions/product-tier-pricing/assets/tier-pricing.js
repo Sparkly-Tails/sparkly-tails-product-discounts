@@ -141,6 +141,12 @@ function buildPromoText(tiers, basePrice, formatMoney, isGroup, title) {
   return prefix + clauses.join(', ')
 }
 
+function computeTierButtonsSignature(state, basePrice, addingQty) {
+  return JSON.stringify(state.tierButtons) + '|' +
+    (state.tempBox ? state.tempBox.afterIndex + ':' + state.tempBox.tier.minQty : 'none') +
+    '|' + addingQty + '|' + basePrice
+}
+
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     computeTierState,
@@ -153,6 +159,7 @@ if (typeof module !== 'undefined' && module.exports) {
     formatTempBoxLabel,
     buildPromoText,
     computeOrderSummary,
+    computeTierButtonsSignature,
   }
 }
 
@@ -254,11 +261,10 @@ if (typeof document !== 'undefined') {
     // clears any focus the customer has placed on a tier button. In group
     // mode this render runs on a 1-second poll, so we skip the rebuild
     // entirely when nothing that affects it has actually changed since the
-    // last render. `lastTierButtonsSignature` starts at null, which never
-    // equals a real (string) signature, so the very first render for this
-    // container always populates the buttons.
-    const tierButtonsSignature = JSON.stringify(state.tierButtons) + '|' +
-      (state.tempBox ? state.tempBox.afterIndex + ':' + state.tempBox.tier.minQty : 'none')
+    // last render. `tierButtonsSignatureRef.value` starts at null, which
+    // never equals a real (string) signature, so the very first render for
+    // this container always populates the buttons.
+    const tierButtonsSignature = computeTierButtonsSignature(state, basePrice, addingQty)
     if (tierButtonsSignatureRef && tierButtonsSignatureRef.value === tierButtonsSignature) {
       return
     }

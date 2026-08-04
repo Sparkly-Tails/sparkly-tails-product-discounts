@@ -1,6 +1,6 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
-const { computeTierState, perUnitPrice, sumGroupQuantityInCart, unitPriceAtTier, totalAtTier, computeProgressState, formatCalloutText, formatTempBoxLabel, buildPromoText, computeOrderSummary } = require('../product-tier-pricing/assets/tier-pricing.js')
+const { computeTierState, perUnitPrice, sumGroupQuantityInCart, unitPriceAtTier, totalAtTier, computeProgressState, formatCalloutText, formatTempBoxLabel, buildPromoText, computeOrderSummary, computeTierButtonsSignature } = require('../product-tier-pricing/assets/tier-pricing.js')
 
 test('below every tier: no discount, lists every tier as a delta from current quantity', () => {
   const tiers = [{ minQty: 7, percentOff: 5 }, { minQty: 14, percentOff: 10 }]
@@ -272,6 +272,40 @@ test('computeProgressState: a single-tier discount has no tempBox and a top thre
   assert.equal(state.topThreshold, 5)
   assert.equal(state.tempBox, null)
   assert.deepEqual(state.tierButtons, [{ minQty: 5, active: false }])
+})
+
+test('computeTierButtonsSignature: differs when addingQty changes within the same inter-tier gap', () => {
+  const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 7, percentOff: 5 }, { minQty: 20, percentOff: 10 }]
+  const stateAt2 = computeProgressState(tiers, 0, 2)
+  const stateAt3 = computeProgressState(tiers, 0, 3)
+
+  // Both 2 and 3 sit strictly between tiers 1 and 7, so tierButtons/tempBox
+  // shape is identical — only addingQty differs.
+  assert.deepEqual(stateAt2.tierButtons, stateAt3.tierButtons)
+  assert.deepEqual(stateAt2.tempBox, stateAt3.tempBox)
+
+  const sigAt2 = computeTierButtonsSignature(stateAt2, 1.49, 2)
+  const sigAt3 = computeTierButtonsSignature(stateAt3, 1.49, 3)
+  assert.notEqual(sigAt2, sigAt3)
+})
+
+test('computeTierButtonsSignature: differs when basePrice changes (e.g. variant switch), even with identical tierButtons/tempBox/addingQty', () => {
+  const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 7, percentOff: 5 }, { minQty: 20, percentOff: 10 }]
+  const state = computeProgressState(tiers, 0, 3)
+
+  const sigOldPrice = computeTierButtonsSignature(state, 1.49, 3)
+  const sigNewPrice = computeTierButtonsSignature(state, 2.99, 3)
+  assert.notEqual(sigOldPrice, sigNewPrice)
+})
+
+test('computeTierButtonsSignature: identical state/addingQty/basePrice produce an equal signature, preserving poll-suppression', () => {
+  const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 7, percentOff: 5 }, { minQty: 20, percentOff: 10 }]
+  const stateA = computeProgressState(tiers, 0, 3)
+  const stateB = computeProgressState(tiers, 0, 3)
+
+  const sigA = computeTierButtonsSignature(stateA, 1.49, 3)
+  const sigB = computeTierButtonsSignature(stateB, 1.49, 3)
+  assert.equal(sigA, sigB)
 })
 
 function fmt(n) {
