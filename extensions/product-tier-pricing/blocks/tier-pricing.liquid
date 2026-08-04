@@ -27,7 +27,7 @@
   {%- capture group_json_raw -%}
     {"tiers": {{ group_metafield.value.tiers | json }}, "siblings": {{ siblings_json }}}
   {%- endcapture -%}
-  {%- assign group_json = group_json_raw | strip | json | escape -%}
+  {%- assign group_json = group_json_raw | strip | escape -%}
 {%- endif -%}
 {%- if tiers_metafield != blank -%}
   {%- assign tiers_json = tiers_metafield.value | json | escape -%}
