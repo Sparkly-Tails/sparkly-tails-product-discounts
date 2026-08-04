@@ -171,7 +171,6 @@ if (typeof document !== 'undefined') {
 
   function renderTierPricing(container, tiers, moneyFormat, otherQty, title, isGroup, tierButtonsSignatureRef) {
     const priceEl = container.querySelector('[data-tier-pricing-price]')
-    const messageEl = container.querySelector('[data-tier-pricing-message]')
     const promoEl = container.querySelector('[data-tier-pricing-promo]')
     const cardEl = container.querySelector('[data-tier-pricing-card]')
     const basePrice = Number(container.dataset.basePrice)
@@ -182,7 +181,6 @@ if (typeof document !== 'undefined') {
       priceEl.textContent = formatMoney(basePrice, moneyFormat)
       if (cardEl) cardEl.hidden = true
       if (promoEl) promoEl.textContent = ''
-      messageEl.textContent = ''
       return
     }
 
@@ -211,21 +209,15 @@ if (typeof document !== 'undefined') {
       renderProgressCard(container, state, tiers, basePrice, addingQty, moneyFormat, tierButtonsSignatureRef)
     }
 
-    messageEl.textContent = formatCalloutText(state, tiers, basePrice, (n) => formatMoney(n, moneyFormat))
-
-    const totalEl = container.querySelector('[data-tier-pricing-total]')
-    const totalValueEl = container.querySelector('[data-tier-pricing-total-value]')
-    const totalBreakdownEl = container.querySelector('[data-tier-pricing-total-breakdown]')
-    if (totalEl) {
+    const breakdownEl = container.querySelector('[data-tier-pricing-breakdown]')
+    if (breakdownEl) {
       const summary = computeOrderSummary(basePrice, addingQty, unit)
-      totalEl.hidden = false
-      totalValueEl.textContent = 'Total ' + formatMoney(summary.total, moneyFormat)
       const unitLabel = addingQty === 1 ? ' unit' : ' units'
       let breakdown = addingQty + unitLabel + ' × ' + formatMoney(unit, moneyFormat)
       if (summary.savings > 0) {
         breakdown += ' · full price ' + formatMoney(summary.fullPrice, moneyFormat) + ' — you save ' + formatMoney(summary.savings, moneyFormat)
       }
-      totalBreakdownEl.textContent = breakdown
+      breakdownEl.textContent = breakdown
     }
   }
 
@@ -298,9 +290,11 @@ if (typeof document !== 'undefined') {
     input.dispatchEvent(new Event('change', { bubbles: true }))
   }
 
-  function renderMixMatchList(listEl, siblings) {
+  function renderMixMatchList(listEl, siblings, cartItems) {
     listEl.innerHTML = ''
     siblings.forEach((s) => {
+      const qty = sumGroupQuantityInCart(cartItems || [], [s.handle])
+
       const row = document.createElement('a')
       row.href = '/products/' + s.handle
       row.className = 'sparkly-tier-pricing__list-item'
@@ -321,6 +315,11 @@ if (typeof document !== 'undefined') {
       name.className = 'sparkly-tier-pricing__list-name'
       name.textContent = s.title
       row.appendChild(name)
+
+      const qtyLabel = document.createElement('span')
+      qtyLabel.className = 'sparkly-tier-pricing__list-qty'
+      qtyLabel.textContent = qty === 1 ? '1 in cart' : qty + ' in cart'
+      row.appendChild(qtyLabel)
 
       listEl.appendChild(row)
     })
@@ -348,6 +347,12 @@ if (typeof document !== 'undefined') {
       // (string) signature, so the first render always populates it.
       const tierButtonsSignatureRef = { value: null }
 
+      // Last cart snapshot fetched by renderWithGroupAwareness, reused so the
+      // mix & match list can show each sibling's in-cart quantity without a
+      // separate fetch — kept fresh by the same poll/event triggers that
+      // already re-fetch the cart for the combined-quantity calculation.
+      let lastCartItems = []
+
       // Group mode combines two sources: otherQty from the REAL cart (only
       // sibling products, fetched fresh from /cart.js — this product's own
       // cart-resident quantity is deliberately excluded, see the plan's
@@ -363,11 +368,15 @@ if (typeof document !== 'undefined') {
         let otherQty = 0
         try {
           const cart = await fetchCart()
+          lastCartItems = cart.items
           otherQty = sumGroupQuantityInCart(cart.items, siblingHandles)
         } catch {
           otherQty = 0
         }
         renderTierPricing(container, tiers, moneyFormat, otherQty, title, true, tierButtonsSignatureRef)
+        if (listEl && !listEl.hidden) {
+          renderMixMatchList(listEl, group.siblings, lastCartItems)
+        }
       }
 
       const toggleEl = container.querySelector('[data-tier-pricing-toggle]')
@@ -378,7 +387,7 @@ if (typeof document !== 'undefined') {
           open = !open
           listEl.hidden = !open
           toggleEl.textContent = 'mix & match products ' + (open ? '▲' : '▼')
-          if (open) renderMixMatchList(listEl, group.siblings)
+          if (open) renderMixMatchList(listEl, group.siblings, lastCartItems)
         })
       }
 

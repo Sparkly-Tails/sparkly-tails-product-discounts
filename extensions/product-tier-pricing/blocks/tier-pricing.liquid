@@ -82,6 +82,7 @@
   {%- endif -%}
 
   <div class="sparkly-tier-pricing__card" data-tier-pricing-card hidden>
+    <div class="sparkly-tier-pricing__breakdown" data-tier-pricing-breakdown></div>
     <div class="sparkly-tier-pricing__bar-wrap">
       <div class="sparkly-tier-pricing__callout" data-tier-pricing-callout></div>
       <div class="sparkly-tier-pricing__tick" data-tier-pricing-tick></div>
@@ -98,13 +99,6 @@
       <div class="sparkly-tier-pricing__list" data-tier-pricing-list hidden></div>
     {%- endif -%}
   </div>
-
-  <div class="sparkly-tier-pricing__total" data-tier-pricing-total hidden>
-    <div class="sparkly-tier-pricing__total-value" data-tier-pricing-total-value></div>
-    <div class="sparkly-tier-pricing__total-breakdown" data-tier-pricing-total-breakdown></div>
-  </div>
-
-  <p class="sparkly-tier-pricing__message" data-tier-pricing-message></p>
 </div>
 
 {%- if block.settings.custom_css != blank -%}
