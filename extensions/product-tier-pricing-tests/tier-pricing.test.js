@@ -287,6 +287,13 @@ test('formatCalloutText: at the top tier shows the combined total and final pric
   assert.equal(text, '20 combined · £1.34 each')
 })
 
+test('formatCalloutText: next tier is a fixed price above base price, clamps to base price (never a markup)', () => {
+  const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 7, fixedPrice: 5.0 }, { minQty: 20, percentOff: 10 }]
+  const state = computeProgressState(tiers, 2, 1)
+  const text = formatCalloutText(state, tiers, 1.49, fmt)
+  assert.equal(text, '3 of 7 · 4 more for £1.49')
+})
+
 test('formatTempBoxLabel: quantity, "x", the total at the next tier\'s blended rate — no "=" sign', () => {
   const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 7, percentOff: 5 }, { minQty: 20, percentOff: 10 }]
   const state = computeProgressState(tiers, 0, 5)

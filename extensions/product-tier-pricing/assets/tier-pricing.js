@@ -113,7 +113,7 @@ function formatCalloutText(progressState, tiers, basePrice, formatMoney) {
   }
   const next = progressState.tierState.nextTier
   return progressState.combinedQty + ' of ' + next.minQty + ' · ' + next.delta + ' more for ' + formatMoney(
-    next.fixedPrice != null ? next.fixedPrice : unitPriceAtTier(basePrice, { minQty: next.minQty, percentOff: next.percentOff, anchorPrice: null }),
+    unitPriceAtTier(basePrice, next),
   )
 }
 
