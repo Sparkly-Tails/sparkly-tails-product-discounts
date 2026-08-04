@@ -46,7 +46,7 @@ function computeTierState(tiers, quantity) {
 
 function perUnitPrice(basePrice, quantity, state) {
   if (state.fixedPrice != null) {
-    return state.fixedPrice
+    return Math.min(Math.max(state.fixedPrice, 0), basePrice)
   }
   if (state.anchorPrice == null) {
     return basePrice * (1 - state.percentOff / 100)
@@ -111,7 +111,8 @@ function formatCalloutText(progressState, tiers, basePrice, formatMoney) {
     const topTier = tiers.slice().sort((a, b) => a.minQty - b.minQty).pop()
     return progressState.combinedQty + ' combined · ' + formatMoney(unitPriceAtTier(basePrice, topTier)) + ' each'
   }
-  const next = progressState.tierState.nextTier
+  const ts = progressState.tierState
+  const next = ts.nextTier || (ts.remainingTiers && ts.remainingTiers[0])
   return progressState.combinedQty + ' of ' + next.minQty + ' · ' + next.delta + ' more for ' + formatMoney(
     unitPriceAtTier(basePrice, next),
   )
@@ -161,7 +162,7 @@ if (typeof document !== 'undefined') {
     return format.replace(/\{\{\s*amount\s*\}\}/, withDecimals)
   }
 
-  function renderTierPricing(container, tiers, moneyFormat, otherQty, title, isGroup) {
+  function renderTierPricing(container, tiers, moneyFormat, otherQty, title, isGroup, tierButtonsSignatureRef) {
     const priceEl = container.querySelector('[data-tier-pricing-price]')
     const messageEl = container.querySelector('[data-tier-pricing-message]')
     const promoEl = container.querySelector('[data-tier-pricing-promo]')
@@ -200,7 +201,7 @@ if (typeof document !== 'undefined') {
 
     if (cardEl) {
       cardEl.hidden = false
-      renderProgressCard(container, state, tiers, basePrice, addingQty, moneyFormat)
+      renderProgressCard(container, state, tiers, basePrice, addingQty, moneyFormat, tierButtonsSignatureRef)
     }
 
     messageEl.textContent = formatCalloutText(state, tiers, basePrice, (n) => formatMoney(n, moneyFormat))
@@ -221,7 +222,7 @@ if (typeof document !== 'undefined') {
     }
   }
 
-  function renderProgressCard(container, state, tiers, basePrice, addingQty, moneyFormat) {
+  function renderProgressCard(container, state, tiers, basePrice, addingQty, moneyFormat, tierButtonsSignatureRef) {
     const calloutEl = container.querySelector('[data-tier-pricing-callout]')
     const tickEl = container.querySelector('[data-tier-pricing-tick]')
     const cartSegmentEl = container.querySelector('[data-tier-pricing-cart-segment]')
@@ -247,6 +248,23 @@ if (typeof document !== 'undefined') {
       label.textContent = t.minQty + ' · ' + formatMoney(unitPriceAtTier(basePrice, t), moneyFormat) + ' ea'
       scaleEl.appendChild(label)
     })
+
+    // Rebuilding this section (tier buttons + the dashed temp-box) is
+    // destructive: it replays the temp-box's fade/scale-in animation and
+    // clears any focus the customer has placed on a tier button. In group
+    // mode this render runs on a 1-second poll, so we skip the rebuild
+    // entirely when nothing that affects it has actually changed since the
+    // last render. `lastTierButtonsSignature` starts at null, which never
+    // equals a real (string) signature, so the very first render for this
+    // container always populates the buttons.
+    const tierButtonsSignature = JSON.stringify(state.tierButtons) + '|' +
+      (state.tempBox ? state.tempBox.afterIndex + ':' + state.tempBox.tier.minQty : 'none')
+    if (tierButtonsSignatureRef && tierButtonsSignatureRef.value === tierButtonsSignature) {
+      return
+    }
+    if (tierButtonsSignatureRef) {
+      tierButtonsSignatureRef.value = tierButtonsSignature
+    }
 
     tiersEl.innerHTML = ''
     state.tierButtons.forEach((btn, i) => {
@@ -317,6 +335,13 @@ if (typeof document !== 'undefined') {
       const tiers = group ? group.tiers : standaloneData.tiers
       const title = group ? group.title : standaloneData.title
 
+      // Per-container signature of the last-rendered tier buttons/temp-box,
+      // used by renderProgressCard to skip rebuilding that section's DOM
+      // when nothing relevant changed (e.g. on every tick of the group-mode
+      // 1s cart poll below). null is a sentinel that can never equal a real
+      // (string) signature, so the first render always populates it.
+      const tierButtonsSignatureRef = { value: null }
+
       // Group mode combines two sources: otherQty from the REAL cart (only
       // sibling products, fetched fresh from /cart.js — this product's own
       // cart-resident quantity is deliberately excluded, see the plan's
@@ -325,7 +350,7 @@ if (typeof document !== 'undefined') {
       // the cart entirely and uses addingQty alone.
       async function renderWithGroupAwareness() {
         if (!group) {
-          renderTierPricing(container, tiers, moneyFormat, 0, title, false)
+          renderTierPricing(container, tiers, moneyFormat, 0, title, false, tierButtonsSignatureRef)
           return
         }
         const siblingHandles = group.siblings.map((s) => s.handle)
@@ -336,7 +361,7 @@ if (typeof document !== 'undefined') {
         } catch {
           otherQty = 0
         }
-        renderTierPricing(container, tiers, moneyFormat, otherQty, title, true)
+        renderTierPricing(container, tiers, moneyFormat, otherQty, title, true, tierButtonsSignatureRef)
       }
 
       const toggleEl = container.querySelector('[data-tier-pricing-toggle]')

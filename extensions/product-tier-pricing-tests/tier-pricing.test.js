@@ -140,6 +140,11 @@ test('perUnitPrice: a fixed-price state returns the fixed price directly, ignori
   assert.equal(perUnitPrice(1.99, 5, state), 1.50)
 })
 
+test('perUnitPrice: a fixed price above base price clamps to base price, never a markup', () => {
+  const state = { percentOff: 0, anchorPrice: null, fixedPrice: 5.0, minQty: 3 }
+  assert.equal(perUnitPrice(1.49, 5, state), 1.49)
+})
+
 test('sumGroupQuantityInCart: sums quantities of cart items matching the given handles', () => {
   const items = [
     { handle: 'tuna-soup', quantity: 3 },
@@ -292,6 +297,26 @@ test('formatCalloutText: next tier is a fixed price above base price, clamps to 
   const state = computeProgressState(tiers, 2, 1)
   const text = formatCalloutText(state, tiers, 1.49, fmt)
   assert.equal(text, '3 of 7 · 4 more for £1.49')
+})
+
+test('formatCalloutText: below every tier (no tier with minQty 1), falls back to remainingTiers instead of throwing on a null nextTier', () => {
+  const tiers = [{ minQty: 7, percentOff: 5 }, { minQty: 20, percentOff: 10 }]
+  const state = computeProgressState(tiers, 0, 1)
+  const text = formatCalloutText(state, tiers, 1.49, fmt)
+  assert.equal(text, '1 of 7 · 6 more for £1.42')
+})
+
+test('computeProgressState: below every tier (no tier with minQty 1) does not throw, and documents that nextTier is null while remainingTiers is populated', () => {
+  const tiers = [{ minQty: 7, percentOff: 5 }, { minQty: 20, percentOff: 10 }]
+  const state = computeProgressState(tiers, 0, 1)
+
+  assert.equal(state.combinedQty, 1)
+  assert.equal(state.maxed, false)
+  assert.equal(state.tierState.nextTier, null)
+  assert.deepEqual(state.tierState.remainingTiers, [
+    { minQty: 7, percentOff: 5, fixedPrice: null, delta: 6 },
+    { minQty: 20, percentOff: 10, fixedPrice: null, delta: 19 },
+  ])
 })
 
 test('formatTempBoxLabel: quantity, "x", the total at the next tier\'s blended rate — no "=" sign', () => {

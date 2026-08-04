@@ -182,6 +182,10 @@
   animation: sparklyTierFadeIn 160ms var(--sparkly-tier-ease);
 }
 
+.sparkly-tier-pricing__list[hidden] {
+  display: none;
+}
+
 .sparkly-tier-pricing__list-item {
   display: flex;
   align-items: center;
