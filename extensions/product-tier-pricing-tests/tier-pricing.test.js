@@ -1,6 +1,6 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
-const { computeTierState, perUnitPrice, sumGroupQuantityInCart, unitPriceAtTier, totalAtTier, computeProgressState, formatCalloutText, formatTempBoxLabel, buildPromoText, computeOrderSummary, computeTierButtonsSignature, withUnitAnchor, cartBaselineOtherQty } = require('../product-tier-pricing/assets/tier-pricing.js')
+const { computeTierState, perUnitPrice, sumGroupQuantityInCart, unitPriceAtTier, totalAtTier, computeProgressState, formatCalloutText, formatTempBoxLabel, buildPromoText, computeOrderSummary, computeTierButtonsSignature, withUnitAnchor, cartBaselineOtherQty, clamp, sortTiersByMinQty, normalizeTierPricing, formatMoney, computeWidgetViewModel, buildMixMatchRows } = require('../product-tier-pricing/assets/tier-pricing.js')
 
 test('below every tier: no discount, lists every tier as a delta from current quantity', () => {
   const tiers = [{ minQty: 7, percentOff: 5 }, { minQty: 14, percentOff: 10 }]
@@ -469,4 +469,117 @@ test('computeOrderSummary: discounted unit price reports savings vs full price',
   assert.equal(summary.total, 7.1)
   assert.equal(summary.fullPrice, 7.45)
   assert.equal(summary.savings, 0.35)
+})
+
+test('clamp: returns the value unchanged when within range', () => {
+  assert.equal(clamp(5, 0, 10), 5)
+})
+
+test('clamp: floors at min', () => {
+  assert.equal(clamp(-5, 0, 10), 0)
+})
+
+test('clamp: ceilings at max', () => {
+  assert.equal(clamp(15, 0, 10), 10)
+})
+
+test('sortTiersByMinQty: sorts ascending by minQty without mutating the input', () => {
+  const tiers = [{ minQty: 20 }, { minQty: 1 }, { minQty: 7 }]
+  const sorted = sortTiersByMinQty(tiers)
+  assert.deepEqual(sorted.map((t) => t.minQty), [1, 7, 20])
+  assert.deepEqual(tiers.map((t) => t.minQty), [20, 1, 7]) // original untouched
+})
+
+test('normalizeTierPricing: fills in defaults for an unset tier', () => {
+  assert.deepEqual(normalizeTierPricing({ minQty: 7 }), { percentOff: 0, anchorPrice: null, fixedPrice: null })
+})
+
+test('normalizeTierPricing: passes through explicit values', () => {
+  assert.deepEqual(
+    normalizeTierPricing({ minQty: 7, percentOff: 5, anchorPrice: 10, fixedPrice: 1.5 }),
+    { percentOff: 5, anchorPrice: 10, fixedPrice: 1.5 },
+  )
+})
+
+test('formatMoney: fills the {{amount}} placeholder with 2 decimal places', () => {
+  assert.equal(formatMoney(1.5, '£{{amount}}'), '£1.50')
+  assert.equal(formatMoney(9.999, '£{{ amount }}'), '£10.00')
+})
+
+test('buildMixMatchRows: builds one row per product with its live cart quantity and product-page link', () => {
+  const products = [
+    { title: 'Canagan Tuna Soup for Cats', handle: 'canagan-tuna-soup-for-cats', imageUrl: 'https://example.com/tuna.png' },
+    { title: 'Canagan Chicken Soup for Cats', handle: 'canagan-chicken-soup-for-cats', imageUrl: null },
+  ]
+  const cartItems = [
+    { handle: 'canagan-tuna-soup-for-cats', quantity: 5 },
+    { handle: 'canagan-ocean-fish-soup-for-cats', quantity: 2 },
+  ]
+  assert.deepEqual(buildMixMatchRows(products, cartItems), [
+    { href: '/products/canagan-tuna-soup-for-cats', title: 'Canagan Tuna Soup for Cats', imageUrl: 'https://example.com/tuna.png', qtyLabel: '5 in cart' },
+    { href: '/products/canagan-chicken-soup-for-cats', title: 'Canagan Chicken Soup for Cats', imageUrl: null, qtyLabel: '0 in cart' },
+  ])
+})
+
+test('buildMixMatchRows: singular "1 in cart" label', () => {
+  const rows = buildMixMatchRows([{ title: 'X', handle: 'x', imageUrl: null }], [{ handle: 'x', quantity: 1 }])
+  assert.equal(rows[0].qtyLabel, '1 in cart')
+})
+
+test('computeWidgetViewModel: no tiers configured at all — plain price, card hidden, breakdown left untouched', () => {
+  const vm = computeWidgetViewModel({ tiers: [], basePrice: 1.49, otherQty: 0, addingQty: 1, title: undefined, isGroup: false, formatMoney: fmt })
+  assert.deepEqual(vm, {
+    showCard: false,
+    discountedPrice: null,
+    plainPrice: '£1.49',
+    promoText: '',
+    progressState: null,
+    calloutText: '',
+    scaleLabels: [],
+    tierButtons: [],
+    tempBoxLabel: null,
+    tempBoxAfterIndex: null,
+    breakdownText: null,
+  })
+})
+
+test('computeWidgetViewModel: fresh page load, qty 1, below the discount tier — no strike-through, "more for" callout', () => {
+  // Mirrors a real group-mode load: otherQty from cartBaselineOtherQty(0) = 0.
+  const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 7, percentOff: 4 }]
+  const vm = computeWidgetViewModel({ tiers, basePrice: 1.49, otherQty: 0, addingQty: 1, title: undefined, isGroup: true, formatMoney: fmt })
+
+  assert.equal(vm.showCard, true)
+  assert.equal(vm.discountedPrice, null) // 0% off at qty 1 — not actually discounted yet
+  assert.equal(vm.plainPrice, '£1.49')
+  assert.equal(vm.promoText, 'Mix & match — 7+ unlocks £1.43 each')
+  assert.equal(vm.calloutText, '1 of 7 · 6 more for £1.43')
+  assert.deepEqual(vm.scaleLabels, ['0', '7 · £1.43 ea'])
+  assert.deepEqual(vm.tierButtons, [
+    { minQty: 1, active: true, label: '1 x £1.49' },
+    { minQty: 7, active: false, label: '7 x £10.01' },
+  ])
+  assert.equal(vm.tempBoxLabel, null) // addingQty sits exactly at the qty:1 anchor, not strictly between two tiers
+  assert.equal(vm.breakdownText, '1 unit × £1.49')
+})
+
+test('computeWidgetViewModel: combined quantity already past the tier threshold (cart-aware baseline + 2 clicks) — matches the live-verified "9 combined" scenario', () => {
+  const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 7, percentOff: 4 }]
+  const otherQty = cartBaselineOtherQty(7) // 7 already in cart across this product + siblings
+  const vm = computeWidgetViewModel({ tiers, basePrice: 1.49, otherQty, addingQty: 3, title: undefined, isGroup: true, formatMoney: fmt })
+
+  assert.equal(vm.discountedPrice, '£1.43')
+  assert.equal(vm.calloutText, '9 combined · £1.43 each')
+  assert.deepEqual(vm.tierButtons, [
+    { minQty: 1, active: false, label: '1 x £1.49' },
+    { minQty: 7, active: false, label: '7 x £10.01' },
+  ])
+  assert.equal(vm.tempBoxLabel, '3x £4.47')
+  assert.equal(vm.tempBoxAfterIndex, 0)
+  assert.equal(vm.breakdownText, '3 units × £1.43 · full price £4.47 — you save £0.18')
+})
+
+test('computeWidgetViewModel: standalone mode (isGroup false) uses "Buy more" promo copy', () => {
+  const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 7, percentOff: 4 }]
+  const vm = computeWidgetViewModel({ tiers, basePrice: 1.49, otherQty: 0, addingQty: 1, title: 'Canagan Tuna Soup', isGroup: false, formatMoney: fmt })
+  assert.equal(vm.promoText, 'Buy more Canagan Tuna Soup — 7+ unlocks £1.43 each')
 })
