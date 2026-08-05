@@ -127,6 +127,24 @@ function withUnitAnchor(tiers) {
   return [{ minQty: 1, percentOff: 0 }].concat(tiers)
 }
 
+// Converts a TRUE, already-in-cart quantity (summed across every product
+// that counts toward this discount, INCLUDING this exact product) into the
+// `otherQty` value computeProgressState expects. The on-page quantity
+// stepper has an inherent floor of 1 (Shopify's native minimum-purchase-
+// quantity convention, never 0), so passing the true cart total straight
+// through would overcount by 1 the instant the page loads — the stepper
+// resting at its floor isn't "one extra unit being added", it's just the
+// widget's baseline state. Subtracting 1 cancels that floor, so combinedQty
+// (= otherQty + addingQty) lands exactly on the true cart total when the
+// stepper is at rest, and tracks it 1-for-1 as the stepper moves up or
+// down — the stepper's own floor of 1 then naturally enforces "combined
+// quantity can never read below the true cart total" with no extra
+// clamping needed anywhere else. Clamped at 0 for the common empty-cart
+// case, where a naive subtraction would otherwise go negative.
+function cartBaselineOtherQty(trueCartQty) {
+  return Math.max(0, trueCartQty - 1)
+}
+
 function formatCalloutText(progressState, tiers, basePrice, formatMoney) {
   if (progressState.maxed) {
     const topTier = tiers.slice().sort((a, b) => a.minQty - b.minQty).pop()
@@ -182,6 +200,7 @@ if (typeof module !== 'undefined' && module.exports) {
     computeOrderSummary,
     computeTierButtonsSignature,
     withUnitAnchor,
+    cartBaselineOtherQty,
   }
 }
 
@@ -367,8 +386,8 @@ if (typeof document !== 'undefined') {
 
       // Per-container signature of the last-rendered tier buttons/temp-box,
       // used by renderProgressCard to skip rebuilding that section's DOM
-      // when nothing relevant changed (e.g. on every tick of the group-mode
-      // 1s cart poll below). null is a sentinel that can never equal a real
+      // when nothing relevant changed (e.g. on every tick of the cart-aware
+      // 1s poll below). null is a sentinel that can never equal a real
       // (string) signature, so the first render always populates it.
       const tierButtonsSignatureRef = { value: null }
 
@@ -378,29 +397,65 @@ if (typeof document !== 'undefined') {
       // already re-fetch the cart for the combined-quantity calculation.
       let lastCartItems = []
 
-      // Group mode combines two sources: otherQty from the REAL cart (only
-      // sibling products, fetched fresh from /cart.js — this product's own
-      // cart-resident quantity is deliberately excluded, see the plan's
-      // "Combined-quantity formula" note) plus addingQty, the live on-page
-      // quantity selector value for this product. Standalone mode ignores
-      // the cart entirely and uses addingQty alone.
+      // Every handle that counts toward this discount's combined quantity —
+      // this product itself plus, in group mode, its siblings. Standalone
+      // mode is just the one-element case of the same formula below.
+      const allDiscountHandles = group ? [productHandle].concat(group.siblings.map((s) => s.handle)) : [productHandle]
+      const mixMatchListItems = group ? [group.self].concat(group.siblings) : []
+
+      // Tracks this exact product's own cart-resident quantity across
+      // renders, so we can detect "a real Add to Cart just succeeded" (the
+      // quantity went UP since we last checked) and reset the stepper back
+      // to its floor of 1 — confirmed live that this theme's native stepper
+      // does NOT do this itself; it stays at whatever was last submitted.
+      // Without this reset, the next render would double-count: the
+      // just-added units are now part of the freshly-fetched cart total
+      // (cartBaselineOtherQty) AND still sitting in the stale addingQty.
+      // null (not 0) is the "haven't observed a baseline yet" sentinel, so
+      // the very first render never fires a false reset.
+      let lastKnownSelfQty = null
+
+      // otherQty now reflects the TRUE combined quantity already sitting in
+      // the customer's real cart — across every product that counts toward
+      // this discount, including this exact product — via
+      // cartBaselineOtherQty (see its own doc comment for the "-1"). Before
+      // this, this product's own cart-resident quantity was invisible to
+      // the widget entirely: reloading a page for a product you already
+      // have some of showed a progress bar/price that silently ignored
+      // those units, and undercounted group discounts that were already
+      // earned. addingQty (the live on-page stepper) is unchanged — it
+      // still can't go below 1, which is exactly what keeps the combined
+      // total from ever reading below the true cart amount.
+      const hasTiers = !!(tiers && tiers.length > 0)
+
       async function renderWithGroupAwareness() {
-        if (!group) {
-          renderTierPricing(container, tiers, moneyFormat, 0, title, false, tierButtonsSignatureRef)
+        // No discount configured at all: renderTierPricing's own early
+        // return already handles this (plain price, card hidden) — skip
+        // the cart fetch entirely rather than doing it on every quantity
+        // change/poll tick for the common undiscounted-product case.
+        if (!hasTiers) {
+          renderTierPricing(container, tiers, moneyFormat, 0, title, !!group, tierButtonsSignatureRef)
           return
         }
-        const siblingHandles = group.siblings.map((s) => s.handle)
+
         let otherQty = 0
         try {
           const cart = await fetchCart()
           lastCartItems = cart.items
-          otherQty = sumGroupQuantityInCart(cart.items, siblingHandles)
+          const trueCartQty = sumGroupQuantityInCart(cart.items, allDiscountHandles)
+          otherQty = cartBaselineOtherQty(trueCartQty)
+
+          const selfQtyNow = sumGroupQuantityInCart(cart.items, [productHandle])
+          if (lastKnownSelfQty != null && selfQtyNow > lastKnownSelfQty) {
+            setQuantityInput(1)
+          }
+          lastKnownSelfQty = selfQtyNow
         } catch {
           otherQty = 0
         }
-        renderTierPricing(container, tiers, moneyFormat, otherQty, title, true, tierButtonsSignatureRef)
-        if (listEl && !listEl.hidden) {
-          renderMixMatchList(listEl, group.siblings, lastCartItems)
+        renderTierPricing(container, tiers, moneyFormat, otherQty, title, !!group, tierButtonsSignatureRef)
+        if (group && listEl && !listEl.hidden) {
+          renderMixMatchList(listEl, mixMatchListItems, lastCartItems)
         }
       }
 
@@ -412,7 +467,7 @@ if (typeof document !== 'undefined') {
           open = !open
           listEl.hidden = !open
           toggleEl.textContent = 'mix & match products ' + (open ? '▲' : '▼')
-          if (open) renderMixMatchList(listEl, group.siblings, lastCartItems)
+          if (open) renderMixMatchList(listEl, mixMatchListItems, lastCartItems)
         })
       }
 
@@ -441,9 +496,10 @@ if (typeof document !== 'undefined') {
       const addToCartForm = document.querySelector('form[action*="/cart/add"]')
       if (addToCartForm) {
         // Best-effort immediate re-check after a real submission, so the
-        // group price doesn't wait for the next poll tick. If /cart/add.js
-        // hasn't finished yet this briefly under-counts, never over-counts,
-        // and self-corrects on the next poll or visibilitychange.
+        // price/progress bar (and the post-add stepper reset above) don't
+        // wait for the next poll tick. If /cart/add.js hasn't finished yet
+        // this briefly under-counts, never over-counts, and self-corrects
+        // on the next poll or visibilitychange.
         addToCartForm.addEventListener('submit', () => {
           renderWithGroupAwareness()
         })
@@ -476,7 +532,11 @@ if (typeof document !== 'undefined') {
         }
       }, 200)
 
-      if (group) {
+      if (hasTiers) {
+        // Not just group mode any more: a standalone-discounted product's
+        // own cart-resident quantity can also change from elsewhere (cart
+        // drawer, another tab) while this page sits open, and the widget
+        // needs to notice without a reload.
         setInterval(renderWithGroupAwareness, 1000)
 
         document.addEventListener('visibilitychange', () => {
