@@ -1,6 +1,6 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
-const { computeTierState, perUnitPrice, sumGroupQuantityInCart, unitPriceAtTier, totalAtTier, computeProgressState, formatCalloutText, formatTempBoxLabel, buildPromoText, computeOrderSummary, computeTierButtonsSignature, withUnitAnchor } = require('../product-tier-pricing/assets/tier-pricing.js')
+const { computeTierState, perUnitPrice, sumGroupQuantityInCart, unitPriceAtTier, totalAtTier, computeProgressState, formatCalloutText, formatTempBoxLabel, buildPromoText, computeOrderSummary, computeTierButtonsSignature, withUnitAnchor, cartBaselineOtherQty } = require('../product-tier-pricing/assets/tier-pricing.js')
 
 test('below every tier: no discount, lists every tier as a delta from current quantity', () => {
   const tiers = [{ minQty: 7, percentOff: 5 }, { minQty: 14, percentOff: 10 }]
@@ -397,6 +397,40 @@ test('withUnitAnchor: passes through empty/missing tiers unchanged', () => {
   assert.equal(withUnitAnchor([]).length, 0)
   assert.equal(withUnitAnchor(null), null)
   assert.equal(withUnitAnchor(undefined), undefined)
+})
+
+test('cartBaselineOtherQty: empty cart contributes nothing', () => {
+  assert.equal(cartBaselineOtherQty(0), 0)
+})
+
+test('cartBaselineOtherQty: exactly 1 already in cart also contributes nothing (matches the stepper\'s own floor)', () => {
+  assert.equal(cartBaselineOtherQty(1), 0)
+})
+
+test('cartBaselineOtherQty: subtracts the stepper\'s floor of 1 from the true cart total', () => {
+  assert.equal(cartBaselineOtherQty(7), 6)
+  assert.equal(cartBaselineOtherQty(100), 99)
+})
+
+test('cartBaselineOtherQty: never goes negative even if called with an impossible sub-1 total', () => {
+  assert.equal(cartBaselineOtherQty(-3), 0)
+})
+
+test('combinedQty end-to-end: on load with 7 already in cart (across this product + siblings), combined reads exactly 7, then tracks the stepper 1-for-1 in both directions, floored at 7', () => {
+  const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 7, percentOff: 4 }]
+  const otherQty = cartBaselineOtherQty(7) // 6
+
+  // Fresh page load: stepper at its native floor of 1.
+  assert.equal(computeProgressState(tiers, otherQty, 1).combinedQty, 7)
+
+  // Customer clicks "+" twice.
+  assert.equal(computeProgressState(tiers, otherQty, 2).combinedQty, 8)
+  assert.equal(computeProgressState(tiers, otherQty, 3).combinedQty, 9)
+
+  // Customer clicks "-" back down; the stepper's own floor of 1 is the
+  // lowest it can go, which lands combined back exactly on the cart total.
+  assert.equal(computeProgressState(tiers, otherQty, 2).combinedQty, 8)
+  assert.equal(computeProgressState(tiers, otherQty, 1).combinedQty, 7)
 })
 
 test('buildPromoText: group mode with a title uses "Mix & match any {title}"', () => {

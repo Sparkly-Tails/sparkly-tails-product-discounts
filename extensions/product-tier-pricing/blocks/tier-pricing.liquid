@@ -24,8 +24,12 @@
     {%- endfor -%}
     ]
   {%- endcapture -%}
+  {%- assign self_image_url = 'null' -%}
+  {%- if product.featured_image -%}
+    {%- assign self_image_url = product.featured_image | image_url: width: 88 | json -%}
+  {%- endif -%}
   {%- capture group_json_raw -%}
-    {"tiers": {{ group_metafield.value.tiers | json }}, "siblings": {{ siblings_json }}}
+    {"tiers": {{ group_metafield.value.tiers | json }}, "siblings": {{ siblings_json }}, "self": {"title": {{ product.title | json }}, "handle": {{ product.handle | json }}, "imageUrl": {{ self_image_url }}}}
   {%- endcapture -%}
   {%- assign group_json = group_json_raw | strip | escape -%}
 {%- endif -%}
