@@ -1,21 +1,9 @@
 // extensions/product-tier-pricing/assets/tier-pricing.js
-//
-// Shopify theme app extension blocks load exactly one JS asset per block
-// (declared as a single "javascript" key in the block's schema) — there is
-// no bundler and no ES modules here, so this can't be split into separate
-// files the way a normal app could be. The section banners below are the
-// closest equivalent: each groups a single, cohesive responsibility, in
-// dependency order (pure math first, DOM last). Everything above the
-// `module.exports` block is pure — no `document`/`window` access, no side
-// effects — and is unit tested by ../product-tier-pricing-tests. Everything
-// below the `typeof document !== 'undefined'` guard is DOM plumbing; it
-// stays intentionally thin, delegating all actual decisions to the pure
-// layer above it (see computeWidgetViewModel), which is what makes that
-// DOM code safe to keep untested — it has almost nothing left to get wrong.
+// One JS asset per theme app extension block (no bundler) — sections below
+// stand in for what would be separate modules. Pure math first, DOM last;
+// everything above module.exports is unit tested by ../product-tier-pricing-tests.
 
-// ===========================================================================
 // Shared pure helpers
-// ===========================================================================
 
 function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max)
@@ -25,13 +13,9 @@ function sortTiersByMinQty(tiers) {
   return tiers.slice().sort((a, b) => a.minQty - b.minQty)
 }
 
-// Fills in a tier's percentOff/anchorPrice/fixedPrice with the defaults
-// pricing math expects (0 / null / null) whenever a merchant left them
-// unset. Used only where a concrete NUMBER is required for a price
-// calculation — computeTierState's "remainingTiers"/"nextTier" preview
-// objects deliberately pass percentOff through raw (undefined stays
-// undefined) since those describe a tier that hasn't been applied yet,
-// not a price being computed right now.
+// Defaults a tier's percentOff/anchorPrice/fixedPrice (0/null/null) for
+// price math. Not used for computeTierState's remainingTiers/nextTier
+// previews — those pass percentOff through raw (undefined stays undefined).
 function normalizeTierPricing(tier) {
   return {
     percentOff: tier.percentOff != null ? tier.percentOff : 0,
@@ -40,18 +24,12 @@ function normalizeTierPricing(tier) {
   }
 }
 
-// Renders a money amount using this shop's money_format template, e.g.
-// "£{{amount}}". Pure string work — no DOM involved — so it lives here
-// rather than in the browser-only section below, and every formatting
-// decision elsewhere in this file goes through this one function.
 function formatMoney(amount, format) {
   const withDecimals = amount.toFixed(2)
   return format.replace(/\{\{\s*amount\s*\}\}/, withDecimals)
 }
 
-// ===========================================================================
 // Tier pricing math
-// ===========================================================================
 
 function computeTierState(tiers, quantity) {
   const sorted = sortTiersByMinQty(tiers)
@@ -94,23 +72,16 @@ function computeTierState(tiers, quantity) {
   }
 }
 
-// Each strategy either prices the unit or returns null ("not applicable,
-// try the next one"). Precedence is fixed price, then an anchored blend,
-// then plain percentage off — adding a new pricing mode in the future means
-// adding a new strategy here, not editing these three (open for extension,
-// closed for modification).
+// Ordered pricing strategies (fixed > anchor > percent). New mode = new
+// entry here, not an edit to the existing three.
 const PRICING_STRATEGIES = [
-  // Fixed price wins outright, clamped so it can never read as a markup.
   (basePrice, quantity, state) => (state.fixedPrice != null ? clamp(state.fixedPrice, 0, basePrice) : null),
-  // Anchored discount: a flat price for the tier's first minQty units, then
-  // percentOff on every unit beyond that, blended back into a per-unit rate.
   (basePrice, quantity, state) => {
     if (state.anchorPrice == null) return null
     const extraUnits = quantity - state.minQty
     const totalPaid = state.anchorPrice + extraUnits * basePrice * (1 - state.percentOff / 100)
     return clamp(totalPaid, 0, basePrice * quantity) / quantity
   },
-  // Plain percentage off — the default when neither of the above applies.
   (basePrice, quantity, state) => basePrice * (1 - state.percentOff / 100),
 ]
 
@@ -119,7 +90,7 @@ function perUnitPrice(basePrice, quantity, state) {
     const price = strategy(basePrice, quantity, state)
     if (price != null) return price
   }
-  return basePrice // unreachable — the plain-percent strategy always matches — kept explicit rather than implicit.
+  return basePrice
 }
 
 function unitPriceAtTier(basePrice, tier) {
@@ -130,23 +101,16 @@ function totalAtTier(basePrice, tier) {
   return Math.round(unitPriceAtTier(basePrice, tier) * tier.minQty * 100) / 100
 }
 
-// Prepends a synthetic { minQty: 1, percentOff: 0 } tier when the config
-// doesn't already define one at quantity 1, so the tier-button row always
-// has a "1 x <base price>" anchor button and the dashed temp-box mechanism
-// covers the 2..first-tier-1 range too (previously that gap never rendered
-// a temp box, since the loop below needs at least two entries to bracket
-// a quantity between). Price-neutral: a 0%-off tier reached below any real
-// discount computes to the same base price computeTierState already
-// returns when no tier is reached at all.
+// Synthetic { minQty: 1, percentOff: 0 } tier so the button row always has
+// a "1 x <base price>" anchor and the temp-box gap-detection below has two
+// entries to bracket a quantity between, even for single-tier configs.
 function withUnitAnchor(tiers) {
   if (!tiers || tiers.length === 0) return tiers
   if (tiers.some((t) => t.minQty === 1)) return tiers
   return [{ minQty: 1, percentOff: 0 }].concat(tiers)
 }
 
-// ===========================================================================
 // Cart math
-// ===========================================================================
 
 function sumGroupQuantityInCart(cartItems, handles) {
   return cartItems
@@ -154,27 +118,15 @@ function sumGroupQuantityInCart(cartItems, handles) {
     .reduce((sum, item) => sum + item.quantity, 0)
 }
 
-// Converts a TRUE, already-in-cart quantity (summed across every product
-// that counts toward this discount, INCLUDING this exact product) into the
-// `otherQty` value computeProgressState expects. The on-page quantity
-// stepper has an inherent floor of 1 (Shopify's native minimum-purchase-
-// quantity convention, never 0), so passing the true cart total straight
-// through would overcount by 1 the instant the page loads — the stepper
-// resting at its floor isn't "one extra unit being added", it's just the
-// widget's baseline state. Subtracting 1 cancels that floor, so combinedQty
-// (= otherQty + addingQty) lands exactly on the true cart total when the
-// stepper is at rest, and tracks it 1-for-1 as the stepper moves up or
-// down — the stepper's own floor of 1 then naturally enforces "combined
-// quantity can never read below the true cart total" with no extra
-// clamping needed anywhere else. Clamped at 0 for the common empty-cart
-// case, where a naive subtraction would otherwise go negative.
+// The on-page stepper floors at 1, not 0 — that floor isn't "one extra
+// unit", it's the resting state. Subtracting 1 cancels it, so combinedQty
+// (= otherQty + addingQty) lands exactly on the true cart total at rest and
+// tracks the stepper 1-for-1 from there. Clamped at 0 for an empty cart.
 function cartBaselineOtherQty(trueCartQty) {
   return Math.max(0, trueCartQty - 1)
 }
 
-// ===========================================================================
 // Progress/derived state
-// ===========================================================================
 
 function computeProgressState(tiers, otherQty, addingQty) {
   const sorted = sortTiersByMinQty(tiers)
@@ -191,13 +143,9 @@ function computeProgressState(tiers, otherQty, addingQty) {
 
   const tierButtons = sorted.map((t) => ({ minQty: t.minQty, active: addingQty === t.minQty }))
 
-  // The dashed box previews the running total AT THE RATE ALREADY IN EFFECT
-  // for this in-between quantity — i.e. sorted[i], the lower/just-crossed
-  // boundary — not sorted[i + 1] (the not-yet-reached tier above it). This
-  // matches the design reference (mkV2 in widget-reference.dc.html): zone 1
-  // (qty strictly between the qty:1 anchor and the first real tier) prices
-  // at plain base rate, and each zone above prices at whichever tier's
-  // threshold the quantity has already passed.
+  // Prices at sorted[i] (the lower, already-crossed boundary), not
+  // sorted[i + 1] — matches the design reference (mkV2 in
+  // widget-reference.dc.html): the preview uses the rate already unlocked.
   let tempBox = null
   for (let i = 0; i < sorted.length - 1; i++) {
     if (addingQty > sorted[i].minQty && addingQty < sorted[i + 1].minQty) {
@@ -215,11 +163,7 @@ function computeTierButtonsSignature(state, basePrice, addingQty) {
     '|' + addingQty + '|' + basePrice
 }
 
-// ===========================================================================
-// Copy formatting (formatMoney is injected — an (n) => string function —
-// so this section depends only on that small abstraction, never on how
-// money actually gets formatted; see createMoneyFormatter below).
-// ===========================================================================
+// Copy formatting — formatMoney is injected as an (n) => string abstraction.
 
 function formatCalloutText(progressState, tiers, basePrice, formatMoneyFn) {
   if (progressState.maxed) {
@@ -257,14 +201,8 @@ function buildPromoText(tiers, basePrice, formatMoneyFn, isGroup, title) {
   return prefix + clauses.join(', ')
 }
 
-// ===========================================================================
-// View-model assembly — the single place that decides WHAT the widget
-// should say, for any combination of inputs. Pure and fully unit tested:
-// this is what used to be smeared across the DOM-touching renderTierPricing
-// and renderProgressCard functions, untestable because it was entangled
-// with container.querySelector calls. The DOM layer at the bottom of this
-// file now does nothing but paint whatever this function returns.
-// ===========================================================================
+// View-model assembly: decides WHAT the widget shows. The DOM layer below
+// only paints whatever this returns.
 
 function computeWidgetViewModel({ tiers, basePrice, otherQty, addingQty, title, isGroup, formatMoney: formatMoneyFn }) {
   const plainPrice = formatMoneyFn(basePrice)
@@ -281,16 +219,13 @@ function computeWidgetViewModel({ tiers, basePrice, otherQty, addingQty, title, 
       tierButtons: [],
       tempBoxLabel: null,
       tempBoxAfterIndex: null,
-      breakdownText: null, // null = "leave it alone", distinct from '' = "clear it"
+      breakdownText: null, // null = leave it alone, distinct from '' = clear it
     }
   }
 
   const progressState = computeProgressState(tiers, otherQty || 0, addingQty)
-  // The price-per-unit AT THE CURRENT COMBINED QUANTITY (which may sit
-  // anywhere within the reached tier's range, not just at its own minQty)
-  // — perUnitPrice, not unitPriceAtTier, which answers a different question
-  // ("price at a SPECIFIC tier's own minQty", used for tier buttons/labels
-  // below) that would silently mis-price anchor tiers here.
+  // perUnitPrice, not unitPriceAtTier: this needs the price at the current
+  // COMBINED quantity, not at a specific tier's own minQty.
   const unit = perUnitPrice(basePrice, progressState.combinedQty, progressState.tierState)
   const isDiscounted = progressState.tierState.fixedPrice != null || progressState.tierState.percentOff > 0
 
@@ -326,9 +261,7 @@ function computeWidgetViewModel({ tiers, basePrice, otherQty, addingQty, title, 
   }
 }
 
-// ===========================================================================
 // Mix & match product list — pure row-building, then a thin DOM paint.
-// ===========================================================================
 
 function buildMixMatchRows(products, cartItems) {
   return products.map((product) => {
@@ -366,10 +299,7 @@ if (typeof module !== 'undefined' && module.exports) {
   }
 }
 
-// ===========================================================================
-// DOM: element painting — each function's only job is copying view-model
-// fields onto the page. No calculation happens below this line.
-// ===========================================================================
+// DOM: element painting — copies view-model fields onto the page, no calculation.
 
 if (typeof document !== 'undefined') {
   function createMoneyFormatter(moneyFormat) {
@@ -393,9 +323,7 @@ if (typeof document !== 'undefined') {
   }
 
   function paintBreakdown(elements, viewModel) {
-    // null means "no discount configured at all" — leave whatever text was
-    // there before untouched (matches the pre-refactor early-return, and
-    // the card sits hidden in that state anyway).
+    // null = no discount configured — leave existing text alone (card is hidden anyway).
     if (elements.breakdownEl && viewModel.breakdownText != null) {
       elements.breakdownEl.textContent = viewModel.breakdownText
     }
@@ -429,14 +357,9 @@ if (typeof document !== 'undefined') {
     })
   }
 
-  // Rebuilding tier buttons + the dashed temp-box is destructive: it
-  // replays the temp-box's fade/scale-in animation and clears any focus
-  // the customer has placed on a tier button. This runs on every render
-  // (including the 1s cart-aware poll), so it's skipped entirely when
-  // nothing that affects it has changed since last time — tracked via a
-  // signature stashed on tierButtonsSignatureRef, a `{ value }` box the
-  // caller owns so it survives across renders. `null` never equals a real
-  // signature, so the very first render always paints the buttons.
+  // Skips the destructive rebuild (replays animation, clears focus) when
+  // nothing tier-button-related changed since last render — tracked via a
+  // signature on tierButtonsSignatureRef, a { value } box the caller owns.
   function paintProgressCard(elements, viewModel, basePrice, addingQty, tierButtonsSignatureRef) {
     if (!viewModel.showCard || !viewModel.progressState) return
     const state = viewModel.progressState
@@ -509,9 +432,7 @@ if (typeof document !== 'undefined') {
     input.dispatchEvent(new Event('change', { bubbles: true }))
   }
 
-  // ===========================================================================
   // DOM: cart access
-  // ===========================================================================
 
   async function fetchCart() {
     const res = await fetch('/cart.js')
@@ -528,14 +449,10 @@ if (typeof document !== 'undefined') {
     }
   }
 
-  // Detects "a real Add to Cart just succeeded" (this product's cart
-  // quantity went up since the last check) and resets the stepper back to
-  // its floor of 1 — confirmed live that this theme's native stepper does
-  // NOT do this itself; it stays at whatever was last submitted. Without
-  // this, the next render would double-count: the just-added units are now
-  // part of the freshly-fetched otherQty AND still sitting in the stale
-  // addingQty. lastKnownSelfQtyRef.value starts at null (not 0), so the
-  // very first render never fires a false reset.
+  // Resets the stepper to 1 once this product's cart qty is observed to
+  // increase — this theme's native stepper does NOT do this itself
+  // (confirmed live). Without it, the next render double-counts: the
+  // just-added units land in the fresh otherQty AND the stale addingQty.
   function resetStepperIfJustAdded(lastKnownSelfQtyRef, selfQtyNow) {
     if (lastKnownSelfQtyRef.value != null && selfQtyNow > lastKnownSelfQtyRef.value) {
       setQuantityInput(1)
@@ -543,20 +460,13 @@ if (typeof document !== 'undefined') {
     lastKnownSelfQtyRef.value = selfQtyNow
   }
 
-  // ===========================================================================
-  // DOM: per-widget setup — config parsing, element lookup, and the
-  // render-cycle factory. Each does exactly one job; initTierPricing at the
-  // bottom of this file just calls them in order.
-  // ===========================================================================
+  // DOM: per-widget setup
 
   function parseWidgetConfig(container) {
     const standaloneData = JSON.parse(container.dataset.tiers)
     const moneyFormat = JSON.parse(container.dataset.moneyFormat)
     const group = JSON.parse(container.dataset.group)
     const productHandle = JSON.parse(container.dataset.productHandle)
-    // withUnitAnchor adds the "buy 1 at base price" tier the merchandiser
-    // never has to configure explicitly — see its definition for why this
-    // is price-neutral and only affects the button row / temp-box range.
     const tiers = withUnitAnchor(group ? group.tiers : standaloneData.tiers)
 
     return {
@@ -566,9 +476,6 @@ if (typeof document !== 'undefined') {
       tiers,
       title: group ? group.title : standaloneData.title,
       hasTiers: !!(tiers && tiers.length > 0),
-      // Every handle that counts toward this discount's combined quantity —
-      // this product itself plus, in group mode, its siblings. Standalone
-      // mode is just the one-element case of the same formula.
       allDiscountHandles: group ? [productHandle].concat(group.siblings.map((s) => s.handle)) : [productHandle],
       mixMatchListItems: group ? [group.self].concat(group.siblings) : [],
     }
@@ -592,12 +499,9 @@ if (typeof document !== 'undefined') {
     }
   }
 
-  // Builds the render cycle for one widget instance and wires the mix &
-  // match toggle (which needs read access to the same last-fetched-cart
-  // state the render cycle owns, so it stays here rather than becoming a
-  // separately-exposed function). Returns `render`; every other event
-  // listener (quantity stepper, Add to Cart, variant change, polling) is
-  // wired from initTierPricing against that single returned function.
+  // Builds the render cycle and wires the mix & match toggle (needs the
+  // same last-fetched-cart state the render cycle owns). Returns `render`;
+  // every other listener is wired from initTierPricing against it.
   function createRenderer(container, config, elements) {
     const tierButtonsSignatureRef = { value: null }
     const lastKnownSelfQtyRef = { value: null }
@@ -610,10 +514,6 @@ if (typeof document !== 'undefined') {
       const addingQty = quantityInput ? Number(quantityInput.value) || 1 : 1
 
       let otherQty = 0
-      // No discount configured at all: skip the cart fetch entirely rather
-      // than doing it on every quantity change/poll tick for the common
-      // undiscounted-product case — computeWidgetViewModel's own
-      // !tiers.length branch handles the resulting plain-price display.
       if (config.hasTiers) {
         try {
           const cartState = await fetchGroupCartState(config.allDiscountHandles, config.productHandle)
@@ -654,11 +554,7 @@ if (typeof document !== 'undefined') {
     return render
   }
 
-  // ===========================================================================
-  // DOM: event wiring — each function attaches exactly one behavior to the
-  // page and calls `render` when something changes. None of them decide
-  // what render should show; that's the view-model layer's job.
-  // ===========================================================================
+  // DOM: event wiring — each function attaches one behavior and calls render().
 
   function wireQuantityStepper(render) {
     const quantityInput = document.querySelector('input[name="quantity"]')
@@ -667,13 +563,10 @@ if (typeof document !== 'undefined') {
     quantityInput.addEventListener('input', render)
     quantityInput.addEventListener('change', render)
 
-    // This theme's +/- stepper buttons set the input's value
-    // programmatically without dispatching input/change on it, so we hook
-    // the buttons' own click events directly instead of polling for a
-    // value change. Scoped to this quantity widget (not document-wide)
-    // since the cart drawer's own per-line steppers use the same
-    // aria-labels. Deferred one tick so we read the value after the
-    // theme's own click handler has updated it.
+    // This theme's +/- buttons set the input's value without dispatching
+    // input/change, so hook the buttons directly. Scoped to this widget's
+    // own quantity input, not document-wide — the cart drawer's steppers
+    // share the same aria-labels.
     const quantityScope = quantityInput.closest('product-quantity') || quantityInput.closest('form') || document
     quantityScope.querySelectorAll('button[aria-label="Increase quantity"], button[aria-label="Decrease quantity"]').forEach((btn) => {
       btn.addEventListener('click', () => setTimeout(render, 0))
@@ -683,12 +576,8 @@ if (typeof document !== 'undefined') {
   function wireAddToCartForm(render) {
     const addToCartForm = document.querySelector('form[action*="/cart/add"]')
     if (!addToCartForm) return
-
-    // Best-effort immediate re-check after a real submission, so the
-    // price/progress bar (and the post-add stepper reset) don't wait for
-    // the next poll tick. If /cart/add.js hasn't finished yet this briefly
-    // under-counts, never over-counts, and self-corrects on the next poll
-    // or visibilitychange.
+    // Best-effort immediate re-check; self-corrects on the next poll if
+    // /cart/add.js hasn't finished yet.
     addToCartForm.addEventListener('submit', () => render())
   }
 
@@ -723,10 +612,6 @@ if (typeof document !== 'undefined') {
     }, 200)
   }
 
-  // Not just group mode: a standalone-discounted product's own
-  // cart-resident quantity can also change from elsewhere (cart drawer,
-  // another tab) while this page sits open, and the widget needs to
-  // notice without a reload.
   function wireCartAwarePolling(render) {
     setInterval(render, 1000)
     document.addEventListener('visibilitychange', () => {
