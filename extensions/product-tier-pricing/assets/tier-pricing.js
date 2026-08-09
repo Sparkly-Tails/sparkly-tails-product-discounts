@@ -141,36 +141,23 @@ function computeProgressState(tiers, otherQty, addingQty) {
   const calloutPct = clamp(rawCalloutPct, 6, 94)
   const maxed = combinedQty >= topThreshold
 
-  // Prices at sorted[i] (the lower, already-crossed boundary), not
-  // sorted[i + 1] — matches the design reference (mkV2 in
-  // widget-reference.dc.html): the preview uses the rate already unlocked.
-  let afterIndex = null
-  for (let i = 0; i < sorted.length - 1; i++) {
-    if (addingQty > sorted[i].minQty && addingQty < sorted[i + 1].minQty) {
-      afterIndex = i
-      break
-    }
-  }
-
-  // reachedTierIndex is driven by combinedQty (otherQty + addingQty) —
-  // which tier is ACTUALLY applied right now, matching the price/callout
-  // above. afterIndex is driven by addingQty alone. These normally agree,
-  // but otherQty (cart-aware baseline) can push the reached tier past what
-  // addingQty's own position would suggest — e.g. 5 already in cart + 2 on
-  // the stepper reaches a 7-tier that addingQty=2 alone never would. When
-  // that happens, the local temp-box preview would misleadingly show an
-  // undiscounted total right next to an already-discounted price, so fall
-  // back to highlighting the tier that's actually applied instead.
+  // Buttons/temp-box are driven entirely by combinedQty (the true cart
+  // total), not addingQty alone — the boxes always reflect what's actually
+  // in the cart. A static button highlights only when combinedQty lands
+  // exactly on that tier's minQty; otherwise a dashed box shows the true
+  // combined quantity, positioned after whichever tier is currently
+  // applied (reachedTierIndex, from tierState — the same source already
+  // driving the price/callout above). That "after" position can be the
+  // last tier's own index, which puts the box to the right of it when
+  // combinedQty has gone past every configured tier.
   const reachedTierIndex = sorted.findIndex((t) => t.minQty === tierState.minQty)
-  const hasExactButtonMatch = sorted.some((t) => t.minQty === addingQty)
-  const useReachedTierInstead = !hasExactButtonMatch && reachedTierIndex !== -1 && reachedTierIndex !== afterIndex
+  const exactMatchIndex = sorted.findIndex((t) => t.minQty === combinedQty)
 
-  const tierButtons = sorted.map((t, i) => ({
-    minQty: t.minQty,
-    active: addingQty === t.minQty || (useReachedTierInstead && i === reachedTierIndex),
-  }))
+  const tierButtons = sorted.map((t, i) => ({ minQty: t.minQty, active: i === exactMatchIndex }))
 
-  const tempBox = afterIndex !== null && !useReachedTierInstead ? { afterIndex, tier: sorted[afterIndex] } : null
+  const tempBox = exactMatchIndex === -1 && reachedTierIndex !== -1
+    ? { afterIndex: reachedTierIndex, tier: sorted[reachedTierIndex] }
+    : null
 
   return { combinedQty, topThreshold, cartPct, addedPct, calloutPct, maxed, tierState, tierButtons, tempBox }
 }
@@ -196,10 +183,11 @@ function formatCalloutText(progressState, tiers, basePrice, formatMoneyFn) {
   )
 }
 
-function formatTempBoxLabel(progressState, basePrice, addingQty, formatMoneyFn) {
+function formatTempBoxLabel(progressState, basePrice, formatMoneyFn) {
   if (!progressState.tempBox) return ''
-  const total = Math.round(unitPriceAtTier(basePrice, progressState.tempBox.tier) * addingQty * 100) / 100
-  return addingQty + 'x ' + formatMoneyFn(total)
+  const qty = progressState.combinedQty
+  const total = Math.round(unitPriceAtTier(basePrice, progressState.tempBox.tier) * qty * 100) / 100
+  return qty + 'x ' + formatMoneyFn(total)
 }
 
 function computeOrderSummary(basePrice, addingQty, unitPrice) {
@@ -273,7 +261,7 @@ function computeWidgetViewModel({ tiers, basePrice, otherQty, addingQty, title, 
     calloutText: formatCalloutText(progressState, tiers, basePrice, formatMoneyFn),
     scaleLabels,
     tierButtons,
-    tempBoxLabel: progressState.tempBox ? formatTempBoxLabel(progressState, basePrice, addingQty, formatMoneyFn) : null,
+    tempBoxLabel: progressState.tempBox ? formatTempBoxLabel(progressState, basePrice, formatMoneyFn) : null,
     tempBoxAfterIndex: progressState.tempBox ? progressState.tempBox.afterIndex : null,
     breakdownText,
   }
