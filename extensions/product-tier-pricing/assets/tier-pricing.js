@@ -141,18 +141,36 @@ function computeProgressState(tiers, otherQty, addingQty) {
   const calloutPct = clamp(rawCalloutPct, 6, 94)
   const maxed = combinedQty >= topThreshold
 
-  const tierButtons = sorted.map((t) => ({ minQty: t.minQty, active: addingQty === t.minQty }))
-
   // Prices at sorted[i] (the lower, already-crossed boundary), not
   // sorted[i + 1] — matches the design reference (mkV2 in
   // widget-reference.dc.html): the preview uses the rate already unlocked.
-  let tempBox = null
+  let afterIndex = null
   for (let i = 0; i < sorted.length - 1; i++) {
     if (addingQty > sorted[i].minQty && addingQty < sorted[i + 1].minQty) {
-      tempBox = { afterIndex: i, tier: sorted[i] }
+      afterIndex = i
       break
     }
   }
+
+  // reachedTierIndex is driven by combinedQty (otherQty + addingQty) —
+  // which tier is ACTUALLY applied right now, matching the price/callout
+  // above. afterIndex is driven by addingQty alone. These normally agree,
+  // but otherQty (cart-aware baseline) can push the reached tier past what
+  // addingQty's own position would suggest — e.g. 5 already in cart + 2 on
+  // the stepper reaches a 7-tier that addingQty=2 alone never would. When
+  // that happens, the local temp-box preview would misleadingly show an
+  // undiscounted total right next to an already-discounted price, so fall
+  // back to highlighting the tier that's actually applied instead.
+  const reachedTierIndex = sorted.findIndex((t) => t.minQty === tierState.minQty)
+  const hasExactButtonMatch = sorted.some((t) => t.minQty === addingQty)
+  const useReachedTierInstead = !hasExactButtonMatch && reachedTierIndex !== -1 && reachedTierIndex !== afterIndex
+
+  const tierButtons = sorted.map((t, i) => ({
+    minQty: t.minQty,
+    active: addingQty === t.minQty || (useReachedTierInstead && i === reachedTierIndex),
+  }))
+
+  const tempBox = afterIndex !== null && !useReachedTierInstead ? { afterIndex, tier: sorted[afterIndex] } : null
 
   return { combinedQty, topThreshold, cartPct, addedPct, calloutPct, maxed, tierState, tierButtons, tempBox }
 }
