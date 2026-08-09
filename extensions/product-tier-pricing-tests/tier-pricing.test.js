@@ -253,18 +253,54 @@ test('computeProgressState: tierButtons marks exactly the button matching adding
   ])
 })
 
-test('computeProgressState: tempBox appears between two tiers based on addingQty alone, not combinedQty', () => {
+test('computeProgressState: tempBox appears between two tiers based on addingQty alone, when that agrees with the combined-qty reached tier', () => {
   const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 7, percentOff: 5 }, { minQty: 20, percentOff: 10 }]
-  const between = computeProgressState(tiers, 10, 3) // addingQty 3 is between 1 and 7
+  const between = computeProgressState(tiers, 0, 3) // otherQty 0 -- nothing pushing the reached tier ahead of addingQty
   // tier is the lower/already-crossed boundary (the qty:1 anchor here), not
   // the not-yet-reached tier above it — see withUnitAnchor's doc comment.
   assert.deepEqual(between.tempBox, { afterIndex: 0, tier: { minQty: 1, percentOff: 0 } })
 
-  const atExactTier = computeProgressState(tiers, 10, 7)
+  const atExactTier = computeProgressState(tiers, 0, 7)
   assert.equal(atExactTier.tempBox, null)
 
-  const pastTop = computeProgressState(tiers, 10, 25)
+  const pastTop = computeProgressState(tiers, 0, 25)
   assert.equal(pastTop.tempBox, null)
+})
+
+test('computeProgressState: otherQty pushing the reached tier past what addingQty alone suggests suppresses the temp box and highlights the reached tier button instead', () => {
+  const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 7, percentOff: 5 }, { minQty: 20, percentOff: 10 }]
+  // addingQty 3 alone sits between the qty:1 anchor and the 7-tier, but
+  // otherQty 10 means the combined total (13) has already reached the
+  // 7-tier — showing a local "not yet discounted" preview here would
+  // contradict the price/callout, which are already using the 7-tier rate.
+  const state = computeProgressState(tiers, 10, 3)
+  assert.equal(state.tempBox, null)
+  assert.deepEqual(state.tierButtons, [
+    { minQty: 1, active: false },
+    { minQty: 7, active: true },
+    { minQty: 20, active: false },
+  ])
+})
+
+test('computeProgressState: maxed via otherQty alone (addingQty matches no tier and sits past the last one) still highlights the top tier button', () => {
+  const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 7, percentOff: 5 }, { minQty: 20, percentOff: 10 }]
+  const state = computeProgressState(tiers, 10, 25) // combined 35, well past the top tier
+  assert.equal(state.tempBox, null)
+  assert.deepEqual(state.tierButtons, [
+    { minQty: 1, active: false },
+    { minQty: 7, active: false },
+    { minQty: 20, active: true },
+  ])
+})
+
+test('computeProgressState: an exact addingQty match on a tier always wins, even if otherQty alone would also reach a different tier', () => {
+  const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 7, percentOff: 5 }, { minQty: 20, percentOff: 10 }]
+  const state = computeProgressState(tiers, 15, 7) // combined 22 reaches the 20-tier, but addingQty is exactly 7
+  assert.deepEqual(state.tierButtons, [
+    { minQty: 1, active: false },
+    { minQty: 7, active: true },
+    { minQty: 20, active: false },
+  ])
 })
 
 test('computeProgressState: tempBox between two real (already-configured) tiers prices at the lower, already-active one', () => {
@@ -569,12 +605,16 @@ test('computeWidgetViewModel: combined quantity already past the tier threshold 
 
   assert.equal(vm.discountedPrice, '£1.43')
   assert.equal(vm.calloutText, '9 combined · £1.43 each')
+  // addingQty 3 alone sits between the qty:1 anchor and the 7-tier, but the
+  // cart-aware otherQty means combined (9) already reached the 7-tier — the
+  // 7-tier button highlights instead of a temp box previewing an
+  // undiscounted total that would contradict the price/callout above.
   assert.deepEqual(vm.tierButtons, [
     { minQty: 1, active: false, label: '1 x £1.49' },
-    { minQty: 7, active: false, label: '7 x £10.01' },
+    { minQty: 7, active: true, label: '7 x £10.01' },
   ])
-  assert.equal(vm.tempBoxLabel, '3x £4.47')
-  assert.equal(vm.tempBoxAfterIndex, 0)
+  assert.equal(vm.tempBoxLabel, null)
+  assert.equal(vm.tempBoxAfterIndex, null)
   assert.equal(vm.breakdownText, '3 units × £1.43 · full price £4.47 — you save £0.18')
 })
 
