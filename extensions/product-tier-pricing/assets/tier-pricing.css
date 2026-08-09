@@ -157,7 +157,7 @@
   font-size: 13px;
   cursor: default;
   border: 2px dashed color-mix(in srgb, var(--sparkly-tier-moss, #434625) 80%, black);
-  background: #fff;
+  background: var(--sparkly-tier-moss-tint);
   color: var(--sparkly-tier-ink);
   animation: sparklyTierFadeIn 180ms var(--sparkly-tier-ease);
 }
