@@ -53,7 +53,7 @@
     <span class="sparkly-tier-pricing__price" data-tier-pricing-price>
       {{ product.selected_or_first_available_variant.price | money }}
     </span>
-    <span class="sparkly-tier-pricing__each-label">each</span>
+    <span class="sparkly-tier-pricing__each-label" data-tier-pricing-each-label>each</span>
   </div>
 
   {%- assign discount_tiers = tiers_metafield.value.tiers -%}

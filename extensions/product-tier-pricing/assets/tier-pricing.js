@@ -318,6 +318,10 @@ if (typeof document !== 'undefined') {
     } else {
       elements.priceEl.textContent = viewModel.plainPrice
     }
+    // "each" only makes sense once there's a per-unit/bulk-pricing story to
+    // explain — showCard already means "this product has a discount
+    // configured", the same condition that should hide it.
+    if (elements.eachLabelEl) elements.eachLabelEl.hidden = !viewModel.showCard
   }
 
   function paintPromo(elements, viewModel) {
@@ -490,6 +494,7 @@ if (typeof document !== 'undefined') {
   function queryWidgetElements(container) {
     return {
       priceEl: container.querySelector('[data-tier-pricing-price]'),
+      eachLabelEl: container.querySelector('[data-tier-pricing-each-label]'),
       promoEl: container.querySelector('[data-tier-pricing-promo]'),
       cardEl: container.querySelector('[data-tier-pricing-card]'),
       breakdownEl: container.querySelector('[data-tier-pricing-breakdown]'),
