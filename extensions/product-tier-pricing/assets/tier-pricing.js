@@ -183,6 +183,18 @@ function formatCalloutText(progressState, tiers, basePrice, formatMoneyFn) {
   )
 }
 
+// Below-tier breakdown copy: tells the customer exactly how many more of
+// the named discount to add to unlock the next tier's price. Only makes
+// sense before the top tier is reached — once maxed, there's no "more" to
+// add, so computeWidgetViewModel falls back to the addingQty/savings line.
+function formatAddMoreText(progressState, tiers, basePrice, formatMoneyFn, title) {
+  const ts = progressState.tierState
+  const next = ts.nextTier || (ts.remainingTiers && ts.remainingTiers[0])
+  const hasTitle = title != null && title !== ''
+  const nextPrice = formatMoneyFn(unitPriceAtTier(basePrice, next))
+  return 'Add ' + next.delta + ' more' + (hasTitle ? ' ' + title : '') + ' to get them for ' + nextPrice
+}
+
 function formatTempBoxLabel(progressState, basePrice, formatMoneyFn) {
   if (!progressState.tempBox) return ''
   const qty = progressState.combinedQty
@@ -251,6 +263,9 @@ function computeWidgetViewModel({ tiers, basePrice, otherQty, addingQty, title, 
   if (summary.savings > 0) {
     breakdownText += ' · full price ' + formatMoneyFn(summary.fullPrice) + ' — you save ' + formatMoneyFn(summary.savings)
   }
+  if (!progressState.maxed) {
+    breakdownText = formatAddMoreText(progressState, tiers, basePrice, formatMoneyFn, title)
+  }
 
   return {
     showCard: true,
@@ -294,6 +309,7 @@ if (typeof module !== 'undefined' && module.exports) {
     totalAtTier,
     computeProgressState,
     formatCalloutText,
+    formatAddMoreText,
     formatTempBoxLabel,
     buildPromoText,
     computeOrderSummary,

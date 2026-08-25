@@ -1,6 +1,6 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
-const { computeTierState, perUnitPrice, sumGroupQuantityInCart, unitPriceAtTier, totalAtTier, computeProgressState, formatCalloutText, formatTempBoxLabel, buildPromoText, computeOrderSummary, computeTierButtonsSignature, withUnitAnchor, cartBaselineOtherQty, clamp, sortTiersByMinQty, normalizeTierPricing, formatMoney, computeWidgetViewModel, buildMixMatchRows } = require('../product-tier-pricing/assets/tier-pricing.js')
+const { computeTierState, perUnitPrice, sumGroupQuantityInCart, unitPriceAtTier, totalAtTier, computeProgressState, formatCalloutText, formatAddMoreText, formatTempBoxLabel, buildPromoText, computeOrderSummary, computeTierButtonsSignature, withUnitAnchor, cartBaselineOtherQty, clamp, sortTiersByMinQty, normalizeTierPricing, formatMoney, computeWidgetViewModel, buildMixMatchRows } = require('../product-tier-pricing/assets/tier-pricing.js')
 
 test('below every tier: no discount, lists every tier as a delta from current quantity', () => {
   const tiers = [{ minQty: 7, percentOff: 5 }, { minQty: 14, percentOff: 10 }]
@@ -392,6 +392,20 @@ test('formatCalloutText: below every tier (no tier with minQty 1), falls back to
   assert.equal(text, '1 of 7 · 6 more for £1.42')
 })
 
+test('formatAddMoreText: names the discount and the next tier price', () => {
+  const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 7, percentOff: 4 }]
+  const state = computeProgressState(tiers, 4, 1) // 5 combined, matches the "5 in cart" worked example
+  const text = formatAddMoreText(state, tiers, 1.49, fmt, 'Canagan Cat Soups')
+  assert.equal(text, 'Add 2 more Canagan Cat Soups to get them for £1.43')
+})
+
+test('formatAddMoreText: no title configured — reads cleanly without a product name', () => {
+  const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 7, percentOff: 4 }]
+  const state = computeProgressState(tiers, 4, 1)
+  const text = formatAddMoreText(state, tiers, 1.49, fmt, undefined)
+  assert.equal(text, 'Add 2 more to get them for £1.43')
+})
+
 test('computeProgressState: below every tier (no tier with minQty 1) does not throw, and documents that nextTier is null while remainingTiers is populated', () => {
   const tiers = [{ minQty: 7, percentOff: 5 }, { minQty: 20, percentOff: 10 }]
   const state = computeProgressState(tiers, 0, 1)
@@ -614,7 +628,20 @@ test('computeWidgetViewModel: fresh page load, qty 1, below the discount tier �
     { minQty: 7, active: false, label: '7 x £10.01' },
   ])
   assert.equal(vm.tempBoxLabel, null) // addingQty sits exactly at the qty:1 anchor, not strictly between two tiers
-  assert.equal(vm.breakdownText, '1 unit × £1.49')
+  // Below the top tier, the breakdown line becomes the "add more" instruction
+  // instead of the addingQty × price line — no title configured here, so it
+  // reads cleanly without a product name.
+  assert.equal(vm.breakdownText, 'Add 6 more to get them for £1.43')
+})
+
+test('computeWidgetViewModel: discount title flows through to the breakdown line — "5 in cart" worked example', () => {
+  const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 7, percentOff: 4 }]
+  const vm = computeWidgetViewModel({ tiers, basePrice: 1.49, otherQty: 4, addingQty: 1, title: 'Canagan Cat Soups', isGroup: true, formatMoney: fmt })
+
+  // The bubble callout on the bar keeps its original phrasing...
+  assert.equal(vm.calloutText, '5 of 7 · 2 more for £1.43')
+  // ...while the breakdown line above the bar names the product.
+  assert.equal(vm.breakdownText, 'Add 2 more Canagan Cat Soups to get them for £1.43')
 })
 
 test('computeWidgetViewModel: combined quantity already past the tier threshold (cart-aware baseline + 2 clicks) — matches the live-verified "9 combined" scenario', () => {
