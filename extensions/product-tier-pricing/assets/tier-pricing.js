@@ -233,14 +233,24 @@ function computeOrderSummary(basePrice, addingQty, unitPrice) {
   return { total, fullPrice, savings }
 }
 
+// Joins a list the way someone would say it out loud ("A, B, or C") rather
+// than dumping it with a mechanical separator — used for the promo line so
+// it reads the same whether a discount has one tier or several.
+function joinNaturally(parts) {
+  if (parts.length <= 1) return parts.join('')
+  if (parts.length === 2) return parts[0] + ' or ' + parts[1]
+  return parts.slice(0, -1).join(', ') + ', or ' + parts[parts.length - 1]
+}
+
 function buildPromoText(tiers, basePrice, formatMoneyFn, isGroup, title) {
   const sorted = sortTiersByMinQty(tiers)
-  const clauses = sorted.slice(1).map((t) => t.minQty + '+ unlocks ' + formatMoneyFn(unitPriceAtTier(basePrice, t)) + ' each')
+  const clauses = sorted.slice(1).map((t) => t.minQty + ' or more for ' + formatMoneyFn(unitPriceAtTier(basePrice, t)))
+  const tail = joinNaturally(clauses)
   const hasTitle = title != null && title !== ''
-  const prefix = isGroup
-    ? (hasTitle ? 'Mix & match any ' + title + ' — ' : 'Mix & match — ')
-    : (hasTitle ? 'Buy more ' + title + ' — ' : 'Buy more, save more — ')
-  return prefix + clauses.join(', ')
+  if (isGroup) {
+    return hasTitle ? 'Mix and match any ' + title + ' and get ' + tail : 'Mix and match and get ' + tail
+  }
+  return hasTitle ? 'Buy ' + title + ' and get ' + tail : 'Buy more and get ' + tail
 }
 
 // View-model assembly: decides WHAT the widget shows. The DOM layer below
@@ -333,6 +343,7 @@ if (typeof module !== 'undefined' && module.exports) {
     pluralizeTitle,
     formatAddMoreText,
     formatTempBoxLabel,
+    joinNaturally,
     buildPromoText,
     computeOrderSummary,
     computeTierButtonsSignature,
