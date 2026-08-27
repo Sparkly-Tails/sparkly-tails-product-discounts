@@ -6,6 +6,14 @@
   --sparkly-tier-border: var(--color-borders-main, #ddd6c2);
   --sparkly-tier-moss-tint: color-mix(in srgb, var(--sparkly-tier-moss, #434625) 15%, white);
   --sparkly-tier-track: #fffdf6;
+  --sparkly-tier-track-empty: #e7e0cb;
+  /* Theme's own main accent colour (already used for hover/active states
+     across this store), not the block's own "sun" setting — so the
+     progress bar's fill matches the rest of the theme rather than a
+     merchant-picked accent that may not match. Falls back to the block's
+     configurable sun color, then a hardcoded default, for any theme that
+     doesn't define this variable. */
+  --sparkly-tier-accent: var(--color-accent-main, var(--sparkly-tier-sun, #ffdc4c));
   --sparkly-tier-radius: var(--border-radius-cards, 8px);
   --sparkly-tier-ease: cubic-bezier(0.4, 0, 0.2, 1);
   font-family: var(--font-stack-body);
@@ -59,70 +67,58 @@
 
 .sparkly-tier-pricing__bar-wrap {
   position: relative;
-  margin-bottom: 8px;
-}
-
-.sparkly-tier-pricing__callout {
-  position: absolute;
-  bottom: 20px;
-  transform: translateX(-50%);
-  white-space: nowrap;
-  background: var(--sparkly-tier-ink);
-  color: #fff;
-  font-family: var(--font-stack-body);
-  font-weight: 600;
-  font-size: 12px;
-  padding: 6px 10px;
-  border-radius: var(--sparkly-tier-radius);
-}
-
-.sparkly-tier-pricing__tick {
-  position: absolute;
-  bottom: 2px;
-  transform: translateX(-50%);
-  width: 1px;
-  height: 16px;
-  background: var(--sparkly-tier-ink);
+  height: 30px;
+  margin-bottom: 16px;
 }
 
 .sparkly-tier-pricing__track {
-  height: 8px;
-  background: var(--sparkly-tier-track);
+  position: absolute;
+  top: 50%;
+  left: 15px;
+  right: 15px;
+  height: 4px;
+  transform: translateY(-50%);
+  background: var(--sparkly-tier-track-empty);
   border-radius: 999px;
   overflow: hidden;
-  display: flex;
-  position: relative;
 }
 
-.sparkly-tier-pricing__segment--cart {
+.sparkly-tier-pricing__fill {
   height: 100%;
-  background: var(--sparkly-tier-moss, #434625);
-}
-
-.sparkly-tier-pricing__segment--adding {
-  height: 100%;
-  background: var(--sparkly-tier-sun, #ffdc4c);
+  background: var(--sparkly-tier-accent);
+  border-radius: 999px;
   transition: width 200ms var(--sparkly-tier-ease);
 }
 
-.sparkly-tier-pricing__dot {
-  position: absolute;
-  top: -2px;
-  transform: translateX(-50%);
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: var(--sparkly-tier-ink);
-  border: 2px solid #fff;
-}
-
-.sparkly-tier-pricing__scale {
+.sparkly-tier-pricing__stops {
+  position: relative;
   display: flex;
   justify-content: space-between;
+  align-items: center;
+}
+
+.sparkly-tier-pricing__stop {
+  position: relative;
+  z-index: 1;
+  width: 30px;
+  height: 30px;
+  flex: none;
+  border-radius: 50%;
+  border: 2px solid var(--sparkly-tier-track-empty);
+  background: var(--sparkly-tier-track);
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-family: var(--font-stack-body);
   font-size: 11px;
+  font-weight: 700;
   color: var(--sparkly-tier-text-secondary);
-  margin-bottom: 14px;
+  transition: border-color 150ms var(--sparkly-tier-ease), color 150ms var(--sparkly-tier-ease);
+}
+
+.sparkly-tier-pricing__stop--active {
+  border-color: var(--sparkly-tier-accent);
+  color: var(--sparkly-tier-accent);
 }
 
 .sparkly-tier-pricing__tiers {
@@ -242,7 +238,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .sparkly-tier-pricing__segment--adding,
+  .sparkly-tier-pricing__fill,
+  .sparkly-tier-pricing__stop,
   .sparkly-tier-pricing__temp-btn,
   .sparkly-tier-pricing__list {
     animation-duration: 0.01ms !important;
