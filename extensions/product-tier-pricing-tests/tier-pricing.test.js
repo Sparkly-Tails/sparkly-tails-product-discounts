@@ -1,6 +1,6 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
-const { computeTierState, perUnitPrice, sumGroupQuantityInCart, unitPriceAtTier, totalAtTier, computeProgressState, computeProgressTrack, pluralizeTitle, formatAddMoreText, formatTempBoxLabel, buildPromoText, computeOrderSummary, computeTierButtonsSignature, withUnitAnchor, cartBaselineOtherQty, clamp, sortTiersByMinQty, normalizeTierPricing, formatMoney, computeWidgetViewModel, buildMixMatchRows } = require('../product-tier-pricing/assets/tier-pricing.js')
+const { computeTierState, perUnitPrice, sumGroupQuantityInCart, unitPriceAtTier, totalAtTier, computeProgressState, computeProgressTrack, pluralizeTitle, formatAddMoreText, formatTempBoxLabel, joinNaturally, buildPromoText, computeOrderSummary, computeTierButtonsSignature, withUnitAnchor, cartBaselineOtherQty, clamp, sortTiersByMinQty, normalizeTierPricing, formatMoney, computeWidgetViewModel, buildMixMatchRows } = require('../product-tier-pricing/assets/tier-pricing.js')
 
 test('below every tier: no discount, lists every tier as a delta from current quantity', () => {
   const tiers = [{ minQty: 7, percentOff: 5 }, { minQty: 14, percentOff: 10 }]
@@ -522,28 +522,40 @@ test('combinedQty end-to-end: on load with 7 already in cart (across this produc
   assert.equal(computeProgressState(tiers, otherQty, 1).combinedQty, 7)
 })
 
-test('buildPromoText: group mode with a title uses "Mix & match any {title}"', () => {
+test('joinNaturally: reads like a spoken list rather than a mechanical dump', () => {
+  assert.equal(joinNaturally(['A']), 'A')
+  assert.equal(joinNaturally(['A', 'B']), 'A or B')
+  assert.equal(joinNaturally(['A', 'B', 'C']), 'A, B, or C')
+})
+
+test('buildPromoText: group mode with a title, single tier — matches the "Canagan Cat Soup" worked example', () => {
+  const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 7, percentOff: 4, anchorPrice: 10 }]
+  const text = buildPromoText(tiers, 1.49, fmt, true, 'Canagan Cat Soup')
+  assert.equal(text, 'Mix and match any Canagan Cat Soup and get 7 or more for £1.43')
+})
+
+test('buildPromoText: group mode with a title, several tiers — lists each threshold naturally', () => {
   const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 7, percentOff: 5 }, { minQty: 20, percentOff: 10 }]
   const text = buildPromoText(tiers, 1.49, fmt, true, 'Canagan treat')
-  assert.equal(text, 'Mix & match any Canagan treat — 7+ unlocks £1.42 each, 20+ unlocks £1.34 each')
+  assert.equal(text, 'Mix and match any Canagan treat and get 7 or more for £1.42 or 20 or more for £1.34')
 })
 
 test('buildPromoText: group mode with no title falls back to generic copy', () => {
   const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 7, percentOff: 5 }]
   const text = buildPromoText(tiers, 1.49, fmt, true, undefined)
-  assert.equal(text, 'Mix & match — 7+ unlocks £1.42 each')
+  assert.equal(text, 'Mix and match and get 7 or more for £1.42')
 })
 
-test('buildPromoText: standalone mode with a title uses "Buy more {title}"', () => {
+test('buildPromoText: standalone mode with a title', () => {
   const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 7, percentOff: 5 }]
   const text = buildPromoText(tiers, 1.49, fmt, false, 'Canagan Tuna Soup')
-  assert.equal(text, 'Buy more Canagan Tuna Soup — 7+ unlocks £1.42 each')
+  assert.equal(text, 'Buy Canagan Tuna Soup and get 7 or more for £1.42')
 })
 
 test('buildPromoText: standalone mode with no title falls back to generic copy', () => {
   const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 7, percentOff: 5 }]
   const text = buildPromoText(tiers, 1.49, fmt, false, '')
-  assert.equal(text, 'Buy more, save more — 7+ unlocks £1.42 each')
+  assert.equal(text, 'Buy more and get 7 or more for £1.42')
 })
 
 test('computeOrderSummary: no discount, no savings line', () => {
@@ -655,7 +667,7 @@ test('computeWidgetViewModel: fresh page load, qty 1, below the discount tier �
   assert.equal(vm.showCard, true)
   assert.equal(vm.discountedPrice, null) // 0% off at qty 1 — not actually discounted yet
   assert.equal(vm.plainPrice, '£1.49')
-  assert.equal(vm.promoText, 'Mix & match — 7+ unlocks £1.43 each')
+  assert.equal(vm.promoText, 'Mix and match and get 7 or more for £1.43')
   assert.deepEqual(vm.progressState.stops, [
     { value: 0, active: true },
     { value: 7, active: false },
@@ -700,5 +712,5 @@ test('computeWidgetViewModel: combined quantity already past the tier threshold 
 test('computeWidgetViewModel: standalone mode (isGroup false) uses "Buy more" promo copy', () => {
   const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 7, percentOff: 4 }]
   const vm = computeWidgetViewModel({ tiers, basePrice: 1.49, otherQty: 0, addingQty: 1, title: 'Canagan Tuna Soup', isGroup: false, formatMoney: fmt })
-  assert.equal(vm.promoText, 'Buy more Canagan Tuna Soup — 7+ unlocks £1.43 each')
+  assert.equal(vm.promoText, 'Buy Canagan Tuna Soup and get 7 or more for £1.43')
 })

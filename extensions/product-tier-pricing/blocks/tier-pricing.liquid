@@ -58,32 +58,16 @@
   </div>
 
   {%- assign discount_tiers = tiers_metafield.value.tiers -%}
-  {%- assign discount_title = tiers_metafield.value.title -%}
   {%- if group_metafield != blank -%}
     {%- assign discount_tiers = group_metafield.value.tiers -%}
-    {%- assign discount_title = group_metafield.value.title -%}
   {%- endif -%}
 
-  {%- if discount_tiers.size > 1 -%}
-    <p class="sparkly-tier-pricing__promo" data-tier-pricing-promo>
-      {%- if group_metafield != blank -%}
-        {%- if discount_title != blank -%}Mix &amp; match any {{ discount_title }}{%- else -%}Mix &amp; match{%- endif -%}
-      {%- else -%}
-        {%- if discount_title != blank -%}Buy more {{ discount_title }}{%- else -%}Buy more, save more{%- endif -%}
-      {%- endif -%}
-      {%- for tier in discount_tiers -%}
-        {%- unless forloop.first -%}
-          {%- if forloop.index == 2 %} —{% else %},{% endif %}
-          {{ tier.minQty }}+ unlocks
-          {%- if tier.fixedPrice -%}
-            {{ tier.fixedPrice | times: 100.0 | money }}
-          {%- else -%}
-            {{ tier.percentOff | default: 0 }}% off
-          {%- endif -%}
-          each
-        {%- endunless -%}
-      {%- endfor -%}
-    </p>
+  {%- if discount_tiers.size > 0 -%}
+    {%- comment -%} Empty mount point — JS (buildPromoText) owns the wording,
+      same as breakdownEl/fillEl/stopsEl below, so there's exactly one place
+      that generates this copy instead of two implementations to keep in
+      sync. {%- endcomment -%}
+    <p class="sparkly-tier-pricing__promo" data-tier-pricing-promo></p>
   {%- endif -%}
 
   <div class="sparkly-tier-pricing__card" data-tier-pricing-card hidden>

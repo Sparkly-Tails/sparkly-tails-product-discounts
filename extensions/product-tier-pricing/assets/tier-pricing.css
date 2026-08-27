@@ -7,13 +7,13 @@
   --sparkly-tier-moss-tint: color-mix(in srgb, var(--sparkly-tier-moss, #434625) 15%, white);
   --sparkly-tier-track: #fffdf6;
   --sparkly-tier-track-empty: #e7e0cb;
-  /* Theme's own main accent colour (already used for hover/active states
-     across this store), not the block's own "sun" setting — so the
-     progress bar's fill matches the rest of the theme rather than a
-     merchant-picked accent that may not match. Falls back to the block's
-     configurable sun color, then a hardcoded default, for any theme that
-     doesn't define this variable. */
-  --sparkly-tier-accent: var(--color-accent-main, var(--sparkly-tier-sun, #ffdc4c));
+  /* Theme's "selected" colour — the same variable the theme's own variant
+     picker uses for its checked/selected swatch border — not the block's
+     own "sun" setting, so the progress bar reads as the theme's native
+     selected state rather than a merchant-picked accent that may not
+     match. Falls back to the block's configurable moss color, then a
+     hardcoded default, for any theme that doesn't define this variable. */
+  --sparkly-tier-accent: var(--color-text-main, var(--sparkly-tier-moss, #434625));
   --sparkly-tier-radius: var(--border-radius-cards, 8px);
   --sparkly-tier-ease: cubic-bezier(0.4, 0, 0.2, 1);
   font-family: var(--font-stack-body);
