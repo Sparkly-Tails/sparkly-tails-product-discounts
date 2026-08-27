@@ -612,6 +612,23 @@ test('computeWidgetViewModel: no tiers configured at all — plain price, card h
   })
 })
 
+test('computeWidgetViewModel: no tiers, but a native compare-at price is set — falls back to showing it crossed out', () => {
+  const vm = computeWidgetViewModel({ tiers: [], basePrice: 1.49, compareAtPrice: 1.99, otherQty: 0, addingQty: 1, title: undefined, isGroup: false, formatMoney: fmt })
+  assert.equal(vm.showCard, false) // still just a price-row fallback, not the full tiered-discount card
+  assert.equal(vm.discountedPrice, '£1.49')
+  assert.equal(vm.plainPrice, '£1.99') // crossed out, matching the app-discount styling
+})
+
+test('computeWidgetViewModel: no tiers, compare-at price equal to or below the selling price — no fake markdown', () => {
+  const vmEqual = computeWidgetViewModel({ tiers: [], basePrice: 1.49, compareAtPrice: 1.49, otherQty: 0, addingQty: 1, title: undefined, isGroup: false, formatMoney: fmt })
+  assert.equal(vmEqual.discountedPrice, null)
+  assert.equal(vmEqual.plainPrice, '£1.49')
+
+  const vmZero = computeWidgetViewModel({ tiers: [], basePrice: 1.49, compareAtPrice: 0, otherQty: 0, addingQty: 1, title: undefined, isGroup: false, formatMoney: fmt })
+  assert.equal(vmZero.discountedPrice, null)
+  assert.equal(vmZero.plainPrice, '£1.49')
+})
+
 test('computeWidgetViewModel: fresh page load, qty 1, below the discount tier — no strike-through, "more for" callout', () => {
   // Mirrors a real group-mode load: otherQty from cartBaselineOtherQty(0) = 0.
   const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 7, percentOff: 4 }]

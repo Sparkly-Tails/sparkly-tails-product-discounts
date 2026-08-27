@@ -222,14 +222,18 @@ function buildPromoText(tiers, basePrice, formatMoneyFn, isGroup, title) {
 // View-model assembly: decides WHAT the widget shows. The DOM layer below
 // only paints whatever this returns.
 
-function computeWidgetViewModel({ tiers, basePrice, otherQty, addingQty, title, isGroup, formatMoney: formatMoneyFn }) {
+function computeWidgetViewModel({ tiers, basePrice, compareAtPrice, otherQty, addingQty, title, isGroup, formatMoney: formatMoneyFn }) {
   const plainPrice = formatMoneyFn(basePrice)
 
   if (!tiers || tiers.length === 0) {
+    // No app discount configured for this product — fall back to Shopify's
+    // own compare-at price, if the merchant set one, so a plain markdown
+    // still shows a crossed-out original price like a tiered discount does.
+    const hasCompareAtDiscount = compareAtPrice != null && compareAtPrice > basePrice
     return {
       showCard: false,
-      discountedPrice: null,
-      plainPrice,
+      discountedPrice: hasCompareAtDiscount ? plainPrice : null,
+      plainPrice: hasCompareAtDiscount ? formatMoneyFn(compareAtPrice) : plainPrice,
       promoText: '',
       progressState: null,
       calloutText: '',
@@ -537,6 +541,7 @@ if (typeof document !== 'undefined') {
 
     async function render() {
       const basePrice = Number(container.dataset.basePrice)
+      const compareAtPrice = Number(container.dataset.compareAtPrice) || 0
       const quantityInput = document.querySelector('input[name="quantity"]')
       const addingQty = quantityInput ? Number(quantityInput.value) || 1 : 1
 
@@ -555,6 +560,7 @@ if (typeof document !== 'undefined') {
       const viewModel = computeWidgetViewModel({
         tiers: config.tiers,
         basePrice,
+        compareAtPrice,
         otherQty,
         addingQty,
         title: config.title,
@@ -616,6 +622,14 @@ if (typeof document !== 'undefined') {
       const variant = event.target.currentVariant
       if (variant && typeof variant.price === 'number') {
         container.dataset.basePrice = String(variant.price / 100)
+      }
+      // Compare-at price is variant-specific too — keep it in sync so
+      // switching to a non-discounted variant doesn't leave a stale
+      // crossed-out price on screen. Accepts either casing the theme's
+      // variant object might use.
+      const variantCompareAt = variant && (variant.compareAtPrice != null ? variant.compareAtPrice : variant.compare_at_price)
+      if (typeof variantCompareAt === 'number') {
+        container.dataset.compareAtPrice = String(variantCompareAt / 100)
       }
       render()
     })
