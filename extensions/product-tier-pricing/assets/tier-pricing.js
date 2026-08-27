@@ -126,6 +126,32 @@ function cartBaselineOtherQty(trueCartQty) {
   return Math.max(0, trueCartQty - 1)
 }
 
+// Evenly-spaced scale points for the progress track: always starts at 0
+// (the synthetic qty:1 anchor tier reads as "0" here, same convention
+// buildPromoText/tierButtons already use), followed by each real tier's
+// minQty. Spacing is even regardless of the value gaps between tiers —
+// matching the fixed circle layout — so combinedQty's fill position is
+// interpolated within whichever even-width segment it currently falls in,
+// not scaled linearly across the whole 0..topThreshold range.
+function computeProgressTrack(sortedTiers, combinedQty) {
+  const values = [0].concat(sortedTiers.slice(1).map((t) => t.minQty))
+  const stops = values.map((value) => ({ value, active: combinedQty >= value }))
+
+  const n = values.length
+  const step = n > 1 ? 100 / (n - 1) : 100
+  let fillPct = 100
+  for (let i = 0; i < n - 1; i++) {
+    if (combinedQty <= values[i + 1]) {
+      const span = values[i + 1] - values[i]
+      const frac = span > 0 ? (combinedQty - values[i]) / span : 1
+      fillPct = Math.round(clamp(i * step + frac * step, 0, 100))
+      break
+    }
+  }
+
+  return { stops, fillPct }
+}
+
 // Progress/derived state
 
 function computeProgressState(tiers, otherQty, addingQty) {
@@ -133,13 +159,8 @@ function computeProgressState(tiers, otherQty, addingQty) {
   const topThreshold = sorted[sorted.length - 1].minQty
   const combinedQty = otherQty + addingQty
   const tierState = computeTierState(sorted, combinedQty)
-
-  const cartPct = topThreshold > 0 ? Math.min(100, Math.round((otherQty / topThreshold) * 100)) : 0
-  const addedPctRaw = topThreshold > 0 ? Math.round((addingQty / topThreshold) * 100) : 0
-  const addedPct = clamp(addedPctRaw, 0, 100 - cartPct)
-  const rawCalloutPct = topThreshold > 0 ? Math.round((combinedQty / topThreshold) * 100) : 0
-  const calloutPct = clamp(rawCalloutPct, 6, 94)
   const maxed = combinedQty >= topThreshold
+  const track = computeProgressTrack(sorted, combinedQty)
 
   // Buttons/temp-box are driven entirely by combinedQty (the true cart
   // total), not addingQty alone — the boxes always reflect what's actually
@@ -147,8 +168,8 @@ function computeProgressState(tiers, otherQty, addingQty) {
   // exactly on that tier's minQty; otherwise a dashed box shows the true
   // combined quantity, positioned after whichever tier is currently
   // applied (reachedTierIndex, from tierState — the same source already
-  // driving the price/callout above). That "after" position can be the
-  // last tier's own index, which puts the box to the right of it when
+  // driving the price above). That "after" position can be the last
+  // tier's own index, which puts the box to the right of it when
   // combinedQty has gone past every configured tier.
   const reachedTierIndex = sorted.findIndex((t) => t.minQty === tierState.minQty)
   const exactMatchIndex = sorted.findIndex((t) => t.minQty === combinedQty)
@@ -159,7 +180,7 @@ function computeProgressState(tiers, otherQty, addingQty) {
     ? { afterIndex: reachedTierIndex, tier: sorted[reachedTierIndex] }
     : null
 
-  return { combinedQty, topThreshold, cartPct, addedPct, calloutPct, maxed, tierState, tierButtons, tempBox }
+  return { combinedQty, topThreshold, maxed, tierState, tierButtons, tempBox, stops: track.stops, fillPct: track.fillPct }
 }
 
 function computeTierButtonsSignature(state, basePrice, addingQty) {
@@ -170,29 +191,32 @@ function computeTierButtonsSignature(state, basePrice, addingQty) {
 
 // Copy formatting — formatMoney is injected as an (n) => string abstraction.
 
-function formatCalloutText(progressState, tiers, basePrice, formatMoneyFn) {
-  if (progressState.maxed) {
-    const sorted = sortTiersByMinQty(tiers)
-    const topTier = sorted[sorted.length - 1]
-    return progressState.combinedQty + ' combined · ' + formatMoneyFn(unitPriceAtTier(basePrice, topTier)) + ' each'
-  }
-  const ts = progressState.tierState
-  const next = ts.nextTier || (ts.remainingTiers && ts.remainingTiers[0])
-  return progressState.combinedQty + ' of ' + next.minQty + ' · ' + next.delta + ' more for ' + formatMoneyFn(
-    unitPriceAtTier(basePrice, next),
-  )
+// Naive English pluralization for a discount's title: append "s" unless it
+// already reads as plural, or the customer only has exactly one. Necessary
+// because real configured titles mix conventions — "Canagan Cat Soup"
+// (singular) vs "Canagan Wet Cat Tins" (already plural) — so blindly
+// appending "s" would double-pluralize the latter into "Tinss".
+function pluralizeTitle(title, qty) {
+  if (qty === 1 || /s$/i.test(title)) return title
+  return title + 's'
 }
 
-// Below-tier breakdown copy: tells the customer exactly how many more of
-// the named discount to add to unlock the next tier's price. Only makes
-// sense before the top tier is reached — once maxed, there's no "more" to
-// add, so computeWidgetViewModel falls back to the addingQty/savings line.
+// Below-tier breakdown copy: states how many of the named discount are
+// already in the cart and how many more to add to unlock the next tier's
+// price (whether that's the first tier or a later one — either way it's
+// "the next tier ahead"). Only makes sense before the top tier is reached —
+// once maxed, there's no "more" to add, so computeWidgetViewModel falls
+// back to the addingQty/savings line instead.
 function formatAddMoreText(progressState, tiers, basePrice, formatMoneyFn, title) {
   const ts = progressState.tierState
   const next = ts.nextTier || (ts.remainingTiers && ts.remainingTiers[0])
   const hasTitle = title != null && title !== ''
   const nextPrice = formatMoneyFn(unitPriceAtTier(basePrice, next))
-  return 'Add ' + next.delta + ' more' + (hasTitle ? ' ' + title : '') + ' to get them for ' + nextPrice
+  if (!hasTitle) {
+    return 'Add ' + next.delta + ' more to get them for ' + nextPrice
+  }
+  const qty = progressState.combinedQty
+  return 'You have ' + qty + ' ' + pluralizeTitle(title, qty) + ', add ' + next.delta + ' to get them for ' + nextPrice
 }
 
 function formatTempBoxLabel(progressState, basePrice, formatMoneyFn) {
@@ -236,8 +260,6 @@ function computeWidgetViewModel({ tiers, basePrice, compareAtPrice, otherQty, ad
       plainPrice: hasCompareAtDiscount ? formatMoneyFn(compareAtPrice) : plainPrice,
       promoText: '',
       progressState: null,
-      calloutText: '',
-      scaleLabels: [],
       tierButtons: [],
       tempBoxLabel: null,
       tempBoxAfterIndex: null,
@@ -252,9 +274,6 @@ function computeWidgetViewModel({ tiers, basePrice, compareAtPrice, otherQty, ad
   const isDiscounted = progressState.tierState.fixedPrice != null || progressState.tierState.percentOff > 0
 
   const sortedTiers = sortTiersByMinQty(tiers)
-  const scaleLabels = ['0'].concat(
-    sortedTiers.slice(1).map((t) => t.minQty + ' · ' + formatMoneyFn(unitPriceAtTier(basePrice, t)) + ' ea'),
-  )
   const tierButtons = progressState.tierButtons.map((btn, i) => ({
     minQty: btn.minQty,
     active: btn.active,
@@ -277,8 +296,6 @@ function computeWidgetViewModel({ tiers, basePrice, compareAtPrice, otherQty, ad
     plainPrice,
     promoText: tiers.length > 1 ? buildPromoText(tiers, basePrice, formatMoneyFn, isGroup, title) : '',
     progressState,
-    calloutText: formatCalloutText(progressState, tiers, basePrice, formatMoneyFn),
-    scaleLabels,
     tierButtons,
     tempBoxLabel: progressState.tempBox ? formatTempBoxLabel(progressState, basePrice, formatMoneyFn) : null,
     tempBoxAfterIndex: progressState.tempBox ? progressState.tempBox.afterIndex : null,
@@ -312,7 +329,8 @@ if (typeof module !== 'undefined' && module.exports) {
     unitPriceAtTier,
     totalAtTier,
     computeProgressState,
-    formatCalloutText,
+    computeProgressTrack,
+    pluralizeTitle,
     formatAddMoreText,
     formatTempBoxLabel,
     buildPromoText,
@@ -359,12 +377,13 @@ if (typeof document !== 'undefined') {
     }
   }
 
-  function paintScale(elements, viewModel) {
-    elements.scaleEl.innerHTML = ''
-    viewModel.scaleLabels.forEach((text) => {
-      const label = document.createElement('span')
-      label.textContent = text
-      elements.scaleEl.appendChild(label)
+  function paintProgressStops(elements, stops) {
+    elements.stopsEl.innerHTML = ''
+    stops.forEach((stop) => {
+      const el = document.createElement('span')
+      el.className = 'sparkly-tier-pricing__stop' + (stop.active ? ' sparkly-tier-pricing__stop--active' : '')
+      el.textContent = String(stop.value)
+      elements.stopsEl.appendChild(el)
     })
   }
 
@@ -394,14 +413,8 @@ if (typeof document !== 'undefined') {
     if (!viewModel.showCard || !viewModel.progressState) return
     const state = viewModel.progressState
 
-    elements.calloutEl.textContent = viewModel.calloutText
-    elements.calloutEl.style.left = state.calloutPct + '%'
-    elements.tickEl.style.left = state.calloutPct + '%'
-    elements.dotEl.style.left = state.calloutPct + '%'
-    elements.cartSegmentEl.style.width = state.cartPct + '%'
-    elements.addingSegmentEl.style.width = state.addedPct + '%'
-
-    paintScale(elements, viewModel)
+    elements.fillEl.style.width = state.fillPct + '%'
+    paintProgressStops(elements, state.stops)
 
     const signature = computeTierButtonsSignature(state, basePrice, addingQty)
     if (tierButtonsSignatureRef.value === signature) return
@@ -518,12 +531,8 @@ if (typeof document !== 'undefined') {
       promoEl: container.querySelector('[data-tier-pricing-promo]'),
       cardEl: container.querySelector('[data-tier-pricing-card]'),
       breakdownEl: container.querySelector('[data-tier-pricing-breakdown]'),
-      calloutEl: container.querySelector('[data-tier-pricing-callout]'),
-      tickEl: container.querySelector('[data-tier-pricing-tick]'),
-      cartSegmentEl: container.querySelector('[data-tier-pricing-cart-segment]'),
-      addingSegmentEl: container.querySelector('[data-tier-pricing-adding-segment]'),
-      dotEl: container.querySelector('[data-tier-pricing-dot]'),
-      scaleEl: container.querySelector('[data-tier-pricing-scale]'),
+      fillEl: container.querySelector('[data-tier-pricing-fill]'),
+      stopsEl: container.querySelector('[data-tier-pricing-stops]'),
       tiersEl: container.querySelector('[data-tier-pricing-tiers]'),
       toggleEl: container.querySelector('[data-tier-pricing-toggle]'),
       listEl: container.querySelector('[data-tier-pricing-list]'),
