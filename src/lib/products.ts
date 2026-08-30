@@ -3,101 +3,107 @@ import { shopifyQuery } from '@/lib/shopify-client'
 export interface ProductSearchResult {
   id: string
   title: string
+  variantCount: number
 }
 
 /**
- * Search-as-you-type lookup for the product picker. Empty/whitespace query
+ * Search-as-you-type lookup for the member picker. Empty/whitespace query
  * short-circuits to no results without a network call, matching the
- * picker's debounce.
+ * picker's debounce. variantCount tells the picker whether to offer the
+ * "select specific variants" expansion.
  */
 export async function searchProducts(query: string): Promise<ProductSearchResult[]> {
   if (!query.trim()) return []
 
   const data = await shopifyQuery<{
-    products: { edges: { node: { id: string; title: string } }[] }
+    products: { edges: { node: { id: string; title: string; variants: { edges: { node: object }[] } } }[] }
   }>(
     `query searchProducts($q: String!) {
       products(first: 8, query: $q) {
-        edges { node { id title } }
+        edges { node { id title variants(first: 250) { edges { node { id } } } } }
       }
     }`,
     { q: query },
   )
 
-  return data.products.edges.map((e) => e.node)
+  return data.products.edges.map((e) => ({
+    id: e.node.id,
+    title: e.node.title,
+    variantCount: e.node.variants.edges.length,
+  }))
 }
 
-export interface ProductInfo {
+export interface ProductVariantOption {
+  variantId: string
   title: string
-  basePrice: number
+  price: number
 }
 
-/**
- * Fetches a product's title and real base price (the first variant's
- * price). Assumes a single-variant product, consistent with this app's
- * per-product tier scoping. Returns null if the product doesn't exist or
- * has no variants, so callers can skip a stale product id rather than crash.
- */
-export async function getProductInfo(productId: string): Promise<ProductInfo | null> {
+/** Lists every variant of a product, for the picker's variant-expansion UI. */
+export async function getProductVariantOptions(productId: string): Promise<ProductVariantOption[]> {
   const data = await shopifyQuery<{
     product: {
-      title: string
-      variants: { edges: { node: { price: string } }[] }
+      variants: { edges: { node: { id: string; title: string; price: string } }[] }
     } | null
   }>(
-    `query getProductInfo($id: ID!) {
+    `query getProductVariantOptions($id: ID!) {
       product(id: $id) {
-        title
-        variants(first: 1) {
-          edges { node { price } }
+        variants(first: 250) {
+          edges { node { id title price } }
         }
       }
     }`,
     { id: productId },
   )
 
-  if (!data.product) return null
-  const firstVariant = data.product.variants.edges[0]?.node
-  if (!firstVariant) return null
-
-  return {
-    title: data.product.title,
-    basePrice: parseFloat(firstVariant.price),
-  }
+  if (!data.product) return []
+  return data.product.variants.edges.map((e) => ({
+    variantId: e.node.id,
+    title: e.node.title,
+    price: parseFloat(e.node.price),
+  }))
 }
 
-export interface GroupProductInfo {
+export interface MemberInfo {
   productId: string
+  variantId?: string
   title: string
-  basePrice: number
+  price: number
   handle: string
+  imageUrl: string | null
 }
 
 /**
- * Batch title/price/handle lookup for group membership. Silently skips any
- * id that no longer resolves to a product or has no variant, mirroring
- * getProductInfo's null-on-missing behavior rather than throwing — a stale
- * id in a group shouldn't take down the whole group's admin page.
+ * Batch title/price/handle/image lookup for a discount's members. Silently
+ * skips any member whose product no longer resolves, mirroring the old
+ * per-product lookups' null-on-missing behavior — a stale id shouldn't take
+ * down the whole discount's admin page.
  */
-export async function getGroupProductInfo(productIds: string[]): Promise<GroupProductInfo[]> {
-  if (productIds.length === 0) return []
+export async function getMemberInfo(
+  members: { productId: string; variantId?: string }[],
+): Promise<MemberInfo[]> {
+  if (members.length === 0) return []
+
+  const productIds = [...new Set(members.map((m) => m.productId))]
 
   const data = await shopifyQuery<{
     nodes: ({
       id: string
       title: string
       handle: string
-      variants: { edges: { node: { price: string } }[] }
+      featuredImage: { url: string } | null
+      variants: { edges: { node: { id: string; title: string; price: string } }[] }
     } | null)[]
   }>(
-    `query getGroupProductInfo($ids: [ID!]!) {
+    `query getMemberInfo($ids: [ID!]!) {
       nodes(ids: $ids) {
         ... on Product {
           id
           title
           handle
-          variants(first: 1) {
-            edges { node { price } }
+          featuredImage { url }
+          variants(first: 250) {
+            edges { node { id title price } }
           }
         }
       }
@@ -105,16 +111,36 @@ export async function getGroupProductInfo(productIds: string[]): Promise<GroupPr
     { ids: productIds },
   )
 
-  const results: GroupProductInfo[] = []
-  for (const node of data.nodes) {
-    if (!node) continue
-    const firstVariant = node.variants.edges[0]?.node
-    if (!firstVariant) continue
+  const productById = new Map(data.nodes.filter((n) => n != null).map((n) => [n!.id, n!]))
+
+  const results: MemberInfo[] = []
+  for (const member of members) {
+    const product = productById.get(member.productId)
+    if (!product) continue
+
+    if (member.variantId == null) {
+      const firstVariant = product.variants.edges[0]?.node
+      if (!firstVariant) continue
+      results.push({
+        productId: product.id,
+        variantId: undefined,
+        title: product.title,
+        price: parseFloat(firstVariant.price),
+        handle: product.handle,
+        imageUrl: product.featuredImage?.url ?? null,
+      })
+      continue
+    }
+
+    const variant = product.variants.edges.find((e) => e.node.id === member.variantId)?.node
+    if (!variant) continue
     results.push({
-      productId: node.id,
-      title: node.title,
-      handle: node.handle,
-      basePrice: parseFloat(firstVariant.price),
+      productId: product.id,
+      variantId: variant.id,
+      title: `${product.title} – ${variant.title}`,
+      price: parseFloat(variant.price),
+      handle: product.handle,
+      imageUrl: product.featuredImage?.url ?? null,
     })
   }
   return results
