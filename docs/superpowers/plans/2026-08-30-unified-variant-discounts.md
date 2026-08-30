@@ -1679,13 +1679,13 @@ export default function PricingModeTierFields({
 }
 ```
 
-- [ ] **Step 3: Verify the app still builds**
+- [ ] **Step 3: Confirm the two edited files themselves are syntactically and type-correct in isolation**
 
 ```bash
-nvm use 20.20.2 && npm run build
+nvm use 20.20.2 && npx tsc --noEmit -p tsconfig.json 2>&1 | grep -E "TierFields\.tsx|PricingModeTierFields\.tsx"
 ```
 
-Expected: build succeeds (Task 8 wires the new required `allowPriceBasedModes` prop at every call site — this task alone will show TypeScript errors at the two current call sites until Task 8 lands; if executing tasks in strict order, note this in the PR rather than working around it here).
+Expected: no output (no errors reported against these two files' own code). A full `npm run build` is NOT the right check here and will show errors — every current call site (`src/app/discounts/new/page.tsx`, `src/app/discounts/groups/new/page.tsx`, and the two edit pages) still calls the old prop-less signature, and three of those four files are replaced or deleted by Task 8, not "two ... until Task 8 lands." That is expected and not a regression to fix in this task; Task 8's own build-verification step (Task 8 Step 6) is the real gate once every call site is rewired or removed.
 
 - [ ] **Step 4: Commit**
 
@@ -1947,12 +1947,13 @@ git commit -m "Add unified member picker supporting whole products and specific 
 
 import { useState } from 'react'
 import { createDiscount } from '@/actions/discountActions'
+import { pricesUniform } from '@/lib/config'
 import MemberPicker from '@/components/MemberPicker'
 import PricingModeTierFields from '@/components/PricingModeTierFields'
 
 export default function NewDiscountPage() {
   const [prices, setPrices] = useState<number[]>([])
-  const allowPriceBasedModes = prices.length <= 1 || prices.every((p) => Math.abs(p - prices[0]) <= 0.001)
+  const allowPriceBasedModes = pricesUniform(prices)
 
   return (
     <main className="p-8 max-w-xl mx-auto">
@@ -2016,7 +2017,7 @@ export default function NewDiscountPage() {
 ```tsx
 import { headers } from 'next/headers'
 import { notFound } from 'next/navigation'
-import { getConfig } from '@/lib/config'
+import { getConfig, pricesUniform } from '@/lib/config'
 import { getMemberInfo } from '@/lib/products'
 import { resultingPrice, totalAtThreshold, clampedFixedPrice, totalAtThresholdFixed } from '@/lib/tier-math'
 import { updateDiscountMembers, updateDiscountTiers, updateDiscountTitle, setDiscountStatus, deleteDiscount } from '@/actions/discountActions'
@@ -2110,7 +2111,7 @@ export default async function DiscountPage({
         <form action={updateTiersWithId} className="space-y-3">
           <PricingModeTierFieldsClient
             currentPricingMode={discount.pricingMode}
-            allowPriceBasedModes={memberInfo.every((m) => Math.abs(m.price - sharedPrice) <= 0.001)}
+            allowPriceBasedModes={pricesUniform(memberInfo.map((m) => m.price))}
             percentTiers={discount.tiers.map((t) => ({ minQty: t.minQty, percentOff: t.percentOff ?? 0, anchorPrice: t.anchorPrice }))}
             fixedTiers={discount.tiers.map((t) => ({ minQty: t.minQty, fixedPrice: t.fixedPrice ?? 0 }))}
           />
