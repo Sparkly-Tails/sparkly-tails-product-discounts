@@ -5,7 +5,8 @@ import { getMemberInfo } from '@/lib/products'
 import { resultingPrice, totalAtThreshold, clampedFixedPrice, totalAtThresholdFixed } from '@/lib/tier-math'
 import { updateDiscountMembers, updateDiscountTiers, updateDiscountTitle, setDiscountStatus, deleteDiscount } from '@/actions/discountActions'
 import MemberPicker from '@/components/MemberPicker'
-import PricingModeTierFieldsClient from './PricingModeTierFieldsClient'
+import TierFields from '@/components/TierFields'
+import FixedPriceTierFields from '@/components/FixedPriceTierFields'
 import ConfirmForm from '@/components/ConfirmForm'
 import AuthLink from '@/components/AuthLink'
 
@@ -92,12 +93,16 @@ export default async function DiscountPage({
       <section className="mb-8">
         <h2 className="font-medium mb-2">Tiers</h2>
         <form action={updateTiersWithId} className="space-y-3">
-          <PricingModeTierFieldsClient
-            currentPricingMode={discount.pricingMode}
-            allowPriceBasedModes={pricesUniform(memberInfo.map((m) => m.price))}
-            percentTiers={discount.tiers.map((t) => ({ minQty: t.minQty, percentOff: t.percentOff ?? 0, anchorPrice: t.anchorPrice }))}
-            fixedTiers={discount.tiers.map((t) => ({ minQty: t.minQty, fixedPrice: t.fixedPrice ?? 0 }))}
-          />
+          {discount.pricingMode === 'fixed' ? (
+            <FixedPriceTierFields
+              initial={discount.tiers.map((t) => ({ minQty: t.minQty, fixedPrice: t.fixedPrice ?? 0 }))}
+            />
+          ) : (
+            <TierFields
+              initial={discount.tiers.map((t) => ({ minQty: t.minQty, percentOff: t.percentOff ?? 0, anchorPrice: t.anchorPrice }))}
+              allowAnchorPrice={pricesUniform(memberInfo.map((m) => m.price))}
+            />
+          )}
           <button
             type="submit"
             className="bg-surface border border-line hover:bg-line px-4 py-3 rounded text-sm transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
