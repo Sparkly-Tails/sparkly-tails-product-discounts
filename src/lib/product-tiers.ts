@@ -35,7 +35,7 @@ export async function syncDiscountMetafields(discount: Discount): Promise<void> 
   const infoByKey = new Map(memberInfo.map((m) => [`${m.productId}::${m.variantId ?? ''}`, m]))
   const uniqueProductIds = [...new Set(discount.members.map((m) => m.productId))]
 
-  await Promise.allSettled(
+  const results = await Promise.allSettled(
     uniqueProductIds.map((productId) => {
       const ownMembers = discount.members.filter((m) => m.productId === productId)
       const ownVariantIds = ownMembers.some((m) => m.variantId == null)
@@ -67,6 +67,11 @@ export async function syncDiscountMetafields(discount: Discount): Promise<void> 
       return setDiscountMetafield(productId, value)
     }),
   )
+
+  const rejected = results.filter((r) => r.status === 'rejected')
+  if (rejected.length > 0) {
+    throw new Error(rejected.map((r) => (r as PromiseRejectedResult).reason?.message ?? String((r as PromiseRejectedResult).reason)).join('; '))
+  }
 }
 
 async function setDiscountMetafield(productId: string, value: DiscountMetafieldValue): Promise<void> {
@@ -100,7 +105,7 @@ async function setDiscountMetafield(productId: string, value: DiscountMetafieldV
 export async function clearDiscountMetafields(members: { productId: string }[]): Promise<void> {
   const uniqueProductIds = [...new Set(members.map((m) => m.productId))]
 
-  await Promise.allSettled(
+  const results = await Promise.allSettled(
     uniqueProductIds.map(async (productId) => {
       const data = await shopifyQuery<{
         metafieldsDelete: { userErrors: { field: string[]; message: string }[] }
@@ -120,4 +125,9 @@ export async function clearDiscountMetafields(members: { productId: string }[]):
       }
     }),
   )
+
+  const rejected = results.filter((r) => r.status === 'rejected')
+  if (rejected.length > 0) {
+    throw new Error(rejected.map((r) => (r as PromiseRejectedResult).reason?.message ?? String((r as PromiseRejectedResult).reason)).join('; '))
+  }
 }

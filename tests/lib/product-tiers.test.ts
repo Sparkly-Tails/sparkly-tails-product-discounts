@@ -50,6 +50,23 @@ describe('syncDiscountMetafields', () => {
       { productId: 'gid://shopify/Product/1', title: 'Tuna Soup', handle: 'tuna-soup', variantId: undefined, imageUrl: null },
     ])
   })
+
+  it('throws when metafieldsSet reports userErrors', async () => {
+    vi.spyOn(products, 'getMemberInfo').mockResolvedValue([
+      { productId: 'gid://shopify/Product/1', variantId: undefined, title: 'Tuna Soup', price: 1.49, handle: 'tuna-soup', imageUrl: null },
+    ])
+    vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({
+      metafieldsSet: { userErrors: [{ field: ['value'], message: 'Invalid JSON' }] },
+    })
+
+    const discount: Discount = {
+      discountId: 'disc_1', name: 'Mix', title: 'Mix & Match', status: 'live', pricingMode: 'percent',
+      members: [{ productId: 'gid://shopify/Product/1' }],
+      tiers: [{ minQty: 7, percentOff: 4 }],
+    }
+
+    await expect(syncDiscountMetafields(discount)).rejects.toThrow('Invalid JSON')
+  })
 })
 
 describe('clearDiscountMetafields', () => {
@@ -65,5 +82,15 @@ describe('clearDiscountMetafields', () => {
     ])
 
     expect(querySpy).toHaveBeenCalledTimes(2)
+  })
+
+  it('throws when metafieldsDelete reports userErrors', async () => {
+    vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({
+      metafieldsDelete: { userErrors: [{ field: ['metafields'], message: 'Not found' }] },
+    })
+
+    await expect(
+      clearDiscountMetafields([{ productId: 'gid://shopify/Product/1' }]),
+    ).rejects.toThrow('Not found')
   })
 })
