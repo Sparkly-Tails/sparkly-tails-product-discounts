@@ -1,35 +1,79 @@
 import { shopifyQuery } from '@/lib/shopify-client'
-import type { Tier } from '@/lib/config'
+import type { Discount } from '@/lib/config'
+import { getMemberInfo } from '@/lib/products'
 
 const NAMESPACE = 'sparkly_product_discounts'
 
-export async function syncProductTierMetafield(productId: string, tiers: Tier[] | null, title: string): Promise<void> {
-  if (tiers === null) {
-    const data = await shopifyQuery<{
-      metafieldsDelete: { userErrors: { field: string[]; message: string }[] }
-    }>(
-      `mutation deleteProductTiers($metafields: [MetafieldIdentifierInput!]!) {
-        metafieldsDelete(metafields: $metafields) {
-          userErrors { field message }
-        }
-      }`,
-      {
-        metafields: [
-          { ownerId: productId, namespace: NAMESPACE, key: 'tiers' },
-        ],
-      },
-    )
+interface DiscountMetafieldSibling {
+  productId: string
+  title: string
+  handle: string
+  variantId?: string
+  imageUrl: string | null
+}
 
-    if (data.metafieldsDelete.userErrors.length > 0) {
-      throw new Error(data.metafieldsDelete.userErrors.map((e) => e.message).join('; '))
-    }
-    return
-  }
+interface DiscountMetafieldValue {
+  discountId: string
+  title: string
+  pricingMode: 'percent' | 'fixed'
+  tiers: Discount['tiers']
+  /** null = single-variant whole-product member; array = these specific variants of THIS product are members. */
+  ownVariantIds: string[] | null
+  siblings: DiscountMetafieldSibling[]
+}
 
+/**
+ * Writes one `discount` metafield per unique product touched by this
+ * discount's members. A product with more than one of its own variants in
+ * the discount gets ownVariantIds listing exactly which; a single-variant
+ * whole-product member gets ownVariantIds: null. siblings has one entry per
+ * OTHER member (not per other product) so a sibling product with two
+ * variants in the discount produces two distinct rows.
+ */
+export async function syncDiscountMetafields(discount: Discount): Promise<void> {
+  const memberInfo = await getMemberInfo(discount.members)
+  const infoByKey = new Map(memberInfo.map((m) => [`${m.productId}::${m.variantId ?? ''}`, m]))
+  const uniqueProductIds = [...new Set(discount.members.map((m) => m.productId))]
+
+  await Promise.allSettled(
+    uniqueProductIds.map((productId) => {
+      const ownMembers = discount.members.filter((m) => m.productId === productId)
+      const ownVariantIds = ownMembers.some((m) => m.variantId == null)
+        ? null
+        : ownMembers.map((m) => m.variantId!)
+
+      const siblings: DiscountMetafieldSibling[] = discount.members
+        .filter((m) => m.productId !== productId)
+        .map((m) => {
+          const info = infoByKey.get(`${m.productId}::${m.variantId ?? ''}`)
+          return {
+            productId: m.productId,
+            title: info?.title ?? '',
+            handle: info?.handle ?? '',
+            variantId: m.variantId,
+            imageUrl: info?.imageUrl ?? null,
+          }
+        })
+
+      const value: DiscountMetafieldValue = {
+        discountId: discount.discountId,
+        title: discount.title,
+        pricingMode: discount.pricingMode,
+        tiers: discount.tiers,
+        ownVariantIds,
+        siblings,
+      }
+
+      return setDiscountMetafield(productId, value)
+    }),
+  )
+}
+
+async function setDiscountMetafield(productId: string, value: DiscountMetafieldValue): Promise<void> {
   const data = await shopifyQuery<{
     metafieldsSet: { userErrors: { field: string[]; message: string }[] }
   }>(
-    `mutation setProductTiers($metafields: [MetafieldsSetInput!]!) {
+    `mutation setDiscountMetafield($metafields: [MetafieldsSetInput!]!) {
       metafieldsSet(metafields: $metafields) {
         userErrors { field message }
       }
@@ -39,9 +83,9 @@ export async function syncProductTierMetafield(productId: string, tiers: Tier[] 
         {
           ownerId: productId,
           namespace: NAMESPACE,
-          key: 'tiers',
+          key: 'discount',
           type: 'json',
-          value: JSON.stringify({ title, tiers }),
+          value: JSON.stringify(value),
         },
       ],
     },
@@ -52,64 +96,28 @@ export async function syncProductTierMetafield(productId: string, tiers: Tier[] 
   }
 }
 
-export interface GroupTierSyncData {
-  title: string
-  tiers: Tier[]
-  siblings: { title: string; handle: string }[]
-}
+/** Deletes the `discount` metafield from every unique product in the list. */
+export async function clearDiscountMetafields(members: { productId: string }[]): Promise<void> {
+  const uniqueProductIds = [...new Set(members.map((m) => m.productId))]
 
-/**
- * Same shape as syncProductTierMetafield but under the 'group' key, so a
- * product can carry both an unrelated standalone-tiers metafield (never, in
- * practice, since membership is mutually exclusive) without collision, and
- * so the theme block can tell which mode to render from a single metafield
- * lookup per key.
- */
-export async function syncGroupTierMetafield(productId: string, data: GroupTierSyncData | null): Promise<void> {
-  if (data === null) {
-    const result = await shopifyQuery<{
-      metafieldsDelete: { userErrors: { field: string[]; message: string }[] }
-    }>(
-      `mutation deleteProductGroupTiers($metafields: [MetafieldIdentifierInput!]!) {
-        metafieldsDelete(metafields: $metafields) {
-          userErrors { field message }
-        }
-      }`,
-      {
-        metafields: [
-          { ownerId: productId, namespace: NAMESPACE, key: 'group' },
-        ],
-      },
-    )
-
-    if (result.metafieldsDelete.userErrors.length > 0) {
-      throw new Error(result.metafieldsDelete.userErrors.map((e) => e.message).join('; '))
-    }
-    return
-  }
-
-  const result = await shopifyQuery<{
-    metafieldsSet: { userErrors: { field: string[]; message: string }[] }
-  }>(
-    `mutation setProductGroupTiers($metafields: [MetafieldsSetInput!]!) {
-      metafieldsSet(metafields: $metafields) {
-        userErrors { field message }
-      }
-    }`,
-    {
-      metafields: [
+  await Promise.allSettled(
+    uniqueProductIds.map(async (productId) => {
+      const data = await shopifyQuery<{
+        metafieldsDelete: { userErrors: { field: string[]; message: string }[] }
+      }>(
+        `mutation deleteDiscountMetafield($metafields: [MetafieldIdentifierInput!]!) {
+          metafieldsDelete(metafields: $metafields) {
+            userErrors { field message }
+          }
+        }`,
         {
-          ownerId: productId,
-          namespace: NAMESPACE,
-          key: 'group',
-          type: 'json',
-          value: JSON.stringify(data),
+          metafields: [{ ownerId: productId, namespace: NAMESPACE, key: 'discount' }],
         },
-      ],
-    },
-  )
+      )
 
-  if (result.metafieldsSet.userErrors.length > 0) {
-    throw new Error(result.metafieldsSet.userErrors.map((e) => e.message).join('; '))
-  }
+      if (data.metafieldsDelete.userErrors.length > 0) {
+        throw new Error(data.metafieldsDelete.userErrors.map((e) => e.message).join('; '))
+      }
+    }),
+  )
 }
