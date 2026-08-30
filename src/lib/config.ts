@@ -7,7 +7,9 @@ export interface Tier {
    * Optional exact total price to charge for minQty units (e.g. £10.00 for
    * 7 tins instead of the percentage's rounded £10.01). Units beyond minQty
    * still accrue at the normal percentOff per-unit rate — only the price at
-   * exactly minQty is anchored. percent mode only.
+   * exactly minQty is anchored. percent mode only, and only valid when
+   * every member of the discount shares one base price — see
+   * pricesUniform.
    */
   anchorPrice?: number
   /**
@@ -15,32 +17,36 @@ export interface Tier {
    * unit in the reached tier is charged this price directly, no percentage
    * involved. fixed mode only. Mutually exclusive with percentOff/
    * anchorPrice, enforced by the admin actions that construct a Tier, not
-   * by this type.
+   * by this type. Only valid when every member shares one base price.
    */
   fixedPrice?: number
 }
 
-export interface ProductDiscount {
+export interface DiscountMember {
   productId: string
-  status: 'draft' | 'live'
-  pricingMode: 'percent' | 'fixed'
-  title: string
-  tiers: Tier[]
+  /**
+   * Omitted only when the product has exactly one variant — that variant
+   * is implied. A product with more than one variant must always specify
+   * which variant this member is; there is no ambiguous "whole
+   * multi-variant product" membership.
+   */
+  variantId?: string
 }
 
-export interface GroupDiscount {
-  groupId: string
+export interface Discount {
+  discountId: string
+  /** Internal admin-facing label. */
   name: string
-  status: 'draft' | 'live'
-  productIds: string[]
-  pricingMode: 'percent' | 'fixed'
+  /** Customer-facing copy used in storefront promo text. Blank allowed. */
   title: string
+  status: 'draft' | 'live'
+  pricingMode: 'percent' | 'fixed'
+  members: DiscountMember[]
   tiers: Tier[]
 }
 
 export interface Config {
-  products: ProductDiscount[]
-  groups: GroupDiscount[]
+  discounts: Discount[]
 }
 
 const NAMESPACE = 'sparkly_product_discounts'
@@ -65,16 +71,10 @@ export async function getConfig(): Promise<Config> {
   )
 
   if (!data.shop.metafield) {
-    return { products: [], groups: [] }
+    return { discounts: [] }
   }
 
-  const parsed = JSON.parse(data.shop.metafield.value) as {
-    products?: Partial<ProductDiscount>[]
-    groups?: Partial<GroupDiscount>[]
-  }
-  const products = (parsed.products ?? []).map((p) => ({ pricingMode: 'percent' as const, title: '', ...p })) as ProductDiscount[]
-  const groups = (parsed.groups ?? []).map((g) => ({ pricingMode: 'percent' as const, title: g.name ?? '', ...g })) as GroupDiscount[]
-  return { products, groups }
+  return JSON.parse(data.shop.metafield.value) as Config
 }
 
 export async function saveConfig(config: Config): Promise<void> {
@@ -109,11 +109,32 @@ export async function saveConfig(config: Config): Promise<void> {
 }
 
 /**
- * True when productId isn't already claimed by a standalone discount or by
- * any group other than excludeGroupId — pass the group's own id when
- * validating an in-progress edit so it doesn't flag its own members.
+ * True when (productId, variantId) isn't already claimed by another
+ * discount's member. Two members match when their productId is equal AND
+ * either shares the same variantId, or at least one of them has no
+ * variantId at all (a whole-product claim blocks every variant of that
+ * product, and vice versa). Pass the discount's own id as excludeDiscountId
+ * when validating an in-progress edit so it doesn't flag its own members.
  */
-export function isProductAvailable(config: Config, productId: string, excludeGroupId?: string): boolean {
-  if (config.products.some((p) => p.productId === productId)) return false
-  return !config.groups.some((g) => g.groupId !== excludeGroupId && g.productIds.includes(productId))
+export function isProductAvailable(
+  config: Config,
+  productId: string,
+  variantId: string | undefined,
+  excludeDiscountId?: string,
+): boolean {
+  return !config.discounts.some((discount) => {
+    if (discount.discountId === excludeDiscountId) return false
+    return discount.members.some((member) => {
+      if (member.productId !== productId) return false
+      if (member.variantId == null || variantId == null) return true
+      return member.variantId === variantId
+    })
+  })
+}
+
+/** True when every price in the list is equal, within floating-point rounding. */
+export function pricesUniform(prices: number[]): boolean {
+  if (prices.length <= 1) return true
+  const [first, ...rest] = prices
+  return rest.every((p) => Math.abs(p - first) <= 0.001)
 }
