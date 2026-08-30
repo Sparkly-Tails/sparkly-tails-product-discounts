@@ -1,9 +1,9 @@
 'use server'
 
-import { getConfig, saveConfig, isProductAvailable, type Tier, type ProductDiscount, type GroupDiscount } from '@/lib/config'
+import { getConfig, saveConfig, isProductAvailable, pricesUniform, type Tier, type Discount, type DiscountMember } from '@/lib/config'
 import { redirectWithToken } from '@/lib/auth-redirect'
-import { syncProductTierMetafield, syncGroupTierMetafield } from '@/lib/product-tiers'
-import { getGroupProductInfo } from '@/lib/products'
+import { syncDiscountMetafields, clearDiscountMetafields } from '@/lib/product-tiers'
+import { getMemberInfo } from '@/lib/products'
 
 function parseTiersFromForm(formData: FormData, pricingMode: 'percent' | 'fixed'): Tier[] {
   const tiers: Tier[] = []
@@ -36,238 +36,159 @@ function parseTiersFromForm(formData: FormData, pricingMode: 'percent' | 'fixed'
   return tiers.sort((a, b) => a.minQty - b.minQty)
 }
 
-function parseGroupProductIdsFromForm(formData: FormData): string[] {
-  const ids: string[] = []
+function parseMembersFromForm(formData: FormData): DiscountMember[] {
+  const members: DiscountMember[] = []
   let i = 0
-  while (formData.has(`product-${i}-id`)) {
-    const id = String(formData.get(`product-${i}-id`) ?? '').trim()
-    if (id && !ids.includes(id)) ids.push(id)
+  while (formData.has(`member-${i}-productId`)) {
+    const productId = String(formData.get(`member-${i}-productId`) ?? '').trim()
+    const rawVariantId = String(formData.get(`member-${i}-variantId`) ?? '').trim()
+    if (productId) {
+      members.push(rawVariantId ? { productId, variantId: rawVariantId } : { productId })
+    }
     i++
   }
-  return ids
+  return members
+}
+
+/**
+ * Throws if the requested pricing mode/tiers require a shared member price
+ * that the resolved members don't actually have. Called before saving on
+ * both create and every edit path that can change members or tiers.
+ */
+async function assertPricingAllowed(members: DiscountMember[], pricingMode: 'percent' | 'fixed', tiers: Tier[]): Promise<void> {
+  const info = await getMemberInfo(members)
+  const uniform = pricesUniform(info.map((m) => m.price))
+  if (uniform) return
+
+  if (pricingMode === 'fixed') {
+    throw new Error('These products/variants have different prices — fixed-price tiers require a shared price. Use percentage tiers instead, or remove the mismatched member.')
+  }
+  if (tiers.some((t) => t.anchorPrice != null)) {
+    throw new Error('These products/variants have different prices — anchor pricing requires a shared price. Remove the anchor price on your tiers, or remove the mismatched member.')
+  }
+}
+
+async function assertMembersAvailable(members: DiscountMember[], excludeDiscountId?: string): Promise<void> {
+  const config = await getConfig()
+  for (const member of members) {
+    if (!isProductAvailable(config, member.productId, member.variantId, excludeDiscountId)) {
+      throw new Error(`${member.productId}${member.variantId ? ` (variant ${member.variantId})` : ''} already belongs to another discount`)
+    }
+  }
 }
 
 export async function createDiscount(formData: FormData): Promise<void> {
-  const productId = String(formData.get('productId') ?? '').trim()
-  if (!productId) throw new Error('A product is required')
+  const name = String(formData.get('name') ?? '').trim()
+  if (!name) throw new Error('A name is required')
 
   const title = String(formData.get('title') ?? '').trim()
   if (!title) throw new Error('A title is required')
+
+  const members = parseMembersFromForm(formData)
+  if (members.length === 0) throw new Error('At least one product or variant is required')
 
   const pricingMode: 'percent' | 'fixed' = formData.get('pricingMode') === 'fixed' ? 'fixed' : 'percent'
   const tiers = parseTiersFromForm(formData, pricingMode)
   if (tiers.length === 0) throw new Error('At least one tier is required')
 
+  await assertMembersAvailable(members)
+  await assertPricingAllowed(members, pricingMode, tiers)
+
   const config = await getConfig()
-  if (!isProductAvailable(config, productId)) {
-    throw new Error(`Product ${productId} already has a discount or belongs to a group`)
-  }
+  const discountId = `disc_${crypto.randomUUID()}`
+  const newDiscount: Discount = { discountId, name, title, status: 'draft', pricingMode, members, tiers }
+  await saveConfig({ discounts: [...config.discounts, newDiscount] })
 
-  const newDiscount: ProductDiscount = { productId, status: 'draft', pricingMode, title, tiers }
-  await saveConfig({ ...config, products: [...config.products, newDiscount] })
-
-  await redirectWithToken(`/discounts/${encodeURIComponent(productId)}`)
+  await redirectWithToken(`/discounts/${encodeURIComponent(discountId)}`)
 }
 
-export async function updateTitle(productId: string, formData: FormData): Promise<void> {
-  const title = String(formData.get('title') ?? '').trim()
-  if (!title) throw new Error('A title is required')
+function findDiscountOrThrow(config: { discounts: Discount[] }, discountId: string): Discount {
+  const discount = config.discounts.find((d) => d.discountId === discountId)
+  if (!discount) throw new Error(`Discount ${discountId} not found`)
+  return discount
+}
+
+export async function updateDiscountMembers(discountId: string, formData: FormData): Promise<void> {
+  const members = parseMembersFromForm(formData)
+  if (members.length === 0) throw new Error('At least one product or variant is required')
+
+  await assertMembersAvailable(members, discountId)
 
   const config = await getConfig()
-  const discount = config.products.find((p) => p.productId === productId)
-  if (!discount) throw new Error(`Discount for product ${productId} not found`)
+  const discount = findDiscountOrThrow(config, discountId)
 
-  discount.title = title
+  await assertPricingAllowed(members, discount.pricingMode, discount.tiers)
+
+  discount.members = members
   await saveConfig(config)
 
   if (discount.status === 'live') {
-    await syncProductTierMetafield(productId, discount.tiers, title)
+    await syncDiscountMetafields(discount)
   }
 
-  await redirectWithToken(`/discounts/${encodeURIComponent(productId)}`)
+  await redirectWithToken(`/discounts/${encodeURIComponent(discountId)}`)
 }
 
-export async function updateTiers(productId: string, formData: FormData): Promise<void> {
+export async function updateDiscountTiers(discountId: string, formData: FormData): Promise<void> {
   const config = await getConfig()
-  const discount = config.products.find((p) => p.productId === productId)
-  if (!discount) throw new Error(`Discount for product ${productId} not found`)
+  const discount = findDiscountOrThrow(config, discountId)
 
   const tiers = parseTiersFromForm(formData, discount.pricingMode)
   if (tiers.length === 0) throw new Error('At least one tier is required')
+
+  await assertPricingAllowed(discount.members, discount.pricingMode, tiers)
 
   discount.tiers = tiers
   await saveConfig(config)
 
   if (discount.status === 'live') {
-    await syncProductTierMetafield(productId, tiers, discount.title)
+    await syncDiscountMetafields(discount)
   }
 
-  await redirectWithToken(`/discounts/${encodeURIComponent(productId)}`)
+  await redirectWithToken(`/discounts/${encodeURIComponent(discountId)}`)
 }
 
-export async function setStatus(productId: string, status: 'draft' | 'live'): Promise<void> {
+export async function updateDiscountTitle(discountId: string, formData: FormData): Promise<void> {
+  const title = String(formData.get('title') ?? '').trim()
+  if (!title) throw new Error('A title is required')
+
   const config = await getConfig()
-  const discount = config.products.find((p) => p.productId === productId)
-  if (!discount) throw new Error(`Discount for product ${productId} not found`)
+  const discount = findDiscountOrThrow(config, discountId)
+
+  discount.title = title
+  await saveConfig(config)
+
+  if (discount.status === 'live') {
+    await syncDiscountMetafields(discount)
+  }
+
+  await redirectWithToken(`/discounts/${encodeURIComponent(discountId)}`)
+}
+
+export async function setDiscountStatus(discountId: string, status: 'draft' | 'live'): Promise<void> {
+  const config = await getConfig()
+  const discount = findDiscountOrThrow(config, discountId)
 
   discount.status = status
   await saveConfig(config)
 
-  await syncProductTierMetafield(productId, status === 'live' ? discount.tiers : null, discount.title)
-
-  await redirectWithToken(`/discounts/${encodeURIComponent(productId)}`)
-}
-
-export async function deleteDiscount(productId: string): Promise<void> {
-  const config = await getConfig()
-  const discount = config.products.find((p) => p.productId === productId)
-  if (!discount) throw new Error(`Discount for product ${productId} not found`)
-
-  const remaining = config.products.filter((p) => p.productId !== productId)
-  await saveConfig({ ...config, products: remaining })
-
-  await syncProductTierMetafield(productId, null, discount.title)
-
-  await redirectWithToken('/')
-}
-
-export async function createGroup(formData: FormData): Promise<void> {
-  const name = String(formData.get('name') ?? '').trim()
-  if (!name) throw new Error('A group name is required')
-
-  const title = String(formData.get('title') ?? '').trim()
-  if (!title) throw new Error('A title is required')
-
-  const productIds = parseGroupProductIdsFromForm(formData)
-  if (productIds.length < 2) throw new Error('A group needs at least 2 products')
-
-  const pricingMode: 'percent' | 'fixed' = formData.get('pricingMode') === 'fixed' ? 'fixed' : 'percent'
-  const tiers = parseTiersFromForm(formData, pricingMode)
-  if (tiers.length === 0) throw new Error('At least one tier is required')
-
-  const config = await getConfig()
-  for (const productId of productIds) {
-    if (!isProductAvailable(config, productId)) {
-      throw new Error(`Product ${productId} already has a discount or belongs to another group`)
-    }
-  }
-
-  const groupId = `grp_${crypto.randomUUID()}`
-  const newGroup: GroupDiscount = { groupId, name, status: 'draft', pricingMode, title, productIds, tiers }
-  await saveConfig({ ...config, groups: [...config.groups, newGroup] })
-
-  await redirectWithToken(`/discounts/groups/${encodeURIComponent(groupId)}`)
-}
-
-async function syncGroupMetafields(group: GroupDiscount): Promise<void> {
-  const members = await getGroupProductInfo(group.productIds)
-  const resolvedIds = new Set(members.map((m) => m.productId))
-  await Promise.allSettled(
-    group.productIds
-      .filter((productId) => resolvedIds.has(productId))
-      .map((productId) => {
-        const siblings = members
-          .filter((m) => m.productId !== productId)
-          .map((m) => ({ title: m.title, handle: m.handle }))
-        return syncGroupTierMetafield(productId, { title: group.title, tiers: group.tiers, siblings })
-      }),
-  )
-}
-
-async function clearGroupMetafields(productIds: string[]): Promise<void> {
-  await Promise.allSettled(productIds.map((productId) => syncGroupTierMetafield(productId, null)))
-}
-
-export async function updateGroupProducts(groupId: string, formData: FormData): Promise<void> {
-  const productIds = parseGroupProductIdsFromForm(formData)
-  if (productIds.length < 2) throw new Error('A group needs at least 2 products')
-
-  const config = await getConfig()
-  const group = config.groups.find((g) => g.groupId === groupId)
-  if (!group) throw new Error(`Group ${groupId} not found`)
-
-  for (const productId of productIds) {
-    if (!isProductAvailable(config, productId, groupId)) {
-      throw new Error(`Product ${productId} already has a discount or belongs to another group`)
-    }
-  }
-
-  const removedProductIds = group.productIds.filter((id) => !productIds.includes(id))
-  group.productIds = productIds
-  await saveConfig(config)
-
-  if (group.status === 'live') {
-    if (removedProductIds.length > 0) {
-      await clearGroupMetafields(removedProductIds)
-    }
-    await syncGroupMetafields(group)
-  }
-
-  await redirectWithToken(`/discounts/groups/${encodeURIComponent(groupId)}`)
-}
-
-export async function updateGroupTiers(groupId: string, formData: FormData): Promise<void> {
-  const config = await getConfig()
-  const group = config.groups.find((g) => g.groupId === groupId)
-  if (!group) throw new Error(`Group ${groupId} not found`)
-
-  const tiers = parseTiersFromForm(formData, group.pricingMode)
-  if (tiers.length === 0) throw new Error('At least one tier is required')
-
-  group.tiers = tiers
-  await saveConfig(config)
-
-  if (group.status === 'live') {
-    await syncGroupMetafields(group)
-  }
-
-  await redirectWithToken(`/discounts/groups/${encodeURIComponent(groupId)}`)
-}
-
-export async function updateGroupTitle(groupId: string, formData: FormData): Promise<void> {
-  const title = String(formData.get('title') ?? '').trim()
-  if (!title) throw new Error('A title is required')
-
-  const config = await getConfig()
-  const group = config.groups.find((g) => g.groupId === groupId)
-  if (!group) throw new Error(`Group ${groupId} not found`)
-
-  group.title = title
-  await saveConfig(config)
-
-  if (group.status === 'live') {
-    await syncGroupMetafields(group)
-  }
-
-  await redirectWithToken(`/discounts/groups/${encodeURIComponent(groupId)}`)
-}
-
-export async function setGroupStatus(groupId: string, status: 'draft' | 'live'): Promise<void> {
-  const config = await getConfig()
-  const group = config.groups.find((g) => g.groupId === groupId)
-  if (!group) throw new Error(`Group ${groupId} not found`)
-
-  group.status = status
-  await saveConfig(config)
-
   if (status === 'live') {
-    await syncGroupMetafields(group)
+    await syncDiscountMetafields(discount)
   } else {
-    await clearGroupMetafields(group.productIds)
+    await clearDiscountMetafields(discount.members)
   }
 
-  await redirectWithToken(`/discounts/groups/${encodeURIComponent(groupId)}`)
+  await redirectWithToken(`/discounts/${encodeURIComponent(discountId)}`)
 }
 
-export async function deleteGroup(groupId: string): Promise<void> {
+export async function deleteDiscount(discountId: string): Promise<void> {
   const config = await getConfig()
-  const group = config.groups.find((g) => g.groupId === groupId)
-  if (!group) throw new Error(`Group ${groupId} not found`)
+  const discount = findDiscountOrThrow(config, discountId)
 
-  const remaining = config.groups.filter((g) => g.groupId !== groupId)
-  await saveConfig({ ...config, groups: remaining })
+  const remaining = config.discounts.filter((d) => d.discountId !== discountId)
+  await saveConfig({ discounts: remaining })
 
-  await clearGroupMetafields(group.productIds)
+  await clearDiscountMetafields(discount.members)
 
   await redirectWithToken('/')
 }
