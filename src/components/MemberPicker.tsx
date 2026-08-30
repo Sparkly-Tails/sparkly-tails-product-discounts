@@ -1,10 +1,15 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { searchProductsAction, getProductVariantsAction, validateMemberAction } from '@/actions/memberPickerActions'
 import type { ProductSearchResult, ProductVariantOption } from '@/lib/products'
 
 export type SelectedMember = { productId: string; variantId?: string; title: string; price: number }
+
+/** True if (productId, variantId) is already among the selected members — used to reject duplicate adds. */
+function isMemberSelected(members: SelectedMember[], productId: string, variantId?: string): boolean {
+  return members.some((m) => m.productId === productId && m.variantId === variantId)
+}
 
 export default function MemberPicker({
   initialMembers,
@@ -26,9 +31,13 @@ export default function MemberPicker({
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const generationRef = useRef(0)
 
-  function notifyPrices(members: SelectedMember[]) {
-    onPricesChange?.(members.map((m) => m.price))
-  }
+  // Recompute from `selected` itself (rather than being called with a
+  // manually-assembled array) so it always reflects the latest committed
+  // state — see the functional setSelected updaters below for why that
+  // matters when adds/removes can interleave.
+  useEffect(() => {
+    onPricesChange?.(selected.map((m) => m.price))
+  }, [selected, onPricesChange])
 
   function handleQueryChange(value: string) {
     setQuery(value)
@@ -68,6 +77,11 @@ export default function MemberPicker({
       return
     }
 
+    if (isMemberSelected(selected, candidate.id, undefined)) {
+      setError('This product is already added')
+      return
+    }
+
     const check = await validateMemberAction(candidate.id, undefined, excludeDiscountId)
     if (!check.ok) {
       setError(check.error)
@@ -79,13 +93,22 @@ export default function MemberPicker({
     // the price comes from the variant list too, so fetch it the same way.
     const [onlyVariant] = await getProductVariantsAction(candidate.id)
     const member: SelectedMember = { productId: candidate.id, title: candidate.title, price: onlyVariant?.price ?? 0 }
-    const next = [...selected, member]
-    setSelected(next)
-    notifyPrices(next)
+    // Functional updater: compose onto whatever is latest when this
+    // resolves, not the `selected` snapshot from when this add started —
+    // an overlapping add/remove may have changed it in the meantime. The
+    // isMemberSelected check is repeated here as a final guard against a
+    // duplicate add that raced past the check above.
+    setSelected((prev) => (isMemberSelected(prev, member.productId, member.variantId) ? prev : [...prev, member]))
   }
 
   async function addVariant(option: ProductVariantOption) {
     if (!expanding) return
+
+    if (isMemberSelected(selected, expanding.id, option.variantId)) {
+      setError('This variant is already added')
+      return
+    }
+
     const check = await validateMemberAction(expanding.id, option.variantId, excludeDiscountId)
     if (!check.ok) {
       setError(check.error)
@@ -97,17 +120,13 @@ export default function MemberPicker({
       title: `${expanding.title} – ${option.title}`,
       price: option.price,
     }
-    const next = [...selected, member]
-    setSelected(next)
-    notifyPrices(next)
+    setSelected((prev) => (isMemberSelected(prev, member.productId, member.variantId) ? prev : [...prev, member]))
     setExpanding(null)
     setVariantOptions([])
   }
 
   function removeMember(index: number) {
-    const next = selected.filter((_, i) => i !== index)
-    setSelected(next)
-    notifyPrices(next)
+    setSelected((prev) => prev.filter((_, i) => i !== index))
   }
 
   return (
