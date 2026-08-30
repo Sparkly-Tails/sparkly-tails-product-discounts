@@ -141,6 +141,211 @@ describe('createDiscount', () => {
   })
 })
 
+describe('updateDiscountMembers', () => {
+  beforeEach(() => vi.restoreAllMocks())
+
+  it('rejects a member set with different prices when the stored discount is fixed-price', async () => {
+    const discount: Discount = {
+      discountId: 'disc_1', name: 'A', title: 'A', status: 'draft', pricingMode: 'fixed',
+      members: [{ productId: 'gid://shopify/Product/1' }], tiers: [{ minQty: 3, fixedPrice: 1.20 }],
+    }
+    vi.spyOn(configLib, 'getConfig').mockResolvedValue({ discounts: [discount] })
+    vi.spyOn(products, 'getMemberInfo').mockResolvedValue([
+      { productId: 'gid://shopify/Product/1', variantId: undefined, title: 'A', price: 1.49, handle: 'a', imageUrl: null },
+      { productId: 'gid://shopify/Product/2', variantId: undefined, title: 'B', price: 1.59, handle: 'b', imageUrl: null },
+    ])
+
+    const formData = memberFormData([{ productId: 'gid://shopify/Product/1' }, { productId: 'gid://shopify/Product/2' }])
+
+    await expect(updateDiscountMembers('disc_1', formData)).rejects.toThrow(/different prices/)
+  })
+
+  it('rejects a member set with different prices when a stored tier has an anchorPrice', async () => {
+    const discount: Discount = {
+      discountId: 'disc_1', name: 'A', title: 'A', status: 'draft', pricingMode: 'percent',
+      members: [{ productId: 'gid://shopify/Product/1' }], tiers: [{ minQty: 7, percentOff: 4, anchorPrice: 10 }],
+    }
+    vi.spyOn(configLib, 'getConfig').mockResolvedValue({ discounts: [discount] })
+    vi.spyOn(products, 'getMemberInfo').mockResolvedValue([
+      { productId: 'gid://shopify/Product/1', variantId: undefined, title: 'A', price: 1.49, handle: 'a', imageUrl: null },
+      { productId: 'gid://shopify/Product/2', variantId: undefined, title: 'B', price: 1.59, handle: 'b', imageUrl: null },
+    ])
+
+    const formData = memberFormData([{ productId: 'gid://shopify/Product/1' }, { productId: 'gid://shopify/Product/2' }])
+
+    await expect(updateDiscountMembers('disc_1', formData)).rejects.toThrow(/different prices/)
+  })
+
+  it('allows a member set with different prices when the stored tiers are plain percent (no anchor)', async () => {
+    const discount: Discount = {
+      discountId: 'disc_1', name: 'A', title: 'A', status: 'draft', pricingMode: 'percent',
+      members: [{ productId: 'gid://shopify/Product/1' }], tiers: [{ minQty: 7, percentOff: 4 }],
+    }
+    vi.spyOn(configLib, 'getConfig').mockResolvedValue({ discounts: [discount] })
+    const saveSpy = vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
+    vi.spyOn(products, 'getMemberInfo').mockResolvedValue([
+      { productId: 'gid://shopify/Product/1', variantId: undefined, title: 'A', price: 1.49, handle: 'a', imageUrl: null },
+      { productId: 'gid://shopify/Product/2', variantId: undefined, title: 'B', price: 1.59, handle: 'b', imageUrl: null },
+    ])
+
+    const formData = memberFormData([{ productId: 'gid://shopify/Product/1' }, { productId: 'gid://shopify/Product/2' }])
+
+    await updateDiscountMembers('disc_1', formData)
+
+    expect(saveSpy).toHaveBeenCalledWith({
+      discounts: [expect.objectContaining({
+        discountId: 'disc_1',
+        members: [{ productId: 'gid://shopify/Product/1' }, { productId: 'gid://shopify/Product/2' }],
+      })],
+    })
+  })
+
+  it('allows a member set with uniform prices regardless of pricing mode', async () => {
+    const discount: Discount = {
+      discountId: 'disc_1', name: 'A', title: 'A', status: 'draft', pricingMode: 'fixed',
+      members: [{ productId: 'gid://shopify/Product/1' }], tiers: [{ minQty: 3, fixedPrice: 1.20 }],
+    }
+    vi.spyOn(configLib, 'getConfig').mockResolvedValue({ discounts: [discount] })
+    const saveSpy = vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
+    vi.spyOn(products, 'getMemberInfo').mockResolvedValue([
+      { productId: 'gid://shopify/Product/1', variantId: undefined, title: 'A', price: 1.49, handle: 'a', imageUrl: null },
+      { productId: 'gid://shopify/Product/2', variantId: undefined, title: 'B', price: 1.49, handle: 'b', imageUrl: null },
+    ])
+
+    const formData = memberFormData([{ productId: 'gid://shopify/Product/1' }, { productId: 'gid://shopify/Product/2' }])
+
+    await updateDiscountMembers('disc_1', formData)
+
+    expect(saveSpy).toHaveBeenCalledWith({
+      discounts: [expect.objectContaining({
+        discountId: 'disc_1',
+        members: [{ productId: 'gid://shopify/Product/1' }, { productId: 'gid://shopify/Product/2' }],
+      })],
+    })
+  })
+})
+
+describe('updateDiscountTiers', () => {
+  beforeEach(() => vi.restoreAllMocks())
+
+  it('rejects a submitted fixedPrice tier when the stored members have different prices', async () => {
+    const discount: Discount = {
+      discountId: 'disc_1', name: 'A', title: 'A', status: 'draft', pricingMode: 'fixed',
+      members: [{ productId: 'gid://shopify/Product/1' }, { productId: 'gid://shopify/Product/2' }],
+      tiers: [{ minQty: 1, fixedPrice: 1.00 }],
+    }
+    vi.spyOn(configLib, 'getConfig').mockResolvedValue({ discounts: [discount] })
+    vi.spyOn(products, 'getMemberInfo').mockResolvedValue([
+      { productId: 'gid://shopify/Product/1', variantId: undefined, title: 'A', price: 1.49, handle: 'a', imageUrl: null },
+      { productId: 'gid://shopify/Product/2', variantId: undefined, title: 'B', price: 1.59, handle: 'b', imageUrl: null },
+    ])
+
+    const formData = new FormData()
+    formData.set('tier-0-minQty', '3')
+    formData.set('tier-0-fixedPrice', '1.20')
+
+    await expect(updateDiscountTiers('disc_1', formData)).rejects.toThrow(/different prices/)
+  })
+
+  it('rejects a submitted anchorPrice tier when the stored members have different prices', async () => {
+    const discount: Discount = {
+      discountId: 'disc_1', name: 'A', title: 'A', status: 'draft', pricingMode: 'percent',
+      members: [{ productId: 'gid://shopify/Product/1' }, { productId: 'gid://shopify/Product/2' }],
+      tiers: [{ minQty: 5, percentOff: 10 }],
+    }
+    vi.spyOn(configLib, 'getConfig').mockResolvedValue({ discounts: [discount] })
+    vi.spyOn(products, 'getMemberInfo').mockResolvedValue([
+      { productId: 'gid://shopify/Product/1', variantId: undefined, title: 'A', price: 1.49, handle: 'a', imageUrl: null },
+      { productId: 'gid://shopify/Product/2', variantId: undefined, title: 'B', price: 1.59, handle: 'b', imageUrl: null },
+    ])
+
+    const formData = new FormData()
+    formData.set('tier-0-minQty', '7')
+    formData.set('tier-0-percentOff', '4')
+    formData.set('tier-0-anchorPrice', '10')
+
+    await expect(updateDiscountTiers('disc_1', formData)).rejects.toThrow(/different prices/)
+  })
+
+  it('allows a submitted plain percent tier (no anchor) when the stored members have different prices', async () => {
+    const discount: Discount = {
+      discountId: 'disc_1', name: 'A', title: 'A', status: 'draft', pricingMode: 'percent',
+      members: [{ productId: 'gid://shopify/Product/1' }, { productId: 'gid://shopify/Product/2' }],
+      tiers: [{ minQty: 5, percentOff: 10 }],
+    }
+    vi.spyOn(configLib, 'getConfig').mockResolvedValue({ discounts: [discount] })
+    const saveSpy = vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
+    vi.spyOn(products, 'getMemberInfo').mockResolvedValue([
+      { productId: 'gid://shopify/Product/1', variantId: undefined, title: 'A', price: 1.49, handle: 'a', imageUrl: null },
+      { productId: 'gid://shopify/Product/2', variantId: undefined, title: 'B', price: 1.59, handle: 'b', imageUrl: null },
+    ])
+
+    const formData = new FormData()
+    formData.set('tier-0-minQty', '7')
+    formData.set('tier-0-percentOff', '4')
+
+    await updateDiscountTiers('disc_1', formData)
+
+    expect(saveSpy).toHaveBeenCalledWith({
+      discounts: [expect.objectContaining({ discountId: 'disc_1', tiers: [{ minQty: 7, percentOff: 4 }] })],
+    })
+  })
+})
+
+describe('updateDiscountTitle', () => {
+  beforeEach(() => vi.restoreAllMocks())
+
+  it('updates the title and re-syncs metafields when the discount is live', async () => {
+    const discount: Discount = {
+      discountId: 'disc_1', name: 'A', title: 'Old Title', status: 'live', pricingMode: 'percent',
+      members: [{ productId: 'gid://shopify/Product/1' }], tiers: [{ minQty: 5, percentOff: 10 }],
+    }
+    vi.spyOn(configLib, 'getConfig').mockResolvedValue({ discounts: [discount] })
+    const saveSpy = vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
+    const syncSpy = vi.spyOn(productTiers, 'syncDiscountMetafields').mockResolvedValue()
+
+    const formData = new FormData()
+    formData.set('title', 'New Title')
+
+    await updateDiscountTitle('disc_1', formData)
+
+    expect(saveSpy).toHaveBeenCalledWith({
+      discounts: [expect.objectContaining({ discountId: 'disc_1', title: 'New Title' })],
+    })
+    expect(syncSpy).toHaveBeenCalledWith(expect.objectContaining({ discountId: 'disc_1', title: 'New Title' }))
+  })
+
+  it('does not sync metafields when the discount is draft', async () => {
+    const discount: Discount = {
+      discountId: 'disc_1', name: 'A', title: 'Old Title', status: 'draft', pricingMode: 'percent',
+      members: [{ productId: 'gid://shopify/Product/1' }], tiers: [],
+    }
+    vi.spyOn(configLib, 'getConfig').mockResolvedValue({ discounts: [discount] })
+    vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
+    const syncSpy = vi.spyOn(productTiers, 'syncDiscountMetafields').mockResolvedValue()
+
+    const formData = new FormData()
+    formData.set('title', 'New Title')
+
+    await updateDiscountTitle('disc_1', formData)
+
+    expect(syncSpy).not.toHaveBeenCalled()
+  })
+
+  it('requires a non-blank title', async () => {
+    const discount: Discount = {
+      discountId: 'disc_1', name: 'A', title: 'Old Title', status: 'draft', pricingMode: 'percent',
+      members: [{ productId: 'gid://shopify/Product/1' }], tiers: [],
+    }
+    vi.spyOn(configLib, 'getConfig').mockResolvedValue({ discounts: [discount] })
+
+    const formData = new FormData()
+    formData.set('title', '   ')
+
+    await expect(updateDiscountTitle('disc_1', formData)).rejects.toThrow('A title is required')
+  })
+})
+
 describe('setDiscountStatus', () => {
   beforeEach(() => vi.restoreAllMocks())
 
