@@ -10,8 +10,10 @@ function makeRow(minQty = '', percentOff = '', anchorPrice = ''): TierRow {
 
 export default function TierFields({
   initial,
+  allowAnchorPrice = true,
 }: {
   initial?: { minQty: number; percentOff: number; anchorPrice?: number }[]
+  allowAnchorPrice?: boolean
 }) {
   const [rows, setRows] = useState<TierRow[]>(() =>
     initial && initial.length > 0
@@ -66,20 +68,24 @@ export default function TierFields({
             onChange={(e) => updateRow(row.key, 'percentOff', e.target.value)}
             className="border border-line rounded px-3 py-2 w-40 transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:border-accent"
           />
-          <label htmlFor={`tier-${i}-anchorPrice`} className="sr-only">
-            Tier {i + 1} anchor price (optional)
-          </label>
-          <input
-            id={`tier-${i}-anchorPrice`}
-            name={`tier-${i}-anchorPrice`}
-            type="number"
-            min="0"
-            step="0.01"
-            placeholder="Anchor price (optional, e.g. 10.00)"
-            value={row.anchorPrice}
-            onChange={(e) => updateRow(row.key, 'anchorPrice', e.target.value)}
-            className="border border-line rounded px-3 py-2 w-52 transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:border-accent"
-          />
+          {allowAnchorPrice && (
+            <>
+              <label htmlFor={`tier-${i}-anchorPrice`} className="sr-only">
+                Tier {i + 1} anchor price (optional)
+              </label>
+              <input
+                id={`tier-${i}-anchorPrice`}
+                name={`tier-${i}-anchorPrice`}
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="Anchor price (optional, e.g. 10.00)"
+                value={row.anchorPrice}
+                onChange={(e) => updateRow(row.key, 'anchorPrice', e.target.value)}
+                className="border border-line rounded px-3 py-2 w-52 transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:border-accent"
+              />
+            </>
+          )}
           <button
             type="button"
             onClick={() => removeRow(row.key)}
