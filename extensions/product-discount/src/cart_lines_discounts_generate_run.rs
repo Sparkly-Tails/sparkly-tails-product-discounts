@@ -24,27 +24,24 @@ pub struct Tier {
 
 #[derive(Deserialize, Default, PartialEq)]
 #[shopify_function(rename_all = "camelCase")]
-pub struct ProductConfig {
+pub struct Member {
     product_id: String,
-    status: String,
-    tiers: Vec<Tier>,
+    #[shopify_function(default)]
+    variant_id: Option<String>,
 }
 
 #[derive(Deserialize, Default, PartialEq)]
 #[shopify_function(rename_all = "camelCase")]
-pub struct GroupConfig {
-    group_id: String,
+pub struct DiscountConfig {
     status: String,
-    product_ids: Vec<String>,
+    members: Vec<Member>,
     tiers: Vec<Tier>,
 }
 
 #[derive(Deserialize, Default, PartialEq)]
 #[shopify_function(rename_all = "camelCase")]
 pub struct Config {
-    products: Vec<ProductConfig>,
-    #[shopify_function(default)]
-    groups: Vec<GroupConfig>,
+    discounts: Vec<DiscountConfig>,
 }
 
 /// Splits a total discount amount across cart lines proportional to each
@@ -103,116 +100,7 @@ fn cart_lines_discounts_generate_run(
 
     let mut candidates = vec![];
 
-    for line in input.cart().lines().iter() {
-        let variant = match line.merchandise() {
-            schema::cart_lines_discounts_generate_run::input::cart::lines::Merchandise::ProductVariant(v) => v,
-            _ => continue,
-        };
-        let product_id = variant.product().id();
-
-        let product_config = config
-            .products
-            .iter()
-            .find(|p| &p.product_id == product_id && p.status == "live");
-
-        let product_config = match product_config {
-            Some(pc) => pc,
-            None => continue,
-        };
-
-        let quantity = *line.quantity();
-
-        let best_tier = product_config
-            .tiers
-            .iter()
-            .filter(|t| t.min_qty <= quantity)
-            .max_by_key(|t| t.min_qty);
-
-        if let Some(tier) = best_tier {
-            if let Some(fixed_price) = tier.fixed_price {
-                // Fixed-price tier: every unit in the reached tier is
-                // charged exactly fixed_price, clamped so a misconfigured
-                // price above sticker price can never produce a markup.
-                let unit_price = line.cost().amount_per_quantity().amount().as_f64();
-                let discount_amount_per_unit = (unit_price - fixed_price).max(0.0);
-                let discount_amount = (discount_amount_per_unit * quantity as f64 * 100.0).round() / 100.0;
-
-                if discount_amount > 0.0 {
-                    candidates.push(schema::ProductDiscountCandidate {
-                        targets: vec![schema::ProductDiscountCandidateTarget::CartLine(
-                            schema::CartLineTarget {
-                                id: line.id().clone(),
-                                quantity: None,
-                            },
-                        )],
-                        message: Some(format!("£{:.2} each", fixed_price)),
-                        value: schema::ProductDiscountCandidateValue::FixedAmount(
-                            schema::ProductDiscountCandidateFixedAmount {
-                                amount: Decimal(discount_amount),
-                                applies_to_each_item: Some(false),
-                            },
-                        ),
-                        associated_discount_code: None,
-                        prerequisites: None,
-                    });
-                }
-            } else {
-                let percent_off = tier.percent_off.unwrap_or(0.0);
-                let value = match tier.anchor_price {
-                    Some(anchor_price) => {
-                        // Anchor the total for min_qty units to an exact price
-                        // (e.g. £10.00 instead of a percentage's rounded
-                        // £10.01); units beyond min_qty still accrue at the
-                        // tier's normal per-unit percentage rate. Expressed as a
-                        // single FixedAmount off the whole line, computed here,
-                        // so Shopify's own percentage rounding never has a
-                        // chance to drift the anchored total off by a penny.
-                        let unit_price = line.cost().amount_per_quantity().amount().as_f64();
-                        let extra_units = (quantity - tier.min_qty) as f64;
-                        // Derivation: total_paid should be anchor_price +
-                        // extra_units * unit_price * (1 - percent_off/100).
-                        // discount_amount = full_price - total_paid, which
-                        // simplifies to the line below (the qty*unit_price and
-                        // -extra_units*unit_price terms cancel down to
-                        // min_qty*unit_price).
-                        let discount_amount = (unit_price * tier.min_qty as f64) - anchor_price
-                            + extra_units * unit_price * (percent_off / 100.0);
-                        // Round to whole pence before clamping — this is real
-                        // money, and TS/JS both round explicitly elsewhere in
-                        // this codebase, so this f64 arithmetic shouldn't be the
-                        // one place relying on Shopify's own downstream rounding
-                        // to paper over floating-point remainders.
-                        let discount_amount = (discount_amount * 100.0).round() / 100.0;
-                        let discount_amount = discount_amount.max(0.0);
-                        schema::ProductDiscountCandidateValue::FixedAmount(
-                            schema::ProductDiscountCandidateFixedAmount {
-                                amount: Decimal(discount_amount),
-                                applies_to_each_item: Some(false),
-                            },
-                        )
-                    }
-                    None => schema::ProductDiscountCandidateValue::Percentage(schema::Percentage {
-                        value: Decimal(percent_off),
-                    }),
-                };
-
-                candidates.push(schema::ProductDiscountCandidate {
-                    targets: vec![schema::ProductDiscountCandidateTarget::CartLine(
-                        schema::CartLineTarget {
-                            id: line.id().clone(),
-                            quantity: None,
-                        },
-                    )],
-                    message: Some(format!("{}% off", percent_off)),
-                    value,
-                    associated_discount_code: None,
-                    prerequisites: None,
-                });
-            }
-        }
-    }
-
-    for group in config.groups.iter().filter(|g| g.status == "live") {
+    for discount in config.discounts.iter().filter(|d| d.status == "live") {
         let mut line_ids = vec![];
         let mut line_quantities: Vec<i32> = vec![];
         let mut line_unit_price: Option<f64> = None;
@@ -223,22 +111,31 @@ fn cart_lines_discounts_generate_run(
                 _ => continue,
             };
             let product_id = variant.product().id();
+            let variant_id = variant.id();
 
-            if !group.product_ids.iter().any(|id| id == product_id) {
+            let matches_member = discount.members.iter().any(|m| {
+                if &m.product_id != product_id {
+                    return false;
+                }
+                match &m.variant_id {
+                    Some(vid) => vid == variant_id,
+                    None => true,
+                }
+            });
+            if !matches_member {
                 continue;
             }
 
             let price = line.cost().amount_per_quantity().amount().as_f64();
             // Take the MINIMUM matching line's unit price, not simply the
-            // last one seen in cart order. The admin app enforces that all
-            // group members share one price, but only at add/edit time —
-            // that guarantee can be broken later by things outside the
-            // admin's own check (e.g. a Loop Subscriptions purchase-option
-            // price, or a variant priced differently than the base). Taking
-            // the minimum fails safe: if the shared-price premise is ever
-            // violated in practice, this under-discounts rather than
-            // computing an arbitrary or inflated total off whichever line
-            // happened to be scanned last.
+            // last one seen in cart order — a fail-safe for the case where
+            // the shared-price premise a fixed/anchor discount depends on
+            // is somehow violated at checkout time (e.g. a differently
+            // priced selling plan), even though the admin app only allows
+            // fixed/anchor pricing when every member shares one price at
+            // save time. Under-discounts rather than computing an
+            // arbitrary or inflated total off whichever line happened to
+            // be scanned last.
             line_unit_price = Some(match line_unit_price {
                 Some(current) => current.min(price),
                 None => price,
@@ -252,10 +149,9 @@ fn cart_lines_discounts_generate_run(
         }
 
         let line_unit_price = line_unit_price.unwrap_or(0.0);
-
         let total_quantity: i32 = line_quantities.iter().sum();
 
-        let best_tier = group
+        let best_tier = discount
             .tiers
             .iter()
             .filter(|t| t.min_qty <= total_quantity)
@@ -267,10 +163,6 @@ fn cart_lines_discounts_generate_run(
         };
 
         if let Some(fixed_price) = tier.fixed_price {
-            // Fixed-price group tier: same largest-remainder split as the
-            // anchored case below, but with a simpler total — every unit in
-            // the reached tier is charged the same flat price, so there's
-            // no "extra units beyond min_qty" distinction to compute.
             let discount_amount_total = ((line_unit_price - fixed_price) * total_quantity as f64 * 100.0).round() / 100.0;
             let discount_amount_total = discount_amount_total.max(0.0);
 
@@ -299,9 +191,6 @@ fn cart_lines_discounts_generate_run(
             let percent_off = tier.percent_off.unwrap_or(0.0);
             match tier.anchor_price {
                 None => {
-                    // Plain percentage off — no split math needed, it's
-                    // line-local by construction, so every matching line gets
-                    // its own independent Percentage candidate.
                     for id in &line_ids {
                         candidates.push(schema::ProductDiscountCandidate {
                             targets: vec![schema::ProductDiscountCandidateTarget::CartLine(
@@ -317,9 +206,6 @@ fn cart_lines_discounts_generate_run(
                     }
                 }
                 Some(anchor_price) => {
-                    // Same anchor formula as the standalone case, generalized to
-                    // the group's combined quantity and shared unit price (the
-                    // admin app guarantees every member shares one price).
                     let extra_units = (total_quantity - tier.min_qty) as f64;
                     let discount_amount_total = (line_unit_price * tier.min_qty as f64) - anchor_price
                         + extra_units * line_unit_price * (percent_off / 100.0);
@@ -329,14 +215,6 @@ fn cart_lines_discounts_generate_run(
                     let pence_per_line = split_discount_by_largest_remainder(discount_amount_total, &line_quantities);
 
                     for (id, pence) in line_ids.iter().zip(pence_per_line.iter()) {
-                        // A zero-pence share is a pure no-op — skip it rather
-                        // than emitting a zero-amount FixedAmount candidate.
-                        // Shopify's function-result validation may reject a
-                        // zero-amount candidate outright, which would fail the
-                        // ENTIRE discount operation (every candidate in the
-                        // cart, not just this line), and even if accepted it
-                        // would show as "X% off — £0.00" at checkout, which
-                        // reads as a bug to the customer.
                         if *pence == 0 {
                             continue;
                         }
@@ -392,6 +270,7 @@ mod tests {
                             "cost": { "amountPerQuantity": { "amount": "1.49" } },
                             "merchandise": {
                                 "__typename": "ProductVariant",
+                                "id": "gid://shopify/ProductVariant/900",
                                 "product": { "id": "gid://shopify/Product/1" }
                             }
                         }
@@ -400,10 +279,10 @@ mod tests {
                 "shop": {
                     "metafield": {
                         "jsonValue": {
-                            "products": [
+                            "discounts": [
                                 {
-                                    "productId": "gid://shopify/Product/1",
                                     "status": "live",
+                                    "members": [{ "productId": "gid://shopify/Product/1" }],
                                     "tiers": [
                                         { "minQty": 5, "percentOff": 10.0 },
                                         { "minQty": 10, "percentOff": 20.0 }
@@ -444,6 +323,7 @@ mod tests {
                             "cost": { "amountPerQuantity": { "amount": "1.49" } },
                             "merchandise": {
                                 "__typename": "ProductVariant",
+                                "id": "gid://shopify/ProductVariant/900",
                                 "product": { "id": "gid://shopify/Product/1" }
                             }
                         }
@@ -452,10 +332,10 @@ mod tests {
                 "shop": {
                     "metafield": {
                         "jsonValue": {
-                            "products": [
+                            "discounts": [
                                 {
-                                    "productId": "gid://shopify/Product/1",
                                     "status": "live",
+                                    "members": [{ "productId": "gid://shopify/Product/1" }],
                                     "tiers": [{ "minQty": 5, "percentOff": 10.0 }]
                                 }
                             ]
@@ -482,12 +362,13 @@ mod tests {
                             "cost": { "amountPerQuantity": { "amount": "1.49" } },
                             "merchandise": {
                                 "__typename": "ProductVariant",
+                                "id": "gid://shopify/ProductVariant/900",
                                 "product": { "id": "gid://shopify/Product/999" }
                             }
                         }
                     ]
                 },
-                "shop": { "metafield": { "jsonValue": { "products": [] } } },
+                "shop": { "metafield": { "jsonValue": { "discounts": [] } } },
                 "discount": { "discountClasses": ["PRODUCT"] }
             }"#,
         )?;
@@ -508,6 +389,7 @@ mod tests {
                             "cost": { "amountPerQuantity": { "amount": "1.49" } },
                             "merchandise": {
                                 "__typename": "ProductVariant",
+                                "id": "gid://shopify/ProductVariant/900",
                                 "product": { "id": "gid://shopify/Product/1" }
                             }
                         }
@@ -516,10 +398,10 @@ mod tests {
                 "shop": {
                     "metafield": {
                         "jsonValue": {
-                            "products": [
+                            "discounts": [
                                 {
-                                    "productId": "gid://shopify/Product/1",
                                     "status": "draft",
+                                    "members": [{ "productId": "gid://shopify/Product/1" }],
                                     "tiers": [{ "minQty": 5, "percentOff": 10.0 }]
                                 }
                             ]
@@ -546,6 +428,7 @@ mod tests {
                             "cost": { "amountPerQuantity": { "amount": "1.49" } },
                             "merchandise": {
                                 "__typename": "ProductVariant",
+                                "id": "gid://shopify/ProductVariant/900",
                                 "product": { "id": "gid://shopify/Product/1" }
                             }
                         },
@@ -555,6 +438,7 @@ mod tests {
                             "cost": { "amountPerQuantity": { "amount": "2.99" } },
                             "merchandise": {
                                 "__typename": "ProductVariant",
+                                "id": "gid://shopify/ProductVariant/901",
                                 "product": { "id": "gid://shopify/Product/2" }
                             }
                         }
@@ -563,15 +447,15 @@ mod tests {
                 "shop": {
                     "metafield": {
                         "jsonValue": {
-                            "products": [
+                            "discounts": [
                                 {
-                                    "productId": "gid://shopify/Product/1",
                                     "status": "live",
+                                    "members": [{ "productId": "gid://shopify/Product/1" }],
                                     "tiers": [{ "minQty": 5, "percentOff": 8.0 }]
                                 },
                                 {
-                                    "productId": "gid://shopify/Product/2",
                                     "status": "live",
+                                    "members": [{ "productId": "gid://shopify/Product/2" }],
                                     "tiers": [{ "minQty": 10, "percentOff": 25.0 }]
                                 }
                             ]
@@ -617,6 +501,7 @@ mod tests {
                             "cost": { "amountPerQuantity": { "amount": "2.00" } },
                             "merchandise": {
                                 "__typename": "ProductVariant",
+                                "id": "gid://shopify/ProductVariant/900",
                                 "product": { "id": "gid://shopify/Product/1" }
                             }
                         }
@@ -625,10 +510,10 @@ mod tests {
                 "shop": {
                     "metafield": {
                         "jsonValue": {
-                            "products": [
+                            "discounts": [
                                 {
-                                    "productId": "gid://shopify/Product/1",
                                     "status": "live",
+                                    "members": [{ "productId": "gid://shopify/Product/1" }],
                                     "tiers": [{ "minQty": 5, "percentOff": 10.0, "anchorPrice": 8.50 }]
                                 }
                             ]
@@ -669,6 +554,7 @@ mod tests {
                             "cost": { "amountPerQuantity": { "amount": "2.00" } },
                             "merchandise": {
                                 "__typename": "ProductVariant",
+                                "id": "gid://shopify/ProductVariant/900",
                                 "product": { "id": "gid://shopify/Product/1" }
                             }
                         }
@@ -677,10 +563,10 @@ mod tests {
                 "shop": {
                     "metafield": {
                         "jsonValue": {
-                            "products": [
+                            "discounts": [
                                 {
-                                    "productId": "gid://shopify/Product/1",
                                     "status": "live",
+                                    "members": [{ "productId": "gid://shopify/Product/1" }],
                                     "tiers": [{ "minQty": 5, "percentOff": 10.0, "anchorPrice": 8.50 }]
                                 }
                             ]
@@ -709,7 +595,13 @@ mod tests {
     fn never_produces_a_negative_discount_amount() -> Result<()> {
         // A pathological anchor_price higher than the plain percentage total
         // must never result in a discount_amount below 0 (which would mean
-        // charging the customer MORE than sticker price).
+        // charging the customer MORE than sticker price). Now that the
+        // single-member and multi-member cases share one loop, a
+        // clamped-to-zero anchor discount goes through the same
+        // zero-pence-skip as every other discount (see
+        // split_discount_by_largest_remainder call sites): it must emit no
+        // candidate at all, not a £0.00 FixedAmount one, exactly like
+        // a_fixed_price_above_sticker_price_never_produces_a_markup below.
         let result = run_function_with_input(
             cart_lines_discounts_generate_run,
             r#"{
@@ -721,6 +613,7 @@ mod tests {
                             "cost": { "amountPerQuantity": { "amount": "2.00" } },
                             "merchandise": {
                                 "__typename": "ProductVariant",
+                                "id": "gid://shopify/ProductVariant/900",
                                 "product": { "id": "gid://shopify/Product/1" }
                             }
                         }
@@ -729,10 +622,10 @@ mod tests {
                 "shop": {
                     "metafield": {
                         "jsonValue": {
-                            "products": [
+                            "discounts": [
                                 {
-                                    "productId": "gid://shopify/Product/1",
                                     "status": "live",
+                                    "members": [{ "productId": "gid://shopify/Product/1" }],
                                     "tiers": [{ "minQty": 5, "percentOff": 10.0, "anchorPrice": 50.0 }]
                                 }
                             ]
@@ -742,15 +635,7 @@ mod tests {
                 "discount": { "discountClasses": ["PRODUCT"] }
             }"#,
         )?;
-        match &result.operations[0] {
-            schema::CartOperation::ProductDiscountsAdd(op) => match &op.candidates[0].value {
-                schema::ProductDiscountCandidateValue::FixedAmount(f) => {
-                    assert_eq!(f.amount.0, 0.0);
-                }
-                _ => panic!("expected a FixedAmount value when anchor_price is set"),
-            },
-            _ => panic!("expected ProductDiscountsAdd"),
-        }
+        assert_eq!(result.operations.len(), 0, "a clamped-to-zero anchor discount must emit no candidates and no operations, same as any other zero-discount cart");
         Ok(())
     }
 
@@ -774,6 +659,7 @@ mod tests {
                             "cost": { "amountPerQuantity": { "amount": "1.10" } },
                             "merchandise": {
                                 "__typename": "ProductVariant",
+                                "id": "gid://shopify/ProductVariant/900",
                                 "product": { "id": "gid://shopify/Product/1" }
                             }
                         }
@@ -782,10 +668,10 @@ mod tests {
                 "shop": {
                     "metafield": {
                         "jsonValue": {
-                            "products": [
+                            "discounts": [
                                 {
-                                    "productId": "gid://shopify/Product/1",
                                     "status": "live",
+                                    "members": [{ "productId": "gid://shopify/Product/1" }],
                                     "tiers": [{ "minQty": 3, "percentOff": 33.33, "anchorPrice": 2.00 }]
                                 }
                             ]
@@ -823,6 +709,7 @@ mod tests {
                             "cost": { "amountPerQuantity": { "amount": "1.49" } },
                             "merchandise": {
                                 "__typename": "ProductVariant",
+                                "id": "gid://shopify/ProductVariant/900",
                                 "product": { "id": "gid://shopify/Product/1" }
                             }
                         },
@@ -832,6 +719,7 @@ mod tests {
                             "cost": { "amountPerQuantity": { "amount": "1.49" } },
                             "merchandise": {
                                 "__typename": "ProductVariant",
+                                "id": "gid://shopify/ProductVariant/901",
                                 "product": { "id": "gid://shopify/Product/2" }
                             }
                         }
@@ -840,12 +728,13 @@ mod tests {
                 "shop": {
                     "metafield": {
                         "jsonValue": {
-                            "products": [],
-                            "groups": [
+                            "discounts": [
                                 {
-                                    "groupId": "grp_1",
                                     "status": "live",
-                                    "productIds": ["gid://shopify/Product/1", "gid://shopify/Product/2"],
+                                    "members": [
+                                        { "productId": "gid://shopify/Product/1" },
+                                        { "productId": "gid://shopify/Product/2" }
+                                    ],
                                     "tiers": [{ "minQty": 7, "percentOff": 8.0 }]
                                 }
                             ]
@@ -885,6 +774,7 @@ mod tests {
                             "cost": { "amountPerQuantity": { "amount": "1.49" } },
                             "merchandise": {
                                 "__typename": "ProductVariant",
+                                "id": "gid://shopify/ProductVariant/900",
                                 "product": { "id": "gid://shopify/Product/1" }
                             }
                         },
@@ -894,6 +784,7 @@ mod tests {
                             "cost": { "amountPerQuantity": { "amount": "1.49" } },
                             "merchandise": {
                                 "__typename": "ProductVariant",
+                                "id": "gid://shopify/ProductVariant/901",
                                 "product": { "id": "gid://shopify/Product/2" }
                             }
                         }
@@ -902,12 +793,13 @@ mod tests {
                 "shop": {
                     "metafield": {
                         "jsonValue": {
-                            "products": [],
-                            "groups": [
+                            "discounts": [
                                 {
-                                    "groupId": "grp_1",
                                     "status": "live",
-                                    "productIds": ["gid://shopify/Product/1", "gid://shopify/Product/2"],
+                                    "members": [
+                                        { "productId": "gid://shopify/Product/1" },
+                                        { "productId": "gid://shopify/Product/2" }
+                                    ],
                                     "tiers": [{ "minQty": 7, "percentOff": 8.0 }]
                                 }
                             ]
@@ -934,6 +826,7 @@ mod tests {
                             "cost": { "amountPerQuantity": { "amount": "1.49" } },
                             "merchandise": {
                                 "__typename": "ProductVariant",
+                                "id": "gid://shopify/ProductVariant/900",
                                 "product": { "id": "gid://shopify/Product/1" }
                             }
                         }
@@ -942,12 +835,10 @@ mod tests {
                 "shop": {
                     "metafield": {
                         "jsonValue": {
-                            "products": [],
-                            "groups": [
+                            "discounts": [
                                 {
-                                    "groupId": "grp_1",
                                     "status": "draft",
-                                    "productIds": ["gid://shopify/Product/1"],
+                                    "members": [{ "productId": "gid://shopify/Product/1" }],
                                     "tiers": [{ "minQty": 7, "percentOff": 8.0 }]
                                 }
                             ]
@@ -976,6 +867,7 @@ mod tests {
                             "cost": { "amountPerQuantity": { "amount": "1.49" } },
                             "merchandise": {
                                 "__typename": "ProductVariant",
+                                "id": "gid://shopify/ProductVariant/900",
                                 "product": { "id": "gid://shopify/Product/1" }
                             }
                         }
@@ -984,10 +876,10 @@ mod tests {
                 "shop": {
                     "metafield": {
                         "jsonValue": {
-                            "products": [
+                            "discounts": [
                                 {
-                                    "productId": "gid://shopify/Product/1",
                                     "status": "live",
+                                    "members": [{ "productId": "gid://shopify/Product/1" }],
                                     "tiers": [{ "minQty": 5, "percentOff": 10.0 }]
                                 }
                             ]
@@ -1023,6 +915,7 @@ mod tests {
                             "cost": { "amountPerQuantity": { "amount": "1.00" } },
                             "merchandise": {
                                 "__typename": "ProductVariant",
+                                "id": "gid://shopify/ProductVariant/900",
                                 "product": { "id": "gid://shopify/Product/1" }
                             }
                         },
@@ -1032,6 +925,7 @@ mod tests {
                             "cost": { "amountPerQuantity": { "amount": "1.00" } },
                             "merchandise": {
                                 "__typename": "ProductVariant",
+                                "id": "gid://shopify/ProductVariant/901",
                                 "product": { "id": "gid://shopify/Product/2" }
                             }
                         },
@@ -1041,6 +935,7 @@ mod tests {
                             "cost": { "amountPerQuantity": { "amount": "1.00" } },
                             "merchandise": {
                                 "__typename": "ProductVariant",
+                                "id": "gid://shopify/ProductVariant/902",
                                 "product": { "id": "gid://shopify/Product/3" }
                             }
                         }
@@ -1049,15 +944,13 @@ mod tests {
                 "shop": {
                     "metafield": {
                         "jsonValue": {
-                            "products": [],
-                            "groups": [
+                            "discounts": [
                                 {
-                                    "groupId": "grp_1",
                                     "status": "live",
-                                    "productIds": [
-                                        "gid://shopify/Product/1",
-                                        "gid://shopify/Product/2",
-                                        "gid://shopify/Product/3"
+                                    "members": [
+                                        { "productId": "gid://shopify/Product/1" },
+                                        { "productId": "gid://shopify/Product/2" },
+                                        { "productId": "gid://shopify/Product/3" }
                                     ],
                                     "tiers": [{ "minQty": 3, "percentOff": 10.0, "anchorPrice": 2.50 }]
                                 }
@@ -1102,6 +995,7 @@ mod tests {
                             "cost": { "amountPerQuantity": { "amount": "2.99" } },
                             "merchandise": {
                                 "__typename": "ProductVariant",
+                                "id": "gid://shopify/ProductVariant/900",
                                 "product": { "id": "gid://shopify/Product/9" }
                             }
                         },
@@ -1111,6 +1005,7 @@ mod tests {
                             "cost": { "amountPerQuantity": { "amount": "1.49" } },
                             "merchandise": {
                                 "__typename": "ProductVariant",
+                                "id": "gid://shopify/ProductVariant/901",
                                 "product": { "id": "gid://shopify/Product/1" }
                             }
                         },
@@ -1120,6 +1015,7 @@ mod tests {
                             "cost": { "amountPerQuantity": { "amount": "1.49" } },
                             "merchandise": {
                                 "__typename": "ProductVariant",
+                                "id": "gid://shopify/ProductVariant/902",
                                 "product": { "id": "gid://shopify/Product/2" }
                             }
                         }
@@ -1128,18 +1024,18 @@ mod tests {
                 "shop": {
                     "metafield": {
                         "jsonValue": {
-                            "products": [
+                            "discounts": [
                                 {
-                                    "productId": "gid://shopify/Product/9",
                                     "status": "live",
+                                    "members": [{ "productId": "gid://shopify/Product/9" }],
                                     "tiers": [{ "minQty": 5, "percentOff": 25.0 }]
-                                }
-                            ],
-                            "groups": [
+                                },
                                 {
-                                    "groupId": "grp_1",
                                     "status": "live",
-                                    "productIds": ["gid://shopify/Product/1", "gid://shopify/Product/2"],
+                                    "members": [
+                                        { "productId": "gid://shopify/Product/1" },
+                                        { "productId": "gid://shopify/Product/2" }
+                                    ],
                                     "tiers": [{ "minQty": 7, "percentOff": 8.0 }]
                                 }
                             ]
@@ -1193,6 +1089,7 @@ mod tests {
                             "cost": { "amountPerQuantity": { "amount": "1.99" } },
                             "merchandise": {
                                 "__typename": "ProductVariant",
+                                "id": "gid://shopify/ProductVariant/900",
                                 "product": { "id": "gid://shopify/Product/1" }
                             }
                         },
@@ -1202,6 +1099,7 @@ mod tests {
                             "cost": { "amountPerQuantity": { "amount": "1.99" } },
                             "merchandise": {
                                 "__typename": "ProductVariant",
+                                "id": "gid://shopify/ProductVariant/901",
                                 "product": { "id": "gid://shopify/Product/2" }
                             }
                         },
@@ -1211,6 +1109,7 @@ mod tests {
                             "cost": { "amountPerQuantity": { "amount": "1.99" } },
                             "merchandise": {
                                 "__typename": "ProductVariant",
+                                "id": "gid://shopify/ProductVariant/902",
                                 "product": { "id": "gid://shopify/Product/3" }
                             }
                         },
@@ -1220,6 +1119,7 @@ mod tests {
                             "cost": { "amountPerQuantity": { "amount": "1.99" } },
                             "merchandise": {
                                 "__typename": "ProductVariant",
+                                "id": "gid://shopify/ProductVariant/903",
                                 "product": { "id": "gid://shopify/Product/4" }
                             }
                         },
@@ -1229,6 +1129,7 @@ mod tests {
                             "cost": { "amountPerQuantity": { "amount": "1.99" } },
                             "merchandise": {
                                 "__typename": "ProductVariant",
+                                "id": "gid://shopify/ProductVariant/904",
                                 "product": { "id": "gid://shopify/Product/5" }
                             }
                         },
@@ -1238,6 +1139,7 @@ mod tests {
                             "cost": { "amountPerQuantity": { "amount": "1.99" } },
                             "merchandise": {
                                 "__typename": "ProductVariant",
+                                "id": "gid://shopify/ProductVariant/905",
                                 "product": { "id": "gid://shopify/Product/6" }
                             }
                         }
@@ -1246,18 +1148,16 @@ mod tests {
                 "shop": {
                     "metafield": {
                         "jsonValue": {
-                            "products": [],
-                            "groups": [
+                            "discounts": [
                                 {
-                                    "groupId": "grp_1",
                                     "status": "live",
-                                    "productIds": [
-                                        "gid://shopify/Product/1",
-                                        "gid://shopify/Product/2",
-                                        "gid://shopify/Product/3",
-                                        "gid://shopify/Product/4",
-                                        "gid://shopify/Product/5",
-                                        "gid://shopify/Product/6"
+                                    "members": [
+                                        { "productId": "gid://shopify/Product/1" },
+                                        { "productId": "gid://shopify/Product/2" },
+                                        { "productId": "gid://shopify/Product/3" },
+                                        { "productId": "gid://shopify/Product/4" },
+                                        { "productId": "gid://shopify/Product/5" },
+                                        { "productId": "gid://shopify/Product/6" }
                                     ],
                                     "tiers": [{ "minQty": 6, "percentOff": 10.0, "anchorPrice": 11.90 }]
                                 }
@@ -1319,6 +1219,7 @@ mod tests {
                             "cost": { "amountPerQuantity": { "amount": "1.00" } },
                             "merchandise": {
                                 "__typename": "ProductVariant",
+                                "id": "gid://shopify/ProductVariant/900",
                                 "product": { "id": "gid://shopify/Product/1" }
                             }
                         },
@@ -1328,6 +1229,7 @@ mod tests {
                             "cost": { "amountPerQuantity": { "amount": "1.00" } },
                             "merchandise": {
                                 "__typename": "ProductVariant",
+                                "id": "gid://shopify/ProductVariant/901",
                                 "product": { "id": "gid://shopify/Product/2" }
                             }
                         },
@@ -1337,6 +1239,7 @@ mod tests {
                             "cost": { "amountPerQuantity": { "amount": "1.00" } },
                             "merchandise": {
                                 "__typename": "ProductVariant",
+                                "id": "gid://shopify/ProductVariant/902",
                                 "product": { "id": "gid://shopify/Product/3" }
                             }
                         }
@@ -1345,15 +1248,13 @@ mod tests {
                 "shop": {
                     "metafield": {
                         "jsonValue": {
-                            "products": [],
-                            "groups": [
+                            "discounts": [
                                 {
-                                    "groupId": "grp_1",
                                     "status": "live",
-                                    "productIds": [
-                                        "gid://shopify/Product/1",
-                                        "gid://shopify/Product/2",
-                                        "gid://shopify/Product/3"
+                                    "members": [
+                                        { "productId": "gid://shopify/Product/1" },
+                                        { "productId": "gid://shopify/Product/2" },
+                                        { "productId": "gid://shopify/Product/3" }
                                     ],
                                     "tiers": [{ "minQty": 7, "percentOff": 10.0, "anchorPrice": 6.90 }]
                                 }
@@ -1399,6 +1300,7 @@ mod tests {
                             "cost": { "amountPerQuantity": { "amount": "1.99" } },
                             "merchandise": {
                                 "__typename": "ProductVariant",
+                                "id": "gid://shopify/ProductVariant/900",
                                 "product": { "id": "gid://shopify/Product/1" }
                             }
                         }
@@ -1407,10 +1309,10 @@ mod tests {
                 "shop": {
                     "metafield": {
                         "jsonValue": {
-                            "products": [
+                            "discounts": [
                                 {
-                                    "productId": "gid://shopify/Product/1",
                                     "status": "live",
+                                    "members": [{ "productId": "gid://shopify/Product/1" }],
                                     "tiers": [
                                         { "minQty": 1, "fixedPrice": 1.70 },
                                         { "minQty": 3, "fixedPrice": 1.50 }
@@ -1455,6 +1357,7 @@ mod tests {
                             "cost": { "amountPerQuantity": { "amount": "1.99" } },
                             "merchandise": {
                                 "__typename": "ProductVariant",
+                                "id": "gid://shopify/ProductVariant/900",
                                 "product": { "id": "gid://shopify/Product/1" }
                             }
                         }
@@ -1463,10 +1366,10 @@ mod tests {
                 "shop": {
                     "metafield": {
                         "jsonValue": {
-                            "products": [
+                            "discounts": [
                                 {
-                                    "productId": "gid://shopify/Product/1",
                                     "status": "live",
+                                    "members": [{ "productId": "gid://shopify/Product/1" }],
                                     "tiers": [
                                         { "minQty": 1, "fixedPrice": 1.70 },
                                         { "minQty": 3, "fixedPrice": 1.50 }
@@ -1506,6 +1409,7 @@ mod tests {
                             "cost": { "amountPerQuantity": { "amount": "1.49" } },
                             "merchandise": {
                                 "__typename": "ProductVariant",
+                                "id": "gid://shopify/ProductVariant/900",
                                 "product": { "id": "gid://shopify/Product/1" }
                             }
                         }
@@ -1514,10 +1418,10 @@ mod tests {
                 "shop": {
                     "metafield": {
                         "jsonValue": {
-                            "products": [
+                            "discounts": [
                                 {
-                                    "productId": "gid://shopify/Product/1",
                                     "status": "live",
+                                    "members": [{ "productId": "gid://shopify/Product/1" }],
                                     "tiers": [{ "minQty": 1, "fixedPrice": 5.00 }]
                                 }
                             ]
@@ -1546,6 +1450,7 @@ mod tests {
                             "cost": { "amountPerQuantity": { "amount": "1.49" } },
                             "merchandise": {
                                 "__typename": "ProductVariant",
+                                "id": "gid://shopify/ProductVariant/900",
                                 "product": { "id": "gid://shopify/Product/1" }
                             }
                         }
@@ -1554,10 +1459,10 @@ mod tests {
                 "shop": {
                     "metafield": {
                         "jsonValue": {
-                            "products": [
+                            "discounts": [
                                 {
-                                    "productId": "gid://shopify/Product/1",
                                     "status": "live",
+                                    "members": [{ "productId": "gid://shopify/Product/1" }],
                                     "tiers": [{ "minQty": 5, "percentOff": 10.0 }]
                                 }
                             ]
@@ -1595,6 +1500,7 @@ mod tests {
                             "cost": { "amountPerQuantity": { "amount": "1.99" } },
                             "merchandise": {
                                 "__typename": "ProductVariant",
+                                "id": "gid://shopify/ProductVariant/900",
                                 "product": { "id": "gid://shopify/Product/1" }
                             }
                         },
@@ -1604,6 +1510,7 @@ mod tests {
                             "cost": { "amountPerQuantity": { "amount": "1.99" } },
                             "merchandise": {
                                 "__typename": "ProductVariant",
+                                "id": "gid://shopify/ProductVariant/901",
                                 "product": { "id": "gid://shopify/Product/2" }
                             }
                         }
@@ -1612,12 +1519,13 @@ mod tests {
                 "shop": {
                     "metafield": {
                         "jsonValue": {
-                            "products": [],
-                            "groups": [
+                            "discounts": [
                                 {
-                                    "groupId": "grp_1",
                                     "status": "live",
-                                    "productIds": ["gid://shopify/Product/1", "gid://shopify/Product/2"],
+                                    "members": [
+                                        { "productId": "gid://shopify/Product/1" },
+                                        { "productId": "gid://shopify/Product/2" }
+                                    ],
                                     "tiers": [
                                         { "minQty": 1, "fixedPrice": 1.70 },
                                         { "minQty": 3, "fixedPrice": 1.50 }
@@ -1666,6 +1574,7 @@ mod tests {
                             "cost": { "amountPerQuantity": { "amount": "1.99" } },
                             "merchandise": {
                                 "__typename": "ProductVariant",
+                                "id": "gid://shopify/ProductVariant/900",
                                 "product": { "id": "gid://shopify/Product/1" }
                             }
                         }
@@ -1674,12 +1583,10 @@ mod tests {
                 "shop": {
                     "metafield": {
                         "jsonValue": {
-                            "products": [],
-                            "groups": [
+                            "discounts": [
                                 {
-                                    "groupId": "grp_1",
                                     "status": "live",
-                                    "productIds": ["gid://shopify/Product/1"],
+                                    "members": [{ "productId": "gid://shopify/Product/1" }],
                                     "tiers": [{ "minQty": 1, "fixedPrice": 5.00 }]
                                 }
                             ]
