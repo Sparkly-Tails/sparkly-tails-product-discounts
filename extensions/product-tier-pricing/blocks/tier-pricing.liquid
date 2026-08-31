@@ -1,50 +1,55 @@
 {% comment %}
   This block replaces the theme's native Buy Buttons price line (its
-  "Show price" setting must be turned off in the theme editor). It
-  always renders a price — a live-updating tiered price when
-  product.metafields.sparkly_product_discounts.tiers is present, or a
-  plain price otherwise — so it works as a drop-in price replacement
-  whether or not a discount is currently live. See
-  src/lib/product-tiers.ts in the admin app, which writes/deletes that
-  metafield as a discount goes live/draft.
+  "Show price" setting must be turned off in the theme editor). It always
+  renders a price — a live-updating tiered price when
+  product.metafields.sparkly_product_discounts.discount is present AND the
+  currently-selected variant is one of its members, or a plain price
+  otherwise.
 {% endcomment %}
-{%- assign tiers_metafield = product.metafields.sparkly_product_discounts.tiers -%}
-{%- assign group_metafield = product.metafields.sparkly_product_discounts.group -%}
-{%- assign group_json = 'null' -%}
-{%- if group_metafield != blank -%}
+{%- assign discount_metafield = product.metafields.sparkly_product_discounts.discount -%}
+{%- assign selected_variant_id = product.selected_or_first_available_variant.id | prepend: 'gid://shopify/ProductVariant/' -%}
+{%- assign own_variant_ids = discount_metafield.value.ownVariantIds -%}
+{%- assign variant_is_eligible = true -%}
+{%- if discount_metafield != blank and own_variant_ids != blank -%}
+  {%- assign variant_is_eligible = false -%}
+  {%- for id in own_variant_ids -%}
+    {%- if id == selected_variant_id -%}
+      {%- assign variant_is_eligible = true -%}
+    {%- endif -%}
+  {%- endfor -%}
+{%- endif -%}
+{%- assign discount_json = '{"tiers":[]}' -%}
+{%- if discount_metafield != blank and variant_is_eligible -%}
   {%- capture siblings_json -%}
     [
-    {%- for sibling in group_metafield.value.siblings -%}
-      {%- assign sibling_product = all_products[sibling.handle] -%}
+    {%- for sibling in discount_metafield.value.siblings -%}
       {
+        "productId": {{ sibling.productId | json }},
         "title": {{ sibling.title | json }},
         "handle": {{ sibling.handle | json }},
-        "imageUrl": {% if sibling_product and sibling_product.featured_image %}{{ sibling_product.featured_image | image_url: width: 88 | json }}{% else %}null{% endif %}
+        "variantId": {{ sibling.variantId | default: null | json }},
+        "imageUrl": {{ sibling.imageUrl | default: null | json }}
       }{%- unless forloop.last -%},{%- endunless -%}
     {%- endfor -%}
     ]
   {%- endcapture -%}
-  {%- assign self_image_url = 'null' -%}
-  {%- if product.featured_image -%}
-    {%- assign self_image_url = product.featured_image | image_url: width: 88 | json -%}
-  {%- endif -%}
-  {%- capture group_json_raw -%}
-    {"tiers": {{ group_metafield.value.tiers | json }}, "siblings": {{ siblings_json }}, "self": {"title": {{ product.title | json }}, "handle": {{ product.handle | json }}, "imageUrl": {{ self_image_url }}}}
+  {%- capture discount_json_raw -%}
+    {
+      "title": {{ discount_metafield.value.title | json }},
+      "tiers": {{ discount_metafield.value.tiers | json }},
+      "siblings": {{ siblings_json }},
+      "selfVariantId": {{ selected_variant_id | json }}
+    }
   {%- endcapture -%}
-  {%- assign group_json = group_json_raw | strip | escape -%}
-{%- endif -%}
-{%- if tiers_metafield != blank -%}
-  {%- assign tiers_json = tiers_metafield.value | json | escape -%}
-{%- else -%}
-  {%- assign tiers_json = '{"tiers":[]}' -%}
+  {%- assign discount_json = discount_json_raw | strip | escape -%}
 {%- endif -%}
 <div
   id="sparkly-tier-pricing-{{ block.id }}"
   class="sparkly-tier-pricing"
   data-sparkly-tier-pricing
-  data-tiers='{{ tiers_json }}'
-  data-group='{{ group_json }}'
+  data-discount='{{ discount_json }}'
   data-product-handle='{{ product.handle | json | escape }}'
+  data-product-id='{{ product.id | prepend: "gid://shopify/Product/" | json }}'
   data-base-price="{{ product.selected_or_first_available_variant.price | divided_by: 100.0 | json }}"
   data-compare-at-price="{{ product.selected_or_first_available_variant.compare_at_price | default: 0 | divided_by: 100.0 | json }}"
   data-money-format='{{ shop.money_format | json | escape }}'
@@ -57,16 +62,8 @@
     <span class="sparkly-tier-pricing__each-label" data-tier-pricing-each-label>each</span>
   </div>
 
-  {%- assign discount_tiers = tiers_metafield.value.tiers -%}
-  {%- if group_metafield != blank -%}
-    {%- assign discount_tiers = group_metafield.value.tiers -%}
-  {%- endif -%}
-
-  {%- if discount_tiers.size > 0 -%}
-    {%- comment -%} Empty mount point — JS (buildPromoText) owns the wording,
-      same as breakdownEl/fillEl/stopsEl below, so there's exactly one place
-      that generates this copy instead of two implementations to keep in
-      sync. {%- endcomment -%}
+  {%- if discount_metafield != blank and variant_is_eligible -%}
+    {%- comment -%} Empty mount point — JS (buildPromoText) owns the wording. {%- endcomment -%}
     <p class="sparkly-tier-pricing__promo" data-tier-pricing-promo></p>
   {%- endif -%}
 
@@ -79,7 +76,7 @@
       <div class="sparkly-tier-pricing__stops" data-tier-pricing-stops></div>
     </div>
     <div class="sparkly-tier-pricing__tiers" data-tier-pricing-tiers></div>
-    {%- if group_metafield != blank -%}
+    {%- if discount_metafield != blank and variant_is_eligible and discount_metafield.value.siblings.size > 0 -%}
       <button type="button" class="sparkly-tier-pricing__toggle" data-tier-pricing-toggle>mix &amp; match products ▼</button>
       <div class="sparkly-tier-pricing__list" data-tier-pricing-list hidden></div>
     {%- endif -%}
