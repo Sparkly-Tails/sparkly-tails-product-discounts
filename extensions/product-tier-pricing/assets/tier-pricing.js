@@ -112,10 +112,28 @@ function withUnitAnchor(tiers) {
 
 // Cart math
 
-function sumGroupQuantityInCart(cartItems, handles) {
-  return cartItems
-    .filter((item) => handles.includes(item.handle))
-    .reduce((sum, item) => sum + item.quantity, 0)
+// Cart items (from /cart.js) and cart lines (from the Rust Function) both
+// carry Shopify's plain numeric ids; this app's own config stores GIDs
+// (gid://shopify/Product/123) end to end for everything else. This is the
+// one seam where the two meet.
+function extractNumericId(id) {
+  const str = String(id)
+  const lastSlash = str.lastIndexOf('/')
+  return lastSlash === -1 ? str : str.slice(lastSlash + 1)
+}
+
+// A member with no variantId matches any of that product's cart lines
+// (today's whole-product behavior); a member with a variantId matches only
+// that specific variant's lines. Members are pre-normalized to numeric ids
+// by the caller (parseWidgetConfig), matching cartItems' own numeric ids.
+function sumMemberQuantityInCart(cartItems, members) {
+  return cartItems.reduce((sum, item) => {
+    const matches = members.some((m) => {
+      if (String(item.product_id) !== m.productId) return false
+      return m.variantId == null || String(item.variant_id) === m.variantId
+    })
+    return matches ? sum + item.quantity : sum
+  }, 0)
 }
 
 // The on-page stepper floors at 1, not 0 — that floor isn't "one extra
@@ -317,7 +335,8 @@ function computeWidgetViewModel({ tiers, basePrice, compareAtPrice, otherQty, ad
 
 function buildMixMatchRows(products, cartItems) {
   return products.map((product) => {
-    const qty = sumGroupQuantityInCart(cartItems || [], [product.handle])
+    const member = { productId: extractNumericId(product.productId), variantId: product.variantId ? extractNumericId(product.variantId) : undefined }
+    const qty = sumMemberQuantityInCart(cartItems || [], [member])
     return {
       href: '/products/' + product.handle,
       title: product.title,
@@ -335,7 +354,8 @@ if (typeof module !== 'undefined' && module.exports) {
     formatMoney,
     computeTierState,
     perUnitPrice,
-    sumGroupQuantityInCart,
+    extractNumericId,
+    sumMemberQuantityInCart,
     unitPriceAtTier,
     totalAtTier,
     computeProgressState,
@@ -493,12 +513,12 @@ if (typeof document !== 'undefined') {
     return res.json()
   }
 
-  async function fetchGroupCartState(allDiscountHandles, productHandle) {
+  async function fetchGroupCartState(allMembers, selfMember) {
     const cart = await fetchCart()
-    const trueCartQty = sumGroupQuantityInCart(cart.items, allDiscountHandles)
+    const trueCartQty = sumMemberQuantityInCart(cart.items, allMembers)
     return {
       otherQty: cartBaselineOtherQty(trueCartQty),
-      selfQty: sumGroupQuantityInCart(cart.items, [productHandle]),
+      selfQty: sumMemberQuantityInCart(cart.items, [selfMember]),
       cartItems: cart.items,
     }
   }
@@ -517,21 +537,27 @@ if (typeof document !== 'undefined') {
   // DOM: per-widget setup
 
   function parseWidgetConfig(container) {
-    const standaloneData = JSON.parse(container.dataset.tiers)
+    const discount = JSON.parse(container.dataset.discount)
     const moneyFormat = JSON.parse(container.dataset.moneyFormat)
-    const group = JSON.parse(container.dataset.group)
     const productHandle = JSON.parse(container.dataset.productHandle)
-    const tiers = withUnitAnchor(group ? group.tiers : standaloneData.tiers)
+    const productId = JSON.parse(container.dataset.productId)
+    const tiers = withUnitAnchor(discount.tiers)
+
+    const selfMember = { productId: extractNumericId(productId), variantId: discount.selfVariantId ? extractNumericId(discount.selfVariantId) : undefined }
+    const siblingMembers = (discount.siblings || []).map((s) => ({
+      productId: extractNumericId(s.productId),
+      variantId: s.variantId ? extractNumericId(s.variantId) : undefined,
+    }))
 
     return {
       moneyFormat,
-      group,
       productHandle,
       tiers,
-      title: group ? group.title : standaloneData.title,
+      title: discount.title,
       hasTiers: !!(tiers && tiers.length > 0),
-      allDiscountHandles: group ? [productHandle].concat(group.siblings.map((s) => s.handle)) : [productHandle],
-      mixMatchListItems: group ? [group.self].concat(group.siblings) : [],
+      allMembers: [selfMember].concat(siblingMembers),
+      mixMatchListItems: discount.siblings || [],
+      isGroup: (discount.siblings || []).length > 0,
     }
   }
 
@@ -568,7 +594,7 @@ if (typeof document !== 'undefined') {
       let otherQty = 0
       if (config.hasTiers) {
         try {
-          const cartState = await fetchGroupCartState(config.allDiscountHandles, config.productHandle)
+          const cartState = await fetchGroupCartState(config.allMembers, config.allMembers[0])
           lastCartItems = cartState.cartItems
           otherQty = cartState.otherQty
           resetStepperIfJustAdded(lastKnownSelfQtyRef, cartState.selfQty)
@@ -584,17 +610,17 @@ if (typeof document !== 'undefined') {
         otherQty,
         addingQty,
         title: config.title,
-        isGroup: !!config.group,
+        isGroup: config.isGroup,
         formatMoney: formatMoneyFn,
       })
       paintWidget(elements, viewModel, basePrice, addingQty, tierButtonsSignatureRef)
 
-      if (config.group && elements.listEl && !elements.listEl.hidden) {
+      if (config.isGroup && elements.listEl && !elements.listEl.hidden) {
         renderMixMatchList(elements.listEl, config.mixMatchListItems, lastCartItems)
       }
     }
 
-    if (elements.toggleEl && elements.listEl && config.group) {
+    if (elements.toggleEl && elements.listEl && config.isGroup) {
       let open = false
       elements.toggleEl.addEventListener('click', () => {
         open = !open
