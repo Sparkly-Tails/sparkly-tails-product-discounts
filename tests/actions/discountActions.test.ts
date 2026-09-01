@@ -223,6 +223,37 @@ describe('updateDiscountMembers', () => {
       })],
     })
   })
+
+  it('clears metafields for a product removed from a live discount and re-syncs the rest', async () => {
+    const discount: Discount = {
+      discountId: 'disc_1', name: 'A', title: 'A', status: 'live', pricingMode: 'percent',
+      members: [{ productId: 'gid://shopify/Product/1' }, { productId: 'gid://shopify/Product/2' }],
+      tiers: [{ minQty: 7, percentOff: 4 }],
+    }
+    vi.spyOn(configLib, 'getConfig').mockResolvedValue({ discounts: [discount] })
+    const saveSpy = vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
+    const clearSpy = vi.spyOn(productTiers, 'clearDiscountMetafields').mockResolvedValue()
+    const syncSpy = vi.spyOn(productTiers, 'syncDiscountMetafields').mockResolvedValue()
+    vi.spyOn(products, 'getMemberInfo').mockResolvedValue([
+      { productId: 'gid://shopify/Product/1', variantId: undefined, title: 'A', price: 1.49, handle: 'a', imageUrl: null },
+    ])
+
+    const formData = memberFormData([{ productId: 'gid://shopify/Product/1' }])
+
+    await updateDiscountMembers('disc_1', formData)
+
+    expect(saveSpy).toHaveBeenCalledWith({
+      discounts: [expect.objectContaining({
+        discountId: 'disc_1',
+        members: [{ productId: 'gid://shopify/Product/1' }],
+      })],
+    })
+    expect(clearSpy).toHaveBeenCalledWith([{ productId: 'gid://shopify/Product/2' }])
+    expect(syncSpy).toHaveBeenCalledWith(expect.objectContaining({
+      discountId: 'disc_1',
+      members: [{ productId: 'gid://shopify/Product/1' }],
+    }))
+  })
 })
 
 describe('updateDiscountTiers', () => {

@@ -119,10 +119,17 @@ export async function updateDiscountMembers(discountId: string, formData: FormDa
 
   await assertPricingAllowed(members, discount.pricingMode, discount.tiers)
 
+  const previousProductIds = new Set(discount.members.map((m) => m.productId))
+  const nextProductIds = new Set(members.map((m) => m.productId))
+  const removed = [...previousProductIds].filter((id) => !nextProductIds.has(id))
+
   discount.members = members
   await saveConfig(config)
 
   if (discount.status === 'live') {
+    if (removed.length > 0) {
+      await clearDiscountMetafields(removed.map((productId) => ({ productId })))
+    }
     await syncDiscountMetafields(discount)
   }
 
