@@ -33,6 +33,16 @@ describe('getConfig', () => {
     const config = await getConfig()
     expect(config).toEqual({ discounts: [] })
   })
+
+  it('returns an empty discount list when the stored config predates the discounts field (old products/groups shape)', async () => {
+    const oldShape = { products: [], groups: [] }
+    vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({
+      shop: { metafield: { value: JSON.stringify(oldShape) } },
+    })
+
+    const config = await getConfig()
+    expect(config).toEqual({ discounts: [] })
+  })
 })
 
 describe('saveConfig', () => {

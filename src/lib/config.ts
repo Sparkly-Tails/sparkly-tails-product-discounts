@@ -74,7 +74,8 @@ export async function getConfig(): Promise<Config> {
     return { discounts: [] }
   }
 
-  return JSON.parse(data.shop.metafield.value) as Config
+  const parsed = JSON.parse(data.shop.metafield.value) as Partial<Config>
+  return { discounts: Array.isArray(parsed.discounts) ? parsed.discounts : [] }
 }
 
 export async function saveConfig(config: Config): Promise<void> {
