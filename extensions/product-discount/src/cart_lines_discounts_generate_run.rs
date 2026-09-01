@@ -1599,4 +1599,174 @@ mod tests {
         assert_eq!(result.operations.len(), 0);
         Ok(())
     }
+
+    #[test]
+    fn variant_scoped_member_ignores_a_different_variant_of_the_same_product() -> Result<()> {
+        let result = run_function_with_input(
+            cart_lines_discounts_generate_run,
+            r#"{
+                "cart": {
+                    "lines": [
+                        {
+                            "id": "gid://shopify/CartLine/0",
+                            "quantity": 7,
+                            "cost": { "amountPerQuantity": { "amount": "1.49" } },
+                            "merchandise": {
+                                "__typename": "ProductVariant",
+                                "id": "gid://shopify/ProductVariant/999",
+                                "product": { "id": "gid://shopify/Product/1" }
+                            }
+                        }
+                    ]
+                },
+                "shop": {
+                    "metafield": {
+                        "jsonValue": {
+                            "discounts": [
+                                {
+                                    "status": "live",
+                                    "members": [
+                                        { "productId": "gid://shopify/Product/1", "variantId": "gid://shopify/ProductVariant/500" }
+                                    ],
+                                    "tiers": [{ "minQty": 7, "percentOff": 4.0 }]
+                                }
+                            ]
+                        }
+                    }
+                },
+                "discount": { "discountClasses": ["PRODUCT"] }
+            }"#,
+        )?;
+        assert_eq!(result.operations.len(), 0);
+        Ok(())
+    }
+
+    #[test]
+    fn variant_scoped_member_matches_its_exact_variant() -> Result<()> {
+        let result = run_function_with_input(
+            cart_lines_discounts_generate_run,
+            r#"{
+                "cart": {
+                    "lines": [
+                        {
+                            "id": "gid://shopify/CartLine/0",
+                            "quantity": 7,
+                            "cost": { "amountPerQuantity": { "amount": "1.49" } },
+                            "merchandise": {
+                                "__typename": "ProductVariant",
+                                "id": "gid://shopify/ProductVariant/500",
+                                "product": { "id": "gid://shopify/Product/1" }
+                            }
+                        }
+                    ]
+                },
+                "shop": {
+                    "metafield": {
+                        "jsonValue": {
+                            "discounts": [
+                                {
+                                    "status": "live",
+                                    "members": [
+                                        { "productId": "gid://shopify/Product/1", "variantId": "gid://shopify/ProductVariant/500" }
+                                    ],
+                                    "tiers": [{ "minQty": 7, "percentOff": 4.0 }]
+                                }
+                            ]
+                        }
+                    }
+                },
+                "discount": { "discountClasses": ["PRODUCT"] }
+            }"#,
+        )?;
+        assert_eq!(result.operations.len(), 1);
+        match &result.operations[0] {
+            schema::CartOperation::ProductDiscountsAdd(op) => {
+                match &op.candidates[0].value {
+                    schema::ProductDiscountCandidateValue::Percentage(p) => assert_eq!(p.value.0, 4.0),
+                    _ => panic!("expected a Percentage value"),
+                }
+            }
+            _ => panic!("expected ProductDiscountsAdd"),
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn mixed_members_combine_quantity_across_a_whole_product_and_a_specific_variant_of_another() -> Result<()> {
+        let result = run_function_with_input(
+            cart_lines_discounts_generate_run,
+            r#"{
+                "cart": {
+                    "lines": [
+                        {
+                            "id": "gid://shopify/CartLine/0",
+                            "quantity": 4,
+                            "cost": { "amountPerQuantity": { "amount": "1.49" } },
+                            "merchandise": {
+                                "__typename": "ProductVariant",
+                                "id": "gid://shopify/ProductVariant/900",
+                                "product": { "id": "gid://shopify/Product/1" }
+                            }
+                        },
+                        {
+                            "id": "gid://shopify/CartLine/1",
+                            "quantity": 3,
+                            "cost": { "amountPerQuantity": { "amount": "1.49" } },
+                            "merchandise": {
+                                "__typename": "ProductVariant",
+                                "id": "gid://shopify/ProductVariant/500",
+                                "product": { "id": "gid://shopify/Product/2" }
+                            }
+                        },
+                        {
+                            "id": "gid://shopify/CartLine/2",
+                            "quantity": 10,
+                            "cost": { "amountPerQuantity": { "amount": "1.49" } },
+                            "merchandise": {
+                                "__typename": "ProductVariant",
+                                "id": "gid://shopify/ProductVariant/501",
+                                "product": { "id": "gid://shopify/Product/2" }
+                            }
+                        }
+                    ]
+                },
+                "shop": {
+                    "metafield": {
+                        "jsonValue": {
+                            "discounts": [
+                                {
+                                    "status": "live",
+                                    "members": [
+                                        { "productId": "gid://shopify/Product/1" },
+                                        { "productId": "gid://shopify/Product/2", "variantId": "gid://shopify/ProductVariant/500" }
+                                    ],
+                                    "tiers": [{ "minQty": 7, "percentOff": 4.0 }]
+                                }
+                            ]
+                        }
+                    }
+                },
+                "discount": { "discountClasses": ["PRODUCT"] }
+            }"#,
+        )?;
+        assert_eq!(result.operations.len(), 1);
+        match &result.operations[0] {
+            schema::CartOperation::ProductDiscountsAdd(op) => {
+                // Line 0 (qty 4) + line 1 (qty 3, the matching variant of
+                // Product/2) = 7, reaching the tier. Line 2 (the OTHER variant
+                // of Product/2, qty 10) must NOT be discounted.
+                assert_eq!(op.candidates.len(), 2);
+                let targeted_line_ids: Vec<String> = op.candidates.iter().map(|c| {
+                    match &c.targets[0] {
+                        schema::ProductDiscountCandidateTarget::CartLine(t) => t.id.to_string(),
+                    }
+                }).collect();
+                assert!(targeted_line_ids.contains(&"gid://shopify/CartLine/0".to_string()));
+                assert!(targeted_line_ids.contains(&"gid://shopify/CartLine/1".to_string()));
+                assert!(!targeted_line_ids.contains(&"gid://shopify/CartLine/2".to_string()));
+            }
+            _ => panic!("expected ProductDiscountsAdd"),
+        }
+        Ok(())
+    }
 }
