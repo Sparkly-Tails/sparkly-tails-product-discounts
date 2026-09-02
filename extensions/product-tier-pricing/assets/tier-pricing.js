@@ -669,6 +669,13 @@ if (typeof document !== 'undefined') {
       }
     }
 
+    // Liquid now renders the toggle+list markup unconditionally (see the
+    // comment on data-discount above) — isGroup is fixed at metafield-sync
+    // time (total member count), not per-variant, so hiding it once here
+    // (rather than every render) is correct and matches how paintCard
+    // already owns cardEl's hidden state.
+    if (elements.toggleEl) elements.toggleEl.hidden = !config.isGroup
+
     if (elements.toggleEl && elements.listEl && config.isGroup) {
       let open = false
       elements.toggleEl.addEventListener('click', () => {
