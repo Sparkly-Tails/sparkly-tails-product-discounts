@@ -136,6 +136,14 @@ function sumMemberQuantityInCart(cartItems, members) {
   }, 0)
 }
 
+// True when the given variant id counts as a member of THIS product's
+// portion of a discount — null ownVariantIds means the whole (single-variant)
+// product is the member, so every variant qualifies; a non-null list means
+// only those specific variants do.
+function resolveEligibility(ownVariantIds, selectedVariantId) {
+  return ownVariantIds == null || ownVariantIds.includes(selectedVariantId)
+}
+
 // The on-page stepper floors at 1, not 0 — that floor isn't "one extra
 // unit", it's the resting state. Subtracting 1 cancels it, so combinedQty
 // (= otherQty + addingQty) lands exactly on the true cart total at rest and
@@ -337,13 +345,32 @@ function buildMixMatchRows(products, cartItems) {
   return products.map((product) => {
     const member = { productId: extractNumericId(product.productId), variantId: product.variantId ? extractNumericId(product.variantId) : undefined }
     const qty = sumMemberQuantityInCart(cartItems || [], [member])
+    const href = member.variantId ? '/products/' + product.handle + '?variant=' + member.variantId : '/products/' + product.handle
     return {
-      href: '/products/' + product.handle,
+      href,
       title: product.title,
       imageUrl: product.imageUrl || null,
       qtyLabel: qty === 1 ? '1 in cart' : qty + ' in cart',
     }
   })
+}
+
+// Cross-product siblings (unconditional) plus this product's own other
+// member-variants (excluding whichever one is currently selected/displayed —
+// showing "the exact variant you're looking at" as a list row would be
+// confusing). Own-variant rows link back to this same product with a
+// ?variant= query param so clicking one selects that flavour.
+function buildDisplayMixMatchItems(config, currentVariantId) {
+  const ownRows = (config.ownVariantOptions || [])
+    .filter((opt) => opt.variantId !== currentVariantId)
+    .map((opt) => ({
+      productId: config.productId,
+      variantId: opt.variantId,
+      title: opt.title,
+      handle: config.productHandle,
+      imageUrl: null,
+    }))
+  return ownRows.concat(config.mixMatchListItems)
 }
 
 if (typeof module !== 'undefined' && module.exports) {
@@ -356,6 +383,7 @@ if (typeof module !== 'undefined' && module.exports) {
     perUnitPrice,
     extractNumericId,
     sumMemberQuantityInCart,
+    resolveEligibility,
     unitPriceAtTier,
     totalAtTier,
     computeProgressState,
@@ -371,6 +399,7 @@ if (typeof module !== 'undefined' && module.exports) {
     cartBaselineOtherQty,
     computeWidgetViewModel,
     buildMixMatchRows,
+    buildDisplayMixMatchItems,
   }
 }
 
@@ -543,21 +572,34 @@ if (typeof document !== 'undefined') {
     const productId = JSON.parse(container.dataset.productId)
     const tiers = withUnitAnchor(discount.tiers)
 
-    const selfMember = { productId: extractNumericId(productId), variantId: discount.selfVariantId ? extractNumericId(discount.selfVariantId) : undefined }
+    const selfProductId = extractNumericId(productId)
+    const ownVariantIds = discount.ownVariantIds ? discount.ownVariantIds.map(extractNumericId) : null
+    const ownMembers = ownVariantIds
+      ? ownVariantIds.map((v) => ({ productId: selfProductId, variantId: v }))
+      : [{ productId: selfProductId }]
+    const ownVariantOptions = (discount.ownVariantOptions || []).map((o) => ({
+      variantId: extractNumericId(o.variantId),
+      title: o.title,
+    }))
     const siblingMembers = (discount.siblings || []).map((s) => ({
       productId: extractNumericId(s.productId),
       variantId: s.variantId ? extractNumericId(s.variantId) : undefined,
     }))
+    const allMembers = ownMembers.concat(siblingMembers)
 
     return {
       moneyFormat,
       productHandle,
+      productId: selfProductId,
       tiers,
       title: discount.title,
       hasTiers: !!(tiers && tiers.length > 0),
-      allMembers: [selfMember].concat(siblingMembers),
+      ownVariantIds,
+      ownVariantOptions,
+      initialVariantId: discount.selfVariantId ? extractNumericId(discount.selfVariantId) : null,
+      allMembers,
       mixMatchListItems: discount.siblings || [],
-      isGroup: (discount.siblings || []).length > 0,
+      isGroup: allMembers.length > 1,
     }
   }
 
@@ -582,6 +624,7 @@ if (typeof document !== 'undefined') {
   function createRenderer(container, config, elements) {
     const tierButtonsSignatureRef = { value: null }
     const lastKnownSelfQtyRef = { value: null }
+    const variantStateRef = { value: config.initialVariantId }
     const formatMoneyFn = createMoneyFormatter(config.moneyFormat)
     let lastCartItems = []
 
@@ -590,11 +633,17 @@ if (typeof document !== 'undefined') {
       const compareAtPrice = Number(container.dataset.compareAtPrice) || 0
       const quantityInput = document.querySelector('input[name="quantity"]')
       const addingQty = quantityInput ? Number(quantityInput.value) || 1 : 1
+      const eligible = resolveEligibility(config.ownVariantIds, variantStateRef.value)
+      // The specific on-screen variant, not allMembers[0] — allMembers[0] is
+      // just the first of possibly several own-variant members and would
+      // misattribute stepper-reset detection once a product has more than
+      // one own member variant.
+      const selfMemberNow = { productId: config.productId, variantId: variantStateRef.value }
 
       let otherQty = 0
       if (config.hasTiers) {
         try {
-          const cartState = await fetchGroupCartState(config.allMembers, config.allMembers[0])
+          const cartState = await fetchGroupCartState(config.allMembers, selfMemberNow)
           lastCartItems = cartState.cartItems
           otherQty = cartState.otherQty
           resetStepperIfJustAdded(lastKnownSelfQtyRef, cartState.selfQty)
@@ -604,7 +653,7 @@ if (typeof document !== 'undefined') {
       }
 
       const viewModel = computeWidgetViewModel({
-        tiers: config.tiers,
+        tiers: eligible ? config.tiers : [],
         basePrice,
         compareAtPrice,
         otherQty,
@@ -616,7 +665,7 @@ if (typeof document !== 'undefined') {
       paintWidget(elements, viewModel, basePrice, addingQty, tierButtonsSignatureRef)
 
       if (config.isGroup && elements.listEl && !elements.listEl.hidden) {
-        renderMixMatchList(elements.listEl, config.mixMatchListItems, lastCartItems)
+        renderMixMatchList(elements.listEl, buildDisplayMixMatchItems(config, variantStateRef.value), lastCartItems)
       }
     }
 
@@ -626,10 +675,11 @@ if (typeof document !== 'undefined') {
         open = !open
         elements.listEl.hidden = !open
         elements.toggleEl.textContent = 'mix & match products ' + (open ? '▲' : '▼')
-        if (open) renderMixMatchList(elements.listEl, config.mixMatchListItems, lastCartItems)
+        if (open) renderMixMatchList(elements.listEl, buildDisplayMixMatchItems(config, variantStateRef.value), lastCartItems)
       })
     }
 
+    render.variantStateRef = variantStateRef
     return render
   }
 
@@ -666,6 +716,9 @@ if (typeof document !== 'undefined') {
 
     productVariantsEl.addEventListener('VARIANT_CHANGE', (event) => {
       const variant = event.target.currentVariant
+      if (variant && variant.id != null && render.variantStateRef) {
+        render.variantStateRef.value = extractNumericId(variant.id)
+      }
       if (variant && typeof variant.price === 'number') {
         container.dataset.basePrice = String(variant.price / 100)
       }

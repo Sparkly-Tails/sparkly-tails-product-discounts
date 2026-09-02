@@ -1,6 +1,6 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
-const { computeTierState, perUnitPrice, extractNumericId, sumMemberQuantityInCart, unitPriceAtTier, totalAtTier, computeProgressState, computeProgressTrack, pluralizeTitle, formatAddMoreText, formatTempBoxLabel, joinNaturally, buildPromoText, computeOrderSummary, computeTierButtonsSignature, withUnitAnchor, cartBaselineOtherQty, clamp, sortTiersByMinQty, normalizeTierPricing, formatMoney, computeWidgetViewModel, buildMixMatchRows } = require('../product-tier-pricing/assets/tier-pricing.js')
+const { computeTierState, perUnitPrice, extractNumericId, sumMemberQuantityInCart, resolveEligibility, unitPriceAtTier, totalAtTier, computeProgressState, computeProgressTrack, pluralizeTitle, formatAddMoreText, formatTempBoxLabel, joinNaturally, buildPromoText, computeOrderSummary, computeTierButtonsSignature, withUnitAnchor, cartBaselineOtherQty, clamp, sortTiersByMinQty, normalizeTierPricing, formatMoney, computeWidgetViewModel, buildMixMatchRows, buildDisplayMixMatchItems } = require('../product-tier-pricing/assets/tier-pricing.js')
 
 test('below every tier: no discount, lists every tier as a delta from current quantity', () => {
   const tiers = [{ minQty: 7, percentOff: 5 }, { minQty: 14, percentOff: 10 }]
@@ -180,6 +180,27 @@ test('sumMemberQuantityInCart: sums across multiple members, mixing whole-produc
   ]
   const total = sumMemberQuantityInCart(cartItems, [{ productId: '1' }, { productId: '2', variantId: '20' }])
   assert.equal(total, 7)
+})
+
+test('sumMemberQuantityInCart: two variants of the SAME product both count toward the combined total', () => {
+  const cartItems = [
+    { product_id: 1, variant_id: 500, quantity: 4 },
+    { product_id: 1, variant_id: 501, quantity: 3 },
+    { product_id: 1, variant_id: 502, quantity: 10 }, // a third variant of the product, NOT a member — must not count
+  ]
+  const members = [{ productId: '1', variantId: '500' }, { productId: '1', variantId: '501' }]
+  const total = sumMemberQuantityInCart(cartItems, members)
+  assert.equal(total, 7)
+})
+
+test('resolveEligibility: null ownVariantIds means the whole (single-variant) product is always eligible', () => {
+  assert.equal(resolveEligibility(null, '500'), true)
+  assert.equal(resolveEligibility(null, '999'), true)
+})
+
+test('resolveEligibility: a non-null list is eligible only when the selected variant is in it', () => {
+  assert.equal(resolveEligibility(['500', '501'], '500'), true)
+  assert.equal(resolveEligibility(['500', '501'], '502'), false)
 })
 
 test('unitPriceAtTier: percent tier with no anchor returns basePrice minus percentOff', () => {
@@ -657,6 +678,66 @@ test('buildMixMatchRows: a variant-scoped member matches only that exact variant
     ],
   )
   assert.equal(rows[0].qtyLabel, '3 in cart')
+})
+
+test('buildMixMatchRows: a variant-scoped member deep-links with a ?variant= query param', () => {
+  const rows = buildMixMatchRows(
+    [{ title: 'Salmon', handle: 'wet-cat-food', productId: 'gid://shopify/Product/9', variantId: 'gid://shopify/ProductVariant/90', imageUrl: null }],
+    [],
+  )
+  assert.equal(rows[0].href, '/products/wet-cat-food?variant=90')
+})
+
+test('buildMixMatchRows: a whole-product member links to the plain product URL, no query param', () => {
+  const rows = buildMixMatchRows(
+    [{ title: 'Tuna', handle: 'tuna-soup', productId: 'gid://shopify/Product/1', imageUrl: null }],
+    [],
+  )
+  assert.equal(rows[0].href, '/products/tuna-soup')
+})
+
+test('buildDisplayMixMatchItems: includes this product\'s own other member-variants, excluding the currently-displayed one', () => {
+  const config = {
+    productId: '2',
+    productHandle: 'wet-cat-food',
+    ownVariantOptions: [
+      { variantId: '20', title: 'Chicken' },
+      { variantId: '21', title: 'Salmon' },
+      { variantId: '22', title: 'Duck' },
+    ],
+    mixMatchListItems: [],
+  }
+  const items = buildDisplayMixMatchItems(config, '21') // viewing Salmon
+  assert.deepEqual(items, [
+    { productId: '2', variantId: '20', title: 'Chicken', handle: 'wet-cat-food', imageUrl: null },
+    { productId: '2', variantId: '22', title: 'Duck', handle: 'wet-cat-food', imageUrl: null },
+  ])
+})
+
+test('buildDisplayMixMatchItems: cross-product siblings are appended after this product\'s own-variant rows', () => {
+  const config = {
+    productId: '2',
+    productHandle: 'wet-cat-food',
+    ownVariantOptions: [{ variantId: '20', title: 'Chicken' }],
+    mixMatchListItems: [{ productId: 'gid://shopify/Product/1', title: 'Tuna Soup', handle: 'tuna-soup', imageUrl: null }],
+  }
+  const items = buildDisplayMixMatchItems(config, '20') // viewing Chicken -- excludes itself
+  assert.deepEqual(items, [
+    { productId: 'gid://shopify/Product/1', title: 'Tuna Soup', handle: 'tuna-soup', imageUrl: null },
+  ])
+})
+
+test('buildDisplayMixMatchItems: single-variant product (no ownVariantOptions) returns just the siblings', () => {
+  const config = {
+    productId: '1',
+    productHandle: 'tuna-soup',
+    ownVariantOptions: [],
+    mixMatchListItems: [{ productId: 'gid://shopify/Product/2', title: 'Wet Cat Food', handle: 'wet-cat-food', imageUrl: null }],
+  }
+  const items = buildDisplayMixMatchItems(config, null)
+  assert.deepEqual(items, [
+    { productId: 'gid://shopify/Product/2', title: 'Wet Cat Food', handle: 'wet-cat-food', imageUrl: null },
+  ])
 })
 
 test('computeWidgetViewModel: no tiers configured at all — plain price, card hidden, breakdown left untouched', () => {
