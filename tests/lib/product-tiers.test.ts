@@ -37,6 +37,7 @@ describe('syncDiscountMetafields', () => {
       pricingMode: 'percent',
       tiers: [{ minQty: 7, percentOff: 4 }],
       ownVariantIds: null,
+      ownVariantOptions: null,
       siblings: [
         { productId: 'gid://shopify/Product/2', title: 'Wet Cat Food – Chicken', handle: 'wet-cat-food', variantId: 'gid://shopify/ProductVariant/20', imageUrl: 'https://x/c.png' },
         { productId: 'gid://shopify/Product/2', title: 'Wet Cat Food – Salmon', handle: 'wet-cat-food', variantId: 'gid://shopify/ProductVariant/21', imageUrl: 'https://x/s.png' },
@@ -46,6 +47,10 @@ describe('syncDiscountMetafields', () => {
     const call2 = querySpy.mock.calls.find((c) => (c[1] as { metafields: { ownerId: string }[] }).metafields[0].ownerId === 'gid://shopify/Product/2')!
     const parsed2 = JSON.parse((call2[1] as { metafields: { value: string }[] }).metafields[0].value)
     expect(parsed2.ownVariantIds).toEqual(['gid://shopify/ProductVariant/20', 'gid://shopify/ProductVariant/21'])
+    expect(parsed2.ownVariantOptions).toEqual([
+      { variantId: 'gid://shopify/ProductVariant/20', title: 'Chicken' },
+      { variantId: 'gid://shopify/ProductVariant/21', title: 'Salmon' },
+    ])
     expect(parsed2.siblings).toEqual([
       { productId: 'gid://shopify/Product/1', title: 'Tuna Soup', handle: 'tuna-soup', variantId: undefined, imageUrl: null },
     ])

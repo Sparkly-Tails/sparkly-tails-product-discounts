@@ -12,6 +12,11 @@ interface DiscountMetafieldSibling {
   imageUrl: string | null
 }
 
+interface DiscountMetafieldOwnVariantOption {
+  variantId: string
+  title: string
+}
+
 interface DiscountMetafieldValue {
   discountId: string
   title: string
@@ -19,6 +24,8 @@ interface DiscountMetafieldValue {
   tiers: Discount['tiers']
   /** null = single-variant whole-product member; array = these specific variants of THIS product are members. */
   ownVariantIds: string[] | null
+  /** Per-own-variant display title (e.g. "Salmon"), populated only when ownVariantIds is non-null. */
+  ownVariantOptions: DiscountMetafieldOwnVariantOption[] | null
   siblings: DiscountMetafieldSibling[]
 }
 
@@ -42,6 +49,18 @@ export async function syncDiscountMetafields(discount: Discount): Promise<void> 
         ? null
         : ownMembers.map((m) => m.variantId!)
 
+      const ownVariantOptions = ownVariantIds
+        ? ownMembers.map((m) => {
+            const info = infoByKey.get(`${m.productId}::${m.variantId ?? ''}`)
+            // Use just the variant's own title (e.g. "Salmon"), not the
+            // "Product – Variant" format used for cross-product siblings — the
+            // product name is already implied by being on that product's page.
+            const fullTitle = info?.title ?? ''
+            const variantOnlyTitle = fullTitle.includes(' – ') ? fullTitle.split(' – ').slice(1).join(' – ') : fullTitle
+            return { variantId: m.variantId!, title: variantOnlyTitle }
+          })
+        : null
+
       const siblings: DiscountMetafieldSibling[] = discount.members
         .filter((m) => m.productId !== productId)
         .map((m) => {
@@ -61,6 +80,7 @@ export async function syncDiscountMetafields(discount: Discount): Promise<void> 
         pricingMode: discount.pricingMode,
         tiers: discount.tiers,
         ownVariantIds,
+        ownVariantOptions,
         siblings,
       }
 
