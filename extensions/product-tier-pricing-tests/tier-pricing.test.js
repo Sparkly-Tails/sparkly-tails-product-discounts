@@ -696,7 +696,7 @@ test('buildMixMatchRows: a whole-product member links to the plain product URL, 
   assert.equal(rows[0].href, '/products/tuna-soup')
 })
 
-test('buildDisplayMixMatchItems: includes this product\'s own other member-variants, excluding the currently-displayed one', () => {
+test('buildDisplayMixMatchItems: includes every one of this product\'s own other member-variants, INCLUDING the currently-displayed one', () => {
   const config = {
     productId: '2',
     productHandle: 'wet-cat-food',
@@ -707,9 +707,10 @@ test('buildDisplayMixMatchItems: includes this product\'s own other member-varia
     ],
     mixMatchListItems: [],
   }
-  const items = buildDisplayMixMatchItems(config, '21') // viewing Salmon
+  const items = buildDisplayMixMatchItems(config) // viewing Salmon, but it still gets a row — a customer's own already-in-cart quantity for the variant they're on must stay visible
   assert.deepEqual(items, [
     { productId: '2', variantId: '20', title: 'Chicken', handle: 'wet-cat-food', imageUrl: null },
+    { productId: '2', variantId: '21', title: 'Salmon', handle: 'wet-cat-food', imageUrl: null },
     { productId: '2', variantId: '22', title: 'Duck', handle: 'wet-cat-food', imageUrl: null },
   ])
 })
@@ -721,8 +722,9 @@ test('buildDisplayMixMatchItems: cross-product siblings are appended after this 
     ownVariantOptions: [{ variantId: '20', title: 'Chicken' }],
     mixMatchListItems: [{ productId: 'gid://shopify/Product/1', title: 'Tuna Soup', handle: 'tuna-soup', imageUrl: null }],
   }
-  const items = buildDisplayMixMatchItems(config, '20') // viewing Chicken -- excludes itself
+  const items = buildDisplayMixMatchItems(config)
   assert.deepEqual(items, [
+    { productId: '2', variantId: '20', title: 'Chicken', handle: 'wet-cat-food', imageUrl: null },
     { productId: 'gid://shopify/Product/1', title: 'Tuna Soup', handle: 'tuna-soup', imageUrl: null },
   ])
 })
@@ -734,7 +736,7 @@ test('buildDisplayMixMatchItems: single-variant product (no ownVariantOptions) r
     ownVariantOptions: [],
     mixMatchListItems: [{ productId: 'gid://shopify/Product/2', title: 'Wet Cat Food', handle: 'wet-cat-food', imageUrl: null }],
   }
-  const items = buildDisplayMixMatchItems(config, null)
+  const items = buildDisplayMixMatchItems(config)
   assert.deepEqual(items, [
     { productId: 'gid://shopify/Product/2', title: 'Wet Cat Food', handle: 'wet-cat-food', imageUrl: null },
   ])
