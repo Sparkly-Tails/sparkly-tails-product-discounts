@@ -41,6 +41,7 @@ pub struct DiscountConfig {
 #[derive(Deserialize, Default, PartialEq)]
 #[shopify_function(rename_all = "camelCase")]
 pub struct Config {
+    #[shopify_function(default)]
     discounts: Vec<DiscountConfig>,
 }
 
@@ -853,9 +854,12 @@ mod tests {
     }
 
     #[test]
-    fn defaults_groups_to_empty_when_the_stored_config_predates_the_field() -> Result<()> {
-        // No "groups" key at all in shop.metafield.jsonValue — must not error,
-        // for backward compatibility with configs saved before this feature.
+    fn defaults_discounts_to_empty_when_the_stored_config_has_no_discounts_key() -> Result<()> {
+        // Empty shop metafield jsonValue — the shape stored before this
+        // feature shipped ({"products":[...],"groups":[...]}) has no
+        // "discounts" key at all. Must not error during the deploy window
+        // between when this Function goes live and when the merchant saves
+        // a new config.
         let result = run_function_with_input(
             cart_lines_discounts_generate_run,
             r#"{
@@ -875,21 +879,13 @@ mod tests {
                 },
                 "shop": {
                     "metafield": {
-                        "jsonValue": {
-                            "discounts": [
-                                {
-                                    "status": "live",
-                                    "members": [{ "productId": "gid://shopify/Product/1" }],
-                                    "tiers": [{ "minQty": 5, "percentOff": 10.0 }]
-                                }
-                            ]
-                        }
+                        "jsonValue": {}
                     }
                 },
                 "discount": { "discountClasses": ["PRODUCT"] }
             }"#,
         )?;
-        assert_eq!(result.operations.len(), 1);
+        assert_eq!(result.operations.len(), 0);
         Ok(())
     }
 
@@ -1764,6 +1760,156 @@ mod tests {
                 assert!(targeted_line_ids.contains(&"gid://shopify/CartLine/0".to_string()));
                 assert!(targeted_line_ids.contains(&"gid://shopify/CartLine/1".to_string()));
                 assert!(!targeted_line_ids.contains(&"gid://shopify/CartLine/2".to_string()));
+            }
+            _ => panic!("expected ProductDiscountsAdd"),
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn same_product_variant_members_combine_quantity_toward_one_tier() -> Result<()> {
+        // Both members are variants of the SAME product (the spec's own
+        // motivating example — e.g. Salmon + Duck flavours of one product).
+        // No existing test exercises this: prior variant-scoped tests use a
+        // whole product plus a variant of a DIFFERENT product.
+        let result = run_function_with_input(
+            cart_lines_discounts_generate_run,
+            r#"{
+                "cart": {
+                    "lines": [
+                        {
+                            "id": "gid://shopify/CartLine/0",
+                            "quantity": 4,
+                            "cost": { "amountPerQuantity": { "amount": "1.49" } },
+                            "merchandise": {
+                                "__typename": "ProductVariant",
+                                "id": "gid://shopify/ProductVariant/500",
+                                "product": { "id": "gid://shopify/Product/1" }
+                            }
+                        },
+                        {
+                            "id": "gid://shopify/CartLine/1",
+                            "quantity": 3,
+                            "cost": { "amountPerQuantity": { "amount": "1.49" } },
+                            "merchandise": {
+                                "__typename": "ProductVariant",
+                                "id": "gid://shopify/ProductVariant/501",
+                                "product": { "id": "gid://shopify/Product/1" }
+                            }
+                        }
+                    ]
+                },
+                "shop": {
+                    "metafield": {
+                        "jsonValue": {
+                            "discounts": [
+                                {
+                                    "status": "live",
+                                    "members": [
+                                        { "productId": "gid://shopify/Product/1", "variantId": "gid://shopify/ProductVariant/500" },
+                                        { "productId": "gid://shopify/Product/1", "variantId": "gid://shopify/ProductVariant/501" }
+                                    ],
+                                    "tiers": [{ "minQty": 7, "percentOff": 4.0 }]
+                                }
+                            ]
+                        }
+                    }
+                },
+                "discount": { "discountClasses": ["PRODUCT"] }
+            }"#,
+        )?;
+        assert_eq!(result.operations.len(), 1);
+        match &result.operations[0] {
+            schema::CartOperation::ProductDiscountsAdd(op) => {
+                assert_eq!(op.candidates.len(), 2);
+                for c in &op.candidates {
+                    match &c.value {
+                        schema::ProductDiscountCandidateValue::Percentage(p) => assert_eq!(p.value.0, 4.0),
+                        _ => panic!("expected a Percentage value"),
+                    }
+                }
+            }
+            _ => panic!("expected ProductDiscountsAdd"),
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn uses_the_lowest_matching_line_price_when_matching_lines_have_different_prices() -> Result<()> {
+        // Defensive fail-safe: the admin app only allows fixed/anchor
+        // pricing when every member shares one base price at save time,
+        // but checkout could still see two matching lines at different
+        // prices (e.g. a selling plan). The Function must under-discount
+        // using the MINIMUM matching line's price, not compute an
+        // arbitrary/inflated total off whichever line it scanned last.
+        // Prior multi-price tests use two SEPARATE discounts; this is the
+        // first to put two differently-priced matching lines in ONE
+        // discount.
+        let result = run_function_with_input(
+            cart_lines_discounts_generate_run,
+            r#"{
+                "cart": {
+                    "lines": [
+                        {
+                            "id": "gid://shopify/CartLine/0",
+                            "quantity": 4,
+                            "cost": { "amountPerQuantity": { "amount": "1.49" } },
+                            "merchandise": {
+                                "__typename": "ProductVariant",
+                                "id": "gid://shopify/ProductVariant/500",
+                                "product": { "id": "gid://shopify/Product/1" }
+                            }
+                        },
+                        {
+                            "id": "gid://shopify/CartLine/1",
+                            "quantity": 3,
+                            "cost": { "amountPerQuantity": { "amount": "1.99" } },
+                            "merchandise": {
+                                "__typename": "ProductVariant",
+                                "id": "gid://shopify/ProductVariant/501",
+                                "product": { "id": "gid://shopify/Product/1" }
+                            }
+                        }
+                    ]
+                },
+                "shop": {
+                    "metafield": {
+                        "jsonValue": {
+                            "discounts": [
+                                {
+                                    "status": "live",
+                                    "members": [
+                                        { "productId": "gid://shopify/Product/1", "variantId": "gid://shopify/ProductVariant/500" },
+                                        { "productId": "gid://shopify/Product/1", "variantId": "gid://shopify/ProductVariant/501" }
+                                    ],
+                                    "tiers": [{ "minQty": 7, "percentOff": 0.0, "anchorPrice": 10.00 }]
+                                }
+                            ]
+                        }
+                    }
+                },
+                "discount": { "discountClasses": ["PRODUCT"] }
+            }"#,
+        )?;
+        assert_eq!(result.operations.len(), 1);
+        match &result.operations[0] {
+            schema::CartOperation::ProductDiscountsAdd(op) => {
+                assert_eq!(op.candidates.len(), 2);
+                let total: f64 = op
+                    .candidates
+                    .iter()
+                    .map(|c| match &c.value {
+                        schema::ProductDiscountCandidateValue::FixedAmount(f) => f.amount.0,
+                        _ => panic!("expected a FixedAmount value when the tier has an anchor"),
+                    })
+                    .sum();
+                // full_price at the MINIMUM matching price (1.49, not
+                // 1.99) for 7 total units = 10.43; anchored to 10.00 =>
+                // discount_amount_total = 0.43. If the fail-safe were
+                // broken (e.g. using 1.99 or the last-scanned price
+                // instead of the minimum), this total would come out
+                // higher than 0.43.
+                assert!((total - 0.43).abs() < 0.005, "expected total discount ~0.43 (using the MIN price 1.49), got {}", total);
             }
             _ => panic!("expected ProductDiscountsAdd"),
         }
