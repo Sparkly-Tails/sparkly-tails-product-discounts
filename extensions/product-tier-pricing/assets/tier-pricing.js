@@ -355,21 +355,26 @@ function buildMixMatchRows(products, cartItems) {
   })
 }
 
-// Cross-product siblings (unconditional) plus this product's own other
-// member-variants (excluding whichever one is currently selected/displayed —
-// showing "the exact variant you're looking at" as a list row would be
-// confusing). Own-variant rows link back to this same product with a
-// ?variant= query param so clicking one selects that flavour.
-function buildDisplayMixMatchItems(config, currentVariantId) {
-  const ownRows = (config.ownVariantOptions || [])
-    .filter((opt) => opt.variantId !== currentVariantId)
-    .map((opt) => ({
-      productId: config.productId,
-      variantId: opt.variantId,
-      title: opt.title,
-      handle: config.productHandle,
-      imageUrl: null,
-    }))
+// Cross-product siblings plus every one of this product's own other
+// member-variants, INCLUDING whichever one is currently selected/displayed.
+// Previously excluded the current variant on the theory that showing "the
+// exact one you're looking at" would be confusing — in practice that made
+// its cart quantity invisible everywhere in the widget (e.g. viewing
+// Chicken with 2 already in the cart: the list showed the other members'
+// counts but never Chicken's, so 5 real combined units looked like only 3
+// were accounted for). Cross-product siblings were never excluded this way
+// either, so this also makes same-product and cross-product members behave
+// consistently. Own-variant rows link back to this same product with a
+// ?variant= query param so clicking one selects that flavour (a no-op for
+// the row matching the currently-displayed variant).
+function buildDisplayMixMatchItems(config) {
+  const ownRows = (config.ownVariantOptions || []).map((opt) => ({
+    productId: config.productId,
+    variantId: opt.variantId,
+    title: opt.title,
+    handle: config.productHandle,
+    imageUrl: null,
+  }))
   return ownRows.concat(config.mixMatchListItems)
 }
 
@@ -665,7 +670,7 @@ if (typeof document !== 'undefined') {
       paintWidget(elements, viewModel, basePrice, addingQty, tierButtonsSignatureRef)
 
       if (config.isGroup && elements.listEl && !elements.listEl.hidden) {
-        renderMixMatchList(elements.listEl, buildDisplayMixMatchItems(config, variantStateRef.value), lastCartItems)
+        renderMixMatchList(elements.listEl, buildDisplayMixMatchItems(config), lastCartItems)
       }
     }
 
@@ -682,7 +687,7 @@ if (typeof document !== 'undefined') {
         open = !open
         elements.listEl.hidden = !open
         elements.toggleEl.textContent = 'mix & match products ' + (open ? '▲' : '▼')
-        if (open) renderMixMatchList(elements.listEl, buildDisplayMixMatchItems(config, variantStateRef.value), lastCartItems)
+        if (open) renderMixMatchList(elements.listEl, buildDisplayMixMatchItems(config), lastCartItems)
       })
     }
 
