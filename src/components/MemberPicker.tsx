@@ -55,9 +55,20 @@ export default function MemberPicker({
     const generation = ++generationRef.current
 
     debounceRef.current = setTimeout(async () => {
-      const matches = await searchProductsAction(value)
+      const matches = await searchProductsAction(value, excludeDiscountId)
       if (generation === generationRef.current) {
-        setResults(matches)
+        // Server already dropped anything claimed by ANOTHER discount; it
+        // has no way to know what's already in THIS in-progress, unsaved
+        // selection, so filter that out here. A single-variant product is
+        // dropped once it's selected; a multi-variant one only once every
+        // one of its variants has been added (variantCount lets us tell
+        // without a second round trip).
+        const filtered = matches.filter((m) => {
+          if (m.variantCount <= 1) return !isMemberSelected(selected, m.id, undefined)
+          const selectedCount = selected.filter((s) => s.productId === m.id).length
+          return selectedCount < m.variantCount
+        })
+        setResults(filtered)
         setSearching(false)
         setOpen(true)
       }
@@ -71,9 +82,12 @@ export default function MemberPicker({
     setError(null)
 
     if (candidate.variantCount > 1) {
-      const options = await getProductVariantsAction(candidate.id)
+      const options = await getProductVariantsAction(candidate.id, excludeDiscountId)
+      // Server already dropped variants claimed by ANOTHER discount; also
+      // drop whichever of this product's variants are already in the
+      // current, unsaved selection.
       setExpanding(candidate)
-      setVariantOptions(options)
+      setVariantOptions(options.filter((o) => !isMemberSelected(selected, candidate.id, o.variantId)))
       return
     }
 
