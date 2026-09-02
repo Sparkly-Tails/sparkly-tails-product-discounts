@@ -1,131 +1,47 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { getConfig, saveConfig, isProductAvailable, type Config } from '@/lib/config'
+import { getConfig, saveConfig, isProductAvailable, pricesUniform, type Config } from '@/lib/config'
 import * as shopifyClient from '@/lib/shopify-client'
 
 describe('getConfig', () => {
   beforeEach(() => vi.restoreAllMocks())
 
   it('parses the stored config JSON', async () => {
-    vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({
-      shop: { metafield: { value: JSON.stringify({ products: [{ productId: 'gid://shopify/Product/1', status: 'live', tiers: [{ minQty: 5, percentOff: 10 }] }] }) } },
-    })
-
-    const config = await getConfig()
-    expect(config).toEqual({
-      products: [{ productId: 'gid://shopify/Product/1', status: 'live', pricingMode: 'percent', title: '', tiers: [{ minQty: 5, percentOff: 10 }] }],
-      groups: [],
-    })
-  })
-
-  it('returns an empty product list when no metafield exists yet', async () => {
-    vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({ shop: { metafield: null } })
-
-    const config = await getConfig()
-    expect(config).toEqual({ products: [], groups: [] })
-  })
-
-  it('defaults groups to [] when the stored config predates the groups field', async () => {
-    vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({
-      shop: { metafield: { value: JSON.stringify({ products: [] }) } },
-    })
-    const config = await getConfig()
-    expect(config).toEqual({ products: [], groups: [] })
-  })
-
-  it('parses a stored config that includes groups', async () => {
     const stored = {
-      products: [],
-      groups: [
+      discounts: [
         {
-          groupId: 'grp_1',
-          name: 'Soups',
+          discountId: 'disc_1',
+          name: 'Tuna Soup',
+          title: 'Canagan Tuna Soup',
           status: 'live',
-          productIds: ['gid://shopify/Product/1', 'gid://shopify/Product/2'],
-          tiers: [{ minQty: 7, percentOff: 10 }],
+          pricingMode: 'percent',
+          members: [{ productId: 'gid://shopify/Product/1' }],
+          tiers: [{ minQty: 5, percentOff: 10 }],
         },
       ],
     }
     vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({
       shop: { metafield: { value: JSON.stringify(stored) } },
     })
+
     const config = await getConfig()
-    expect(config).toEqual({
-      products: [],
-      groups: [{ ...stored.groups[0], pricingMode: 'percent', title: 'Soups' }],
-    })
+    expect(config).toEqual(stored)
   })
 
-  it('defaults pricingMode to percent for a product discount stored before this field existed', async () => {
-    const stored = {
-      products: [{ productId: 'gid://shopify/Product/1', status: 'live', tiers: [{ minQty: 5, percentOff: 10 }] }],
-      groups: [],
-    }
-    vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({
-      shop: { metafield: { value: JSON.stringify(stored) } },
-    })
+  it('returns an empty discount list when no metafield exists yet', async () => {
+    vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({ shop: { metafield: null } })
+
     const config = await getConfig()
-    expect(config.products[0].pricingMode).toBe('percent')
+    expect(config).toEqual({ discounts: [] })
   })
 
-  it('defaults pricingMode to percent for a group discount stored before this field existed', async () => {
-    const stored = {
-      products: [],
-      groups: [{ groupId: 'grp_1', name: 'Soups', status: 'live', productIds: ['gid://shopify/Product/1', 'gid://shopify/Product/2'], tiers: [{ minQty: 7, percentOff: 10 }] }],
-    }
+  it('returns an empty discount list when the stored config predates the discounts field (old products/groups shape)', async () => {
+    const oldShape = { products: [], groups: [] }
     vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({
-      shop: { metafield: { value: JSON.stringify(stored) } },
+      shop: { metafield: { value: JSON.stringify(oldShape) } },
     })
-    const config = await getConfig()
-    expect(config.groups[0].pricingMode).toBe('percent')
-  })
 
-  it('preserves an explicit pricingMode of fixed', async () => {
-    const stored = {
-      products: [{ productId: 'gid://shopify/Product/1', status: 'live', pricingMode: 'fixed', tiers: [{ minQty: 1, fixedPrice: 1.70 }, { minQty: 3, fixedPrice: 1.50 }] }],
-      groups: [],
-    }
-    vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({
-      shop: { metafield: { value: JSON.stringify(stored) } },
-    })
     const config = await getConfig()
-    expect(config.products[0]).toEqual({ ...stored.products[0], title: '' })
-  })
-
-  it('defaults title to an empty string for a product discount stored before this field existed', async () => {
-    const stored = {
-      products: [{ productId: 'gid://shopify/Product/1', status: 'live', pricingMode: 'percent', tiers: [{ minQty: 5, percentOff: 10 }] }],
-      groups: [],
-    }
-    vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({
-      shop: { metafield: { value: JSON.stringify(stored) } },
-    })
-    const config = await getConfig()
-    expect(config.products[0].title).toBe('')
-  })
-
-  it('defaults title to the group\'s existing name for a group discount stored before this field existed', async () => {
-    const stored = {
-      products: [],
-      groups: [{ groupId: 'grp_1', name: 'Soups', status: 'live', pricingMode: 'percent', productIds: ['gid://shopify/Product/1', 'gid://shopify/Product/2'], tiers: [{ minQty: 7, percentOff: 10 }] }],
-    }
-    vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({
-      shop: { metafield: { value: JSON.stringify(stored) } },
-    })
-    const config = await getConfig()
-    expect(config.groups[0].title).toBe('Soups')
-  })
-
-  it('preserves an explicit title over the backfilled default', async () => {
-    const stored = {
-      products: [{ productId: 'gid://shopify/Product/1', status: 'live', pricingMode: 'percent', title: 'Canagan Tuna Soup', tiers: [{ minQty: 5, percentOff: 10 }] }],
-      groups: [{ groupId: 'grp_1', name: 'Soups', status: 'live', pricingMode: 'percent', title: 'Canagan treat', productIds: ['gid://shopify/Product/1'], tiers: [{ minQty: 7, percentOff: 10 }] }],
-    }
-    vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({
-      shop: { metafield: { value: JSON.stringify(stored) } },
-    })
-    const config = await getConfig()
-    expect(config.products[0].title).toBe('Canagan Tuna Soup')
-    expect(config.groups[0].title).toBe('Canagan treat')
+    expect(config).toEqual({ discounts: [] })
   })
 })
 
@@ -137,7 +53,14 @@ describe('saveConfig', () => {
     shopIdSpy.mockResolvedValueOnce({ shop: { id: 'gid://shopify/Shop/1' } })
     shopIdSpy.mockResolvedValueOnce({ metafieldsSet: { userErrors: [] } })
 
-    const config: Config = { products: [{ productId: 'gid://shopify/Product/1', status: 'draft', pricingMode: 'percent', title: 'Some Title', tiers: [] }], groups: [] }
+    const config: Config = {
+      discounts: [
+        {
+          discountId: 'disc_1', name: 'Tuna Soup', title: 'Some Title', status: 'draft',
+          pricingMode: 'percent', members: [{ productId: 'gid://shopify/Product/1' }], tiers: [],
+        },
+      ],
+    }
     await saveConfig(config)
 
     expect(shopIdSpy).toHaveBeenCalledTimes(2)
@@ -162,35 +85,69 @@ describe('saveConfig', () => {
     shopIdSpy.mockResolvedValueOnce({ shop: { id: 'gid://shopify/Shop/1' } })
     shopIdSpy.mockResolvedValueOnce({ metafieldsSet: { userErrors: [{ field: ['value'], message: 'Invalid JSON' }] } })
 
-    await expect(saveConfig({ products: [], groups: [] })).rejects.toThrow('Invalid JSON')
+    await expect(saveConfig({ discounts: [] })).rejects.toThrow('Invalid JSON')
   })
 })
 
 describe('isProductAvailable', () => {
   const baseConfig: Config = {
-    products: [{ productId: 'gid://shopify/Product/1', status: 'draft', pricingMode: 'percent', title: 'Some Title', tiers: [] }],
-    groups: [
-      { groupId: 'grp_a', name: 'A', status: 'draft', pricingMode: 'percent', title: 'Some Title', productIds: ['gid://shopify/Product/2'], tiers: [] },
+    discounts: [
+      {
+        discountId: 'disc_1', name: 'Solo', title: 'Solo', status: 'draft', pricingMode: 'percent',
+        members: [{ productId: 'gid://shopify/Product/1' }],
+        tiers: [],
+      },
+      {
+        discountId: 'disc_2', name: 'Flavours', title: 'Flavours', status: 'draft', pricingMode: 'percent',
+        members: [
+          { productId: 'gid://shopify/Product/2', variantId: 'gid://shopify/ProductVariant/20' },
+          { productId: 'gid://shopify/Product/3' },
+        ],
+        tiers: [],
+      },
     ],
   }
 
-  it('is false for a product already in a standalone discount', () => {
-    expect(isProductAvailable(baseConfig, 'gid://shopify/Product/1')).toBe(false)
+  it('is false for a whole product already claimed by another discount', () => {
+    expect(isProductAvailable(baseConfig, 'gid://shopify/Product/1', undefined)).toBe(false)
   })
 
-  it('is false for a product already in another group', () => {
-    expect(isProductAvailable(baseConfig, 'gid://shopify/Product/2')).toBe(false)
+  it('is false for a product already claimed as a whole-product member', () => {
+    expect(isProductAvailable(baseConfig, 'gid://shopify/Product/3', undefined)).toBe(false)
   })
 
-  it('is true for a product in neither', () => {
-    expect(isProductAvailable(baseConfig, 'gid://shopify/Product/3')).toBe(true)
+  it('is false for the exact same variant already claimed', () => {
+    expect(isProductAvailable(baseConfig, 'gid://shopify/Product/2', 'gid://shopify/ProductVariant/20')).toBe(false)
   })
 
-  it('is true for a product already in the group being excluded', () => {
-    expect(isProductAvailable(baseConfig, 'gid://shopify/Product/2', 'grp_a')).toBe(true)
+  it('is true for a different variant of a product that only has one specific variant claimed', () => {
+    expect(isProductAvailable(baseConfig, 'gid://shopify/Product/2', 'gid://shopify/ProductVariant/21')).toBe(true)
   })
 
-  it('is still false for a product in a different, non-excluded group', () => {
-    expect(isProductAvailable(baseConfig, 'gid://shopify/Product/2', 'grp_other')).toBe(false)
+  it('is true for a product in no discount', () => {
+    expect(isProductAvailable(baseConfig, 'gid://shopify/Product/4', undefined)).toBe(true)
+  })
+
+  it('is true for a member already claimed by the discount being excluded', () => {
+    expect(isProductAvailable(baseConfig, 'gid://shopify/Product/1', undefined, 'disc_1')).toBe(true)
+  })
+})
+
+describe('pricesUniform', () => {
+  it('is true for zero or one price', () => {
+    expect(pricesUniform([])).toBe(true)
+    expect(pricesUniform([1.49])).toBe(true)
+  })
+
+  it('is true when all prices match exactly', () => {
+    expect(pricesUniform([1.49, 1.49, 1.49])).toBe(true)
+  })
+
+  it('is true when prices match within floating-point tolerance', () => {
+    expect(pricesUniform([1.1 + 0.39, 1.49])).toBe(true)
+  })
+
+  it('is false when any price differs', () => {
+    expect(pricesUniform([1.49, 1.59])).toBe(false)
   })
 })

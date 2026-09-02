@@ -1,62 +1,92 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { syncProductTierMetafield, syncGroupTierMetafield } from '@/lib/product-tiers'
+import { syncDiscountMetafields, clearDiscountMetafields } from '@/lib/product-tiers'
 import * as shopifyClient from '@/lib/shopify-client'
+import * as products from '@/lib/products'
+import type { Discount } from '@/lib/config'
 
-describe('syncProductTierMetafield', () => {
+describe('syncDiscountMetafields', () => {
   beforeEach(() => vi.restoreAllMocks())
 
-  it('writes the tiers JSON to the product metafield', async () => {
-    const querySpy = vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({
-      metafieldsSet: { userErrors: [] },
+  it('writes one metafield per unique product, with ownVariantIds and per-member siblings', async () => {
+    vi.spyOn(products, 'getMemberInfo').mockResolvedValue([
+      { productId: 'gid://shopify/Product/1', variantId: undefined, title: 'Tuna Soup', price: 1.49, handle: 'tuna-soup', imageUrl: null },
+      { productId: 'gid://shopify/Product/2', variantId: 'gid://shopify/ProductVariant/20', title: 'Wet Cat Food – Chicken', price: 1.49, handle: 'wet-cat-food', imageUrl: 'https://x/c.png' },
+      { productId: 'gid://shopify/Product/2', variantId: 'gid://shopify/ProductVariant/21', title: 'Wet Cat Food – Salmon', price: 1.49, handle: 'wet-cat-food', imageUrl: 'https://x/s.png' },
+    ])
+    const querySpy = vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({ metafieldsSet: { userErrors: [] } })
+
+    const discount: Discount = {
+      discountId: 'disc_1', name: 'Mix', title: 'Mix & Match', status: 'live', pricingMode: 'percent',
+      members: [
+        { productId: 'gid://shopify/Product/1' },
+        { productId: 'gid://shopify/Product/2', variantId: 'gid://shopify/ProductVariant/20' },
+        { productId: 'gid://shopify/Product/2', variantId: 'gid://shopify/ProductVariant/21' },
+      ],
+      tiers: [{ minQty: 7, percentOff: 4 }],
+    }
+
+    await syncDiscountMetafields(discount)
+
+    expect(querySpy).toHaveBeenCalledTimes(2)
+
+    const call1 = querySpy.mock.calls.find((c) => (c[1] as { metafields: { ownerId: string }[] }).metafields[0].ownerId === 'gid://shopify/Product/1')!
+    const parsed1 = JSON.parse((call1[1] as { metafields: { value: string }[] }).metafields[0].value)
+    expect(parsed1).toEqual({
+      discountId: 'disc_1',
+      title: 'Mix & Match',
+      pricingMode: 'percent',
+      tiers: [{ minQty: 7, percentOff: 4 }],
+      ownVariantIds: null,
+      ownVariantOptions: null,
+      siblings: [
+        { productId: 'gid://shopify/Product/2', title: 'Wet Cat Food – Chicken', handle: 'wet-cat-food', variantId: 'gid://shopify/ProductVariant/20', imageUrl: 'https://x/c.png' },
+        { productId: 'gid://shopify/Product/2', title: 'Wet Cat Food – Salmon', handle: 'wet-cat-food', variantId: 'gid://shopify/ProductVariant/21', imageUrl: 'https://x/s.png' },
+      ],
     })
 
-    await syncProductTierMetafield('gid://shopify/Product/1', [{ minQty: 7, percentOff: 5 }], 'Chicken Soup')
-
-    expect(querySpy).toHaveBeenCalledWith(
-      expect.stringContaining('metafieldsSet'),
-      {
-        metafields: [
-          {
-            ownerId: 'gid://shopify/Product/1',
-            namespace: 'sparkly_product_discounts',
-            key: 'tiers',
-            type: 'json',
-            value: JSON.stringify({ title: 'Chicken Soup', tiers: [{ minQty: 7, percentOff: 5 }] }),
-          },
-        ],
-      },
-    )
-  })
-
-  it('deletes the metafield when tiers is null', async () => {
-    const querySpy = vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({
-      metafieldsDelete: { userErrors: [] },
-    })
-
-    await syncProductTierMetafield('gid://shopify/Product/1', null, 'Chicken Soup')
-
-    expect(querySpy).toHaveBeenCalledWith(
-      expect.stringContaining('metafieldsDelete'),
-      {
-        metafields: [
-          {
-            ownerId: 'gid://shopify/Product/1',
-            namespace: 'sparkly_product_discounts',
-            key: 'tiers',
-          },
-        ],
-      },
-    )
+    const call2 = querySpy.mock.calls.find((c) => (c[1] as { metafields: { ownerId: string }[] }).metafields[0].ownerId === 'gid://shopify/Product/2')!
+    const parsed2 = JSON.parse((call2[1] as { metafields: { value: string }[] }).metafields[0].value)
+    expect(parsed2.ownVariantIds).toEqual(['gid://shopify/ProductVariant/20', 'gid://shopify/ProductVariant/21'])
+    expect(parsed2.ownVariantOptions).toEqual([
+      { variantId: 'gid://shopify/ProductVariant/20', title: 'Chicken' },
+      { variantId: 'gid://shopify/ProductVariant/21', title: 'Salmon' },
+    ])
+    expect(parsed2.siblings).toEqual([
+      { productId: 'gid://shopify/Product/1', title: 'Tuna Soup', handle: 'tuna-soup', variantId: undefined, imageUrl: null },
+    ])
   })
 
   it('throws when metafieldsSet reports userErrors', async () => {
+    vi.spyOn(products, 'getMemberInfo').mockResolvedValue([
+      { productId: 'gid://shopify/Product/1', variantId: undefined, title: 'Tuna Soup', price: 1.49, handle: 'tuna-soup', imageUrl: null },
+    ])
     vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({
       metafieldsSet: { userErrors: [{ field: ['value'], message: 'Invalid JSON' }] },
     })
 
-    await expect(
-      syncProductTierMetafield('gid://shopify/Product/1', [{ minQty: 5, percentOff: 10 }], 'Chicken Soup'),
-    ).rejects.toThrow('Invalid JSON')
+    const discount: Discount = {
+      discountId: 'disc_1', name: 'Mix', title: 'Mix & Match', status: 'live', pricingMode: 'percent',
+      members: [{ productId: 'gid://shopify/Product/1' }],
+      tiers: [{ minQty: 7, percentOff: 4 }],
+    }
+
+    await expect(syncDiscountMetafields(discount)).rejects.toThrow('Invalid JSON')
+  })
+})
+
+describe('clearDiscountMetafields', () => {
+  beforeEach(() => vi.restoreAllMocks())
+
+  it('deletes the discount metafield for every unique product', async () => {
+    const querySpy = vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({ metafieldsDelete: { userErrors: [] } })
+
+    await clearDiscountMetafields([
+      { productId: 'gid://shopify/Product/1' },
+      { productId: 'gid://shopify/Product/2' },
+      { productId: 'gid://shopify/Product/2' },
+    ])
+
+    expect(querySpy).toHaveBeenCalledTimes(2)
   })
 
   it('throws when metafieldsDelete reports userErrors', async () => {
@@ -64,114 +94,8 @@ describe('syncProductTierMetafield', () => {
       metafieldsDelete: { userErrors: [{ field: ['metafields'], message: 'Not found' }] },
     })
 
-    await expect(syncProductTierMetafield('gid://shopify/Product/1', null, 'Chicken Soup')).rejects.toThrow('Not found')
-  })
-
-  it('includes the title in the synced tiers metafield JSON', async () => {
-    const spy = vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({
-      metafieldsSet: { userErrors: [] },
-    })
-
-    await syncProductTierMetafield('gid://shopify/Product/1', [{ minQty: 5, percentOff: 10 }], 'Canagan Tuna Soup')
-
-    expect(spy).toHaveBeenCalledWith(
-      expect.stringContaining('metafieldsSet'),
-      expect.objectContaining({
-        metafields: [
-          expect.objectContaining({
-            value: JSON.stringify({ title: 'Canagan Tuna Soup', tiers: [{ minQty: 5, percentOff: 10 }] }),
-          }),
-        ],
-      }),
-    )
-  })
-})
-
-describe('syncGroupTierMetafield', () => {
-  beforeEach(() => vi.restoreAllMocks())
-
-  it('writes the group tiers + siblings JSON to the product metafield', async () => {
-    const querySpy = vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({
-      metafieldsSet: { userErrors: [] },
-    })
-
-    await syncGroupTierMetafield('gid://shopify/Product/1', {
-      title: 'Canagan treat',
-      tiers: [{ minQty: 7, percentOff: 10 }],
-      siblings: [{ title: 'Chicken Soup', handle: 'chicken-soup' }],
-    })
-
-    expect(querySpy).toHaveBeenCalledWith(
-      expect.stringContaining('metafieldsSet'),
-      {
-        metafields: [
-          {
-            ownerId: 'gid://shopify/Product/1',
-            namespace: 'sparkly_product_discounts',
-            key: 'group',
-            type: 'json',
-            value: JSON.stringify({
-              title: 'Canagan treat',
-              tiers: [{ minQty: 7, percentOff: 10 }],
-              siblings: [{ title: 'Chicken Soup', handle: 'chicken-soup' }],
-            }),
-          },
-        ],
-      },
-    )
-  })
-
-  it('deletes the metafield when data is null', async () => {
-    const querySpy = vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({
-      metafieldsDelete: { userErrors: [] },
-    })
-
-    await syncGroupTierMetafield('gid://shopify/Product/1', null)
-
-    expect(querySpy).toHaveBeenCalledWith(
-      expect.stringContaining('metafieldsDelete'),
-      {
-        metafields: [
-          { ownerId: 'gid://shopify/Product/1', namespace: 'sparkly_product_discounts', key: 'group' },
-        ],
-      },
-    )
-  })
-
-  it('throws when metafieldsSet reports userErrors', async () => {
-    vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({
-      metafieldsSet: { userErrors: [{ field: ['value'], message: 'Invalid JSON' }] },
-    })
-
     await expect(
-      syncGroupTierMetafield('gid://shopify/Product/1', { title: 'Canagan treat', tiers: [], siblings: [] }),
-    ).rejects.toThrow('Invalid JSON')
-  })
-
-  it('includes the title in the synced group metafield JSON', async () => {
-    const spy = vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({
-      metafieldsSet: { userErrors: [] },
-    })
-
-    await syncGroupTierMetafield('gid://shopify/Product/1', {
-      title: 'Canagan treat',
-      tiers: [{ minQty: 7, percentOff: 10 }],
-      siblings: [{ title: 'Canagan Duck Pouch', handle: 'canagan-duck-pouch' }],
-    })
-
-    expect(spy).toHaveBeenCalledWith(
-      expect.stringContaining('metafieldsSet'),
-      expect.objectContaining({
-        metafields: [
-          expect.objectContaining({
-            value: JSON.stringify({
-              title: 'Canagan treat',
-              tiers: [{ minQty: 7, percentOff: 10 }],
-              siblings: [{ title: 'Canagan Duck Pouch', handle: 'canagan-duck-pouch' }],
-            }),
-          }),
-        ],
-      }),
-    )
+      clearDiscountMetafields([{ productId: 'gid://shopify/Product/1' }]),
+    ).rejects.toThrow('Not found')
   })
 })

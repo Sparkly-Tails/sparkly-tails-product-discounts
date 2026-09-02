@@ -1,14 +1,39 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import TierFields from '@/components/TierFields'
 import FixedPriceTierFields from '@/components/FixedPriceTierFields'
 
-export default function PricingModeTierFields() {
-  const [mode, setMode] = useState<'percent' | 'fixed'>('percent')
+export default function PricingModeTierFields({
+  allowPriceBasedModes,
+  initial,
+}: {
+  allowPriceBasedModes: boolean
+  initial?: {
+    percentTiers?: { minQty: number; percentOff: number; anchorPrice?: number }[]
+    fixedTiers?: { minQty: number; fixedPrice: number }[]
+    startMode?: 'percent' | 'fixed'
+  }
+}) {
+  const [mode, setMode] = useState<'percent' | 'fixed'>(
+    allowPriceBasedModes ? (initial?.startMode ?? 'percent') : 'percent',
+  )
+
+  // If membership changes after mount (e.g. the picker adds a
+  // differently-priced member) and fixed mode is no longer valid, fall
+  // back to percent rather than leaving an invalid mode selected.
+  useEffect(() => {
+    if (!allowPriceBasedModes && mode === 'fixed') setMode('percent')
+  }, [allowPriceBasedModes, mode])
 
   return (
     <div className="space-y-4">
+      {!allowPriceBasedModes && (
+        <p className="text-xs text-muted">
+          These products/variants have different prices, so only a percentage discount is available.
+        </p>
+      )}
+
       <div className="flex gap-4">
         <label className="flex items-center gap-2 text-sm">
           <input
@@ -20,21 +45,23 @@ export default function PricingModeTierFields() {
           />
           Percentage off
         </label>
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="radio"
-            name="pricingMode"
-            value="fixed"
-            checked={mode === 'fixed'}
-            onChange={() => setMode('fixed')}
-          />
-          Fixed price
-        </label>
+        {allowPriceBasedModes && (
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="radio"
+              name="pricingMode"
+              value="fixed"
+              checked={mode === 'fixed'}
+              onChange={() => setMode('fixed')}
+            />
+            Fixed price
+          </label>
+        )}
       </div>
 
       {mode === 'percent' ? (
         <>
-          <TierFields />
+          <TierFields initial={initial?.percentTiers} allowAnchorPrice={allowPriceBasedModes} />
           <p className="text-xs text-muted mt-2">
             Enter percent-off directly. The next screen shows the actual
             resulting price before you go live.
@@ -42,7 +69,7 @@ export default function PricingModeTierFields() {
         </>
       ) : (
         <>
-          <FixedPriceTierFields />
+          <FixedPriceTierFields initial={initial?.fixedTiers} />
           <p className="text-xs text-muted mt-2">
             Enter the exact price each customer pays per unit at that
             quantity — no percentage math needed.

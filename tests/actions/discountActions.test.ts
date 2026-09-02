@@ -1,1026 +1,429 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import {
-  createDiscount, updateTiers, updateTitle, setStatus, deleteDiscount,
-  createGroup, updateGroupProducts, updateGroupTiers, updateGroupTitle, setGroupStatus, deleteGroup,
+  createDiscount, updateDiscountMembers, updateDiscountTiers, updateDiscountTitle, setDiscountStatus, deleteDiscount,
 } from '@/actions/discountActions'
 import * as configLib from '@/lib/config'
 import * as authRedirect from '@/lib/auth-redirect'
 import * as productTiers from '@/lib/product-tiers'
 import * as products from '@/lib/products'
+import type { Config, Discount } from '@/lib/config'
 
 vi.mock('@/lib/auth-redirect', () => ({ redirectWithToken: vi.fn() }))
+
+function memberFormData(members: { productId: string; variantId?: string }[], extra: Record<string, string> = {}) {
+  const fd = new FormData()
+  members.forEach((m, i) => {
+    fd.set(`member-${i}-productId`, m.productId)
+    if (m.variantId) fd.set(`member-${i}-variantId`, m.variantId)
+  })
+  Object.entries(extra).forEach(([k, v]) => fd.set(k, v))
+  return fd
+}
 
 describe('createDiscount', () => {
   beforeEach(() => vi.restoreAllMocks())
 
-  it('adds a new product discount with parsed tiers', async () => {
-    vi.spyOn(configLib, 'getConfig').mockResolvedValue({ products: [], groups: [] })
+  it('creates a single-member discount with parsed tiers', async () => {
+    vi.spyOn(configLib, 'getConfig').mockResolvedValue({ discounts: [] })
     const saveSpy = vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
+    vi.spyOn(products, 'getMemberInfo').mockResolvedValue([
+      { productId: 'gid://shopify/Product/1', variantId: undefined, title: 'Tuna Soup', price: 1.49, handle: 'tuna-soup', imageUrl: null },
+    ])
 
-    const formData = new FormData()
-    formData.set('productId', 'gid://shopify/Product/111')
-    formData.set('title', 'Tuna Soup')
-    formData.set('tier-0-minQty', '5')
-    formData.set('tier-0-percentOff', '10')
+    const formData = memberFormData(
+      [{ productId: 'gid://shopify/Product/1' }],
+      { name: 'Tuna Soup', title: 'Tuna Soup', 'tier-0-minQty': '5', 'tier-0-percentOff': '10' },
+    )
 
     await createDiscount(formData)
 
     expect(saveSpy).toHaveBeenCalledWith({
-      products: [{ productId: 'gid://shopify/Product/111', status: 'draft', pricingMode: 'percent', title: 'Tuna Soup', tiers: [{ minQty: 5, percentOff: 10 }] }],
-      groups: [],
+      discounts: [{
+        discountId: expect.stringMatching(/^disc_/),
+        name: 'Tuna Soup', title: 'Tuna Soup', status: 'draft', pricingMode: 'percent',
+        members: [{ productId: 'gid://shopify/Product/1' }],
+        tiers: [{ minQty: 5, percentOff: 10 }],
+      }],
     })
-    expect(authRedirect.redirectWithToken).toHaveBeenCalledWith('/discounts/gid%3A%2F%2Fshopify%2FProduct%2F111')
+    expect(authRedirect.redirectWithToken).toHaveBeenCalledWith(expect.stringMatching(/^\/discounts\/disc_/))
+  })
+
+  it('creates a multi-member discount mixing a whole product and a specific variant', async () => {
+    vi.spyOn(configLib, 'getConfig').mockResolvedValue({ discounts: [] })
+    const saveSpy = vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
+    vi.spyOn(products, 'getMemberInfo').mockResolvedValue([
+      { productId: 'gid://shopify/Product/1', variantId: undefined, title: 'Tuna Soup', price: 1.49, handle: 'tuna-soup', imageUrl: null },
+      { productId: 'gid://shopify/Product/2', variantId: 'gid://shopify/ProductVariant/20', title: 'Wet Cat Food – Chicken', price: 1.49, handle: 'wet-cat-food', imageUrl: null },
+    ])
+
+    const formData = memberFormData(
+      [{ productId: 'gid://shopify/Product/1' }, { productId: 'gid://shopify/Product/2', variantId: 'gid://shopify/ProductVariant/20' }],
+      { name: 'Mix', title: 'Mix', 'tier-0-minQty': '7', 'tier-0-percentOff': '4' },
+    )
+
+    await createDiscount(formData)
+
+    expect(saveSpy).toHaveBeenCalledWith(expect.objectContaining({
+      discounts: [expect.objectContaining({
+        members: [
+          { productId: 'gid://shopify/Product/1' },
+          { productId: 'gid://shopify/Product/2', variantId: 'gid://shopify/ProductVariant/20' },
+        ],
+      })],
+    }))
+  })
+
+  it('rejects fixedPrice tiers when members have different prices', async () => {
+    vi.spyOn(configLib, 'getConfig').mockResolvedValue({ discounts: [] })
+    vi.spyOn(products, 'getMemberInfo').mockResolvedValue([
+      { productId: 'gid://shopify/Product/1', variantId: undefined, title: 'A', price: 1.49, handle: 'a', imageUrl: null },
+      { productId: 'gid://shopify/Product/2', variantId: undefined, title: 'B', price: 1.59, handle: 'b', imageUrl: null },
+    ])
+
+    const formData = memberFormData(
+      [{ productId: 'gid://shopify/Product/1' }, { productId: 'gid://shopify/Product/2' }],
+      { name: 'Mix', title: 'Mix', pricingMode: 'fixed', 'tier-0-minQty': '3', 'tier-0-fixedPrice': '1.20' },
+    )
+
+    await expect(createDiscount(formData)).rejects.toThrow(/different prices/)
+  })
+
+  it('rejects an anchorPrice tier when members have different prices', async () => {
+    vi.spyOn(configLib, 'getConfig').mockResolvedValue({ discounts: [] })
+    vi.spyOn(products, 'getMemberInfo').mockResolvedValue([
+      { productId: 'gid://shopify/Product/1', variantId: undefined, title: 'A', price: 1.49, handle: 'a', imageUrl: null },
+      { productId: 'gid://shopify/Product/2', variantId: undefined, title: 'B', price: 1.59, handle: 'b', imageUrl: null },
+    ])
+
+    const formData = memberFormData(
+      [{ productId: 'gid://shopify/Product/1' }, { productId: 'gid://shopify/Product/2' }],
+      { name: 'Mix', title: 'Mix', 'tier-0-minQty': '7', 'tier-0-percentOff': '4', 'tier-0-anchorPrice': '10' },
+    )
+
+    await expect(createDiscount(formData)).rejects.toThrow(/different prices/)
+  })
+
+  it('allows plain percent tiers (no anchor) when members have different prices', async () => {
+    vi.spyOn(configLib, 'getConfig').mockResolvedValue({ discounts: [] })
+    const saveSpy = vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
+    vi.spyOn(products, 'getMemberInfo').mockResolvedValue([
+      { productId: 'gid://shopify/Product/1', variantId: undefined, title: 'A', price: 1.49, handle: 'a', imageUrl: null },
+      { productId: 'gid://shopify/Product/2', variantId: undefined, title: 'B', price: 1.59, handle: 'b', imageUrl: null },
+    ])
+
+    const formData = memberFormData(
+      [{ productId: 'gid://shopify/Product/1' }, { productId: 'gid://shopify/Product/2' }],
+      { name: 'Mix', title: 'Mix', 'tier-0-minQty': '7', 'tier-0-percentOff': '4' },
+    )
+
+    await createDiscount(formData)
+    expect(saveSpy).toHaveBeenCalled()
+  })
+
+  it('rejects when a member is already claimed by another discount', async () => {
+    const existing: Config = {
+      discounts: [{
+        discountId: 'disc_x', name: 'X', title: 'X', status: 'live', pricingMode: 'percent',
+        members: [{ productId: 'gid://shopify/Product/1' }], tiers: [],
+      }],
+    }
+    vi.spyOn(configLib, 'getConfig').mockResolvedValue(existing)
+    vi.spyOn(products, 'getMemberInfo').mockResolvedValue([
+      { productId: 'gid://shopify/Product/1', variantId: undefined, title: 'A', price: 1.49, handle: 'a', imageUrl: null },
+    ])
+
+    const formData = memberFormData(
+      [{ productId: 'gid://shopify/Product/1' }],
+      { name: 'Dup', title: 'Dup', 'tier-0-minQty': '5', 'tier-0-percentOff': '10' },
+    )
+
+    await expect(createDiscount(formData)).rejects.toThrow(/already/)
+  })
+})
+
+describe('updateDiscountMembers', () => {
+  beforeEach(() => vi.restoreAllMocks())
+
+  it('rejects a member set with different prices when the stored discount is fixed-price', async () => {
+    const discount: Discount = {
+      discountId: 'disc_1', name: 'A', title: 'A', status: 'draft', pricingMode: 'fixed',
+      members: [{ productId: 'gid://shopify/Product/1' }], tiers: [{ minQty: 3, fixedPrice: 1.20 }],
+    }
+    vi.spyOn(configLib, 'getConfig').mockResolvedValue({ discounts: [discount] })
+    vi.spyOn(products, 'getMemberInfo').mockResolvedValue([
+      { productId: 'gid://shopify/Product/1', variantId: undefined, title: 'A', price: 1.49, handle: 'a', imageUrl: null },
+      { productId: 'gid://shopify/Product/2', variantId: undefined, title: 'B', price: 1.59, handle: 'b', imageUrl: null },
+    ])
+
+    const formData = memberFormData([{ productId: 'gid://shopify/Product/1' }, { productId: 'gid://shopify/Product/2' }])
+
+    await expect(updateDiscountMembers('disc_1', formData)).rejects.toThrow(/different prices/)
+  })
+
+  it('rejects a member set with different prices when a stored tier has an anchorPrice', async () => {
+    const discount: Discount = {
+      discountId: 'disc_1', name: 'A', title: 'A', status: 'draft', pricingMode: 'percent',
+      members: [{ productId: 'gid://shopify/Product/1' }], tiers: [{ minQty: 7, percentOff: 4, anchorPrice: 10 }],
+    }
+    vi.spyOn(configLib, 'getConfig').mockResolvedValue({ discounts: [discount] })
+    vi.spyOn(products, 'getMemberInfo').mockResolvedValue([
+      { productId: 'gid://shopify/Product/1', variantId: undefined, title: 'A', price: 1.49, handle: 'a', imageUrl: null },
+      { productId: 'gid://shopify/Product/2', variantId: undefined, title: 'B', price: 1.59, handle: 'b', imageUrl: null },
+    ])
+
+    const formData = memberFormData([{ productId: 'gid://shopify/Product/1' }, { productId: 'gid://shopify/Product/2' }])
+
+    await expect(updateDiscountMembers('disc_1', formData)).rejects.toThrow(/different prices/)
+  })
+
+  it('allows a member set with different prices when the stored tiers are plain percent (no anchor)', async () => {
+    const discount: Discount = {
+      discountId: 'disc_1', name: 'A', title: 'A', status: 'draft', pricingMode: 'percent',
+      members: [{ productId: 'gid://shopify/Product/1' }], tiers: [{ minQty: 7, percentOff: 4 }],
+    }
+    vi.spyOn(configLib, 'getConfig').mockResolvedValue({ discounts: [discount] })
+    const saveSpy = vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
+    vi.spyOn(products, 'getMemberInfo').mockResolvedValue([
+      { productId: 'gid://shopify/Product/1', variantId: undefined, title: 'A', price: 1.49, handle: 'a', imageUrl: null },
+      { productId: 'gid://shopify/Product/2', variantId: undefined, title: 'B', price: 1.59, handle: 'b', imageUrl: null },
+    ])
+
+    const formData = memberFormData([{ productId: 'gid://shopify/Product/1' }, { productId: 'gid://shopify/Product/2' }])
+
+    await updateDiscountMembers('disc_1', formData)
+
+    expect(saveSpy).toHaveBeenCalledWith({
+      discounts: [expect.objectContaining({
+        discountId: 'disc_1',
+        members: [{ productId: 'gid://shopify/Product/1' }, { productId: 'gid://shopify/Product/2' }],
+      })],
+    })
+  })
+
+  it('allows a member set with uniform prices regardless of pricing mode', async () => {
+    const discount: Discount = {
+      discountId: 'disc_1', name: 'A', title: 'A', status: 'draft', pricingMode: 'fixed',
+      members: [{ productId: 'gid://shopify/Product/1' }], tiers: [{ minQty: 3, fixedPrice: 1.20 }],
+    }
+    vi.spyOn(configLib, 'getConfig').mockResolvedValue({ discounts: [discount] })
+    const saveSpy = vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
+    vi.spyOn(products, 'getMemberInfo').mockResolvedValue([
+      { productId: 'gid://shopify/Product/1', variantId: undefined, title: 'A', price: 1.49, handle: 'a', imageUrl: null },
+      { productId: 'gid://shopify/Product/2', variantId: undefined, title: 'B', price: 1.49, handle: 'b', imageUrl: null },
+    ])
+
+    const formData = memberFormData([{ productId: 'gid://shopify/Product/1' }, { productId: 'gid://shopify/Product/2' }])
+
+    await updateDiscountMembers('disc_1', formData)
+
+    expect(saveSpy).toHaveBeenCalledWith({
+      discounts: [expect.objectContaining({
+        discountId: 'disc_1',
+        members: [{ productId: 'gid://shopify/Product/1' }, { productId: 'gid://shopify/Product/2' }],
+      })],
+    })
+  })
+
+  it('clears metafields for a product removed from a live discount and re-syncs the rest', async () => {
+    const discount: Discount = {
+      discountId: 'disc_1', name: 'A', title: 'A', status: 'live', pricingMode: 'percent',
+      members: [{ productId: 'gid://shopify/Product/1' }, { productId: 'gid://shopify/Product/2' }],
+      tiers: [{ minQty: 7, percentOff: 4 }],
+    }
+    vi.spyOn(configLib, 'getConfig').mockResolvedValue({ discounts: [discount] })
+    const saveSpy = vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
+    const clearSpy = vi.spyOn(productTiers, 'clearDiscountMetafields').mockResolvedValue()
+    const syncSpy = vi.spyOn(productTiers, 'syncDiscountMetafields').mockResolvedValue()
+    vi.spyOn(products, 'getMemberInfo').mockResolvedValue([
+      { productId: 'gid://shopify/Product/1', variantId: undefined, title: 'A', price: 1.49, handle: 'a', imageUrl: null },
+    ])
+
+    const formData = memberFormData([{ productId: 'gid://shopify/Product/1' }])
+
+    await updateDiscountMembers('disc_1', formData)
+
+    expect(saveSpy).toHaveBeenCalledWith({
+      discounts: [expect.objectContaining({
+        discountId: 'disc_1',
+        members: [{ productId: 'gid://shopify/Product/1' }],
+      })],
+    })
+    expect(clearSpy).toHaveBeenCalledWith([{ productId: 'gid://shopify/Product/2' }])
+    expect(syncSpy).toHaveBeenCalledWith(expect.objectContaining({
+      discountId: 'disc_1',
+      members: [{ productId: 'gid://shopify/Product/1' }],
+    }))
+  })
+})
+
+describe('updateDiscountTiers', () => {
+  beforeEach(() => vi.restoreAllMocks())
+
+  it('rejects a submitted fixedPrice tier when the stored members have different prices', async () => {
+    const discount: Discount = {
+      discountId: 'disc_1', name: 'A', title: 'A', status: 'draft', pricingMode: 'fixed',
+      members: [{ productId: 'gid://shopify/Product/1' }, { productId: 'gid://shopify/Product/2' }],
+      tiers: [{ minQty: 1, fixedPrice: 1.00 }],
+    }
+    vi.spyOn(configLib, 'getConfig').mockResolvedValue({ discounts: [discount] })
+    vi.spyOn(products, 'getMemberInfo').mockResolvedValue([
+      { productId: 'gid://shopify/Product/1', variantId: undefined, title: 'A', price: 1.49, handle: 'a', imageUrl: null },
+      { productId: 'gid://shopify/Product/2', variantId: undefined, title: 'B', price: 1.59, handle: 'b', imageUrl: null },
+    ])
+
+    const formData = new FormData()
+    formData.set('tier-0-minQty', '3')
+    formData.set('tier-0-fixedPrice', '1.20')
+
+    await expect(updateDiscountTiers('disc_1', formData)).rejects.toThrow(/different prices/)
+  })
+
+  it('rejects a submitted anchorPrice tier when the stored members have different prices', async () => {
+    const discount: Discount = {
+      discountId: 'disc_1', name: 'A', title: 'A', status: 'draft', pricingMode: 'percent',
+      members: [{ productId: 'gid://shopify/Product/1' }, { productId: 'gid://shopify/Product/2' }],
+      tiers: [{ minQty: 5, percentOff: 10 }],
+    }
+    vi.spyOn(configLib, 'getConfig').mockResolvedValue({ discounts: [discount] })
+    vi.spyOn(products, 'getMemberInfo').mockResolvedValue([
+      { productId: 'gid://shopify/Product/1', variantId: undefined, title: 'A', price: 1.49, handle: 'a', imageUrl: null },
+      { productId: 'gid://shopify/Product/2', variantId: undefined, title: 'B', price: 1.59, handle: 'b', imageUrl: null },
+    ])
+
+    const formData = new FormData()
+    formData.set('tier-0-minQty', '7')
+    formData.set('tier-0-percentOff', '4')
+    formData.set('tier-0-anchorPrice', '10')
+
+    await expect(updateDiscountTiers('disc_1', formData)).rejects.toThrow(/different prices/)
+  })
+
+  it('allows a submitted plain percent tier (no anchor) when the stored members have different prices', async () => {
+    const discount: Discount = {
+      discountId: 'disc_1', name: 'A', title: 'A', status: 'draft', pricingMode: 'percent',
+      members: [{ productId: 'gid://shopify/Product/1' }, { productId: 'gid://shopify/Product/2' }],
+      tiers: [{ minQty: 5, percentOff: 10 }],
+    }
+    vi.spyOn(configLib, 'getConfig').mockResolvedValue({ discounts: [discount] })
+    const saveSpy = vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
+    vi.spyOn(products, 'getMemberInfo').mockResolvedValue([
+      { productId: 'gid://shopify/Product/1', variantId: undefined, title: 'A', price: 1.49, handle: 'a', imageUrl: null },
+      { productId: 'gid://shopify/Product/2', variantId: undefined, title: 'B', price: 1.59, handle: 'b', imageUrl: null },
+    ])
+
+    const formData = new FormData()
+    formData.set('tier-0-minQty', '7')
+    formData.set('tier-0-percentOff', '4')
+
+    await updateDiscountTiers('disc_1', formData)
+
+    expect(saveSpy).toHaveBeenCalledWith({
+      discounts: [expect.objectContaining({ discountId: 'disc_1', tiers: [{ minQty: 7, percentOff: 4 }] })],
+    })
+  })
+})
+
+describe('updateDiscountTitle', () => {
+  beforeEach(() => vi.restoreAllMocks())
+
+  it('updates the title and re-syncs metafields when the discount is live', async () => {
+    const discount: Discount = {
+      discountId: 'disc_1', name: 'A', title: 'Old Title', status: 'live', pricingMode: 'percent',
+      members: [{ productId: 'gid://shopify/Product/1' }], tiers: [{ minQty: 5, percentOff: 10 }],
+    }
+    vi.spyOn(configLib, 'getConfig').mockResolvedValue({ discounts: [discount] })
+    const saveSpy = vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
+    const syncSpy = vi.spyOn(productTiers, 'syncDiscountMetafields').mockResolvedValue()
+
+    const formData = new FormData()
+    formData.set('title', 'New Title')
+
+    await updateDiscountTitle('disc_1', formData)
+
+    expect(saveSpy).toHaveBeenCalledWith({
+      discounts: [expect.objectContaining({ discountId: 'disc_1', title: 'New Title' })],
+    })
+    expect(syncSpy).toHaveBeenCalledWith(expect.objectContaining({ discountId: 'disc_1', title: 'New Title' }))
+  })
+
+  it('does not sync metafields when the discount is draft', async () => {
+    const discount: Discount = {
+      discountId: 'disc_1', name: 'A', title: 'Old Title', status: 'draft', pricingMode: 'percent',
+      members: [{ productId: 'gid://shopify/Product/1' }], tiers: [],
+    }
+    vi.spyOn(configLib, 'getConfig').mockResolvedValue({ discounts: [discount] })
+    vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
+    const syncSpy = vi.spyOn(productTiers, 'syncDiscountMetafields').mockResolvedValue()
+
+    const formData = new FormData()
+    formData.set('title', 'New Title')
+
+    await updateDiscountTitle('disc_1', formData)
+
+    expect(syncSpy).not.toHaveBeenCalled()
   })
 
   it('requires a non-blank title', async () => {
-    vi.spyOn(configLib, 'getConfig').mockResolvedValue({ products: [], groups: [] })
+    const discount: Discount = {
+      discountId: 'disc_1', name: 'A', title: 'Old Title', status: 'draft', pricingMode: 'percent',
+      members: [{ productId: 'gid://shopify/Product/1' }], tiers: [],
+    }
+    vi.spyOn(configLib, 'getConfig').mockResolvedValue({ discounts: [discount] })
 
     const formData = new FormData()
-    formData.set('productId', 'gid://shopify/Product/111')
     formData.set('title', '   ')
-    formData.set('tier-0-minQty', '5')
-    formData.set('tier-0-percentOff', '10')
 
-    await expect(createDiscount(formData)).rejects.toThrow('A title is required')
-  })
-
-  it('saves the trimmed title alongside a new discount', async () => {
-    vi.spyOn(configLib, 'getConfig').mockResolvedValue({ products: [], groups: [] })
-    const saveSpy = vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
-
-    const formData = new FormData()
-    formData.set('productId', 'gid://shopify/Product/111')
-    formData.set('title', '  Canagan Tuna Soup  ')
-    formData.set('pricingMode', 'percent')
-    formData.set('tier-0-minQty', '5')
-    formData.set('tier-0-percentOff', '10')
-
-    await createDiscount(formData)
-
-    expect(saveSpy).toHaveBeenCalledWith({
-      products: [{
-        productId: 'gid://shopify/Product/111',
-        status: 'draft',
-        pricingMode: 'percent',
-        title: 'Canagan Tuna Soup',
-        tiers: [{ minQty: 5, percentOff: 10 }],
-      }],
-      groups: [],
-    })
-  })
-
-  it('includes anchorPrice when provided, omits it when blank', async () => {
-    vi.spyOn(configLib, 'getConfig').mockResolvedValue({ products: [], groups: [] })
-    const saveSpy = vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
-
-    const formData = new FormData()
-    formData.set('productId', 'gid://shopify/Product/111')
-    formData.set('title', 'Tuna Soup')
-    formData.set('tier-0-minQty', '7')
-    formData.set('tier-0-percentOff', '5')
-    formData.set('tier-0-anchorPrice', '10.00')
-    formData.set('tier-1-minQty', '14')
-    formData.set('tier-1-percentOff', '10')
-    formData.set('tier-1-anchorPrice', '')
-
-    await createDiscount(formData)
-
-    expect(saveSpy).toHaveBeenCalledWith({
-      products: [{
-        productId: 'gid://shopify/Product/111',
-        status: 'draft', pricingMode: 'percent', title: 'Tuna Soup',
-        tiers: [
-          { minQty: 7, percentOff: 5, anchorPrice: 10 },
-          { minQty: 14, percentOff: 10 },
-        ],
-      }],
-      groups: [],
-    })
-  })
-
-  it('creates a fixed-price discount when pricingMode is fixed', async () => {
-    vi.spyOn(configLib, 'getConfig').mockResolvedValue({ products: [], groups: [] })
-    const saveSpy = vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
-
-    const formData = new FormData()
-    formData.set('productId', 'gid://shopify/Product/111')
-    formData.set('title', 'Tuna Soup')
-    formData.set('pricingMode', 'fixed')
-    formData.set('tier-0-minQty', '1')
-    formData.set('tier-0-fixedPrice', '1.70')
-    formData.set('tier-1-minQty', '3')
-    formData.set('tier-1-fixedPrice', '1.50')
-
-    await createDiscount(formData)
-
-    expect(saveSpy).toHaveBeenCalledWith({
-      products: [{
-        productId: 'gid://shopify/Product/111',
-        status: 'draft',
-        pricingMode: 'fixed', title: 'Tuna Soup',
-        tiers: [
-          { minQty: 1, fixedPrice: 1.70 },
-          { minQty: 3, fixedPrice: 1.50 },
-        ],
-      }],
-      groups: [],
-    })
-  })
-
-  it('ignores percentOff/anchorPrice fields entirely when pricingMode is fixed', async () => {
-    vi.spyOn(configLib, 'getConfig').mockResolvedValue({ products: [], groups: [] })
-    const saveSpy = vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
-
-    const formData = new FormData()
-    formData.set('productId', 'gid://shopify/Product/111')
-    formData.set('title', 'Tuna Soup')
-    formData.set('pricingMode', 'fixed')
-    formData.set('tier-0-minQty', '1')
-    formData.set('tier-0-fixedPrice', '1.70')
-    formData.set('tier-0-percentOff', '50')
-    formData.set('tier-0-anchorPrice', '99.00')
-
-    await createDiscount(formData)
-
-    expect(saveSpy).toHaveBeenCalledWith({
-      products: [{
-        productId: 'gid://shopify/Product/111',
-        status: 'draft',
-        pricingMode: 'fixed', title: 'Tuna Soup',
-        tiers: [{ minQty: 1, fixedPrice: 1.70 }],
-      }],
-      groups: [],
-    })
-  })
-
-  it('defaults to percent mode when pricingMode is not provided', async () => {
-    vi.spyOn(configLib, 'getConfig').mockResolvedValue({ products: [], groups: [] })
-    const saveSpy = vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
-
-    const formData = new FormData()
-    formData.set('productId', 'gid://shopify/Product/111')
-    formData.set('title', 'Tuna Soup')
-    formData.set('tier-0-minQty', '5')
-    formData.set('tier-0-percentOff', '10')
-
-    await createDiscount(formData)
-
-    expect(saveSpy).toHaveBeenCalledWith({
-      products: [{ productId: 'gid://shopify/Product/111', status: 'draft', pricingMode: 'percent', title: 'Tuna Soup', tiers: [{ minQty: 5, percentOff: 10 }] }],
-      groups: [],
-    })
-  })
-
-  it('throws when no product is selected', async () => {
-    const formData = new FormData()
-    formData.set('tier-0-minQty', '5')
-    formData.set('tier-0-percentOff', '10')
-    await expect(createDiscount(formData)).rejects.toThrow('A product is required')
-  })
-
-  it('throws when no valid tier is provided', async () => {
-    const formData = new FormData()
-    formData.set('productId', 'gid://shopify/Product/111')
-    formData.set('title', 'Tuna Soup')
-    await expect(createDiscount(formData)).rejects.toThrow('At least one tier is required')
-  })
-
-  it('throws when the product already has a discount configured', async () => {
-    vi.spyOn(configLib, 'getConfig').mockResolvedValue({
-      products: [{ productId: 'gid://shopify/Product/111', status: 'draft', pricingMode: 'percent', title: '', tiers: [] }],
-      groups: [],
-    })
-    const formData = new FormData()
-    formData.set('productId', 'gid://shopify/Product/111')
-    formData.set('title', 'Tuna Soup')
-    formData.set('tier-0-minQty', '5')
-    formData.set('tier-0-percentOff', '10')
-    await expect(createDiscount(formData)).rejects.toThrow('already has a discount or belongs to a group')
-  })
-
-  it('rejects a product that already belongs to a group', async () => {
-    vi.spyOn(configLib, 'getConfig').mockResolvedValue({
-      products: [],
-      groups: [{ groupId: 'grp_a', name: 'A', status: 'draft', pricingMode: 'percent', title: '', productIds: ['gid://shopify/Product/1'], tiers: [] }],
-    })
-    const formData = new FormData()
-    formData.set('productId', 'gid://shopify/Product/1')
-    formData.set('title', 'Tuna Soup')
-    formData.set('tier-0-minQty', '5')
-    formData.set('tier-0-percentOff', '10')
-    await expect(createDiscount(formData)).rejects.toThrow('already has a discount or belongs to a group')
-  })
-
-  it('preserves existing groups when saving a new standalone discount', async () => {
-    vi.spyOn(configLib, 'getConfig').mockResolvedValue({
-      products: [],
-      groups: [{ groupId: 'grp_a', name: 'A', status: 'live', pricingMode: 'percent', title: '', productIds: ['gid://shopify/Product/9'], tiers: [] }],
-    })
-    const saveSpy = vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
-
-    const formData = new FormData()
-    formData.set('productId', 'gid://shopify/Product/111')
-    formData.set('title', 'Tuna Soup')
-    formData.set('tier-0-minQty', '5')
-    formData.set('tier-0-percentOff', '10')
-
-    await createDiscount(formData)
-
-    expect(saveSpy).toHaveBeenCalledWith({
-      products: [{ productId: 'gid://shopify/Product/111', status: 'draft', pricingMode: 'percent', title: 'Tuna Soup', tiers: [{ minQty: 5, percentOff: 10 }] }],
-      groups: [{ groupId: 'grp_a', name: 'A', status: 'live', pricingMode: 'percent', title: '', productIds: ['gid://shopify/Product/9'], tiers: [] }],
-    })
+    await expect(updateDiscountTitle('disc_1', formData)).rejects.toThrow('A title is required')
   })
 })
 
-describe('updateTiers', () => {
+describe('setDiscountStatus', () => {
   beforeEach(() => vi.restoreAllMocks())
 
-  it('replaces the tiers for an existing product', async () => {
-    vi.spyOn(configLib, 'getConfig').mockResolvedValue({
-      products: [{ productId: 'gid://shopify/Product/111', status: 'live', pricingMode: 'percent', title: '', tiers: [{ minQty: 5, percentOff: 10 }] }],
-      groups: [],
-    })
-    const saveSpy = vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
-    vi.spyOn(productTiers, 'syncProductTierMetafield').mockResolvedValue()
-
-    const formData = new FormData()
-    formData.set('tier-0-minQty', '3')
-    formData.set('tier-0-percentOff', '5')
-    formData.set('tier-1-minQty', '8')
-    formData.set('tier-1-percentOff', '12')
-
-    await updateTiers('gid://shopify/Product/111', formData)
-
-    expect(saveSpy).toHaveBeenCalledWith({
-      products: [{
-        productId: 'gid://shopify/Product/111',
-        status: 'live', pricingMode: 'percent', title: '',
-        tiers: [{ minQty: 3, percentOff: 5 }, { minQty: 8, percentOff: 12 }],
-      }],
-      groups: [],
-    })
-  })
-
-  it('throws when the product has no existing discount', async () => {
-    vi.spyOn(configLib, 'getConfig').mockResolvedValue({ products: [], groups: [] })
-    const formData = new FormData()
-    formData.set('tier-0-minQty', '5')
-    formData.set('tier-0-percentOff', '10')
-    await expect(updateTiers('gid://shopify/Product/999', formData)).rejects.toThrow('not found')
-  })
-
-  it('re-syncs the per-product metafield when the discount is already live', async () => {
-    vi.spyOn(configLib, 'getConfig').mockResolvedValue({
-      products: [{ productId: 'gid://shopify/Product/111', status: 'live', pricingMode: 'percent', title: '', tiers: [{ minQty: 5, percentOff: 10 }] }],
-      groups: [],
-    })
+  it('syncs metafields when going live', async () => {
+    const discount: Discount = {
+      discountId: 'disc_1', name: 'A', title: 'A', status: 'draft', pricingMode: 'percent',
+      members: [{ productId: 'gid://shopify/Product/1' }], tiers: [{ minQty: 5, percentOff: 10 }],
+    }
+    vi.spyOn(configLib, 'getConfig').mockResolvedValue({ discounts: [discount] })
     vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
-    const syncSpy = vi.spyOn(productTiers, 'syncProductTierMetafield').mockResolvedValue()
+    const syncSpy = vi.spyOn(productTiers, 'syncDiscountMetafields').mockResolvedValue()
 
-    const formData = new FormData()
-    formData.set('tier-0-minQty', '3')
-    formData.set('tier-0-percentOff', '5')
+    await setDiscountStatus('disc_1', 'live')
 
-    await updateTiers('gid://shopify/Product/111', formData)
-
-    expect(syncSpy).toHaveBeenCalledWith('gid://shopify/Product/111', [{ minQty: 3, percentOff: 5 }], '')
+    expect(syncSpy).toHaveBeenCalledWith(expect.objectContaining({ discountId: 'disc_1', status: 'live' }))
   })
 
-  it('does not sync the per-product metafield when the discount is still draft', async () => {
-    vi.spyOn(configLib, 'getConfig').mockResolvedValue({
-      products: [{ productId: 'gid://shopify/Product/111', status: 'draft', pricingMode: 'percent', title: '', tiers: [{ minQty: 5, percentOff: 10 }] }],
-      groups: [],
-    })
+  it('clears metafields when taken offline', async () => {
+    const discount: Discount = {
+      discountId: 'disc_1', name: 'A', title: 'A', status: 'live', pricingMode: 'percent',
+      members: [{ productId: 'gid://shopify/Product/1' }], tiers: [{ minQty: 5, percentOff: 10 }],
+    }
+    vi.spyOn(configLib, 'getConfig').mockResolvedValue({ discounts: [discount] })
     vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
-    const syncSpy = vi.spyOn(productTiers, 'syncProductTierMetafield').mockResolvedValue()
+    const clearSpy = vi.spyOn(productTiers, 'clearDiscountMetafields').mockResolvedValue()
 
-    const formData = new FormData()
-    formData.set('tier-0-minQty', '3')
-    formData.set('tier-0-percentOff', '5')
+    await setDiscountStatus('disc_1', 'draft')
 
-    await updateTiers('gid://shopify/Product/111', formData)
-
-    expect(syncSpy).not.toHaveBeenCalled()
-  })
-
-  it('parses fixed-price tiers when the stored discount is fixed mode', async () => {
-    vi.spyOn(configLib, 'getConfig').mockResolvedValue({
-      products: [{ productId: 'gid://shopify/Product/111', status: 'live', pricingMode: 'fixed', title: '', tiers: [{ minQty: 1, fixedPrice: 2.00 }] }],
-      groups: [],
-    })
-    const saveSpy = vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
-    vi.spyOn(productTiers, 'syncProductTierMetafield').mockResolvedValue()
-
-    const formData = new FormData()
-    formData.set('tier-0-minQty', '1')
-    formData.set('tier-0-fixedPrice', '1.70')
-    formData.set('tier-1-minQty', '3')
-    formData.set('tier-1-fixedPrice', '1.50')
-
-    await updateTiers('gid://shopify/Product/111', formData)
-
-    expect(saveSpy).toHaveBeenCalledWith({
-      products: [{
-        productId: 'gid://shopify/Product/111',
-        status: 'live',
-        pricingMode: 'fixed', title: '',
-        tiers: [
-          { minQty: 1, fixedPrice: 1.70 },
-          { minQty: 3, fixedPrice: 1.50 },
-        ],
-      }],
-      groups: [],
-    })
-  })
-
-  it('ignores a pricingMode field in the form when updating tiers — mode is locked to the stored value', async () => {
-    vi.spyOn(configLib, 'getConfig').mockResolvedValue({
-      products: [{ productId: 'gid://shopify/Product/111', status: 'live', pricingMode: 'percent', title: '', tiers: [{ minQty: 5, percentOff: 10 }] }],
-      groups: [],
-    })
-    const saveSpy = vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
-    vi.spyOn(productTiers, 'syncProductTierMetafield').mockResolvedValue()
-
-    const formData = new FormData()
-    formData.set('pricingMode', 'fixed')
-    formData.set('tier-0-minQty', '7')
-    formData.set('tier-0-percentOff', '20')
-
-    await updateTiers('gid://shopify/Product/111', formData)
-
-    expect(saveSpy).toHaveBeenCalledWith({
-      products: [{ productId: 'gid://shopify/Product/111', status: 'live', pricingMode: 'percent', title: '', tiers: [{ minQty: 7, percentOff: 20 }] }],
-      groups: [],
-    })
-  })
-})
-
-describe('updateTitle', () => {
-  beforeEach(() => vi.restoreAllMocks())
-
-  it('updates the title of an existing standalone discount and re-syncs the metafield when live', async () => {
-    vi.spyOn(configLib, 'getConfig').mockResolvedValue({
-      products: [{ productId: 'gid://shopify/Product/111', status: 'live', pricingMode: 'percent', title: 'Old Title', tiers: [{ minQty: 5, percentOff: 10 }] }],
-      groups: [],
-    })
-    const saveSpy = vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
-    const syncSpy = vi.spyOn(productTiers, 'syncProductTierMetafield').mockResolvedValue()
-
-    const formData = new FormData()
-    formData.set('title', 'New Title')
-
-    await updateTitle('gid://shopify/Product/111', formData)
-
-    expect(saveSpy).toHaveBeenCalledWith({
-      products: [{ productId: 'gid://shopify/Product/111', status: 'live', pricingMode: 'percent', title: 'New Title', tiers: [{ minQty: 5, percentOff: 10 }] }],
-      groups: [],
-    })
-    expect(syncSpy).toHaveBeenCalledWith('gid://shopify/Product/111', [{ minQty: 5, percentOff: 10 }], 'New Title')
-  })
-
-  it('does not sync the metafield when the discount is draft', async () => {
-    vi.spyOn(configLib, 'getConfig').mockResolvedValue({
-      products: [{ productId: 'gid://shopify/Product/111', status: 'draft', pricingMode: 'percent', title: 'Old Title', tiers: [] }],
-      groups: [],
-    })
-    const saveSpy = vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
-    const syncSpy = vi.spyOn(productTiers, 'syncProductTierMetafield').mockResolvedValue()
-
-    const formData = new FormData()
-    formData.set('title', 'New Title')
-
-    await updateTitle('gid://shopify/Product/111', formData)
-
-    expect(saveSpy).toHaveBeenCalledWith({
-      products: [{ productId: 'gid://shopify/Product/111', status: 'draft', pricingMode: 'percent', title: 'New Title', tiers: [] }],
-      groups: [],
-    })
-    expect(syncSpy).not.toHaveBeenCalled()
-  })
-
-  it('throws when the title is blank', async () => {
-    vi.spyOn(configLib, 'getConfig').mockResolvedValue({
-      products: [{ productId: 'gid://shopify/Product/111', status: 'draft', pricingMode: 'percent', title: 'Old Title', tiers: [] }],
-      groups: [],
-    })
-
-    const formData = new FormData()
-    formData.set('title', '  ')
-
-    await expect(updateTitle('gid://shopify/Product/111', formData)).rejects.toThrow('A title is required')
-  })
-
-  it('throws when the discount does not exist', async () => {
-    vi.spyOn(configLib, 'getConfig').mockResolvedValue({ products: [], groups: [] })
-
-    const formData = new FormData()
-    formData.set('title', 'New Title')
-
-    await expect(updateTitle('gid://shopify/Product/999', formData)).rejects.toThrow('not found')
-  })
-})
-
-describe('setStatus', () => {
-  beforeEach(() => vi.restoreAllMocks())
-
-  it('flips a product discount to live', async () => {
-    vi.spyOn(configLib, 'getConfig').mockResolvedValue({
-      products: [{ productId: 'gid://shopify/Product/111', status: 'draft', pricingMode: 'percent', title: '', tiers: [{ minQty: 5, percentOff: 10 }] }],
-      groups: [],
-    })
-    const saveSpy = vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
-    vi.spyOn(productTiers, 'syncProductTierMetafield').mockResolvedValue()
-
-    await setStatus('gid://shopify/Product/111', 'live')
-
-    expect(saveSpy).toHaveBeenCalledWith({
-      products: [{ productId: 'gid://shopify/Product/111', status: 'live', pricingMode: 'percent', title: '', tiers: [{ minQty: 5, percentOff: 10 }] }],
-      groups: [],
-    })
-  })
-
-  it('writes the per-product metafield when flipping to live', async () => {
-    vi.spyOn(configLib, 'getConfig').mockResolvedValue({
-      products: [{ productId: 'gid://shopify/Product/111', status: 'draft', pricingMode: 'percent', title: '', tiers: [{ minQty: 5, percentOff: 10 }] }],
-      groups: [],
-    })
-    vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
-    const syncSpy = vi.spyOn(productTiers, 'syncProductTierMetafield').mockResolvedValue()
-
-    await setStatus('gid://shopify/Product/111', 'live')
-
-    expect(syncSpy).toHaveBeenCalledWith('gid://shopify/Product/111', [{ minQty: 5, percentOff: 10 }], '')
-  })
-
-  it('deletes the per-product metafield when flipping to draft', async () => {
-    vi.spyOn(configLib, 'getConfig').mockResolvedValue({
-      products: [{ productId: 'gid://shopify/Product/111', status: 'live', pricingMode: 'percent', title: '', tiers: [{ minQty: 5, percentOff: 10 }] }],
-      groups: [],
-    })
-    vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
-    const syncSpy = vi.spyOn(productTiers, 'syncProductTierMetafield').mockResolvedValue()
-
-    await setStatus('gid://shopify/Product/111', 'draft')
-
-    expect(syncSpy).toHaveBeenCalledWith('gid://shopify/Product/111', null, '')
+    expect(clearSpy).toHaveBeenCalledWith([{ productId: 'gid://shopify/Product/1' }])
   })
 })
 
 describe('deleteDiscount', () => {
   beforeEach(() => vi.restoreAllMocks())
 
-  it('removes the product entirely from config', async () => {
-    vi.spyOn(configLib, 'getConfig').mockResolvedValue({
-      products: [
-        { productId: 'gid://shopify/Product/111', status: 'live', pricingMode: 'percent', title: '', tiers: [] },
-        { productId: 'gid://shopify/Product/222', status: 'draft', pricingMode: 'percent', title: '', tiers: [] },
-      ],
-      groups: [],
-    })
+  it('removes the discount and clears its metafields', async () => {
+    const discount: Discount = {
+      discountId: 'disc_1', name: 'A', title: 'A', status: 'live', pricingMode: 'percent',
+      members: [{ productId: 'gid://shopify/Product/1' }], tiers: [],
+    }
+    vi.spyOn(configLib, 'getConfig').mockResolvedValue({ discounts: [discount] })
     const saveSpy = vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
-    vi.spyOn(productTiers, 'syncProductTierMetafield').mockResolvedValue()
+    const clearSpy = vi.spyOn(productTiers, 'clearDiscountMetafields').mockResolvedValue()
 
-    await deleteDiscount('gid://shopify/Product/111')
+    await deleteDiscount('disc_1')
 
-    expect(saveSpy).toHaveBeenCalledWith({
-      products: [{ productId: 'gid://shopify/Product/222', status: 'draft', pricingMode: 'percent', title: '', tiers: [] }],
-      groups: [],
-    })
-  })
-
-  it('deletes the per-product metafield', async () => {
-    vi.spyOn(configLib, 'getConfig').mockResolvedValue({
-      products: [{ productId: 'gid://shopify/Product/111', status: 'live', pricingMode: 'percent', title: '', tiers: [] }],
-      groups: [],
-    })
-    vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
-    const syncSpy = vi.spyOn(productTiers, 'syncProductTierMetafield').mockResolvedValue()
-
-    await deleteDiscount('gid://shopify/Product/111')
-
-    expect(syncSpy).toHaveBeenCalledWith('gid://shopify/Product/111', null, '')
-  })
-
-  it('preserves existing groups when deleting a standalone discount', async () => {
-    vi.spyOn(configLib, 'getConfig').mockResolvedValue({
-      products: [{ productId: 'gid://shopify/Product/111', status: 'live', pricingMode: 'percent', title: '', tiers: [] }],
-      groups: [{ groupId: 'grp_a', name: 'A', status: 'live', pricingMode: 'percent', title: '', productIds: ['gid://shopify/Product/9'], tiers: [] }],
-    })
-    const saveSpy = vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
-    vi.spyOn(productTiers, 'syncProductTierMetafield').mockResolvedValue()
-
-    await deleteDiscount('gid://shopify/Product/111')
-
-    expect(saveSpy).toHaveBeenCalledWith({
-      products: [],
-      groups: [{ groupId: 'grp_a', name: 'A', status: 'live', pricingMode: 'percent', title: '', productIds: ['gid://shopify/Product/9'], tiers: [] }],
-    })
-  })
-
-  it('throws when the product does not exist', async () => {
-    vi.spyOn(configLib, 'getConfig').mockResolvedValue({ products: [], groups: [] })
-    await expect(deleteDiscount('gid://shopify/Product/999')).rejects.toThrow('not found')
-  })
-})
-
-describe('createGroup', () => {
-  beforeEach(() => vi.restoreAllMocks())
-
-  function formWithProducts(ids: string[]): FormData {
-    const formData = new FormData()
-    ids.forEach((id, i) => formData.set(`product-${i}-id`, id))
-    return formData
-  }
-
-  it('creates a draft group with parsed tiers and products', async () => {
-    vi.spyOn(configLib, 'getConfig').mockResolvedValue({ products: [], groups: [] })
-    const saveSpy = vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
-    vi.spyOn(crypto, 'randomUUID').mockReturnValue('11111111-1111-1111-1111-111111111111')
-
-    const formData = formWithProducts(['gid://shopify/Product/1', 'gid://shopify/Product/2'])
-    formData.set('name', 'Mix & Match Soups')
-    formData.set('title', 'Mix & Match Soups')
-    formData.set('tier-0-minQty', '7')
-    formData.set('tier-0-percentOff', '10')
-
-    await createGroup(formData)
-
-    expect(saveSpy).toHaveBeenCalledWith({
-      products: [],
-      groups: [
-        {
-          groupId: 'grp_11111111-1111-1111-1111-111111111111',
-          name: 'Mix & Match Soups',
-          status: 'draft', pricingMode: 'percent', title: 'Mix & Match Soups',
-          productIds: ['gid://shopify/Product/1', 'gid://shopify/Product/2'],
-          tiers: [{ minQty: 7, percentOff: 10 }],
-        },
-      ],
-    })
-    expect(authRedirect.redirectWithToken).toHaveBeenCalledWith(
-      '/discounts/groups/grp_11111111-1111-1111-1111-111111111111',
-    )
-  })
-
-  it('requires a non-blank title', async () => {
-    vi.spyOn(configLib, 'getConfig').mockResolvedValue({ products: [], groups: [] })
-
-    const formData = formWithProducts(['gid://shopify/Product/1', 'gid://shopify/Product/2'])
-    formData.set('name', 'Mix & Match Soups')
-    formData.set('title', '   ')
-    formData.set('tier-0-minQty', '7')
-    formData.set('tier-0-percentOff', '10')
-
-    await expect(createGroup(formData)).rejects.toThrow('A title is required')
-  })
-
-  it('saves the trimmed title alongside a new group', async () => {
-    vi.spyOn(configLib, 'getConfig').mockResolvedValue({ products: [], groups: [] })
-    const saveSpy = vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
-    vi.spyOn(crypto, 'randomUUID').mockReturnValue('11111111-1111-1111-1111-111111111111')
-
-    const formData = formWithProducts(['gid://shopify/Product/1', 'gid://shopify/Product/2'])
-    formData.set('name', 'Mix & Match Soups')
-    formData.set('title', '  Mix & Match Soup Bundle  ')
-    formData.set('tier-0-minQty', '7')
-    formData.set('tier-0-percentOff', '10')
-
-    await createGroup(formData)
-
-    expect(saveSpy).toHaveBeenCalledWith({
-      products: [],
-      groups: [
-        {
-          groupId: 'grp_11111111-1111-1111-1111-111111111111',
-          name: 'Mix & Match Soups',
-          status: 'draft', pricingMode: 'percent', title: 'Mix & Match Soup Bundle',
-          productIds: ['gid://shopify/Product/1', 'gid://shopify/Product/2'],
-          tiers: [{ minQty: 7, percentOff: 10 }],
-        },
-      ],
-    })
-  })
-
-  it('throws when the name is blank', async () => {
-    const formData = formWithProducts(['gid://shopify/Product/1', 'gid://shopify/Product/2'])
-    formData.set('tier-0-minQty', '7')
-    formData.set('tier-0-percentOff', '10')
-    await expect(createGroup(formData)).rejects.toThrow('A group name is required')
-  })
-
-  it('throws when fewer than 2 products are provided', async () => {
-    const formData = formWithProducts(['gid://shopify/Product/1'])
-    formData.set('name', 'Solo')
-    formData.set('title', 'Solo')
-    formData.set('tier-0-minQty', '7')
-    formData.set('tier-0-percentOff', '10')
-    await expect(createGroup(formData)).rejects.toThrow('at least 2 products')
-  })
-
-  it('throws when no valid tier is provided', async () => {
-    const formData = formWithProducts(['gid://shopify/Product/1', 'gid://shopify/Product/2'])
-    formData.set('name', 'Soups')
-    formData.set('title', 'Soups')
-    await expect(createGroup(formData)).rejects.toThrow('At least one tier is required')
-  })
-
-  it('throws when a product already has a standalone discount', async () => {
-    vi.spyOn(configLib, 'getConfig').mockResolvedValue({
-      products: [{ productId: 'gid://shopify/Product/1', status: 'draft', pricingMode: 'percent', title: '', tiers: [] }],
-      groups: [],
-    })
-    const formData = formWithProducts(['gid://shopify/Product/1', 'gid://shopify/Product/2'])
-    formData.set('name', 'Soups')
-    formData.set('title', 'Soups')
-    formData.set('tier-0-minQty', '7')
-    formData.set('tier-0-percentOff', '10')
-    await expect(createGroup(formData)).rejects.toThrow('already has a discount or belongs to another group')
-  })
-
-  it('throws when a product already belongs to another group', async () => {
-    vi.spyOn(configLib, 'getConfig').mockResolvedValue({
-      products: [],
-      groups: [{ groupId: 'grp_other', name: 'Other', status: 'draft', pricingMode: 'percent', title: '', productIds: ['gid://shopify/Product/2'], tiers: [] }],
-    })
-    const formData = formWithProducts(['gid://shopify/Product/1', 'gid://shopify/Product/2'])
-    formData.set('name', 'Soups')
-    formData.set('title', 'Soups')
-    formData.set('tier-0-minQty', '7')
-    formData.set('tier-0-percentOff', '10')
-    await expect(createGroup(formData)).rejects.toThrow('already has a discount or belongs to another group')
-  })
-
-  it('dedupes a product id submitted more than once in the form', async () => {
-    vi.spyOn(configLib, 'getConfig').mockResolvedValue({ products: [], groups: [] })
-    const saveSpy = vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
-    vi.spyOn(crypto, 'randomUUID').mockReturnValue('22222222-2222-2222-2222-222222222222')
-
-    const formData = formWithProducts([
-      'gid://shopify/Product/1',
-      'gid://shopify/Product/1',
-      'gid://shopify/Product/2',
-    ])
-    formData.set('name', 'Soups')
-    formData.set('title', 'Soups')
-    formData.set('tier-0-minQty', '7')
-    formData.set('tier-0-percentOff', '10')
-
-    await createGroup(formData)
-
-    expect(saveSpy).toHaveBeenCalledWith({
-      products: [],
-      groups: [
-        {
-          groupId: 'grp_22222222-2222-2222-2222-222222222222',
-          name: 'Soups',
-          status: 'draft', pricingMode: 'percent', title: 'Soups',
-          productIds: ['gid://shopify/Product/1', 'gid://shopify/Product/2'],
-          tiers: [{ minQty: 7, percentOff: 10 }],
-        },
-      ],
-    })
-  })
-
-  it('creates a fixed-price group when pricingMode is fixed', async () => {
-    vi.spyOn(configLib, 'getConfig').mockResolvedValue({ products: [], groups: [] })
-    const saveSpy = vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
-    vi.spyOn(crypto, 'randomUUID').mockReturnValue('22222222-2222-2222-2222-222222222222')
-
-    const formData = new FormData()
-    formData.set('product-0-id', 'gid://shopify/Product/1')
-    formData.set('product-1-id', 'gid://shopify/Product/2')
-    formData.set('name', 'Mix & Match Soups')
-    formData.set('title', 'Mix & Match Soups')
-    formData.set('pricingMode', 'fixed')
-    formData.set('tier-0-minQty', '1')
-    formData.set('tier-0-fixedPrice', '1.70')
-    formData.set('tier-1-minQty', '3')
-    formData.set('tier-1-fixedPrice', '1.50')
-
-    await createGroup(formData)
-
-    expect(saveSpy).toHaveBeenCalledWith({
-      products: [],
-      groups: [{
-        groupId: 'grp_22222222-2222-2222-2222-222222222222',
-        name: 'Mix & Match Soups',
-        status: 'draft',
-        pricingMode: 'fixed', title: 'Mix & Match Soups',
-        productIds: ['gid://shopify/Product/1', 'gid://shopify/Product/2'],
-        tiers: [
-          { minQty: 1, fixedPrice: 1.70 },
-          { minQty: 3, fixedPrice: 1.50 },
-        ],
-      }],
-    })
-  })
-})
-
-describe('updateGroupTiers', () => {
-  beforeEach(() => vi.restoreAllMocks())
-
-  it('replaces the tiers for an existing group', async () => {
-    vi.spyOn(configLib, 'getConfig').mockResolvedValue({
-      products: [],
-      groups: [{ groupId: 'grp_a', name: 'Soups', status: 'draft', pricingMode: 'percent', title: '', productIds: ['gid://shopify/Product/1', 'gid://shopify/Product/2'], tiers: [{ minQty: 5, percentOff: 10 }] }],
-    })
-    const saveSpy = vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
-
-    const formData = new FormData()
-    formData.set('tier-0-minQty', '3')
-    formData.set('tier-0-percentOff', '5')
-
-    await updateGroupTiers('grp_a', formData)
-
-    expect(saveSpy).toHaveBeenCalledWith({
-      products: [],
-      groups: [{ groupId: 'grp_a', name: 'Soups', status: 'draft', pricingMode: 'percent', title: '', productIds: ['gid://shopify/Product/1', 'gid://shopify/Product/2'], tiers: [{ minQty: 3, percentOff: 5 }] }],
-    })
-  })
-
-  it('throws when the group does not exist', async () => {
-    vi.spyOn(configLib, 'getConfig').mockResolvedValue({ products: [], groups: [] })
-    const formData = new FormData()
-    formData.set('tier-0-minQty', '5')
-    formData.set('tier-0-percentOff', '10')
-    await expect(updateGroupTiers('grp_missing', formData)).rejects.toThrow('not found')
-  })
-
-  it('re-syncs every member metafield when the group is live', async () => {
-    vi.spyOn(configLib, 'getConfig').mockResolvedValue({
-      products: [],
-      groups: [{ groupId: 'grp_a', name: 'Soups', status: 'live', pricingMode: 'percent', title: '', productIds: ['gid://shopify/Product/1', 'gid://shopify/Product/2'], tiers: [{ minQty: 5, percentOff: 10 }] }],
-    })
-    vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
-    vi.spyOn(products, 'getGroupProductInfo').mockResolvedValue([
-      { productId: 'gid://shopify/Product/1', title: 'Tuna', handle: 'tuna', basePrice: 1.49 },
-      { productId: 'gid://shopify/Product/2', title: 'Chicken', handle: 'chicken', basePrice: 1.49 },
-    ])
-    const syncSpy = vi.spyOn(productTiers, 'syncGroupTierMetafield').mockResolvedValue()
-
-    const formData = new FormData()
-    formData.set('tier-0-minQty', '3')
-    formData.set('tier-0-percentOff', '5')
-
-    await updateGroupTiers('grp_a', formData)
-
-    expect(syncSpy).toHaveBeenCalledWith('gid://shopify/Product/1', {
-      title: '',
-      tiers: [{ minQty: 3, percentOff: 5 }],
-      siblings: [{ title: 'Chicken', handle: 'chicken' }],
-    })
-    expect(syncSpy).toHaveBeenCalledWith('gid://shopify/Product/2', {
-      title: '',
-      tiers: [{ minQty: 3, percentOff: 5 }],
-      siblings: [{ title: 'Tuna', handle: 'tuna' }],
-    })
-  })
-
-  it('does not sync metafields when the group is still draft', async () => {
-    vi.spyOn(configLib, 'getConfig').mockResolvedValue({
-      products: [],
-      groups: [{ groupId: 'grp_a', name: 'Soups', status: 'draft', pricingMode: 'percent', title: '', productIds: ['gid://shopify/Product/1'], tiers: [{ minQty: 5, percentOff: 10 }] }],
-    })
-    vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
-    const syncSpy = vi.spyOn(productTiers, 'syncGroupTierMetafield').mockResolvedValue()
-
-    const formData = new FormData()
-    formData.set('tier-0-minQty', '3')
-    formData.set('tier-0-percentOff', '5')
-
-    await updateGroupTiers('grp_a', formData)
-
-    expect(syncSpy).not.toHaveBeenCalled()
-  })
-
-  it('parses fixed-price tiers when the stored group is fixed mode', async () => {
-    vi.spyOn(configLib, 'getConfig').mockResolvedValue({
-      products: [],
-      groups: [{ groupId: 'grp_a', name: 'Soups', status: 'draft', pricingMode: 'fixed', title: '', productIds: ['gid://shopify/Product/1', 'gid://shopify/Product/2'], tiers: [{ minQty: 1, fixedPrice: 2.00 }] }],
-    })
-    const saveSpy = vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
-
-    const formData = new FormData()
-    formData.set('tier-0-minQty', '1')
-    formData.set('tier-0-fixedPrice', '1.70')
-
-    await updateGroupTiers('grp_a', formData)
-
-    expect(saveSpy).toHaveBeenCalledWith({
-      products: [],
-      groups: [{ groupId: 'grp_a', name: 'Soups', status: 'draft', pricingMode: 'fixed', title: '', productIds: ['gid://shopify/Product/1', 'gid://shopify/Product/2'], tiers: [{ minQty: 1, fixedPrice: 1.70 }] }],
-    })
-  })
-})
-
-describe('updateGroupTitle', () => {
-  beforeEach(() => vi.restoreAllMocks())
-
-  it('updates the title of an existing group and re-syncs the metafields when live', async () => {
-    vi.spyOn(configLib, 'getConfig').mockResolvedValue({
-      products: [],
-      groups: [{ groupId: 'grp_a', name: 'Soups', status: 'live', pricingMode: 'percent', title: 'Old Title', productIds: ['gid://shopify/Product/1', 'gid://shopify/Product/2'], tiers: [{ minQty: 5, percentOff: 10 }] }],
-    })
-    const saveSpy = vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
-    vi.spyOn(products, 'getGroupProductInfo').mockResolvedValue([
-      { productId: 'gid://shopify/Product/1', title: 'Tuna', handle: 'tuna', basePrice: 1.49 },
-      { productId: 'gid://shopify/Product/2', title: 'Chicken', handle: 'chicken', basePrice: 1.49 },
-    ])
-    const syncSpy = vi.spyOn(productTiers, 'syncGroupTierMetafield').mockResolvedValue()
-
-    const formData = new FormData()
-    formData.set('title', 'New Title')
-
-    await updateGroupTitle('grp_a', formData)
-
-    expect(saveSpy).toHaveBeenCalledWith({
-      products: [],
-      groups: [{ groupId: 'grp_a', name: 'Soups', status: 'live', pricingMode: 'percent', title: 'New Title', productIds: ['gid://shopify/Product/1', 'gid://shopify/Product/2'], tiers: [{ minQty: 5, percentOff: 10 }] }],
-    })
-    expect(syncSpy).toHaveBeenCalledWith('gid://shopify/Product/1', {
-      title: 'New Title',
-      tiers: [{ minQty: 5, percentOff: 10 }],
-      siblings: [{ title: 'Chicken', handle: 'chicken' }],
-    })
-    expect(syncSpy).toHaveBeenCalledWith('gid://shopify/Product/2', {
-      title: 'New Title',
-      tiers: [{ minQty: 5, percentOff: 10 }],
-      siblings: [{ title: 'Tuna', handle: 'tuna' }],
-    })
-  })
-
-  it('does not sync metafields when the group is draft', async () => {
-    vi.spyOn(configLib, 'getConfig').mockResolvedValue({
-      products: [],
-      groups: [{ groupId: 'grp_a', name: 'Soups', status: 'draft', pricingMode: 'percent', title: 'Old Title', productIds: ['gid://shopify/Product/1', 'gid://shopify/Product/2'], tiers: [] }],
-    })
-    const saveSpy = vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
-    const syncSpy = vi.spyOn(productTiers, 'syncGroupTierMetafield').mockResolvedValue()
-
-    const formData = new FormData()
-    formData.set('title', 'New Title')
-
-    await updateGroupTitle('grp_a', formData)
-
-    expect(saveSpy).toHaveBeenCalledWith({
-      products: [],
-      groups: [{ groupId: 'grp_a', name: 'Soups', status: 'draft', pricingMode: 'percent', title: 'New Title', productIds: ['gid://shopify/Product/1', 'gid://shopify/Product/2'], tiers: [] }],
-    })
-    expect(syncSpy).not.toHaveBeenCalled()
-  })
-
-  it('throws when the title is blank', async () => {
-    vi.spyOn(configLib, 'getConfig').mockResolvedValue({
-      products: [],
-      groups: [{ groupId: 'grp_a', name: 'Soups', status: 'draft', pricingMode: 'percent', title: 'Old Title', productIds: ['gid://shopify/Product/1', 'gid://shopify/Product/2'], tiers: [] }],
-    })
-
-    const formData = new FormData()
-    formData.set('title', '  ')
-
-    await expect(updateGroupTitle('grp_a', formData)).rejects.toThrow('A title is required')
-  })
-
-  it('throws when the group does not exist', async () => {
-    vi.spyOn(configLib, 'getConfig').mockResolvedValue({ products: [], groups: [] })
-
-    const formData = new FormData()
-    formData.set('title', 'New Title')
-
-    await expect(updateGroupTitle('grp_missing', formData)).rejects.toThrow('not found')
-  })
-})
-
-describe('updateGroupProducts', () => {
-  beforeEach(() => vi.restoreAllMocks())
-
-  function formWithProducts(ids: string[]): FormData {
-    const formData = new FormData()
-    ids.forEach((id, i) => formData.set(`product-${i}-id`, id))
-    return formData
-  }
-
-  it('replaces the product list for a draft group', async () => {
-    vi.spyOn(configLib, 'getConfig').mockResolvedValue({
-      products: [],
-      groups: [{ groupId: 'grp_a', name: 'Soups', status: 'draft', pricingMode: 'percent', title: '', productIds: ['gid://shopify/Product/1', 'gid://shopify/Product/2'], tiers: [] }],
-    })
-    const saveSpy = vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
-
-    await updateGroupProducts('grp_a', formWithProducts(['gid://shopify/Product/1', 'gid://shopify/Product/3']))
-
-    expect(saveSpy).toHaveBeenCalledWith({
-      products: [],
-      groups: [{ groupId: 'grp_a', name: 'Soups', status: 'draft', pricingMode: 'percent', title: '', productIds: ['gid://shopify/Product/1', 'gid://shopify/Product/3'], tiers: [] }],
-    })
-  })
-
-  it('throws when fewer than 2 products are provided', async () => {
-    vi.spyOn(configLib, 'getConfig').mockResolvedValue({
-      products: [],
-      groups: [{ groupId: 'grp_a', name: 'Soups', status: 'draft', pricingMode: 'percent', title: '', productIds: ['gid://shopify/Product/1', 'gid://shopify/Product/2'], tiers: [] }],
-    })
-    await expect(updateGroupProducts('grp_a', formWithProducts(['gid://shopify/Product/1']))).rejects.toThrow(
-      'at least 2 products',
-    )
-  })
-
-  it('allows re-submitting the group\'s own current members without a membership conflict', async () => {
-    vi.spyOn(configLib, 'getConfig').mockResolvedValue({
-      products: [],
-      groups: [{ groupId: 'grp_a', name: 'Soups', status: 'draft', pricingMode: 'percent', title: '', productIds: ['gid://shopify/Product/1', 'gid://shopify/Product/2'], tiers: [] }],
-    })
-    const saveSpy = vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
-
-    await updateGroupProducts('grp_a', formWithProducts(['gid://shopify/Product/1', 'gid://shopify/Product/2']))
-
-    expect(saveSpy).toHaveBeenCalled()
-  })
-
-  it('clears metafields from products removed from a live group', async () => {
-    vi.spyOn(configLib, 'getConfig').mockResolvedValue({
-      products: [],
-      groups: [{ groupId: 'grp_a', name: 'Soups', status: 'live', pricingMode: 'percent', title: '', productIds: ['gid://shopify/Product/1', 'gid://shopify/Product/2'], tiers: [{ minQty: 5, percentOff: 10 }] }],
-    })
-    vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
-    vi.spyOn(products, 'getGroupProductInfo').mockResolvedValue([
-      { productId: 'gid://shopify/Product/1', title: 'Tuna', handle: 'tuna', basePrice: 1.49 },
-      { productId: 'gid://shopify/Product/3', title: 'Ocean', handle: 'ocean', basePrice: 1.49 },
-    ])
-    const syncSpy = vi.spyOn(productTiers, 'syncGroupTierMetafield').mockResolvedValue()
-
-    await updateGroupProducts('grp_a', formWithProducts(['gid://shopify/Product/1', 'gid://shopify/Product/3']))
-
-    expect(syncSpy).toHaveBeenCalledWith('gid://shopify/Product/2', null)
-  })
-})
-
-describe('setGroupStatus', () => {
-  beforeEach(() => vi.restoreAllMocks())
-
-  it('writes metafields to every member when flipping to live', async () => {
-    vi.spyOn(configLib, 'getConfig').mockResolvedValue({
-      products: [],
-      groups: [{ groupId: 'grp_a', name: 'Soups', status: 'draft', pricingMode: 'percent', title: '', productIds: ['gid://shopify/Product/1', 'gid://shopify/Product/2'], tiers: [{ minQty: 5, percentOff: 10 }] }],
-    })
-    const saveSpy = vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
-    vi.spyOn(products, 'getGroupProductInfo').mockResolvedValue([
-      { productId: 'gid://shopify/Product/1', title: 'Tuna', handle: 'tuna', basePrice: 1.49 },
-      { productId: 'gid://shopify/Product/2', title: 'Chicken', handle: 'chicken', basePrice: 1.49 },
-    ])
-    const syncSpy = vi.spyOn(productTiers, 'syncGroupTierMetafield').mockResolvedValue()
-
-    await setGroupStatus('grp_a', 'live')
-
-    expect(saveSpy).toHaveBeenCalledWith({
-      products: [],
-      groups: [{ groupId: 'grp_a', name: 'Soups', status: 'live', pricingMode: 'percent', title: '', productIds: ['gid://shopify/Product/1', 'gid://shopify/Product/2'], tiers: [{ minQty: 5, percentOff: 10 }] }],
-    })
-    expect(syncSpy).toHaveBeenCalledTimes(2)
-  })
-
-  it('clears metafields from every member when flipping to draft', async () => {
-    vi.spyOn(configLib, 'getConfig').mockResolvedValue({
-      products: [],
-      groups: [{ groupId: 'grp_a', name: 'Soups', status: 'live', pricingMode: 'percent', title: '', productIds: ['gid://shopify/Product/1', 'gid://shopify/Product/2'], tiers: [] }],
-    })
-    vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
-    const syncSpy = vi.spyOn(productTiers, 'syncGroupTierMetafield').mockResolvedValue()
-
-    await setGroupStatus('grp_a', 'draft')
-
-    expect(syncSpy).toHaveBeenCalledWith('gid://shopify/Product/1', null)
-    expect(syncSpy).toHaveBeenCalledWith('gid://shopify/Product/2', null)
-  })
-})
-
-describe('deleteGroup', () => {
-  beforeEach(() => vi.restoreAllMocks())
-
-  it('removes the group and clears every member metafield', async () => {
-    vi.spyOn(configLib, 'getConfig').mockResolvedValue({
-      products: [],
-      groups: [
-        { groupId: 'grp_a', name: 'Soups', status: 'live', pricingMode: 'percent', title: '', productIds: ['gid://shopify/Product/1', 'gid://shopify/Product/2'], tiers: [] },
-        { groupId: 'grp_b', name: 'Other', status: 'draft', pricingMode: 'percent', title: '', productIds: ['gid://shopify/Product/9'], tiers: [] },
-      ],
-    })
-    const saveSpy = vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
-    const syncSpy = vi.spyOn(productTiers, 'syncGroupTierMetafield').mockResolvedValue()
-
-    await deleteGroup('grp_a')
-
-    expect(saveSpy).toHaveBeenCalledWith({
-      products: [],
-      groups: [{ groupId: 'grp_b', name: 'Other', status: 'draft', pricingMode: 'percent', title: '', productIds: ['gid://shopify/Product/9'], tiers: [] }],
-    })
-    expect(syncSpy).toHaveBeenCalledWith('gid://shopify/Product/1', null)
-    expect(syncSpy).toHaveBeenCalledWith('gid://shopify/Product/2', null)
-  })
-
-  it('throws when the group does not exist', async () => {
-    vi.spyOn(configLib, 'getConfig').mockResolvedValue({ products: [], groups: [] })
-    await expect(deleteGroup('grp_missing')).rejects.toThrow('not found')
+    expect(saveSpy).toHaveBeenCalledWith({ discounts: [] })
+    expect(clearSpy).toHaveBeenCalledWith([{ productId: 'gid://shopify/Product/1' }])
   })
 })
