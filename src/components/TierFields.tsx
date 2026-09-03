@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 type TierRow = { key: string; minQty: string; percentOff: string; anchorPrice: string }
 
@@ -8,12 +8,20 @@ function makeRow(minQty = '', percentOff = '', anchorPrice = ''): TierRow {
   return { key: crypto.randomUUID(), minQty, percentOff, anchorPrice }
 }
 
+/** True once a row has enough filled in that the server would accept it as one tier. */
+function isRowComplete(row: TierRow): boolean {
+  return Number(row.minQty) > 0 && row.percentOff.trim() !== '' && Number(row.percentOff) >= 0
+}
+
 export default function TierFields({
   initial,
   allowAnchorPrice = true,
+  onValidityChange,
 }: {
   initial?: { minQty: number; percentOff: number; anchorPrice?: number }[]
   allowAnchorPrice?: boolean
+  /** Fires whenever at least one row is complete enough for the server to accept — see isRowComplete. */
+  onValidityChange?: (valid: boolean) => void
 }) {
   const [rows, setRows] = useState<TierRow[]>(() =>
     initial && initial.length > 0
@@ -22,6 +30,10 @@ export default function TierFields({
         )
       : [makeRow()],
   )
+
+  useEffect(() => {
+    onValidityChange?.(rows.some(isRowComplete))
+  }, [rows, onValidityChange])
 
   function addRow() {
     setRows((prev) => [...prev, makeRow()])

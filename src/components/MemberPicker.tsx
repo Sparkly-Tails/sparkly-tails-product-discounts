@@ -15,10 +15,12 @@ export default function MemberPicker({
   initialMembers,
   excludeDiscountId,
   onPricesChange,
+  onMembersChange,
 }: {
   initialMembers?: SelectedMember[]
   excludeDiscountId?: string
   onPricesChange?: (prices: number[]) => void
+  onMembersChange?: (members: SelectedMember[]) => void
 }) {
   const [selected, setSelected] = useState<SelectedMember[]>(initialMembers ?? [])
   const [query, setQuery] = useState('')
@@ -37,7 +39,8 @@ export default function MemberPicker({
   // matters when adds/removes can interleave.
   useEffect(() => {
     onPricesChange?.(selected.map((m) => m.price))
-  }, [selected, onPricesChange])
+    onMembersChange?.(selected)
+  }, [selected, onPricesChange, onMembersChange])
 
   function handleQueryChange(value: string) {
     setQuery(value)

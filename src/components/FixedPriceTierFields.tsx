@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 type FixedTierRow = { key: string; minQty: string; fixedPrice: string }
 
@@ -8,16 +8,28 @@ function makeRow(minQty = '', fixedPrice = ''): FixedTierRow {
   return { key: crypto.randomUUID(), minQty, fixedPrice }
 }
 
+/** True once a row has enough filled in that the server would accept it as one tier. */
+function isRowComplete(row: FixedTierRow): boolean {
+  return Number(row.minQty) > 0 && Number(row.fixedPrice) > 0
+}
+
 export default function FixedPriceTierFields({
   initial,
+  onValidityChange,
 }: {
   initial?: { minQty: number; fixedPrice: number }[]
+  /** Fires whenever at least one row is complete enough for the server to accept — see isRowComplete. */
+  onValidityChange?: (valid: boolean) => void
 }) {
   const [rows, setRows] = useState<FixedTierRow[]>(() =>
     initial && initial.length > 0
       ? initial.map((t) => makeRow(String(t.minQty), String(t.fixedPrice)))
       : [makeRow()],
   )
+
+  useEffect(() => {
+    onValidityChange?.(rows.some(isRowComplete))
+  }, [rows, onValidityChange])
 
   function addRow() {
     setRows((prev) => [...prev, makeRow()])
