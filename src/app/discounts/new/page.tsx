@@ -3,12 +3,20 @@
 import { useState } from 'react'
 import { createDiscount } from '@/actions/discountActions'
 import { pricesUniform } from '@/lib/config'
-import MemberPicker from '@/components/MemberPicker'
+import MemberPicker, { type SelectedMember } from '@/components/MemberPicker'
 import PricingModeTierFields from '@/components/PricingModeTierFields'
 
 export default function NewDiscountPage() {
   const [prices, setPrices] = useState<number[]>([])
+  const [members, setMembers] = useState<SelectedMember[]>([])
+  const [tiersValid, setTiersValid] = useState(false)
   const allowPriceBasedModes = pricesUniform(prices)
+  // The server (createDiscount) already rejects a submission with no
+  // members or no complete tier — this mirrors that same rule client-side
+  // so the merchant sees why the button is disabled instead of hitting a
+  // thrown error after clicking it. Name/title are covered by the inputs'
+  // own `required` attribute, so they don't need tracking here.
+  const canSubmit = members.length > 0 && tiersValid
 
   return (
     <main className="p-8 max-w-xl mx-auto">
@@ -47,20 +55,26 @@ export default function NewDiscountPage() {
 
         <div>
           <p className="block text-sm font-medium mb-2">Products / variants</p>
-          <MemberPicker onPricesChange={setPrices} />
+          <MemberPicker onPricesChange={setPrices} onMembersChange={setMembers} />
         </div>
 
         <div>
           <p className="block text-sm font-medium mb-2">Tiers</p>
-          <PricingModeTierFields allowPriceBasedModes={allowPriceBasedModes} />
+          <PricingModeTierFields allowPriceBasedModes={allowPriceBasedModes} onTiersValidChange={setTiersValid} />
         </div>
 
-        <button
-          type="submit"
-          className="bg-accent hover:bg-accent-hover text-white px-4 py-3 rounded transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-        >
-          Create draft discount
-        </button>
+        <div>
+          <button
+            type="submit"
+            disabled={!canSubmit}
+            className="bg-accent hover:bg-accent-hover text-white px-4 py-3 rounded transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-accent"
+          >
+            Create draft discount
+          </button>
+          {!canSubmit && (
+            <p className="text-xs text-muted mt-2">Add at least one product/variant and one tier to continue.</p>
+          )}
+        </div>
       </form>
     </main>
   )

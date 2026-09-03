@@ -7,6 +7,7 @@ import FixedPriceTierFields from '@/components/FixedPriceTierFields'
 export default function PricingModeTierFields({
   allowPriceBasedModes,
   initial,
+  onTiersValidChange,
 }: {
   allowPriceBasedModes: boolean
   initial?: {
@@ -14,6 +15,8 @@ export default function PricingModeTierFields({
     fixedTiers?: { minQty: number; fixedPrice: number }[]
     startMode?: 'percent' | 'fixed'
   }
+  /** Fires whenever the currently-active mode's tier rows go from having a complete one to not (or back). */
+  onTiersValidChange?: (valid: boolean) => void
 }) {
   const [mode, setMode] = useState<'percent' | 'fixed'>(
     allowPriceBasedModes ? (initial?.startMode ?? 'percent') : 'percent',
@@ -61,7 +64,7 @@ export default function PricingModeTierFields({
 
       {mode === 'percent' ? (
         <>
-          <TierFields initial={initial?.percentTiers} allowAnchorPrice={allowPriceBasedModes} />
+          <TierFields initial={initial?.percentTiers} allowAnchorPrice={allowPriceBasedModes} onValidityChange={onTiersValidChange} />
           <p className="text-xs text-muted mt-2">
             Enter percent-off directly. The next screen shows the actual
             resulting price before you go live.
@@ -69,7 +72,7 @@ export default function PricingModeTierFields({
         </>
       ) : (
         <>
-          <FixedPriceTierFields initial={initial?.fixedTiers} />
+          <FixedPriceTierFields initial={initial?.fixedTiers} onValidityChange={onTiersValidChange} />
           <p className="text-xs text-muted mt-2">
             Enter the exact price each customer pays per unit at that
             quantity — no percentage math needed.
