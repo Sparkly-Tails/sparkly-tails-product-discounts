@@ -20,8 +20,8 @@ export async function syncTimeDiscountMetafields(discount: TimeDiscount): Promis
     title: discount.title,
     pricingMode: discount.pricingMode,
     amount: discount.amount,
-    startsAt: normalizeIsoDateTime(discount.startsAt),
-    endsAt: normalizeIsoDateTime(discount.endsAt),
+    startsAt: discount.startsAt,
+    endsAt: discount.endsAt,
   }
 
   const results = await Promise.allSettled(uniqueProductIds.map((productId) => setTimeDiscountMetafield(productId, value)))
@@ -30,11 +30,6 @@ export async function syncTimeDiscountMetafields(discount: TimeDiscount): Promis
   if (rejected.length > 0) {
     throw new Error(rejected.map((r) => (r as PromiseRejectedResult).reason?.message ?? String((r as PromiseRejectedResult).reason)).join('; '))
   }
-}
-
-function normalizeIsoDateTime(isoString: string): string {
-  const date = new Date(isoString)
-  return date.toISOString().replace(/\.\d{3}Z$/, 'Z')
 }
 
 async function setTimeDiscountMetafield(productId: string, value: TimeDiscountMetafieldValue): Promise<void> {

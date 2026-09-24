@@ -22,7 +22,7 @@ describe('syncTimeDiscountMetafields', () => {
     const parsed = JSON.parse((call1[1] as { metafields: { value: string }[] }).metafields[0].value)
     expect(parsed).toEqual({
       discountId: 'time_disc_1', title: 'Flash Sale', pricingMode: 'percent', amount: 20,
-      startsAt: '2026-01-01T00:00:00Z', endsAt: '2026-01-02T00:00:00Z',
+      startsAt: '2026-01-01T00:00', endsAt: '2026-01-02T00:00',
     })
   })
 
