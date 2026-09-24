@@ -21,6 +21,12 @@ export default function NewTimeDiscountForm({ shopTimezone }: { shopTimezone: st
   const hasValidAmount = Number(amount) > 0
   const canSubmit = hasSelection && hasValidSchedule && hasValidAmount
 
+  function handleSelectionModeChange(mode: 'products' | 'collections') {
+    setSelectionMode(mode)
+    setMembers([])
+    setCollections([])
+  }
+
   // A selection change can invalidate an already-chosen fixed mode (members
   // no longer share one price) — fall back to percent automatically. Mirrors
   // the existing PricingModeTierFields's own fallback-on-invalid-mode
@@ -81,11 +87,11 @@ export default function NewTimeDiscountForm({ shopTimezone }: { shopTimezone: st
           <p className="block text-sm font-medium mb-2">Applies to</p>
           <div className="flex gap-4 mb-3">
             <label className="flex items-center gap-2 text-sm">
-              <input type="radio" checked={selectionMode === 'products'} onChange={() => setSelectionMode('products')} />
+              <input type="radio" checked={selectionMode === 'products'} onChange={() => handleSelectionModeChange('products')} />
               Specific products / variants
             </label>
             <label className="flex items-center gap-2 text-sm">
-              <input type="radio" checked={selectionMode === 'collections'} onChange={() => setSelectionMode('collections')} />
+              <input type="radio" checked={selectionMode === 'collections'} onChange={() => handleSelectionModeChange('collections')} />
               Collections
             </label>
           </div>
