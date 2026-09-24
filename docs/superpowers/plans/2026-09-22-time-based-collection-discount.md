@@ -1760,9 +1760,12 @@ git commit -m "Add time discount picker server actions"
 
 ---
 
-### Task 7: Products-mode picker component
+### Task 7: Component testing harness + products-mode picker component
 
 **Files:**
+- Modify: `package.json` (new devDependencies)
+- Modify: `vitest.config.ts` (no structural change needed — see the environment note below)
+- Create: `tests/timeDiscounts/components/TimeProductPicker.test.tsx`
 - Create: `src/timeDiscounts/components/TimeProductPicker.tsx`
 
 **Interfaces:**
@@ -1774,9 +1777,139 @@ git commit -m "Add time discount picker server actions"
   ```
   Emits hidden `member-{i}-productId`/`member-{i}-variantId` inputs, matching the form-field convention Task 5's actions parse.
 
-No dedicated test file for this task — this repo has no component-test harness for React components (matching the existing `MemberPicker.tsx`'s own precedent). Verified via the `tsc --noEmit` check in Step 2 below, and end-to-end in Task 10's page once it's wired up.
+**This repo has no React component-test harness yet** (confirmed: no `@testing-library/*` in `package.json`, no `.test.tsx` files anywhere, `vitest.config.ts` runs `environment: 'node'`, and the existing `MemberPicker.tsx` has no test file — matching what this plan originally assumed). This task adds one, scoped to the new module's own test files via Vitest's per-file `@vitest-environment` docblock pragma rather than restructuring the shared `vitest.config.ts` into a workspace/projects split — every existing test file keeps running under `environment: 'node'` exactly as today; only files that open with `// @vitest-environment jsdom` opt into a DOM. This is the standard, minimal-footprint way Vitest supports mixed environments in one project, and it means this task never touches behavior for any existing test. It intentionally does **not** retrofit tests onto `MemberPicker.tsx` or any other pre-existing component — out of scope for this plan (spec's Global Constraints: no changes to the existing discount system).
 
-- [ ] **Step 1: Create `src/timeDiscounts/components/TimeProductPicker.tsx`**
+- [ ] **Step 1: Install the testing harness devDependencies**
+
+```bash
+npm install --save-dev @testing-library/react @testing-library/jest-dom @testing-library/user-event jsdom
+```
+
+- [ ] **Step 2: Write the failing tests**
+
+Create `tests/timeDiscounts/components/TimeProductPicker.test.tsx`:
+
+```tsx
+// @vitest-environment jsdom
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import '@testing-library/jest-dom/vitest'
+import TimeProductPicker from '@/timeDiscounts/components/TimeProductPicker'
+import * as pickerActions from '@/timeDiscounts/pickerActions'
+
+beforeEach(() => {
+  vi.restoreAllMocks()
+  vi.useFakeTimers({ shouldAdvanceTime: true })
+})
+
+afterEach(() => {
+  vi.useRealTimers()
+})
+
+describe('TimeProductPicker', () => {
+  it('renders with no members selected and no hidden inputs', () => {
+    const { container } = render(<TimeProductPicker />)
+    expect(screen.getByPlaceholderText('Search for a product to add…')).toBeInTheDocument()
+    expect(container.querySelectorAll('input[type="hidden"]')).toHaveLength(0)
+  })
+
+  it('searches after the debounce and adds a single-variant result, emitting a hidden productId input', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    vi.spyOn(pickerActions, 'searchTimeDiscountProductsAction').mockResolvedValue([
+      { id: 'gid://shopify/Product/1', title: 'Tuna Soup', variantCount: 1 },
+    ])
+    vi.spyOn(pickerActions, 'getTimeDiscountProductVariantsAction').mockResolvedValue([
+      { variantId: 'gid://shopify/ProductVariant/900', title: 'Default', price: 4.5 },
+    ])
+    vi.spyOn(pickerActions, 'validateTimeDiscountMemberAction').mockResolvedValue({ ok: true })
+    const onMembersChange = vi.fn()
+
+    const { container } = render(<TimeProductPicker onMembersChange={onMembersChange} />)
+    await user.type(screen.getByPlaceholderText('Search for a product to add…'), 'tuna')
+    await vi.advanceTimersByTimeAsync(300)
+
+    const result = await screen.findByText('Tuna Soup')
+    await user.pointer({ keys: '[MouseLeft]', target: result })
+
+    expect(await screen.findByText(/Tuna Soup — £4.50/)).toBeInTheDocument()
+    expect(container.querySelector('input[name="member-0-productId"]')).toHaveValue('gid://shopify/Product/1')
+    expect(container.querySelector('input[name="member-0-variantId"]')).not.toBeInTheDocument()
+    expect(onMembersChange).toHaveBeenLastCalledWith([
+      { productId: 'gid://shopify/Product/1', title: 'Tuna Soup', price: 4.5 },
+    ])
+  })
+
+  it('expands a multi-variant result and adds the chosen variant, emitting both hidden inputs', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    vi.spyOn(pickerActions, 'searchTimeDiscountProductsAction').mockResolvedValue([
+      { id: 'gid://shopify/Product/2', title: 'Salmon Bowl', variantCount: 2 },
+    ])
+    vi.spyOn(pickerActions, 'getTimeDiscountProductVariantsAction').mockResolvedValue([
+      { variantId: 'gid://shopify/ProductVariant/901', title: 'Small', price: 3.0 },
+      { variantId: 'gid://shopify/ProductVariant/902', title: 'Large', price: 5.0 },
+    ])
+    vi.spyOn(pickerActions, 'validateTimeDiscountMemberAction').mockResolvedValue({ ok: true })
+
+    const { container } = render(<TimeProductPicker />)
+    await user.type(screen.getByPlaceholderText('Search for a product to add…'), 'salmon')
+    await vi.advanceTimersByTimeAsync(300)
+
+    const result = await screen.findByText(/Salmon Bowl/)
+    await user.pointer({ keys: '[MouseLeft]', target: result })
+
+    const largeOption = await screen.findByText(/Large — £5.00/)
+    await user.click(largeOption)
+
+    expect(container.querySelector('input[name="member-0-productId"]')).toHaveValue('gid://shopify/Product/2')
+    expect(container.querySelector('input[name="member-0-variantId"]')).toHaveValue('gid://shopify/ProductVariant/902')
+  })
+
+  it('removes a selected member and its hidden inputs', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    const { container } = render(
+      <TimeProductPicker initialMembers={[{ productId: 'gid://shopify/Product/1', title: 'Tuna Soup', price: 4.5 }]} />,
+    )
+    expect(container.querySelector('input[name="member-0-productId"]')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Remove Tuna Soup' }))
+
+    expect(container.querySelectorAll('input[type="hidden"]')).toHaveLength(0)
+  })
+
+  it('shows the server validation error and does not add the member when validation rejects it', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    vi.spyOn(pickerActions, 'searchTimeDiscountProductsAction').mockResolvedValue([
+      { id: 'gid://shopify/Product/3', title: 'Beef Stew', variantCount: 1 },
+    ])
+    vi.spyOn(pickerActions, 'getTimeDiscountProductVariantsAction').mockResolvedValue([
+      { variantId: 'gid://shopify/ProductVariant/903', title: 'Default', price: 6.0 },
+    ])
+    vi.spyOn(pickerActions, 'validateTimeDiscountMemberAction').mockResolvedValue({
+      ok: false, error: 'This product already belongs to another discount',
+    })
+
+    const { container } = render(<TimeProductPicker />)
+    await user.type(screen.getByPlaceholderText('Search for a product to add…'), 'beef')
+    await vi.advanceTimersByTimeAsync(300)
+    const result = await screen.findByText('Beef Stew')
+    await user.pointer({ keys: '[MouseLeft]', target: result })
+
+    expect(await screen.findByText('This product already belongs to another discount')).toBeInTheDocument()
+    expect(container.querySelectorAll('input[type="hidden"]')).toHaveLength(0)
+  })
+})
+```
+
+- [ ] **Step 3: Run the tests to verify they fail**
+
+```bash
+npx vitest run tests/timeDiscounts/components/TimeProductPicker.test.tsx
+```
+
+Expected: FAIL — `@/timeDiscounts/components/TimeProductPicker` doesn't exist yet.
+
+- [ ] **Step 4: Create `src/timeDiscounts/components/TimeProductPicker.tsx`**
 
 This is a from-scratch reimplementation of the existing `MemberPicker.tsx`'s behavior against the new module's actions — deliberate duplication per this plan's Global Constraints, not a copy-paste-and-edit of the existing file (do not import from `@/components/MemberPicker`).
 
@@ -1987,7 +2120,15 @@ export default function TimeProductPicker({
 }
 ```
 
-- [ ] **Step 2: Verify the file is internally type-correct**
+- [ ] **Step 5: Run the tests to verify they pass**
+
+```bash
+npx vitest run tests/timeDiscounts/components/TimeProductPicker.test.tsx
+```
+
+Expected: PASS, all 5 tests green.
+
+- [ ] **Step 6: Verify the file is internally type-correct**
 
 ```bash
 npx tsc --noEmit 2>&1 | grep TimeProductPicker
@@ -1995,11 +2136,11 @@ npx tsc --noEmit 2>&1 | grep TimeProductPicker
 
 Expected: no output (no errors referencing this file). Errors in other files that don't yet import this component are expected until later tasks wire it up.
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
-git add src/timeDiscounts/components/TimeProductPicker.tsx
-git commit -m "Add the products-mode picker for time discounts"
+git add package.json package-lock.json src/timeDiscounts/components/TimeProductPicker.tsx tests/timeDiscounts/components/TimeProductPicker.test.tsx
+git commit -m "Add component testing harness and the products-mode picker for time discounts"
 ```
 
 ---
@@ -2007,6 +2148,7 @@ git commit -m "Add the products-mode picker for time discounts"
 ### Task 8: Collections-mode picker component
 
 **Files:**
+- Create: `tests/timeDiscounts/components/TimeCollectionPicker.test.tsx`
 - Create: `src/timeDiscounts/components/TimeCollectionPicker.tsx`
 
 **Interfaces:**
@@ -2018,9 +2160,91 @@ git commit -m "Add the products-mode picker for time discounts"
   ```
   Emits repeated hidden `collectionId` inputs, matching `parseCollectionIdsFromForm`'s `formData.getAll('collectionId')` convention from Task 5.
 
-No dedicated test file — same rationale as Task 7 (no component-test harness in this repo).
+The component-testing harness (`@testing-library/react` etc.) was installed in Task 7 — this task only adds its own test file, using the same `// @vitest-environment jsdom` pragma.
 
-- [ ] **Step 1: Create `src/timeDiscounts/components/TimeCollectionPicker.tsx`**
+- [ ] **Step 1: Write the failing tests**
+
+Create `tests/timeDiscounts/components/TimeCollectionPicker.test.tsx`:
+
+```tsx
+// @vitest-environment jsdom
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import '@testing-library/jest-dom/vitest'
+import TimeCollectionPicker from '@/timeDiscounts/components/TimeCollectionPicker'
+import * as pickerActions from '@/timeDiscounts/pickerActions'
+
+beforeEach(() => {
+  vi.restoreAllMocks()
+  vi.useFakeTimers({ shouldAdvanceTime: true })
+})
+
+afterEach(() => {
+  vi.useRealTimers()
+})
+
+describe('TimeCollectionPicker', () => {
+  it('renders with no collections selected and no hidden inputs', () => {
+    const { container } = render(<TimeCollectionPicker />)
+    expect(screen.getByPlaceholderText('Search for a collection to add…')).toBeInTheDocument()
+    expect(container.querySelectorAll('input[name="collectionId"]')).toHaveLength(0)
+  })
+
+  it('searches after the debounce and adds a result, emitting a hidden collectionId input', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    vi.spyOn(pickerActions, 'searchTimeDiscountCollectionsAction').mockResolvedValue([
+      { id: 'gid://shopify/Collection/1', title: 'Summer Sale' },
+    ])
+    const onCollectionsChange = vi.fn()
+
+    const { container } = render(<TimeCollectionPicker onCollectionsChange={onCollectionsChange} />)
+    await user.type(screen.getByPlaceholderText('Search for a collection to add…'), 'summer')
+    await vi.advanceTimersByTimeAsync(300)
+
+    const result = await screen.findByText('Summer Sale')
+    await user.pointer({ keys: '[MouseLeft]', target: result })
+
+    expect(container.querySelector('input[name="collectionId"]')).toHaveValue('gid://shopify/Collection/1')
+    expect(onCollectionsChange).toHaveBeenLastCalledWith([{ id: 'gid://shopify/Collection/1', title: 'Summer Sale' }])
+  })
+
+  it('does not offer an already-selected collection again in search results', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    vi.spyOn(pickerActions, 'searchTimeDiscountCollectionsAction').mockResolvedValue([
+      { id: 'gid://shopify/Collection/1', title: 'Summer Sale' },
+    ])
+
+    render(<TimeCollectionPicker initialCollections={[{ id: 'gid://shopify/Collection/1', title: 'Summer Sale' }]} />)
+    await user.type(screen.getByPlaceholderText('Search for a collection to add…'), 'summer')
+    await vi.advanceTimersByTimeAsync(300)
+
+    expect(screen.queryAllByText('Summer Sale')).toHaveLength(1) // only the already-selected chip, not a second result row
+  })
+
+  it('removes a selected collection and its hidden input', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    const { container } = render(
+      <TimeCollectionPicker initialCollections={[{ id: 'gid://shopify/Collection/1', title: 'Summer Sale' }]} />,
+    )
+    expect(container.querySelector('input[name="collectionId"]')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Remove Summer Sale' }))
+
+    expect(container.querySelectorAll('input[name="collectionId"]')).toHaveLength(0)
+  })
+})
+```
+
+- [ ] **Step 2: Run the tests to verify they fail**
+
+```bash
+npx vitest run tests/timeDiscounts/components/TimeCollectionPicker.test.tsx
+```
+
+Expected: FAIL — `@/timeDiscounts/components/TimeCollectionPicker` doesn't exist yet.
+
+- [ ] **Step 3: Create `src/timeDiscounts/components/TimeCollectionPicker.tsx`**
 
 Deliberately simpler than `TimeProductPicker` — no variant expansion, no cross-kind availability check (collection membership is resolved and checked server-side at save time, per spec §4/§6, not per-keystroke in the picker).
 
@@ -2144,7 +2368,15 @@ export default function TimeCollectionPicker({
 }
 ```
 
-- [ ] **Step 2: Verify the file is internally type-correct**
+- [ ] **Step 4: Run the tests to verify they pass**
+
+```bash
+npx vitest run tests/timeDiscounts/components/TimeCollectionPicker.test.tsx
+```
+
+Expected: PASS, all 4 tests green.
+
+- [ ] **Step 5: Verify the file is internally type-correct**
 
 ```bash
 npx tsc --noEmit 2>&1 | grep TimeCollectionPicker
@@ -2152,10 +2384,10 @@ npx tsc --noEmit 2>&1 | grep TimeCollectionPicker
 
 Expected: no output.
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
-git add src/timeDiscounts/components/TimeCollectionPicker.tsx
+git add src/timeDiscounts/components/TimeCollectionPicker.tsx tests/timeDiscounts/components/TimeCollectionPicker.test.tsx
 git commit -m "Add the collections-mode picker for time discounts"
 ```
 
@@ -2164,20 +2396,128 @@ git commit -m "Add the collections-mode picker for time discounts"
 ### Task 9: New discount page
 
 **Files:**
+- Create: `tests/timeDiscounts/components/NewTimeDiscountForm.test.tsx`
 - Create: `src/timeDiscounts/components/NewTimeDiscountForm.tsx`
 - Create: `src/app/time-discounts/new/page.tsx`
 
 **Interfaces:**
 - Consumes: `createTimeDiscount` (Task 5); `TimeProductPicker`, `type SelectedMember` (Task 7); `TimeCollectionPicker`, `type SelectedCollection` (Task 8); `getShopTimezone` from `@/lib/shop` (Task 5 — already created there, since that task needed it first for the UTC conversion; this page just imports it for display).
 
-- [ ] **Step 1: Create `src/timeDiscounts/components/NewTimeDiscountForm.tsx`**
-
 The interactive client form. `<input type="datetime-local">` naturally produces a naive (no-offset) datetime string, matching how `TimeDiscount.startsAt`/`endsAt` are stored and displayed throughout the admin (spec §3) — conversion to the UTC values Shopify's native discount scheduling requires happens only at the Admin API boundary, inside the server actions (Task 5's `zonedTimeToUtc`), not here. `shopTimezone` is shown only as a label, so the merchant knows which timezone they're entering, in case their own device is set to a different one.
+
+- [ ] **Step 1: Write the failing tests**
+
+The test isolates `NewTimeDiscountForm`'s own responsibility (completeness gating, exclusive-mode rendering, the fixed-mode fallback effect) from `TimeProductPicker`/`TimeCollectionPicker`'s own internals (already covered by Tasks 7/8) by mocking both children with a minimal stub that exposes their real callback contract.
+
+Create `tests/timeDiscounts/components/NewTimeDiscountForm.test.tsx`:
+
+```tsx
+// @vitest-environment jsdom
+import { describe, it, expect, vi } from 'vitest'
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import '@testing-library/jest-dom/vitest'
+import NewTimeDiscountForm from '@/timeDiscounts/components/NewTimeDiscountForm'
+
+vi.mock('@/timeDiscounts/components/TimeProductPicker', () => ({
+  default: ({ onMembersChange }: { onMembersChange?: (m: { productId: string; title: string; price: number }[]) => void }) => (
+    <div data-testid="stub-product-picker">
+      <button type="button" onClick={() => onMembersChange?.([{ productId: 'gid://shopify/Product/1', title: 'A', price: 10 }])}>
+        stub-select-uniform
+      </button>
+      <button
+        type="button"
+        onClick={() => onMembersChange?.([
+          { productId: 'gid://shopify/Product/1', title: 'A', price: 10 },
+          { productId: 'gid://shopify/Product/2', title: 'B', price: 20 },
+        ])}
+      >
+        stub-select-mixed
+      </button>
+    </div>
+  ),
+}))
+
+vi.mock('@/timeDiscounts/components/TimeCollectionPicker', () => ({
+  default: () => <div data-testid="stub-collection-picker" />,
+}))
+
+describe('NewTimeDiscountForm', () => {
+  it('disables submit until name, title, schedule, amount, and a selection are all present', async () => {
+    const user = userEvent.setup()
+    render(<NewTimeDiscountForm shopTimezone="Europe/London" />)
+
+    expect(screen.getByRole('button', { name: 'Create discount' })).toBeDisabled()
+
+    await user.type(screen.getByLabelText('Internal name'), 'Flash')
+    await user.type(screen.getByLabelText('Title'), 'Flash Sale')
+    await user.type(screen.getByLabelText(/Starts/), '2026-07-01T12:00')
+    await user.type(screen.getByLabelText(/Ends/), '2026-07-02T12:00')
+    await user.type(screen.getByLabelText('Amount'), '20')
+    expect(screen.getByRole('button', { name: 'Create discount' })).toBeDisabled() // no selection yet
+
+    await user.click(screen.getByText('stub-select-uniform'))
+    expect(screen.getByRole('button', { name: 'Create discount' })).toBeEnabled()
+  })
+
+  it('keeps submit disabled when the end time is not after the start time', async () => {
+    const user = userEvent.setup()
+    render(<NewTimeDiscountForm shopTimezone="Europe/London" />)
+
+    await user.type(screen.getByLabelText('Internal name'), 'Flash')
+    await user.type(screen.getByLabelText('Title'), 'Flash Sale')
+    await user.type(screen.getByLabelText(/Starts/), '2026-07-02T12:00')
+    await user.type(screen.getByLabelText(/Ends/), '2026-07-01T12:00')
+    await user.type(screen.getByLabelText('Amount'), '20')
+    await user.click(screen.getByText('stub-select-uniform'))
+
+    expect(screen.getByRole('button', { name: 'Create discount' })).toBeDisabled()
+    expect(screen.getByText('End must be after start.')).toBeInTheDocument()
+  })
+
+  it('shows only the picker for the selected mode, never both at once', async () => {
+    const user = userEvent.setup()
+    render(<NewTimeDiscountForm shopTimezone="Europe/London" />)
+
+    expect(screen.getByTestId('stub-product-picker')).toBeInTheDocument()
+    expect(screen.queryByTestId('stub-collection-picker')).not.toBeInTheDocument()
+
+    await user.click(screen.getByLabelText('Collections'))
+
+    expect(screen.queryByTestId('stub-product-picker')).not.toBeInTheDocument()
+    expect(screen.getByTestId('stub-collection-picker')).toBeInTheDocument()
+  })
+
+  it('automatically falls back to percent when a fixed selection becomes non-uniform', async () => {
+    const user = userEvent.setup()
+    render(<NewTimeDiscountForm shopTimezone="Europe/London" />)
+
+    await user.click(screen.getByRole('radio', { name: 'Fixed price' }))
+    expect(screen.getByRole('radio', { name: 'Fixed price' })).toBeChecked()
+
+    await user.click(screen.getByText('stub-select-mixed')) // £10 and £20 — no longer uniform
+
+    expect(screen.queryByRole('radio', { name: 'Fixed price' })).not.toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: 'Percentage off' })).toBeChecked()
+    expect(screen.getByText('These products/variants have different prices, so only a percentage discount is available.')).toBeInTheDocument()
+  })
+})
+```
+
+- [ ] **Step 2: Run the tests to verify they fail**
+
+```bash
+npx vitest run tests/timeDiscounts/components/NewTimeDiscountForm.test.tsx
+```
+
+Expected: FAIL — `@/timeDiscounts/components/NewTimeDiscountForm` doesn't exist yet.
+
+- [ ] **Step 3: Create `src/timeDiscounts/components/NewTimeDiscountForm.tsx`**
 
 ```tsx
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { createTimeDiscount } from '@/timeDiscounts/actions'
 import { pricesUniform } from '@/timeDiscounts/config'
 import TimeProductPicker, { type SelectedMember } from '@/timeDiscounts/components/TimeProductPicker'
@@ -2197,6 +2537,17 @@ export default function NewTimeDiscountForm({ shopTimezone }: { shopTimezone: st
   const hasValidSchedule = startsAt !== '' && endsAt !== '' && endsAt > startsAt
   const hasValidAmount = Number(amount) > 0
   const canSubmit = hasSelection && hasValidSchedule && hasValidAmount
+
+  // A selection change can invalidate an already-chosen fixed mode (members
+  // no longer share one price) — fall back to percent automatically. Mirrors
+  // the existing PricingModeTierFields's own fallback-on-invalid-mode
+  // pattern. Deliberately a useEffect, not a setState call during render
+  // (`{!allowFixed && pricingMode === 'fixed' && setPricingMode('percent')}`)
+  // — that pattern is a real anti-pattern (calling a state setter mid-render)
+  // and must not be used here even though it would often appear to work.
+  useEffect(() => {
+    if (!allowFixed && pricingMode === 'fixed') setPricingMode('percent')
+  }, [allowFixed, pricingMode])
 
   return (
     <main className="p-8 max-w-xl mx-auto">
@@ -2277,7 +2628,6 @@ export default function NewTimeDiscountForm({ shopTimezone }: { shopTimezone: st
               </label>
             )}
           </div>
-          {!allowFixed && pricingMode === 'fixed' && setPricingMode('percent') as unknown as null}
           <label htmlFor="amount" className="sr-only">Amount</label>
           <input
             id="amount" name="amount" type="number" min="0.01" step="0.01" value={amount}
@@ -2305,17 +2655,15 @@ export default function NewTimeDiscountForm({ shopTimezone }: { shopTimezone: st
 }
 ```
 
-The `{!allowFixed && pricingMode === 'fixed' && setPricingMode('percent') as unknown as null}` line calling a state setter during render is a code smell flagged deliberately: **do not implement it this way**. Replace it with a `useEffect`:
+- [ ] **Step 4: Run the tests to verify they pass**
 
-```tsx
-useEffect(() => {
-  if (!allowFixed && pricingMode === 'fixed') setPricingMode('percent')
-}, [allowFixed, pricingMode])
+```bash
+npx vitest run tests/timeDiscounts/components/NewTimeDiscountForm.test.tsx
 ```
 
-placed above the `return` (add `useEffect` to the `react` import). This mirrors the existing `PricingModeTierFields`'s own fallback-on-invalid-mode pattern exactly (same effect, same reasoning: membership changing after mount can invalidate an already-selected fixed mode).
+Expected: PASS, all 4 tests green.
 
-- [ ] **Step 2: Create `src/app/time-discounts/new/page.tsx`**
+- [ ] **Step 5: Create `src/app/time-discounts/new/page.tsx`**
 
 ```tsx
 import { getShopTimezone } from '@/lib/shop'
@@ -2327,7 +2675,7 @@ export default async function NewTimeDiscountPage() {
 }
 ```
 
-- [ ] **Step 3: Verify the new files are internally type-correct**
+- [ ] **Step 6: Verify the new files are internally type-correct**
 
 ```bash
 npx tsc --noEmit 2>&1 | grep -E "NewTimeDiscountForm|time-discounts/new"
@@ -2335,10 +2683,10 @@ npx tsc --noEmit 2>&1 | grep -E "NewTimeDiscountForm|time-discounts/new"
 
 Expected: no output.
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
-git add src/timeDiscounts/components/NewTimeDiscountForm.tsx src/app/time-discounts/new/page.tsx
+git add src/timeDiscounts/components/NewTimeDiscountForm.tsx tests/timeDiscounts/components/NewTimeDiscountForm.test.tsx src/app/time-discounts/new/page.tsx
 git commit -m "Add the new time discount page"
 ```
 
@@ -2356,6 +2704,8 @@ git commit -m "Add the new time discount page"
 **Design note on selection editing:** the edit page shows which mode the discount uses (Products or Collections) as a static label, with only that mode's picker rendered for editing membership — **no interactive mode-switch toggle on this page**. This deliberately avoids the exact class of bug this app already hit once and fixed (an interactive toggle on an edit page whose action didn't actually honor the submitted value) — even though `updateTimeDiscountSchedule`'s `pricingMode` toggle IS safe (Task 5 built it to genuinely respect whatever is submitted), switching *selection mode* after creation is a bigger structural change the spec never asked for (§4: the choice is forced once, upfront). Not offering it on edit is the conservative, spec-consistent choice.
 
 **Design note on activation controls:** there is no "Go live"/"Take offline" toggle on this page, and no local status to flip — Shopify's own native scheduling on the discount's `DiscountAutomaticApp` record decides activation from `startsAt`/`endsAt` (spec §5). The page shows a computed, display-only Upcoming/Active/Expired label (same `zonedTimeToUtc` conversion Task 5's actions use, applied here just for comparison against the current instant) and offers only Delete as a direct action.
+
+**Not covered by the Task 7 component-testing harness:** this file and the `src/app/page.tsx` edit are Next.js `async` Server Components — they fetch data directly (`getTimeDiscountsConfig`, `getMemberInfo`, `getShopTimezone`) rather than receiving it as props, which `@testing-library/react`'s synchronous `render()` doesn't support without a different (heavier) integration-testing setup (e.g. rendering through Next's own test harness, or Playwright). This wasn't part of what was scoped when adding the harness in Task 7. Verified here via `tsc --noEmit` only, same as every other Server Component page in this app (including the existing `src/app/discounts/[discountId]/page.tsx`), plus manual browser verification in Task 14.
 
 - [ ] **Step 1: Create `src/app/time-discounts/[discountId]/page.tsx`**
 
