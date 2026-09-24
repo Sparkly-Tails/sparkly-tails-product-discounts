@@ -38,11 +38,11 @@ export async function resolveCollectionMembers(collectionIds: string[]): Promise
   for (const collectionId of collectionIds) {
     let cursor: string | null = null
     for (;;) {
-      const data = await shopifyQuery<{
+      const data: {
         collection: {
           products: { edges: { node: { id: string } }[]; pageInfo: { hasNextPage: boolean; endCursor: string | null } }
         } | null
-      }>(
+      } = await shopifyQuery(
         `query getCollectionProducts($id: ID!, $after: String) {
           collection(id: $id) {
             products(first: 250, after: $after) {
