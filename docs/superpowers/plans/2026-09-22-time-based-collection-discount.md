@@ -1788,12 +1788,12 @@ npm install --save-dev @testing-library/react @testing-library/jest-dom @testing
 
 - [ ] **Step 2: Write the failing tests**
 
-Create `tests/timeDiscounts/components/TimeProductPicker.test.tsx`:
+Create `tests/timeDiscounts/components/TimeProductPicker.test.tsx`. Note the explicit `cleanup()` in `afterEach`: this repo's `vitest.config.ts` doesn't set `test.globals: true` (every test file explicitly imports `describe`/`it`/etc. from `vitest`), so `@testing-library/react`'s automatic post-test DOM cleanup — which relies on detecting a global test framework — never registers. Without an explicit `cleanup()` call, each `render()` in this file accumulates in the jsdom document across tests in the same run, breaking `getByPlaceholderText`/`getByText` queries with "found multiple elements" once more than one test has rendered the component. Every component test file in this plan needs this same explicit `cleanup()`:
 
 ```tsx
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, within, cleanup } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import '@testing-library/jest-dom/vitest'
 import TimeProductPicker from '@/timeDiscounts/components/TimeProductPicker'
@@ -1805,6 +1805,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  cleanup()
   vi.useRealTimers()
 })
 
@@ -2165,12 +2166,12 @@ The component-testing harness (`@testing-library/react` etc.) was installed in T
 
 - [ ] **Step 1: Write the failing tests**
 
-Create `tests/timeDiscounts/components/TimeCollectionPicker.test.tsx`:
+Create `tests/timeDiscounts/components/TimeCollectionPicker.test.tsx` — same explicit `cleanup()` requirement as Task 7's test file (this repo has no `test.globals: true`, so `@testing-library/react`'s automatic cleanup never registers):
 
 ```tsx
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, cleanup } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import '@testing-library/jest-dom/vitest'
 import TimeCollectionPicker from '@/timeDiscounts/components/TimeCollectionPicker'
@@ -2182,6 +2183,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  cleanup()
   vi.useRealTimers()
 })
 
@@ -2410,15 +2412,19 @@ The interactive client form. `<input type="datetime-local">` naturally produces 
 
 The test isolates `NewTimeDiscountForm`'s own responsibility (completeness gating, exclusive-mode rendering, the fixed-mode fallback effect) from `TimeProductPicker`/`TimeCollectionPicker`'s own internals (already covered by Tasks 7/8) by mocking both children with a minimal stub that exposes their real callback contract.
 
-Create `tests/timeDiscounts/components/NewTimeDiscountForm.test.tsx`:
+Create `tests/timeDiscounts/components/NewTimeDiscountForm.test.tsx` — same explicit `cleanup()` requirement as Tasks 7/8's test files (this repo has no `test.globals: true`, so `@testing-library/react`'s automatic cleanup never registers):
 
 ```tsx
 // @vitest-environment jsdom
-import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { describe, it, expect, vi, afterEach } from 'vitest'
+import { render, screen, cleanup } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import '@testing-library/jest-dom/vitest'
 import NewTimeDiscountForm from '@/timeDiscounts/components/NewTimeDiscountForm'
+
+afterEach(() => {
+  cleanup()
+})
 
 vi.mock('@/timeDiscounts/components/TimeProductPicker', () => ({
   default: ({ onMembersChange }: { onMembersChange?: (m: { productId: string; title: string; price: number }[]) => void }) => (
