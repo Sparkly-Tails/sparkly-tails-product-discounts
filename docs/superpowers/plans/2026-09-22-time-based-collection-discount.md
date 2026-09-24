@@ -3022,7 +3022,7 @@ New block inside the *existing* `product-tier-pricing` extension (own schema ent
 
 {% schema %}
 {
-  "name": "t:name",
+  "name": "t:name_time_discount",
   "target": "section",
   "stylesheet": "time-based-discount.css",
   "javascript": "time-based-discount.js",
@@ -3040,11 +3040,14 @@ New block inside the *existing* `product-tier-pricing` extension (own schema ent
 
 The block starts `hidden` in markup (server-rendered state is always "unknown/closed" since evaluating the window requires the customer's live clock, not just server-render time) — Task 12's JS removes `hidden` only once it confirms the window is actually active, matching spec §7's "only renders once the window is active" rule.
 
-- [ ] **Step 2: Add the locale key**
+`"t:name_time_discount"`, not `"t:name"`: the existing `tier-pricing.liquid` block's schema already uses `"name": "t:name"` (resolving to `en.default.schema.json`'s `"name": "Tier pricing"`). Reusing the same key for this block would make both blocks display as "Tier pricing" in the theme editor's block picker — a distinct key is required so this block gets its own label.
 
-Modify `extensions/product-tier-pricing/locales/en.default.json` — read it first, then add (alongside whatever keys already exist for the other block, without removing them):
+- [ ] **Step 2: Add the locale keys**
+
+Shopify theme-app-extension convention (confirmed by `tier-pricing.liquid`'s own existing schema, which uses `"t:name"`/`"t:price_font_size_label"`/etc. resolving against this exact file): `{% schema %}` `"t:"` references resolve against `<locale>.default.schema.json`, NOT `<locale>.default.json` (that second file, if present at all, serves `{{ 'key' | t }}` calls in the rendered Liquid body — a different mechanism this task doesn't use). Modify the existing `extensions/product-tier-pricing/locales/en.default.schema.json` — read it first (it already has 7 keys, including `"name": "Tier pricing"`), then add these two new keys alongside the existing ones, without removing or renaming any:
 
 ```json
+"name_time_discount": "Time-based discount",
 "countdown_color_label": "Countdown box color"
 ```
 
@@ -3106,7 +3109,7 @@ Modify `extensions/product-tier-pricing/locales/en.default.json` — read it fir
 - [ ] **Step 4: Commit**
 
 ```bash
-git add extensions/product-tier-pricing/blocks/time-based-discount.liquid extensions/product-tier-pricing/assets/time-based-discount.css extensions/product-tier-pricing/locales/en.default.json
+git add extensions/product-tier-pricing/blocks/time-based-discount.liquid extensions/product-tier-pricing/assets/time-based-discount.css extensions/product-tier-pricing/locales/en.default.schema.json
 git commit -m "Add the countdown widget Liquid block"
 ```
 
