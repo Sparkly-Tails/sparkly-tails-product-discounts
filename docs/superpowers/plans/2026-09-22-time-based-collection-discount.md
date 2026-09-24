@@ -3078,7 +3078,9 @@ fn main() {
 }
 ```
 
-- [ ] **Step 5: Create `extensions/time-based-discount/src/cart_lines_discounts_generate_run.rs`**
+- [ ] **Step 5: Write the failing tests — create `extensions/time-based-discount/src/cart_lines_discounts_generate_run.rs` with real struct definitions, a STUB function body, and the full test module**
+
+Rust tests live in the same file as the code under test (unlike the TS tasks in this plan, where test and implementation are separate files) — so "write the test first" here means: define the real `Member`/`Config` structs and the function signature (needed for the test module to compile at all), but stub the function body to always return no operations, then write every test against that stub. Every test in this step must FAIL on assertions (not on a compile error) once run in Step 6 — that's what proves the tests actually exercise real behavior in Step 8, not vacuously pass.
 
 ```rust
 use super::schema;
@@ -3108,104 +3110,13 @@ pub struct Config {
 
 #[shopify_function]
 fn cart_lines_discounts_generate_run(
-    input: schema::cart_lines_discounts_generate_run::Input,
+    _input: schema::cart_lines_discounts_generate_run::Input,
 ) -> Result<schema::CartLinesDiscountsGenerateRunResult> {
-    let has_product_discount_class = input
-        .discount()
-        .discount_classes()
-        .contains(&schema::DiscountClass::Product);
-
-    if !has_product_discount_class {
-        return Ok(schema::CartLinesDiscountsGenerateRunResult { operations: vec![] });
-    }
-
-    // No status check here: Shopify only invokes this Function at all once
-    // this specific discount's native startsAt/endsAt window is open (see
-    // spec §5) — there is nothing left for the Function itself to verify
-    // about timing.
-    let config: &Config = match input.discount().metafield() {
-        Some(metafield) => metafield.json_value(),
-        None => return Ok(schema::CartLinesDiscountsGenerateRunResult { operations: vec![] }),
-    };
-
-    if config.resolved_members.is_empty() {
-        return Ok(schema::CartLinesDiscountsGenerateRunResult { operations: vec![] });
-    }
-
-    let mut candidates = vec![];
-
-    for line in input.cart().lines().iter() {
-        let variant = match line.merchandise() {
-            schema::cart_lines_discounts_generate_run::input::cart::lines::Merchandise::ProductVariant(v) => v,
-            _ => continue,
-        };
-        let product_id = variant.product().id();
-        let variant_id = variant.id();
-
-        let matches_member = config.resolved_members.iter().any(|m| {
-            if &m.product_id != product_id {
-                return false;
-            }
-            match &m.variant_id {
-                Some(vid) => vid == variant_id,
-                None => true,
-            }
-        });
-        if !matches_member {
-            continue;
-        }
-
-        let price = line.cost().amount_per_quantity().amount().as_f64();
-
-        if config.pricing_mode == "fixed" {
-            // Clamp to the line's own price, same fail-safe as the existing
-            // Function: never produce a negative discount (a markup).
-            let fixed_price = config.amount.min(price);
-            let discount_amount = ((price - fixed_price) * (*line.quantity() as f64) * 100.0).round() / 100.0;
-            if discount_amount <= 0.0 {
-                continue;
-            }
-            candidates.push(schema::ProductDiscountCandidate {
-                targets: vec![schema::ProductDiscountCandidateTarget::CartLine(
-                    schema::CartLineTarget { id: line.id().clone(), quantity: None },
-                )],
-                message: Some(format!("£{:.2} each", fixed_price)),
-                value: schema::ProductDiscountCandidateValue::FixedAmount(
-                    schema::ProductDiscountCandidateFixedAmount {
-                        amount: Decimal(discount_amount),
-                        applies_to_each_item: Some(false),
-                    },
-                ),
-                associated_discount_code: None,
-                prerequisites: None,
-            });
-        } else {
-            candidates.push(schema::ProductDiscountCandidate {
-                targets: vec![schema::ProductDiscountCandidateTarget::CartLine(
-                    schema::CartLineTarget { id: line.id().clone(), quantity: None },
-                )],
-                message: Some(format!("{}% off", config.amount)),
-                value: schema::ProductDiscountCandidateValue::Percentage(schema::Percentage {
-                    value: Decimal(config.amount),
-                }),
-                associated_discount_code: None,
-                prerequisites: None,
-            });
-        }
-    }
-
-    if candidates.is_empty() {
-        return Ok(schema::CartLinesDiscountsGenerateRunResult { operations: vec![] });
-    }
-
-    Ok(schema::CartLinesDiscountsGenerateRunResult {
-        operations: vec![schema::CartOperation::ProductDiscountsAdd(
-            schema::ProductDiscountsAddOperation {
-                selection_strategy: schema::ProductDiscountSelectionStrategy::All,
-                candidates,
-            },
-        )],
-    })
+    // STUB — Step 7 replaces this body with the real implementation.
+    // Every test below must fail against this stub (an empty result never
+    // matches the "applies a discount" tests' assertions), not fail to
+    // compile — that's what makes Step 6 a genuine red state.
+    Ok(schema::CartLinesDiscountsGenerateRunResult { operations: vec![] })
 }
 
 #[cfg(test)]
@@ -3433,15 +3344,131 @@ mod tests {
 }
 ```
 
-- [ ] **Step 6: Run the Rust test suite**
+- [ ] **Step 6: Run the Rust test suite to verify the new tests fail against the stub**
 
 ```bash
 cd extensions/time-based-discount && cargo test
 ```
 
-Expected: PASS, all 6 tests green. If `cargo test` fails to compile because `schema.graphql`/the Cargo workspace scaffold don't exist yet, run `shopify app generate extension --template rust --name time-based-discount` first (from the repo root) to let the Shopify CLI create the scaffold (`schema.graphql`, `package.json`, `locales/`, `.gitignore`, a real `uid`), then overwrite `shopify.extension.toml`, `Cargo.toml`, `src/main.rs`, and `src/cart_lines_discounts_generate_run.{graphql,rs}` with this task's content (keeping the CLI-assigned `uid`), and re-run `cargo test`.
+Expected: if `cargo test` fails to compile because `schema.graphql`/the Cargo workspace scaffold don't exist yet, run `shopify app generate extension --template rust --name time-based-discount` first (from the repo root) to let the Shopify CLI create the scaffold (`schema.graphql`, `package.json`, `locales/`, `.gitignore`, a real `uid`), then re-place `shopify.extension.toml`, `Cargo.toml`, `src/main.rs`, and this file (keeping the CLI-assigned `uid`), and retry. Once it compiles: FAIL — `applies_a_percent_discount_to_a_matching_line`, `applies_a_fixed_price_discount_to_a_matching_line`, and `matches_a_specific_variant_only_when_variant_id_is_present` must all fail on their `assert_eq!(result.operations.len(), 1)` (the stub always returns 0 operations); `a_fixed_price_above_sticker_price_never_produces_a_markup`, `ignores_a_line_whose_product_is_not_in_resolved_members`, and `returns_no_operations_when_no_metafield_is_present` are expected to already PASS against the stub (they all assert zero operations) — that's fine, they're true-negative cases the stub happens to satisfy trivially; the three FAILing tests are what prove the suite isn't vacuous.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 7: Replace the stub body with the real implementation**
+
+```rust
+#[shopify_function]
+fn cart_lines_discounts_generate_run(
+    input: schema::cart_lines_discounts_generate_run::Input,
+) -> Result<schema::CartLinesDiscountsGenerateRunResult> {
+    let has_product_discount_class = input
+        .discount()
+        .discount_classes()
+        .contains(&schema::DiscountClass::Product);
+
+    if !has_product_discount_class {
+        return Ok(schema::CartLinesDiscountsGenerateRunResult { operations: vec![] });
+    }
+
+    // No status check here: Shopify only invokes this Function at all once
+    // this specific discount's native startsAt/endsAt window is open (see
+    // spec §5) — there is nothing left for the Function itself to verify
+    // about timing.
+    let config: &Config = match input.discount().metafield() {
+        Some(metafield) => metafield.json_value(),
+        None => return Ok(schema::CartLinesDiscountsGenerateRunResult { operations: vec![] }),
+    };
+
+    if config.resolved_members.is_empty() {
+        return Ok(schema::CartLinesDiscountsGenerateRunResult { operations: vec![] });
+    }
+
+    let mut candidates = vec![];
+
+    for line in input.cart().lines().iter() {
+        let variant = match line.merchandise() {
+            schema::cart_lines_discounts_generate_run::input::cart::lines::Merchandise::ProductVariant(v) => v,
+            _ => continue,
+        };
+        let product_id = variant.product().id();
+        let variant_id = variant.id();
+
+        let matches_member = config.resolved_members.iter().any(|m| {
+            if &m.product_id != product_id {
+                return false;
+            }
+            match &m.variant_id {
+                Some(vid) => vid == variant_id,
+                None => true,
+            }
+        });
+        if !matches_member {
+            continue;
+        }
+
+        let price = line.cost().amount_per_quantity().amount().as_f64();
+
+        if config.pricing_mode == "fixed" {
+            // Clamp to the line's own price, same fail-safe as the existing
+            // Function: never produce a negative discount (a markup).
+            let fixed_price = config.amount.min(price);
+            let discount_amount = ((price - fixed_price) * (*line.quantity() as f64) * 100.0).round() / 100.0;
+            if discount_amount <= 0.0 {
+                continue;
+            }
+            candidates.push(schema::ProductDiscountCandidate {
+                targets: vec![schema::ProductDiscountCandidateTarget::CartLine(
+                    schema::CartLineTarget { id: line.id().clone(), quantity: None },
+                )],
+                message: Some(format!("£{:.2} each", fixed_price)),
+                value: schema::ProductDiscountCandidateValue::FixedAmount(
+                    schema::ProductDiscountCandidateFixedAmount {
+                        amount: Decimal(discount_amount),
+                        applies_to_each_item: Some(false),
+                    },
+                ),
+                associated_discount_code: None,
+                prerequisites: None,
+            });
+        } else {
+            candidates.push(schema::ProductDiscountCandidate {
+                targets: vec![schema::ProductDiscountCandidateTarget::CartLine(
+                    schema::CartLineTarget { id: line.id().clone(), quantity: None },
+                )],
+                message: Some(format!("{}% off", config.amount)),
+                value: schema::ProductDiscountCandidateValue::Percentage(schema::Percentage {
+                    value: Decimal(config.amount),
+                }),
+                associated_discount_code: None,
+                prerequisites: None,
+            });
+        }
+    }
+
+    if candidates.is_empty() {
+        return Ok(schema::CartLinesDiscountsGenerateRunResult { operations: vec![] });
+    }
+
+    Ok(schema::CartLinesDiscountsGenerateRunResult {
+        operations: vec![schema::CartOperation::ProductDiscountsAdd(
+            schema::ProductDiscountsAddOperation {
+                selection_strategy: schema::ProductDiscountSelectionStrategy::All,
+                candidates,
+            },
+        )],
+    })
+}
+```
+
+Replace only the `#[shopify_function] fn cart_lines_discounts_generate_run` block from Step 5 with this — the struct definitions and `#[cfg(test)] mod tests` block from Step 5 stay exactly as written.
+
+- [ ] **Step 8: Run the Rust test suite again to verify all tests now pass**
+
+```bash
+cd extensions/time-based-discount && cargo test
+```
+
+Expected: PASS, all 6 tests green.
+
+- [ ] **Step 9: Commit**
 
 ```bash
 git add extensions/time-based-discount/
