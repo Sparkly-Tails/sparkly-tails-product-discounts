@@ -950,6 +950,7 @@ describe('createTimeDiscount', () => {
   })
 
   it('rejects a fixed-price discount whose members have different prices', async () => {
+    vi.spyOn(timeConfigLib, 'getTimeDiscountsConfig').mockResolvedValue({ discounts: [] })
     vi.spyOn(productsLib, 'getMemberInfo').mockResolvedValue([
       { productId: 'gid://shopify/Product/1', title: 'A', price: 10, handle: 'a', imageUrl: null },
       { productId: 'gid://shopify/Product/2', title: 'B', price: 20, handle: 'b', imageUrl: null },
