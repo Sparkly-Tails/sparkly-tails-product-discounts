@@ -2,7 +2,7 @@
 
 import { searchProducts, getProductVariantOptions, type ProductSearchResult, type ProductVariantOption } from '@/lib/products'
 import { searchCollections, type CollectionSearchResult } from '@/lib/collections'
-import { isAvailableEverywhere, fetchAvailabilityConfigs } from '@/lib/discountAvailability'
+import { isAvailableEverywhere, fetchAvailabilityConfigs } from '@/lib/discount-availability'
 
 /**
  * Backs the picker's search box. Fires on every debounced keystroke — both

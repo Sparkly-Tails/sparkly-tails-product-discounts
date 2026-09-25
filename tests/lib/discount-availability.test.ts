@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { isAvailableEverywhere, fetchAvailabilityConfigs } from '@/lib/discountAvailability'
+import { isAvailableEverywhere, fetchAvailabilityConfigs } from '@/lib/discount-availability'
 import * as configLib from '@/lib/config'
 import * as timeConfigLib from '@/timeDiscounts/config'
 import type { Config } from '@/lib/config'
