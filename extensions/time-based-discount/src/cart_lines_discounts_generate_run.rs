@@ -1,6 +1,7 @@
 use super::schema;
 use shopify_function::prelude::*;
 use shopify_function::Result;
+use std::collections::HashMap;
 
 #[derive(Deserialize, Default, PartialEq)]
 #[shopify_function(rename_all = "camelCase")]
@@ -49,6 +50,15 @@ fn cart_lines_discounts_generate_run(
         return Ok(schema::CartLinesDiscountsGenerateRunResult { operations: vec![] });
     }
 
+    // Build a product_id -> members index once, so each cart line does an
+    // O(1) HashMap lookup instead of a full linear scan of resolved_members.
+    // This is the checkout hot path (invoked on every cart recalculation),
+    // and a collections-mode discount can have hundreds of resolved_members.
+    let mut members_by_product: HashMap<&str, Vec<&Member>> = HashMap::new();
+    for member in &config.resolved_members {
+        members_by_product.entry(member.product_id.as_str()).or_default().push(member);
+    }
+
     let mut candidates = vec![];
 
     for line in input.cart().lines().iter() {
@@ -59,15 +69,15 @@ fn cart_lines_discounts_generate_run(
         let product_id = variant.product().id();
         let variant_id = variant.id();
 
-        let matches_member = config.resolved_members.iter().any(|m| {
-            if &m.product_id != product_id {
-                return false;
-            }
-            match &m.variant_id {
-                Some(vid) => vid == variant_id,
-                None => true,
-            }
-        });
+        let matches_member = members_by_product
+            .get(product_id.as_str())
+            .map(|members| {
+                members.iter().any(|m| match &m.variant_id {
+                    Some(vid) => vid == variant_id,
+                    None => true,
+                })
+            })
+            .unwrap_or(false);
         if !matches_member {
             continue;
         }
