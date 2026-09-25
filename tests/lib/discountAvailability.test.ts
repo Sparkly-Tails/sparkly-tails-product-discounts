@@ -1,5 +1,7 @@
-import { describe, it, expect } from 'vitest'
-import { isAvailableEverywhere } from '@/lib/discountAvailability'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { isAvailableEverywhere, fetchAvailabilityConfigs } from '@/lib/discountAvailability'
+import * as configLib from '@/lib/config'
+import * as timeConfigLib from '@/timeDiscounts/config'
 import type { Config } from '@/lib/config'
 import type { TimeDiscountsConfig } from '@/timeDiscounts/config'
 
@@ -39,5 +41,18 @@ describe('isAvailableEverywhere', () => {
     // collide (both are crypto.randomUUID()-based), so this is a no-op
     // cross-kind, not a bug.
     expect(isAvailableEverywhere(productConfig, timeConfig, 'gid://shopify/Product/1', undefined, 'time_disc_1')).toBe(false)
+  })
+})
+
+describe('fetchAvailabilityConfigs', () => {
+  beforeEach(() => vi.restoreAllMocks())
+
+  it('fetches both configs and returns them together — the only place @/lib/config and @/timeDiscounts/config meet', async () => {
+    vi.spyOn(configLib, 'getConfig').mockResolvedValue(productConfig)
+    vi.spyOn(timeConfigLib, 'getTimeDiscountsConfig').mockResolvedValue(timeConfig)
+
+    const result = await fetchAvailabilityConfigs()
+
+    expect(result).toEqual({ productConfig, timeConfig })
   })
 })

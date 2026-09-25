@@ -2,9 +2,7 @@
 
 import { searchProducts, getProductVariantOptions, type ProductSearchResult, type ProductVariantOption } from '@/lib/products'
 import { searchCollections, type CollectionSearchResult } from '@/lib/collections'
-import { getConfig } from '@/lib/config'
-import { getTimeDiscountsConfig } from '@/timeDiscounts/config'
-import { isAvailableEverywhere } from '@/lib/discountAvailability'
+import { isAvailableEverywhere, fetchAvailabilityConfigs } from '@/lib/discountAvailability'
 
 /**
  * Backs the picker's search box. Fires on every debounced keystroke — both
@@ -15,7 +13,7 @@ import { isAvailableEverywhere } from '@/lib/discountAvailability'
 export async function searchTimeDiscountProductsAction(query: string, excludeDiscountId?: string): Promise<ProductSearchResult[]> {
   try {
     const results = await searchProducts(query)
-    const [productConfig, timeConfig] = await Promise.all([getConfig(), getTimeDiscountsConfig()])
+    const { productConfig, timeConfig } = await fetchAvailabilityConfigs()
 
     const available = await Promise.all(
       results.map(async (product) => {
@@ -37,7 +35,7 @@ export async function searchTimeDiscountProductsAction(query: string, excludeDis
 export async function getTimeDiscountProductVariantsAction(productId: string, excludeDiscountId?: string): Promise<ProductVariantOption[]> {
   try {
     const variants = await getProductVariantOptions(productId)
-    const [productConfig, timeConfig] = await Promise.all([getConfig(), getTimeDiscountsConfig()])
+    const { productConfig, timeConfig } = await fetchAvailabilityConfigs()
     return variants.filter((v) => isAvailableEverywhere(productConfig, timeConfig, productId, v.variantId, excludeDiscountId))
   } catch (err) {
     console.error('[getTimeDiscountProductVariantsAction] lookup failed:', err)
@@ -53,7 +51,7 @@ export async function validateTimeDiscountMemberAction(
   variantId: string | undefined,
   excludeDiscountId?: string,
 ): Promise<ValidateMemberResult> {
-  const [productConfig, timeConfig] = await Promise.all([getConfig(), getTimeDiscountsConfig()])
+  const { productConfig, timeConfig } = await fetchAvailabilityConfigs()
   if (!isAvailableEverywhere(productConfig, timeConfig, productId, variantId, excludeDiscountId)) {
     return {
       ok: false,

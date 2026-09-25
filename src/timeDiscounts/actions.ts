@@ -4,8 +4,7 @@ import {
   getTimeDiscountsConfig, saveTimeDiscountsConfig, pricesUniform,
   type TimeDiscount, type TimeDiscountSelection, type DiscountMember, type TimeDiscountsConfig,
 } from '@/timeDiscounts/config'
-import { getConfig } from '@/lib/config'
-import { isAvailableEverywhere } from '@/lib/discountAvailability'
+import { isAvailableEverywhere, fetchAvailabilityConfigs } from '@/lib/discountAvailability'
 import { resolveCollectionMembers } from '@/lib/collections'
 import { getMemberInfo } from '@/lib/products'
 import { syncTimeDiscountMetafields, clearTimeDiscountMetafields } from '@/timeDiscounts/metafieldSync'
@@ -187,7 +186,7 @@ async function resolveSelection(formData: FormData): Promise<{ selection: TimeDi
 }
 
 async function assertMembersAvailable(members: DiscountMember[], excludeDiscountId?: string): Promise<void> {
-  const [productConfig, timeConfig] = await Promise.all([getConfig(), getTimeDiscountsConfig()])
+  const { productConfig, timeConfig } = await fetchAvailabilityConfigs()
   for (const member of members) {
     if (!isAvailableEverywhere(productConfig, timeConfig, member.productId, member.variantId, excludeDiscountId)) {
       throw new Error(`${member.productId}${member.variantId ? ` (variant ${member.variantId})` : ''} already belongs to another discount`)
