@@ -209,6 +209,7 @@ mod tests {
             schema::CartOperation::ProductDiscountsAdd(op) => match &op.candidates[0].value {
                 schema::ProductDiscountCandidateValue::FixedAmount(f) => {
                     assert!((f.amount.0 - 5.00).abs() < 1e-9, "expected 5.00, got {}", f.amount.0);
+                    assert_eq!(f.applies_to_each_item, Some(false), "discount must apply once to the whole line, not per unit — if this flips to Some(true), Shopify takes the amount off EACH unit instead");
                 }
                 _ => panic!("expected FixedAmount"),
             },
