@@ -8,6 +8,7 @@ import { getShopTimezone, zonedTimeToUtc } from '@/lib/shop'
 import { getMemberInfo } from '@/lib/products'
 import TimeProductPicker from '@/timeDiscounts/components/TimeProductPicker'
 import TimeCollectionPicker, { type SelectedCollection } from '@/timeDiscounts/components/TimeCollectionPicker'
+import PricingAmountFields from '@/timeDiscounts/components/PricingAmountFields'
 import ConfirmForm from '@/components/ConfirmForm'
 import AuthLink from '@/components/AuthLink'
 
@@ -112,21 +113,7 @@ export default async function TimeDiscountPage({
               />
             </div>
           </div>
-          <div className="flex gap-4">
-            <label className="flex items-center gap-2 text-sm">
-              <input type="radio" name="pricingMode" value="percent" defaultChecked={discount.pricingMode === 'percent'} />
-              Percentage off
-            </label>
-            <label className="flex items-center gap-2 text-sm">
-              <input type="radio" name="pricingMode" value="fixed" defaultChecked={discount.pricingMode === 'fixed'} />
-              Fixed price
-            </label>
-          </div>
-          <label htmlFor="amount" className="sr-only">Amount</label>
-          <input
-            id="amount" name="amount" type="number" min="0.01" step="0.01" required defaultValue={discount.amount}
-            className="w-full border border-line rounded px-3 py-2 text-sm transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:border-accent"
-          />
+          <PricingAmountFields defaultPricingMode={discount.pricingMode} defaultAmount={discount.amount} />
           <button type="submit" className="bg-surface border border-line hover:bg-line px-4 py-3 rounded text-sm transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent">
             Save schedule &amp; discount
           </button>

@@ -119,7 +119,7 @@ export default function NewTimeDiscountForm({ shopTimezone }: { shopTimezone: st
           </div>
           <label htmlFor="amount" className="sr-only">Amount</label>
           <input
-            id="amount" name="amount" type="number" min="0.01" step="0.01" value={amount}
+            id="amount" name="amount" type="number" min="0.01" max={pricingMode === 'percent' ? 100 : undefined} step="0.01" value={amount}
             onChange={(e) => setAmount(e.target.value)}
             placeholder={pricingMode === 'percent' ? '% off (e.g. 20)' : 'Price each (e.g. 1.50)'}
             className="w-full border border-line rounded px-3 py-2 text-sm transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:border-accent"

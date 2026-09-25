@@ -59,6 +59,46 @@ describe('createTimeDiscount', () => {
     ]))).rejects.toThrow('different prices')
   })
 
+  it('rejects a percent amount over 100', async () => {
+    await expect(createTimeDiscount(formData([
+      ['name', 'N'], ['title', 'T'], ['startsAt', '2026-01-01T00:00'], ['endsAt', '2026-01-02T00:00'],
+      ['pricingMode', 'percent'], ['amount', '101'], ['selectionMode', 'products'], ['member-0-productId', 'gid://shopify/Product/1'],
+    ]))).rejects.toThrow('cannot exceed 100%')
+  })
+
+  it('rejects a percent amount of 100.01', async () => {
+    await expect(createTimeDiscount(formData([
+      ['name', 'N'], ['title', 'T'], ['startsAt', '2026-01-01T00:00'], ['endsAt', '2026-01-02T00:00'],
+      ['pricingMode', 'percent'], ['amount', '100.01'], ['selectionMode', 'products'], ['member-0-productId', 'gid://shopify/Product/1'],
+    ]))).rejects.toThrow('cannot exceed 100%')
+  })
+
+  it('allows a percent amount of exactly 100', async () => {
+    vi.spyOn(timeConfigLib, 'getTimeDiscountsConfig').mockResolvedValue({ discounts: [] })
+    vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({
+      discountAutomaticAppCreate: { automaticAppDiscount: { discountId: 'gid://shopify/DiscountAutomaticApp/99' }, userErrors: [] },
+    })
+    vi.spyOn(timeConfigLib, 'saveTimeDiscountsConfig').mockResolvedValue(undefined)
+
+    await expect(createTimeDiscount(formData([
+      ['name', 'N'], ['title', 'T'], ['startsAt', '2026-01-01T00:00'], ['endsAt', '2026-01-02T00:00'],
+      ['pricingMode', 'percent'], ['amount', '100'], ['selectionMode', 'products'], ['member-0-productId', 'gid://shopify/Product/1'],
+    ]))).resolves.toBeUndefined()
+  })
+
+  it('allows a fixed-price amount over 100 (no regression — a fixed price is a real currency amount, not a percentage)', async () => {
+    vi.spyOn(timeConfigLib, 'getTimeDiscountsConfig').mockResolvedValue({ discounts: [] })
+    vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({
+      discountAutomaticAppCreate: { automaticAppDiscount: { discountId: 'gid://shopify/DiscountAutomaticApp/99' }, userErrors: [] },
+    })
+    vi.spyOn(timeConfigLib, 'saveTimeDiscountsConfig').mockResolvedValue(undefined)
+
+    await expect(createTimeDiscount(formData([
+      ['name', 'N'], ['title', 'T'], ['startsAt', '2026-01-01T00:00'], ['endsAt', '2026-01-02T00:00'],
+      ['pricingMode', 'fixed'], ['amount', '150'], ['selectionMode', 'products'], ['member-0-productId', 'gid://shopify/Product/1'],
+    ]))).resolves.toBeUndefined()
+  })
+
   it('creates the Shopify discount record with UTC dates and the function-config metafield, then saves', async () => {
     const shopifyQuerySpy = vi.spyOn(shopifyClient, 'shopifyQuery')
     shopifyQuerySpy.mockResolvedValueOnce({

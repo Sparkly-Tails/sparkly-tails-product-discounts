@@ -227,6 +227,11 @@ function parsePricing(formData: FormData): { pricingMode: 'percent' | 'fixed'; a
   const pricingMode: 'percent' | 'fixed' = formData.get('pricingMode') === 'fixed' ? 'fixed' : 'percent'
   const amount = Number(formData.get('amount'))
   if (!(amount > 0)) throw new Error('A discount amount greater than zero is required')
+  // Shopify's Function output schema rejects a Percentage value over 100 —
+  // catch it here with a clear message rather than letting checkout fail
+  // silently later. A fixed price has no such cap (it's a real currency
+  // amount, not a percentage).
+  if (pricingMode === 'percent' && amount > 100) throw new Error('A percentage discount cannot exceed 100%')
   return { pricingMode, amount }
 }
 
