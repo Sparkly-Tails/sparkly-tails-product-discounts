@@ -3677,6 +3677,48 @@ mod tests {
     }
 
     #[test]
+    fn matches_a_specific_variant_when_the_ids_agree() -> Result<()> {
+        let result = run_function_with_input(
+            cart_lines_discounts_generate_run,
+            r#"{
+                "cart": {
+                    "lines": [
+                        {
+                            "id": "gid://shopify/CartLine/0",
+                            "quantity": 1,
+                            "cost": { "amountPerQuantity": { "amount": "10.00" } },
+                            "merchandise": {
+                                "__typename": "ProductVariant",
+                                "id": "gid://shopify/ProductVariant/901",
+                                "product": { "id": "gid://shopify/Product/1" }
+                            }
+                        }
+                    ]
+                },
+                "discount": {
+                    "discountClasses": ["PRODUCT"],
+                    "metafield": {
+                        "jsonValue": {
+                            "resolvedMembers": [{ "productId": "gid://shopify/Product/1", "variantId": "gid://shopify/ProductVariant/901" }],
+                            "pricingMode": "percent",
+                            "amount": 25.0
+                        }
+                    }
+                }
+            }"#,
+        )?;
+        assert_eq!(result.operations.len(), 1, "variant 901 must match a resolvedMembers entry pinned to variant 901");
+        match &result.operations[0] {
+            schema::CartOperation::ProductDiscountsAdd(op) => match &op.candidates[0].value {
+                schema::ProductDiscountCandidateValue::Percentage(p) => assert_eq!(p.value.0, 25.0),
+                _ => panic!("expected Percentage"),
+            },
+            _ => panic!("expected ProductDiscountsAdd"),
+        }
+        Ok(())
+    }
+
+    #[test]
     fn returns_no_operations_when_no_metafield_is_present() -> Result<()> {
         let result = run_function_with_input(
             cart_lines_discounts_generate_run,
@@ -3710,7 +3752,9 @@ mod tests {
 cd extensions/time-based-discount && cargo test
 ```
 
-Expected: if `cargo test` fails to compile because `schema.graphql`/the Cargo workspace scaffold don't exist yet, run `shopify app generate extension --template rust --name time-based-discount` first (from the repo root) to let the Shopify CLI create the scaffold (`schema.graphql`, `package.json`, `locales/`, `.gitignore`, a real `uid`), then re-place `shopify.extension.toml`, `Cargo.toml`, `src/main.rs`, and this file (keeping the CLI-assigned `uid`), and retry. Once it compiles: FAIL — `applies_a_percent_discount_to_a_matching_line`, `applies_a_fixed_price_discount_to_a_matching_line`, and `matches_a_specific_variant_only_when_variant_id_is_present` must all fail on their `assert_eq!(result.operations.len(), 1)` (the stub always returns 0 operations); `a_fixed_price_above_sticker_price_never_produces_a_markup`, `ignores_a_line_whose_product_is_not_in_resolved_members`, and `returns_no_operations_when_no_metafield_is_present` are expected to already PASS against the stub (they all assert zero operations) — that's fine, they're true-negative cases the stub happens to satisfy trivially; the three FAILing tests are what prove the suite isn't vacuous.
+Expected: if `cargo test` fails to compile because `schema.graphql`/the Cargo workspace scaffold don't exist yet, run the Shopify CLI's extension generator from the repo root to create the scaffold (`schema.graphql`, `package.json`, `locales/`, `.gitignore`, a real `uid`) — on the currently installed CLI this is `shopify app generate extension --template discount --flavor rust --name time-based-discount` (the CLI's `--template`/`--flavor` split may differ by CLI version; if the exact invocation errors, run `shopify app generate extension --help` to find the current equivalent, and confirm the generated `shopify.extension.toml` targets `cart.lines.discounts.generate.run` — not a legacy `purchase.product-discount.run` target some templates still offer). Delete any extra targeting block the scaffold adds beyond the one this brief's Step 1 specifies (e.g. a `cart.delivery-options.discounts.generate.run` target and its files), and re-set `api_version` to `2026-04` in the generated `shopify.extension.toml` if the scaffold defaulted to a newer version — then run `shopify app function schema` from inside the extension directory to refresh `schema.graphql` for that pinned version. Then re-place `shopify.extension.toml`, `Cargo.toml`, `src/main.rs`, and this file (keeping the CLI-assigned `uid`), and retry.
+
+Once it compiles: FAIL — exactly three tests fail, the three that assert `operations.len() == 1` (the stub always returns 0 operations, so none of these can pass against it): `applies_a_percent_discount_to_a_matching_line`, `applies_a_fixed_price_discount_to_a_matching_line`, and `matches_a_specific_variant_when_the_ids_agree`. The other four tests assert `operations.len() == 0` and PASS trivially against the stub — they're true-negative cases: `a_fixed_price_above_sticker_price_never_produces_a_markup`, `ignores_a_line_whose_product_is_not_in_resolved_members`, `matches_a_specific_variant_only_when_variant_id_is_present` (note: despite its name, this one asserts a *mismatched* variant produces zero operations — it is the negative counterpart to `matches_a_specific_variant_when_the_ids_agree`, not a positive-match test itself), and `returns_no_operations_when_no_metafield_is_present`. **3 failing / 4 passing, 7 tests total.** The three failing tests are what prove the suite isn't vacuous — they're exactly the tests a stub that always returns zero operations cannot satisfy.
 
 - [ ] **Step 7: Replace the stub body with the real implementation**
 
@@ -3826,7 +3870,7 @@ Replace only the `#[shopify_function] fn cart_lines_discounts_generate_run` bloc
 cd extensions/time-based-discount && cargo test
 ```
 
-Expected: PASS, all 6 tests green.
+Expected: PASS, all 7 tests green.
 
 - [ ] **Step 9: Commit**
 
