@@ -8,3 +8,4 @@ extensions/*/target/
 
 # Local-only architecture reference — not for the remote repo yet
 /README.md
+tsconfig.tsbuildinfo
