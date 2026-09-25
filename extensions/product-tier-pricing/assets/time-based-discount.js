@@ -6,17 +6,25 @@
 // Pure countdown math
 
 /**
- * Both startsAt/endsAt and `now` are treated as naive shop-local
- * timestamps (no timezone offset) — the admin's <input type="datetime-local">
- * already produces exactly this shape, and the storefront widget reads the
- * customer's own device clock, which is what the countdown should visually
- * match. This is independent of checkout: the Function never evaluates a
+ * startsAt/endsAt arrive here as real UTC ISO instants (with the `Z`
+ * suffix) — syncTimeDiscountMetafields converts them from the admin's
+ * naive shop-local strings via zonedTimeToUtc before writing the product
+ * metafield this widget reads. `new Date(...)` parses a `Z`-suffixed
+ * string as the same absolute instant in every browser, regardless of the
+ * customer's own timezone, which is what makes the countdown correct for
+ * customers outside the shop's timezone. `now` is a real `new Date()` —
+ * also an absolute instant, so the comparison is timezone-independent on
+ * both sides. Do NOT reintroduce naive (no-offset) strings here — that was
+ * a real, shipped bug (the countdown activated/deactivated at the wrong
+ * real-world moment for any customer outside the shop's timezone) fixed
+ * by converting at the metafield-sync boundary, not by anything in this
+ * file. This is independent of checkout: the Function never evaluates a
  * time window itself (spec §5 — Shopify's native discount scheduling does,
  * server-side, using the UTC dates on the discount record), so this
- * client-side countdown and the actual activation moment can drift by
- * whatever gap exists between the customer's clock and Shopify's — the
- * same class of imprecision any client-side countdown has, and no worse
- * than before.
+ * client-side countdown and the actual activation moment can still drift
+ * by ordinary network/clock-sync latency — the same class of imprecision
+ * any client-side countdown has, not the timezone bug this comment warns
+ * against reintroducing.
  */
 function computeCountdown(startsAt, endsAt, now) {
   const start = new Date(startsAt).getTime()
