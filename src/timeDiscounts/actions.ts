@@ -4,7 +4,7 @@ import {
   getTimeDiscountsConfig, saveTimeDiscountsConfig, pricesUniform,
   type TimeDiscount, type TimeDiscountSelection, type DiscountMember, type TimeDiscountsConfig,
 } from '@/timeDiscounts/config'
-import { isAvailableEverywhere, fetchAvailabilityConfigs } from '@/lib/discountAvailability'
+import { isAvailableEverywhere, fetchAvailabilityConfigs } from '@/lib/discount-availability'
 import { resolveCollectionMembers } from '@/lib/collections'
 import { getMemberInfo } from '@/lib/products'
 import { syncTimeDiscountMetafields, clearTimeDiscountMetafields } from '@/timeDiscounts/metafieldSync'
@@ -182,6 +182,7 @@ async function resolveSelection(formData: FormData): Promise<{ selection: TimeDi
   const collectionIds = parseCollectionIdsFromForm(formData)
   if (collectionIds.length === 0) throw new Error('At least one collection is required')
   const resolvedMembers = await resolveCollectionMembers(collectionIds)
+  if (resolvedMembers.length === 0) throw new Error('The selected collection(s) contain no products — choose a different collection or add products to it first')
   return { selection: { mode: 'collections', collectionIds }, resolvedMembers }
 }
 
@@ -225,13 +226,14 @@ function parseSchedule(formData: FormData): { startsAt: string; endsAt: string }
 function parsePricing(formData: FormData): { pricingMode: 'percent' | 'fixed'; amount: number } {
   const pricingMode: 'percent' | 'fixed' = formData.get('pricingMode') === 'fixed' ? 'fixed' : 'percent'
   const amount = Number(formData.get('amount'))
-  if (!(amount > 0)) throw new Error('A discount amount greater than zero is required')
+  const roundedAmount = Math.round(amount * 100) / 100
+  if (!(roundedAmount > 0)) throw new Error('A discount amount greater than zero is required')
   // Shopify's Function output schema rejects a Percentage value over 100 —
   // catch it here with a clear message rather than letting checkout fail
   // silently later. A fixed price has no such cap (it's a real currency
   // amount, not a percentage).
-  if (pricingMode === 'percent' && amount > 100) throw new Error('A percentage discount cannot exceed 100%')
-  return { pricingMode, amount }
+  if (pricingMode === 'percent' && roundedAmount > 100) throw new Error('A percentage discount cannot exceed 100%')
+  return { pricingMode, amount: roundedAmount }
 }
 
 export async function createTimeDiscount(formData: FormData): Promise<void> {
@@ -258,13 +260,39 @@ export async function createTimeDiscount(formData: FormData): Promise<void> {
     amount,
   })
 
-  const config = await getTimeDiscountsConfig()
   const discountId = `time_disc_${crypto.randomUUID()}`
   const newDiscount: TimeDiscount = {
     discountId, shopifyDiscountId, name, title, pricingMode, amount, startsAt, endsAt, selection, resolvedMembers,
   }
-  await saveTimeDiscountsConfig({ discounts: [...config.discounts, newDiscount] })
-  await syncTimeDiscountMetafields(newDiscount, timezone)
+
+  try {
+    const config = await getTimeDiscountsConfig()
+    await saveTimeDiscountsConfig({ discounts: [...config.discounts, newDiscount] })
+  } catch (err) {
+    // The Shopify discount record already exists and is live at checkout —
+    // if we can't save it into this app's own config, it becomes an
+    // orphan the merchant has no way to find or manage through this admin.
+    // Best-effort compensating delete so a failed create doesn't silently
+    // leave a live, invisible discount running.
+    try {
+      await deleteShopifyDiscountRecord(shopifyDiscountId)
+    } catch (cleanupErr) {
+      console.error(
+        `[createTimeDiscount] FAILED TO ROLL BACK an orphaned Shopify discount record (id: ${shopifyDiscountId}) after the local config save failed — this discount is live at checkout but invisible in this app; delete it manually via Shopify Admin → Discounts.`,
+        cleanupErr,
+      )
+      throw new Error(
+        `Failed to save the discount, and automatic cleanup also failed. A live Shopify discount (id: ${shopifyDiscountId}) may still exist — please check Shopify Admin → Discounts and delete it manually if present.`,
+      )
+    }
+    throw err
+  }
+
+  try {
+    await syncTimeDiscountMetafields(newDiscount, timezone)
+  } catch (err) {
+    console.error('[createTimeDiscount] storefront metafield sync failed (discount is saved and live; countdown widget may be stale for some products):', err)
+  }
 
   await redirectWithToken(`/time-discounts/${encodeURIComponent(discountId)}`)
 }
@@ -295,8 +323,12 @@ export async function updateTimeDiscountSelection(discountId: string, formData: 
   discount.resolvedMembers = resolvedMembers
   await saveTimeDiscountsConfig(config)
 
-  if (removed.length > 0) await clearTimeDiscountMetafields(removed.map((productId) => ({ productId })))
-  await syncTimeDiscountMetafields(discount, timezone)
+  try {
+    if (removed.length > 0) await clearTimeDiscountMetafields(removed.map((productId) => ({ productId })))
+    await syncTimeDiscountMetafields(discount, timezone)
+  } catch (err) {
+    console.error('[updateTimeDiscountSelection] storefront metafield sync failed (discount is saved and live; countdown widget may be stale for some products):', err)
+  }
 
   await redirectWithToken(`/time-discounts/${encodeURIComponent(discountId)}`)
 }
@@ -327,7 +359,11 @@ export async function updateTimeDiscountSchedule(discountId: string, formData: F
   discount.amount = amount
   await saveTimeDiscountsConfig(config)
 
-  await syncTimeDiscountMetafields(discount, timezone)
+  try {
+    await syncTimeDiscountMetafields(discount, timezone)
+  } catch (err) {
+    console.error('[updateTimeDiscountSchedule] storefront metafield sync failed (discount is saved and live; countdown widget may be stale for some products):', err)
+  }
 
   await redirectWithToken(`/time-discounts/${encodeURIComponent(discountId)}`)
 }
@@ -338,12 +374,20 @@ export async function updateTimeDiscountTitle(discountId: string, formData: Form
 
   const config = await getTimeDiscountsConfig()
   const discount = findDiscountOrThrow(config, discountId)
+
+  const timezone = await getShopTimezone()
+
+  // Shopify's own record is updated FIRST — see Fix 3: save-order defect.
+  await updateShopifyDiscountRecord(discount.shopifyDiscountId, { title })
+
   discount.title = title
   await saveTimeDiscountsConfig(config)
 
-  const timezone = await getShopTimezone()
-  await updateShopifyDiscountRecord(discount.shopifyDiscountId, { title })
-  await syncTimeDiscountMetafields(discount, timezone)
+  try {
+    await syncTimeDiscountMetafields(discount, timezone)
+  } catch (err) {
+    console.error('[updateTimeDiscountTitle] storefront metafield sync failed (discount is saved and live; countdown widget may be stale for some products):', err)
+  }
 
   await redirectWithToken(`/time-discounts/${encodeURIComponent(discountId)}`)
 }
@@ -363,7 +407,11 @@ export async function deleteTimeDiscount(discountId: string): Promise<void> {
   const remaining = config.discounts.filter((d) => d.discountId !== discountId)
   await saveTimeDiscountsConfig({ discounts: remaining })
 
-  await clearTimeDiscountMetafields(discount.resolvedMembers)
+  try {
+    await clearTimeDiscountMetafields(discount.resolvedMembers)
+  } catch (err) {
+    console.error('[deleteTimeDiscount] storefront metafield clear failed (discount is deleted and no longer live; countdown widget may be stale for some products until the next successful save):', err)
+  }
 
   await redirectWithToken('/')
 }
