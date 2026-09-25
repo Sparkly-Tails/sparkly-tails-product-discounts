@@ -3914,9 +3914,9 @@ Add the `time-based-discount.liquid` block to a product template for a member pr
 
 Add a new product to a collection powering a live collections-mode discount, without re-saving the discount. Confirm (as documented, not as a bug) that the new product does *not* get discounted until the discount is edited and re-saved — this is the explicitly accepted limitation, not a regression.
 
-- [ ] **Step 7: Confirm cross-kind exclusivity end-to-end**
+- [ ] **Step 7: Confirm cross-kind exclusivity (one direction — accepted asymmetry, see spec §2/§10)**
 
-Attempt to add a product already claimed by an existing tiered discount to a new time discount (and vice versa, from the existing discount form) — confirm both pickers correctly exclude it and both server actions reject a forced attempt with the "already belongs to another discount" error.
+Attempt to add a product already claimed by an existing tiered discount to a new time discount — confirm the time-discount picker correctly excludes it and `createTimeDiscount`/`updateTimeDiscountSelection` reject a forced attempt with the "already belongs to another discount" error. The reverse (adding a product already claimed by a time discount to the *existing* tiered-discount form) is NOT expected to be blocked — the existing system's pickers/actions are deliberately never edited by this plan (Global Constraints), so they have no way to see the new time-discount config. Confirm this is indeed what happens (no error, the product can be added to both) — this is the accepted, documented limitation, not a regression to fix here.
 
 - [ ] **Step 8: Clean up test data**
 
