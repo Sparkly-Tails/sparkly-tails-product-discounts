@@ -24,7 +24,7 @@ describe('syncTimeDiscountMetafields', () => {
     const call1 = spy.mock.calls.find((c) => (c[1] as { metafields: { ownerId: string }[] }).metafields[0].ownerId === 'gid://shopify/Product/1')!
     const parsed = JSON.parse((call1[1] as { metafields: { value: string }[] }).metafields[0].value)
     expect(parsed).toEqual({
-      discountId: 'time_disc_1', title: 'Flash Sale', pricingMode: 'percent', amount: 20,
+      discountId: 'time_disc_1', title: 'Flash Sale',
       startsAt: zonedTimeToUtc('2026-01-01T00:00', TIME_ZONE), endsAt: zonedTimeToUtc('2026-01-02T00:00', TIME_ZONE),
     })
   })

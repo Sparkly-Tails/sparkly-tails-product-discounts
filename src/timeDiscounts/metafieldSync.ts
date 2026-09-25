@@ -7,8 +7,6 @@ const NAMESPACE = 'sparkly_time_discounts'
 interface TimeDiscountMetafieldValue {
   discountId: string
   title: string
-  pricingMode: 'percent' | 'fixed'
-  amount: number
   startsAt: string
   endsAt: string
 }
@@ -30,8 +28,6 @@ export async function syncTimeDiscountMetafields(discount: TimeDiscount, timeZon
   const value: TimeDiscountMetafieldValue = {
     discountId: discount.discountId,
     title: discount.title,
-    pricingMode: discount.pricingMode,
-    amount: discount.amount,
     startsAt: zonedTimeToUtc(discount.startsAt, timeZone),
     endsAt: zonedTimeToUtc(discount.endsAt, timeZone),
   }
