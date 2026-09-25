@@ -1,16 +1,16 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { createTimeDiscount } from '@/timeDiscounts/actions'
 import { pricesUniform } from '@/timeDiscounts/config'
 import TimeProductPicker, { type SelectedMember } from '@/timeDiscounts/components/TimeProductPicker'
 import TimeCollectionPicker, { type SelectedCollection } from '@/timeDiscounts/components/TimeCollectionPicker'
+import PricingAmountFields from '@/timeDiscounts/components/PricingAmountFields'
 
 export default function NewTimeDiscountForm({ shopTimezone }: { shopTimezone: string }) {
   const [selectionMode, setSelectionMode] = useState<'products' | 'collections'>('products')
   const [members, setMembers] = useState<SelectedMember[]>([])
   const [collections, setCollections] = useState<SelectedCollection[]>([])
-  const [pricingMode, setPricingMode] = useState<'percent' | 'fixed'>('percent')
   const [startsAt, setStartsAt] = useState('')
   const [endsAt, setEndsAt] = useState('')
   const [amount, setAmount] = useState('')
@@ -26,17 +26,6 @@ export default function NewTimeDiscountForm({ shopTimezone }: { shopTimezone: st
     setMembers([])
     setCollections([])
   }
-
-  // A selection change can invalidate an already-chosen fixed mode (members
-  // no longer share one price) — fall back to percent automatically. Mirrors
-  // the existing PricingModeTierFields's own fallback-on-invalid-mode
-  // pattern. Deliberately a useEffect, not a setState call during render
-  // (`{!allowFixed && pricingMode === 'fixed' && setPricingMode('percent')}`)
-  // — that pattern is a real anti-pattern (calling a state setter mid-render)
-  // and must not be used here even though it would often appear to work.
-  useEffect(() => {
-    if (!allowFixed && pricingMode === 'fixed') setPricingMode('percent')
-  }, [allowFixed, pricingMode])
 
   return (
     <main className="p-8 max-w-xl mx-auto">
@@ -105,26 +94,7 @@ export default function NewTimeDiscountForm({ shopTimezone }: { shopTimezone: st
 
         <div>
           <p className="block text-sm font-medium mb-2">Discount</p>
-          <div className="flex gap-4 mb-3">
-            <label className="flex items-center gap-2 text-sm">
-              <input type="radio" name="pricingMode" value="percent" checked={pricingMode === 'percent'} onChange={() => setPricingMode('percent')} />
-              Percentage off
-            </label>
-            {allowFixed && (
-              <label className="flex items-center gap-2 text-sm">
-                <input type="radio" name="pricingMode" value="fixed" checked={pricingMode === 'fixed'} onChange={() => setPricingMode('fixed')} />
-                Fixed price
-              </label>
-            )}
-          </div>
-          <label htmlFor="amount" className="sr-only">Amount</label>
-          <input
-            id="amount" name="amount" type="number" min="0.01" max={pricingMode === 'percent' ? 100 : undefined} step="0.01" value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            placeholder={pricingMode === 'percent' ? '% off (e.g. 20)' : 'Price each (e.g. 1.50)'}
-            className="w-full border border-line rounded px-3 py-2 text-sm transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:border-accent"
-          />
-          {!allowFixed && <p className="text-xs text-muted mt-2">These products/variants have different prices, so only a percentage discount is available.</p>}
+          <PricingAmountFields defaultPricingMode="percent" allowFixed={allowFixed} onAmountChange={setAmount} />
         </div>
 
         <div>
