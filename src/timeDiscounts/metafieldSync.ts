@@ -1,4 +1,5 @@
 import { shopifyQuery } from '@/lib/shopify-client'
+import { zonedTimeToUtc } from '@/lib/shop'
 import type { TimeDiscount } from '@/timeDiscounts/config'
 
 const NAMESPACE = 'sparkly_time_discounts'
@@ -12,16 +13,27 @@ interface TimeDiscountMetafieldValue {
   endsAt: string
 }
 
-/** Writes the `discount` metafield to every unique product in resolvedMembers — the storefront widget block reads this, keyed per product. */
-export async function syncTimeDiscountMetafields(discount: TimeDiscount): Promise<void> {
+/**
+ * Writes the `discount` metafield to every unique product in resolvedMembers
+ * — the storefront widget block reads this, keyed per product.
+ *
+ * `discount.startsAt`/`endsAt` are always naive shop-local strings (no
+ * timezone offset). The storefront widget parses the metafield value with
+ * `new Date(...)` in the CUSTOMER's browser, which would interpret a naive
+ * string as midnight in the customer's own local timezone — wrong for any
+ * customer outside the shop's timezone. Converting to a real UTC ISO
+ * instant here (the same conversion used at the Shopify Admin API boundary)
+ * makes `new Date(...)` parse correctly in any browser, in any timezone.
+ */
+export async function syncTimeDiscountMetafields(discount: TimeDiscount, timeZone: string): Promise<void> {
   const uniqueProductIds = [...new Set(discount.resolvedMembers.map((m) => m.productId))]
   const value: TimeDiscountMetafieldValue = {
     discountId: discount.discountId,
     title: discount.title,
     pricingMode: discount.pricingMode,
     amount: discount.amount,
-    startsAt: discount.startsAt,
-    endsAt: discount.endsAt,
+    startsAt: zonedTimeToUtc(discount.startsAt, timeZone),
+    endsAt: zonedTimeToUtc(discount.endsAt, timeZone),
   }
 
   const results = await Promise.allSettled(uniqueProductIds.map((productId) => setTimeDiscountMetafield(productId, value)))

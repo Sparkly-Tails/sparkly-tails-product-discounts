@@ -1,7 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { syncTimeDiscountMetafields, clearTimeDiscountMetafields } from '@/timeDiscounts/metafieldSync'
 import * as shopifyClient from '@/lib/shopify-client'
+import { zonedTimeToUtc } from '@/lib/shop'
 import type { TimeDiscount } from '@/timeDiscounts/config'
+
+const TIME_ZONE = 'Europe/London'
 
 const discount: TimeDiscount = {
   discountId: 'time_disc_1', shopifyDiscountId: 'gid://shopify/DiscountAutomaticApp/1', name: 'Flash', title: 'Flash Sale', pricingMode: 'percent', amount: 20,
@@ -13,16 +16,16 @@ const discount: TimeDiscount = {
 describe('syncTimeDiscountMetafields', () => {
   beforeEach(() => vi.restoreAllMocks())
 
-  it('writes one metafield per unique product in resolvedMembers', async () => {
+  it('writes one metafield per unique product in resolvedMembers, with dates converted to real UTC instants', async () => {
     const spy = vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({ metafieldsSet: { userErrors: [] } })
-    await syncTimeDiscountMetafields(discount)
+    await syncTimeDiscountMetafields(discount, TIME_ZONE)
 
     expect(spy).toHaveBeenCalledTimes(2)
     const call1 = spy.mock.calls.find((c) => (c[1] as { metafields: { ownerId: string }[] }).metafields[0].ownerId === 'gid://shopify/Product/1')!
     const parsed = JSON.parse((call1[1] as { metafields: { value: string }[] }).metafields[0].value)
     expect(parsed).toEqual({
       discountId: 'time_disc_1', title: 'Flash Sale', pricingMode: 'percent', amount: 20,
-      startsAt: '2026-01-01T00:00', endsAt: '2026-01-02T00:00',
+      startsAt: zonedTimeToUtc('2026-01-01T00:00', TIME_ZONE), endsAt: zonedTimeToUtc('2026-01-02T00:00', TIME_ZONE),
     })
   })
 
@@ -34,7 +37,7 @@ describe('syncTimeDiscountMetafields', () => {
         { productId: 'gid://shopify/Product/1', variantId: 'gid://shopify/ProductVariant/10' },
         { productId: 'gid://shopify/Product/1', variantId: 'gid://shopify/ProductVariant/11' },
       ],
-    })
+    }, TIME_ZONE)
     expect(spy).toHaveBeenCalledTimes(1)
   })
 
@@ -42,7 +45,7 @@ describe('syncTimeDiscountMetafields', () => {
     const spy = vi.spyOn(shopifyClient, 'shopifyQuery')
     spy.mockResolvedValueOnce({ metafieldsSet: { userErrors: [] } })
     spy.mockRejectedValueOnce(new Error('boom'))
-    await expect(syncTimeDiscountMetafields(discount)).rejects.toThrow('boom')
+    await expect(syncTimeDiscountMetafields(discount, TIME_ZONE)).rejects.toThrow('boom')
   })
 })
 

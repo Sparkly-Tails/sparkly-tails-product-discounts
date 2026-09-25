@@ -233,7 +233,7 @@ export async function createTimeDiscount(formData: FormData): Promise<void> {
     discountId, shopifyDiscountId, name, title, pricingMode, amount, startsAt, endsAt, selection, resolvedMembers,
   }
   await saveTimeDiscountsConfig({ discounts: [...config.discounts, newDiscount] })
-  await syncTimeDiscountMetafields(newDiscount)
+  await syncTimeDiscountMetafields(newDiscount, timezone)
 
   await redirectWithToken(`/time-discounts/${encodeURIComponent(discountId)}`)
 }
@@ -247,6 +247,8 @@ export async function updateTimeDiscountSelection(discountId: string, formData: 
 
   await assertPricingAllowed(resolvedMembers, discount.pricingMode)
 
+  const timezone = await getShopTimezone()
+
   const previousProductIds = new Set(discount.resolvedMembers.map((m) => m.productId))
   const nextProductIds = new Set(resolvedMembers.map((m) => m.productId))
   const removed = [...previousProductIds].filter((id) => !nextProductIds.has(id))
@@ -259,7 +261,7 @@ export async function updateTimeDiscountSelection(discountId: string, formData: 
     resolvedMembers, pricingMode: discount.pricingMode, amount: discount.amount,
   })
   if (removed.length > 0) await clearTimeDiscountMetafields(removed.map((productId) => ({ productId })))
-  await syncTimeDiscountMetafields(discount)
+  await syncTimeDiscountMetafields(discount, timezone)
 
   await redirectWithToken(`/time-discounts/${encodeURIComponent(discountId)}`)
 }
@@ -288,7 +290,7 @@ export async function updateTimeDiscountSchedule(discountId: string, formData: F
     pricingMode,
     amount,
   })
-  await syncTimeDiscountMetafields(discount)
+  await syncTimeDiscountMetafields(discount, timezone)
 
   await redirectWithToken(`/time-discounts/${encodeURIComponent(discountId)}`)
 }
@@ -302,8 +304,9 @@ export async function updateTimeDiscountTitle(discountId: string, formData: Form
   discount.title = title
   await saveTimeDiscountsConfig(config)
 
+  const timezone = await getShopTimezone()
   await updateShopifyDiscountRecord(discount.shopifyDiscountId, { title })
-  await syncTimeDiscountMetafields(discount)
+  await syncTimeDiscountMetafields(discount, timezone)
 
   await redirectWithToken(`/time-discounts/${encodeURIComponent(discountId)}`)
 }

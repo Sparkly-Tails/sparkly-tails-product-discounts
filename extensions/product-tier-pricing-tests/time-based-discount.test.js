@@ -42,6 +42,20 @@ test('computeCountdown: just under one minute remaining rounds down to 0 minutes
   assert.equal(result.seconds, 59)
 })
 
+test('computeCountdown: treats a real UTC ISO instant as the same absolute moment regardless of process timezone — the guarantee the metafield-sync fix depends on', () => {
+  // startsAt/endsAt here are real UTC instants (with the Z suffix), as
+  // written by syncTimeDiscountMetafields after converting the naive
+  // shop-local strings via zonedTimeToUtc. new Date(...) parses a 'Z'
+  // string as an absolute instant in every timezone, so this must behave
+  // identically no matter what timezone the test runner itself is in.
+  const result = computeCountdown('2026-06-01T00:00:00.000Z', '2026-06-02T00:00:00.000Z', new Date('2026-06-01T12:00:00.000Z'))
+  assert.equal(result.active, true)
+  assert.equal(result.days, 0)
+  assert.equal(result.hours, 12)
+  assert.equal(result.minutes, 0)
+  assert.equal(result.seconds, 0)
+})
+
 test('formatCountdownUnit: zero-pads single digits', () => {
   assert.equal(formatCountdownUnit(0), '00')
   assert.equal(formatCountdownUnit(5), '05')
