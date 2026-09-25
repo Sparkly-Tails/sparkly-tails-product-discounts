@@ -210,6 +210,18 @@ describe('updateTimeDiscountSelection', () => {
     expect(clearSpy).toHaveBeenCalledWith([{ productId: 'gid://shopify/Product/1' }])
     expect(syncSpy).toHaveBeenCalled()
   })
+
+  it('does not save the local config when the Shopify update fails, so the two never drift out of sync', async () => {
+    vi.spyOn(timeConfigLib, 'getTimeDiscountsConfig').mockResolvedValue({ discounts: [{ ...existingDiscount }] })
+    const saveSpy = vi.spyOn(timeConfigLib, 'saveTimeDiscountsConfig').mockResolvedValue(undefined)
+    vi.spyOn(shopifyClient, 'shopifyQuery').mockRejectedValue(new Error('network down'))
+
+    await expect(
+      updateTimeDiscountSelection('time_disc_1', formData([['selectionMode', 'products'], ['member-0-productId', 'gid://shopify/Product/2']])),
+    ).rejects.toThrow('network down')
+
+    expect(saveSpy).not.toHaveBeenCalled()
+  })
 })
 
 describe('updateTimeDiscountSchedule', () => {
@@ -261,5 +273,29 @@ describe('deleteTimeDiscount', () => {
     expect(saveSpy).toHaveBeenCalledWith({ discounts: [] })
     expect(shopifyQuerySpy).toHaveBeenCalledWith(expect.stringContaining('discountAutomaticDelete'), { id: 'gid://shopify/DiscountAutomaticApp/1' })
     expect(clearSpy).toHaveBeenCalledWith([{ productId: 'gid://shopify/Product/1' }])
+  })
+
+  it('does not remove the discount from local config when the Shopify delete fails', async () => {
+    vi.spyOn(timeConfigLib, 'getTimeDiscountsConfig').mockResolvedValue({ discounts: [{ ...existingDiscount }] })
+    const saveSpy = vi.spyOn(timeConfigLib, 'saveTimeDiscountsConfig').mockResolvedValue(undefined)
+    vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({
+      discountAutomaticDelete: { userErrors: [{ field: [], message: 'Something went wrong' }] },
+    })
+
+    await expect(deleteTimeDiscount('time_disc_1')).rejects.toThrow('Something went wrong')
+
+    expect(saveSpy).not.toHaveBeenCalled()
+  })
+
+  it('treats a "not found" delete error as a successful no-op, so a retry after a partial failure still succeeds', async () => {
+    vi.spyOn(timeConfigLib, 'getTimeDiscountsConfig').mockResolvedValue({ discounts: [{ ...existingDiscount }] })
+    const saveSpy = vi.spyOn(timeConfigLib, 'saveTimeDiscountsConfig').mockResolvedValue(undefined)
+    vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({
+      discountAutomaticDelete: { userErrors: [{ field: ['id'], message: 'Discount does not exist' }] },
+    })
+
+    await expect(deleteTimeDiscount('time_disc_1')).resolves.toBeUndefined()
+
+    expect(saveSpy).toHaveBeenCalledWith({ discounts: [] })
   })
 })

@@ -127,7 +127,14 @@ async function updateShopifyDiscountRecord(shopifyDiscountId: string, update: Sh
   }
 }
 
-/** Uses the generic discountAutomaticDelete mutation — there is no discount-type-specific delete mutation. */
+/**
+ * Uses the generic discountAutomaticDelete mutation — there is no
+ * discount-type-specific delete mutation. A "not found"/"does not
+ * exist"-shaped userError is treated as a successful no-op rather than an
+ * error: it means Shopify's side of a previous delete already succeeded
+ * (e.g. this delete is a retry after saveTimeDiscountsConfig failed on a
+ * prior attempt), so retrying must not get permanently stuck.
+ */
 async function deleteShopifyDiscountRecord(shopifyDiscountId: string): Promise<void> {
   const data = await shopifyQuery<{
     discountAutomaticDelete: { userErrors: { field: string[]; message: string }[] }
@@ -140,8 +147,11 @@ async function deleteShopifyDiscountRecord(shopifyDiscountId: string): Promise<v
     { id: shopifyDiscountId },
   )
 
-  if (data.discountAutomaticDelete.userErrors.length > 0) {
-    throw new Error(data.discountAutomaticDelete.userErrors.map((e) => e.message).join('; '))
+  const realErrors = data.discountAutomaticDelete.userErrors.filter(
+    (e) => !/not found|does not exist/i.test(e.message),
+  )
+  if (realErrors.length > 0) {
+    throw new Error(realErrors.map((e) => e.message).join('; '))
   }
 }
 
@@ -270,13 +280,17 @@ export async function updateTimeDiscountSelection(discountId: string, formData: 
   const nextProductIds = new Set(resolvedMembers.map((m) => m.productId))
   const removed = [...previousProductIds].filter((id) => !nextProductIds.has(id))
 
+  // Shopify's own record is updated FIRST — if it fails, the local config
+  // is never saved, so the two never disagree about which members are
+  // actually being discounted (see Fix 3: save-order defect).
+  await updateShopifyDiscountRecord(discount.shopifyDiscountId, {
+    resolvedMembers, pricingMode: discount.pricingMode, amount: discount.amount,
+  })
+
   discount.selection = selection
   discount.resolvedMembers = resolvedMembers
   await saveTimeDiscountsConfig(config)
 
-  await updateShopifyDiscountRecord(discount.shopifyDiscountId, {
-    resolvedMembers, pricingMode: discount.pricingMode, amount: discount.amount,
-  })
   if (removed.length > 0) await clearTimeDiscountMetafields(removed.map((productId) => ({ productId })))
   await syncTimeDiscountMetafields(discount, timezone)
 
@@ -294,12 +308,7 @@ export async function updateTimeDiscountSchedule(discountId: string, formData: F
 
   const timezone = await getShopTimezone()
 
-  discount.startsAt = startsAt
-  discount.endsAt = endsAt
-  discount.pricingMode = pricingMode
-  discount.amount = amount
-  await saveTimeDiscountsConfig(config)
-
+  // Shopify's own record is updated FIRST — see Fix 3: save-order defect.
   await updateShopifyDiscountRecord(discount.shopifyDiscountId, {
     startsAtUtc: zonedTimeToUtc(startsAt, timezone),
     endsAtUtc: zonedTimeToUtc(endsAt, timezone),
@@ -307,6 +316,13 @@ export async function updateTimeDiscountSchedule(discountId: string, formData: F
     pricingMode,
     amount,
   })
+
+  discount.startsAt = startsAt
+  discount.endsAt = endsAt
+  discount.pricingMode = pricingMode
+  discount.amount = amount
+  await saveTimeDiscountsConfig(config)
+
   await syncTimeDiscountMetafields(discount, timezone)
 
   await redirectWithToken(`/time-discounts/${encodeURIComponent(discountId)}`)
@@ -332,10 +348,17 @@ export async function deleteTimeDiscount(discountId: string): Promise<void> {
   const config = await getTimeDiscountsConfig()
   const discount = findDiscountOrThrow(config, discountId)
 
+  // Shopify's own record is deleted FIRST — if it fails, the app hasn't yet
+  // forgotten the discount exists, so the merchant can retry rather than
+  // being left with a discount that discounts forever with no way to see
+  // or remove it (see Fix 3: save-order defect). deleteShopifyDiscountRecord
+  // itself treats "already gone" as success, so a retry after a prior
+  // partial failure (Shopify deleted, config save failed) still succeeds.
+  await deleteShopifyDiscountRecord(discount.shopifyDiscountId)
+
   const remaining = config.discounts.filter((d) => d.discountId !== discountId)
   await saveTimeDiscountsConfig({ discounts: remaining })
 
-  await deleteShopifyDiscountRecord(discount.shopifyDiscountId)
   await clearTimeDiscountMetafields(discount.resolvedMembers)
 
   await redirectWithToken('/')
