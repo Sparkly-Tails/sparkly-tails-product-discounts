@@ -148,6 +148,44 @@ describe('createTimeDiscount', () => {
       ['pricingMode', 'percent'], ['amount', '10'], ['selectionMode', 'products'], ['member-0-productId', 'gid://shopify/Product/1'],
     ]))).rejects.toThrow('Invalid date')
   })
+
+  it('rejects a discount whose resolvedMembers would not fit in a single function_config metafield', async () => {
+    vi.spyOn(timeConfigLib, 'getTimeDiscountsConfig').mockResolvedValue({ discounts: [] })
+
+    // Compute exactly how many members are needed to exceed the 9500-byte
+    // safety threshold, rather than guessing a round number — this keeps
+    // the test honest if the guard's margin or the GID shape ever changes.
+    let memberCount = 0
+    let byteLength = 0
+    do {
+      memberCount++
+      const resolvedMembers = Array.from({ length: memberCount }, (_, n) => ({ productId: `gid://shopify/Product/${1000000 + n}` }))
+      byteLength = new TextEncoder().encode(JSON.stringify({ resolvedMembers, pricingMode: 'percent', amount: 20 })).length
+    } while (byteLength <= 9500)
+
+    const formEntries: [string, string][] = [
+      ['name', 'Big'], ['title', 'Big Sale'], ['startsAt', '2026-01-01T00:00'], ['endsAt', '2026-01-02T00:00'],
+      ['pricingMode', 'percent'], ['amount', '20'], ['selectionMode', 'products'],
+    ]
+    for (let n = 0; n < memberCount; n++) {
+      formEntries.push([`member-${n}-productId`, `gid://shopify/Product/${1000000 + n}`])
+    }
+
+    await expect(createTimeDiscount(formData(formEntries))).rejects.toThrow(/too many products\/variants.*split it into multiple/)
+  })
+
+  it('does not reject a normal-sized resolvedMembers list', async () => {
+    vi.spyOn(timeConfigLib, 'getTimeDiscountsConfig').mockResolvedValue({ discounts: [] })
+    vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({
+      discountAutomaticAppCreate: { automaticAppDiscount: { discountId: 'gid://shopify/DiscountAutomaticApp/99' }, userErrors: [] },
+    })
+    vi.spyOn(timeConfigLib, 'saveTimeDiscountsConfig').mockResolvedValue(undefined)
+
+    await expect(createTimeDiscount(formData([
+      ['name', 'Small'], ['title', 'Small Sale'], ['startsAt', '2026-01-01T00:00'], ['endsAt', '2026-01-02T00:00'],
+      ['pricingMode', 'percent'], ['amount', '20'], ['selectionMode', 'products'], ['member-0-productId', 'gid://shopify/Product/1'],
+    ]))).resolves.toBeUndefined()
+  })
 })
 
 describe('updateTimeDiscountSelection', () => {

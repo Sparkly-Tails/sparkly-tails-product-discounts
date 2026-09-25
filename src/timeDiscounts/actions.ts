@@ -24,13 +24,30 @@ interface FunctionConfigMetafield {
   value: string
 }
 
+/**
+ * Shopify Functions never see a metafield value larger than 10,000 bytes —
+ * it comes back as `null` instead (see
+ * https://shopify.dev/docs/apps/build/metafields/metafield-limits and
+ * https://shopify.dev/docs/apps/build/functions/input-output). A `null`
+ * function_config means the Function silently applies NO discount at
+ * checkout, while the admin and storefront still show the discount as
+ * active — a large collection's resolvedMembers array can exceed this with
+ * zero visible symptom until checkout. Guard well below the real limit.
+ */
+const FUNCTION_CONFIG_MAX_BYTES = 9500
+
 /** The Function's own per-discount config — see spec §5. Written atomically as part of the DiscountAutomaticAppInput on create/update, not via a separate metafieldsSet call. */
 function buildFunctionConfigMetafield(resolvedMembers: DiscountMember[], pricingMode: 'percent' | 'fixed', amount: number): FunctionConfigMetafield {
+  const value = JSON.stringify({ resolvedMembers, pricingMode, amount })
+  const byteLength = new TextEncoder().encode(value).length
+  if (byteLength > FUNCTION_CONFIG_MAX_BYTES) {
+    throw new Error(`This discount includes too many products/variants (${resolvedMembers.length}) to fit in a single time-based discount. Please split it into multiple, smaller discounts.`)
+  }
   return {
     namespace: METAFIELD_NAMESPACE,
     key: 'function_config',
     type: 'json',
-    value: JSON.stringify({ resolvedMembers, pricingMode, amount }),
+    value,
   }
 }
 
