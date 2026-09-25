@@ -1,5 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { getTimeDiscountsConfig, saveTimeDiscountsConfig, isTimeDiscountMemberAvailable, pricesUniform, type TimeDiscountsConfig } from '@/timeDiscounts/config'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import {
+  getTimeDiscountsConfig, saveTimeDiscountsConfig, isTimeDiscountMemberAvailable, pricesUniform,
+  computeTimeDiscountStatusLabel, type TimeDiscountsConfig,
+} from '@/timeDiscounts/config'
 import * as shopifyClient from '@/lib/shopify-client'
 
 describe('getTimeDiscountsConfig', () => {
@@ -123,5 +126,43 @@ describe('pricesUniform', () => {
 
   it('is false when any price differs', () => {
     expect(pricesUniform([1.49, 1.59])).toBe(false)
+  })
+})
+
+describe('computeTimeDiscountStatusLabel', () => {
+  const TIME_ZONE = 'UTC'
+  const startsAt = '2026-01-01T00:00'
+  const endsAt = '2026-01-02T00:00'
+
+  afterEach(() => vi.useRealTimers())
+
+  it('is Upcoming before the start instant', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2025-12-31T23:59:59.999Z'))
+    expect(computeTimeDiscountStatusLabel(startsAt, endsAt, TIME_ZONE)).toBe('Upcoming')
+  })
+
+  it('is Active exactly at the start instant (inclusive lower boundary)', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-01-01T00:00:00.000Z'))
+    expect(computeTimeDiscountStatusLabel(startsAt, endsAt, TIME_ZONE)).toBe('Active')
+  })
+
+  it('is Active just before the end instant', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-01-01T23:59:59.999Z'))
+    expect(computeTimeDiscountStatusLabel(startsAt, endsAt, TIME_ZONE)).toBe('Active')
+  })
+
+  it('is Expired exactly at the end instant (exclusive upper boundary)', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-01-02T00:00:00.000Z'))
+    expect(computeTimeDiscountStatusLabel(startsAt, endsAt, TIME_ZONE)).toBe('Expired')
+  })
+
+  it('is Expired after the end instant', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-01-02T00:00:01.000Z'))
+    expect(computeTimeDiscountStatusLabel(startsAt, endsAt, TIME_ZONE)).toBe('Expired')
   })
 })

@@ -2,8 +2,8 @@ import { headers } from 'next/headers'
 import { getConfig } from '@/lib/config'
 import { getMemberInfo } from '@/lib/products'
 import AuthLink from '@/components/AuthLink'
-import { getTimeDiscountsConfig } from '@/timeDiscounts/config'
-import { getShopTimezone, zonedTimeToUtc } from '@/lib/shop'
+import { getTimeDiscountsConfig, computeTimeDiscountStatusLabel } from '@/timeDiscounts/config'
+import { getShopTimezone } from '@/lib/shop'
 
 export default async function Home() {
   const token = (await headers()).get('x-auth-token') ?? ''
@@ -18,11 +18,8 @@ export default async function Home() {
 
   const timeConfig = await getTimeDiscountsConfig()
   const shopTimezone = await getShopTimezone()
-  const nowMs = Date.now()
   function scheduleLabel(startsAt: string, endsAt: string): string {
-    const startsAtMs = new Date(zonedTimeToUtc(startsAt, shopTimezone)).getTime()
-    const endsAtMs = new Date(zonedTimeToUtc(endsAt, shopTimezone)).getTime()
-    return nowMs < startsAtMs ? 'Upcoming' : nowMs < endsAtMs ? 'Active' : 'Expired'
+    return computeTimeDiscountStatusLabel(startsAt, endsAt, shopTimezone)
   }
 
   return (

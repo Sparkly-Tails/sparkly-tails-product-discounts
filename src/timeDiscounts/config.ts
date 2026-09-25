@@ -1,4 +1,5 @@
 import { shopifyQuery } from '@/lib/shopify-client'
+import { zonedTimeToUtc } from '@/lib/shop'
 
 export interface DiscountMember {
   productId: string
@@ -114,4 +115,23 @@ export function pricesUniform(prices: number[]): boolean {
   if (prices.length <= 1) return true
   const [first, ...rest] = prices
   return rest.every((p) => Math.abs(p - first) <= 0.001)
+}
+
+/**
+ * 'Upcoming' before startsAt, 'Active' from startsAt up to (but not
+ * including) endsAt, 'Expired' from endsAt onward. `startsAt`/`endsAt` are
+ * naive shop-local strings (see TimeDiscount) — `timezone` converts them to
+ * real UTC instants before comparing against the current moment. Shared by
+ * the discount list and the discount detail page so the two never drift
+ * apart on what counts as the boundary instant.
+ */
+export function computeTimeDiscountStatusLabel(
+  startsAt: string,
+  endsAt: string,
+  timezone: string,
+): 'Upcoming' | 'Active' | 'Expired' {
+  const startsAtMs = new Date(zonedTimeToUtc(startsAt, timezone)).getTime()
+  const endsAtMs = new Date(zonedTimeToUtc(endsAt, timezone)).getTime()
+  const nowMs = Date.now()
+  return nowMs < startsAtMs ? 'Upcoming' : nowMs < endsAtMs ? 'Active' : 'Expired'
 }

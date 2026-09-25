@@ -1,10 +1,10 @@
 import { notFound } from 'next/navigation'
 import { headers } from 'next/headers'
-import { getTimeDiscountsConfig } from '@/timeDiscounts/config'
+import { getTimeDiscountsConfig, computeTimeDiscountStatusLabel } from '@/timeDiscounts/config'
 import {
   updateTimeDiscountSelection, updateTimeDiscountSchedule, updateTimeDiscountTitle, deleteTimeDiscount,
 } from '@/timeDiscounts/actions'
-import { getShopTimezone, zonedTimeToUtc } from '@/lib/shop'
+import { getShopTimezone } from '@/lib/shop'
 import { getMemberInfo } from '@/lib/products'
 import TimeProductPicker from '@/timeDiscounts/components/TimeProductPicker'
 import TimeCollectionPicker, { type SelectedCollection } from '@/timeDiscounts/components/TimeCollectionPicker'
@@ -32,10 +32,7 @@ export default async function TimeDiscountPage({
     : Math.round(basePrice * (1 - discount.amount / 100) * 100) / 100
 
   const timezone = await getShopTimezone()
-  const startsAtMs = new Date(zonedTimeToUtc(discount.startsAt, timezone)).getTime()
-  const endsAtMs = new Date(zonedTimeToUtc(discount.endsAt, timezone)).getTime()
-  const nowMs = Date.now()
-  const scheduleLabel = nowMs < startsAtMs ? 'Upcoming' : nowMs < endsAtMs ? 'Active' : 'Expired'
+  const scheduleLabel = computeTimeDiscountStatusLabel(discount.startsAt, discount.endsAt, timezone)
 
   const updateSelectionWithId = updateTimeDiscountSelection.bind(null, discountId)
   const updateScheduleWithId = updateTimeDiscountSchedule.bind(null, discountId)
