@@ -1,0 +1,18 @@
+api_version = "2026-04"
+
+[[extensions]]
+name = "Time-based discount"
+handle = "time-based-discount"
+type = "function"
+uid = "735489ad-8776-b895-9b18-1014ae1b96f88eb10441"
+description = "Applies a flat percent-or-fixed discount, within a merchant-scheduled time window, to the specific products/variants this discount owns."
+
+  [[extensions.targeting]]
+  target = "cart.lines.discounts.generate.run"
+  input_query = "src/cart_lines_discounts_generate_run.graphql"
+  export = "cart_lines_discounts_generate_run"
+
+  [extensions.build]
+  command = "cargo build --target=wasm32-unknown-unknown --release"
+  path = "target/wasm32-unknown-unknown/release/time-based-discount.wasm"
+  watch = [ "src/**/*.rs" ]

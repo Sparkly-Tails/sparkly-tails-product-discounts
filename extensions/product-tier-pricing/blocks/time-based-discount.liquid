@@ -1,0 +1,67 @@
+{% comment %}
+  Countdown-only widget for time-based discounts — shows "Sale ends in:
+  DAY HRS MINS SECS" while product.metafields.sparkly_time_discounts.discount
+  is present and the current moment is within the discount's window.
+  Renders nothing (an empty, hidden container) otherwise; JS decides
+  visibility live, since a page can be open while the window opens or
+  closes (see extensions/product-tier-pricing/assets/time-based-discount.js).
+  Does not show pricing — the actual discount applies at cart/checkout via
+  the time-based-discount Shopify Function, independently of this widget.
+{% endcomment %}
+{%- assign discount_metafield = product.metafields.sparkly_time_discounts.discount -%}
+{%- assign discount_json = 'null' -%}
+{%- if discount_metafield != blank -%}
+  {%- capture discount_json_raw -%}
+    {
+      "title": {{ discount_metafield.value.title | json }},
+      "startsAt": {{ discount_metafield.value.startsAt | json }},
+      "endsAt": {{ discount_metafield.value.endsAt | json }}
+    }
+  {%- endcapture -%}
+  {%- assign discount_json = discount_json_raw | strip | escape -%}
+{%- endif -%}
+<div
+  id="sparkly-time-discount-{{ block.id }}"
+  class="sparkly-time-discount"
+  data-sparkly-time-discount
+  data-discount='{{ discount_json }}'
+  style="--sparkly-time-discount-color: {{ block.settings.countdown_color }};"
+  hidden
+>
+  <p class="sparkly-time-discount__label" data-time-discount-label></p>
+  <div class="sparkly-time-discount__boxes">
+    <div class="sparkly-time-discount__box">
+      <span class="sparkly-time-discount__value" data-time-discount-days>00</span>
+      <span class="sparkly-time-discount__unit">DAY</span>
+    </div>
+    <div class="sparkly-time-discount__box">
+      <span class="sparkly-time-discount__value" data-time-discount-hours>00</span>
+      <span class="sparkly-time-discount__unit">HRS</span>
+    </div>
+    <div class="sparkly-time-discount__box">
+      <span class="sparkly-time-discount__value" data-time-discount-minutes>00</span>
+      <span class="sparkly-time-discount__unit">MINS</span>
+    </div>
+    <div class="sparkly-time-discount__box">
+      <span class="sparkly-time-discount__value" data-time-discount-seconds>00</span>
+      <span class="sparkly-time-discount__unit">SECS</span>
+    </div>
+  </div>
+</div>
+
+{% schema %}
+{
+  "name": "t:name_time_discount",
+  "target": "section",
+  "stylesheet": "time-based-discount.css",
+  "javascript": "time-based-discount.js",
+  "settings": [
+    {
+      "type": "color",
+      "id": "countdown_color",
+      "label": "t:countdown_color_label",
+      "default": "#e35d4f"
+    }
+  ]
+}
+{% endschema %}

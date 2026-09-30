@@ -1,0 +1,28 @@
+query Input {
+  cart {
+    lines {
+      id
+      quantity
+      cost {
+        amountPerQuantity {
+          amount
+        }
+      }
+      merchandise {
+        __typename
+        ... on ProductVariant {
+          id
+          product {
+            id
+          }
+        }
+      }
+    }
+  }
+  discount {
+    discountClasses
+    metafield(namespace: "sparkly_time_discounts", key: "function_config") {
+      jsonValue
+    }
+  }
+}

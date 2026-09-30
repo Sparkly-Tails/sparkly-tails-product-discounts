@@ -5,5 +5,7 @@
   "cream_color_label": "Tier card background color",
   "sun_color_label": "\"Adding now\" bar segment color",
   "custom_css_label": "Custom CSS",
-  "custom_css_info": "Advanced. Applies only to this block."
+  "custom_css_info": "Advanced. Applies only to this block.",
+  "name_time_discount": "Time-based discount",
+  "countdown_color_label": "Countdown box color"
 }

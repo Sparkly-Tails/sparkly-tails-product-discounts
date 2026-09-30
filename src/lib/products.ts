@@ -64,6 +64,12 @@ export async function getProductVariantOptions(productId: string): Promise<Produ
   }))
 }
 
+function chunk<T>(arr: T[], size: number): T[][] {
+  const chunks: T[][] = []
+  for (let i = 0; i < arr.length; i += size) chunks.push(arr.slice(i, i + size))
+  return chunks
+}
+
 export interface MemberInfo {
   productId: string
   variantId?: string
@@ -73,11 +79,23 @@ export interface MemberInfo {
   imageUrl: string | null
 }
 
+/** Shopify's GraphQL API caps list-argument variables (like `nodes(ids:)`) at 250 items. */
+const NODES_QUERY_CHUNK_SIZE = 250
+
+type MemberInfoProductNode = {
+  id: string
+  title: string
+  handle: string
+  featuredImage: { url: string } | null
+  variants: { edges: { node: { id: string; title: string; price: string } }[] }
+} | null
+
 /**
  * Batch title/price/handle/image lookup for a discount's members. Silently
  * skips any member whose product no longer resolves, mirroring the old
  * per-product lookups' null-on-missing behavior — a stale id shouldn't take
- * down the whole discount's admin page.
+ * down the whole discount's admin page. Batches the `nodes(ids:)` lookup in
+ * chunks of 250 (Shopify's list-argument cap) and merges the results.
  */
 export async function getMemberInfo(
   members: { productId: string; variantId?: string }[],
@@ -86,32 +104,30 @@ export async function getMemberInfo(
 
   const productIds = [...new Set(members.map((m) => m.productId))]
 
-  const data = await shopifyQuery<{
-    nodes: ({
-      id: string
-      title: string
-      handle: string
-      featuredImage: { url: string } | null
-      variants: { edges: { node: { id: string; title: string; price: string } }[] }
-    } | null)[]
-  }>(
-    `query getMemberInfo($ids: [ID!]!) {
-      nodes(ids: $ids) {
-        ... on Product {
-          id
-          title
-          handle
-          featuredImage { url }
-          variants(first: 250) {
-            edges { node { id title price } }
+  const idChunks = chunk(productIds, NODES_QUERY_CHUNK_SIZE)
+  const chunkResults = await Promise.all(
+    idChunks.map((ids) =>
+      shopifyQuery<{ nodes: MemberInfoProductNode[] }>(
+        `query getMemberInfo($ids: [ID!]!) {
+          nodes(ids: $ids) {
+            ... on Product {
+              id
+              title
+              handle
+              featuredImage { url }
+              variants(first: 250) {
+                edges { node { id title price } }
+              }
+            }
           }
-        }
-      }
-    }`,
-    { ids: productIds },
+        }`,
+        { ids },
+      ),
+    ),
   )
+  const allNodes = chunkResults.flatMap((data) => data.nodes)
 
-  const productById = new Map(data.nodes.filter((n) => n != null).map((n) => [n!.id, n!]))
+  const productById = new Map(allNodes.filter((n) => n != null).map((n) => [n!.id, n!]))
 
   const results: MemberInfo[] = []
   for (const member of members) {

@@ -107,4 +107,32 @@ describe('getMemberInfo', () => {
     vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({ nodes: [null] })
     expect(await getMemberInfo([{ productId: 'gid://shopify/Product/999' }])).toEqual([])
   })
+
+  it('batches nodes(ids:) lookups in chunks of 250 (Shopify\'s list-argument cap) and merges/dedupes the results', async () => {
+    const memberCount = 300
+    const members = Array.from({ length: memberCount }, (_, i) => ({ productId: `gid://shopify/Product/${i}` }))
+
+    const spy = vi.spyOn(shopifyClient, 'shopifyQuery').mockImplementation(async (_query, variables) => {
+      const ids = (variables as { ids: string[] }).ids
+      return {
+        nodes: ids.map((id) => ({
+          id,
+          title: `Product ${id}`,
+          handle: id,
+          featuredImage: null,
+          variants: { edges: [{ node: { id: `${id}-variant`, title: 'Default Title', price: '1.00' } }] },
+        })),
+      }
+    })
+
+    const info = await getMemberInfo(members)
+
+    expect(spy).toHaveBeenCalledTimes(2)
+    for (const call of spy.mock.calls) {
+      const ids = (call[1] as { ids: string[] }).ids
+      expect(ids.length).toBeLessThanOrEqual(250)
+    }
+    expect(info).toHaveLength(memberCount)
+    expect(new Set(info.map((m) => m.productId)).size).toBe(memberCount)
+  })
 })

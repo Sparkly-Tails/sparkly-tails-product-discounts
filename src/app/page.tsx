@@ -2,6 +2,8 @@ import { headers } from 'next/headers'
 import { getConfig } from '@/lib/config'
 import { getMemberInfo } from '@/lib/products'
 import AuthLink from '@/components/AuthLink'
+import { getTimeDiscountsConfig, computeTimeDiscountStatusLabel } from '@/timeDiscounts/config'
+import { getShopTimezone } from '@/lib/shop'
 
 export default async function Home() {
   const token = (await headers()).get('x-auth-token') ?? ''
@@ -13,6 +15,12 @@ export default async function Home() {
       return { ...d, memberTitles: memberInfo.map((m) => m.title) }
     }),
   )
+
+  const timeConfig = await getTimeDiscountsConfig()
+  const shopTimezone = await getShopTimezone()
+  function scheduleLabel(startsAt: string, endsAt: string): string {
+    return computeTimeDiscountStatusLabel(startsAt, endsAt, shopTimezone)
+  }
 
   return (
     <main className="p-8 max-w-3xl mx-auto">
@@ -42,6 +50,38 @@ export default async function Home() {
               </AuthLink>
               <p className="text-sm text-muted">
                 {row.status} · {row.pricingMode === 'fixed' ? 'Fixed price' : 'Percentage'} · {row.memberTitles.join(', ') || 'no members resolved'} · {row.tiers.length} tier{row.tiers.length === 1 ? '' : 's'}
+              </p>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <div className="flex items-center justify-between mb-6 mt-10">
+        <h2 className="text-xl font-semibold">Time-based discounts</h2>
+        <AuthLink
+          href="/time-discounts/new"
+          token={token}
+          className="bg-accent hover:bg-accent-hover text-white px-4 py-3 rounded transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+        >
+          Add time-based discount
+        </AuthLink>
+      </div>
+
+      {timeConfig.discounts.length === 0 ? (
+        <p className="text-muted">No time-based discounts yet.</p>
+      ) : (
+        <ul className="divide-y divide-line">
+          {timeConfig.discounts.map((row) => (
+            <li key={row.discountId} className="py-4">
+              <AuthLink
+                href={`/time-discounts/${encodeURIComponent(row.discountId)}`}
+                token={token}
+                className="font-medium hover:underline transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded"
+              >
+                {row.name}
+              </AuthLink>
+              <p className="text-sm text-muted">
+                {scheduleLabel(row.startsAt, row.endsAt)} · {row.pricingMode === 'fixed' ? 'Fixed price' : 'Percentage'} · {row.startsAt} → {row.endsAt} · {row.resolvedMembers.length} product{row.resolvedMembers.length === 1 ? '' : 's'}
               </p>
             </li>
           ))}
