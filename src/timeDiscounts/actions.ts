@@ -1,7 +1,7 @@
 'use server'
 
 import {
-  getTimeDiscountsConfig, saveTimeDiscountsConfig, pricesUniform,
+  getTimeDiscountsConfig, saveTimeDiscountsConfig, pricesUniform, fixedPriceNotLowerError,
   type TimeDiscount, type TimeDiscountSelection, type DiscountMember, type TimeDiscountsConfig,
 } from '@/timeDiscounts/config'
 import { isAvailableEverywhere, fetchAvailabilityConfigs } from '@/lib/discount-availability'
@@ -201,12 +201,14 @@ async function assertMembersAvailable(members: DiscountMember[], excludeDiscount
  * plan's Global Constraints for why pricesUniform is redefined locally
  * rather than imported).
  */
-async function assertPricingAllowed(resolvedMembers: DiscountMember[], pricingMode: 'percent' | 'fixed'): Promise<void> {
+async function assertPricingAllowed(resolvedMembers: DiscountMember[], pricingMode: 'percent' | 'fixed', amount: number): Promise<void> {
   if (pricingMode !== 'fixed') return
   const info = await getMemberInfo(resolvedMembers)
   if (!pricesUniform(info.map((m) => m.price))) {
     throw new Error('These products/variants have different prices — a fixed price requires a shared price. Use a percentage instead, or narrow the selection.')
   }
+  const notLowerError = fixedPriceNotLowerError(pricingMode, amount, info[0]?.price)
+  if (notLowerError) throw new Error(notLowerError)
 }
 
 function findDiscountOrThrow(config: TimeDiscountsConfig, discountId: string): TimeDiscount {
@@ -248,7 +250,7 @@ export async function createTimeDiscount(formData: FormData): Promise<void> {
 
   const { selection, resolvedMembers } = await resolveSelection(formData)
   await assertMembersAvailable(resolvedMembers)
-  await assertPricingAllowed(resolvedMembers, pricingMode)
+  await assertPricingAllowed(resolvedMembers, pricingMode, amount)
 
   const timezone = await getShopTimezone()
   const shopifyDiscountId = await createShopifyDiscountRecord({
@@ -304,7 +306,7 @@ export async function updateTimeDiscountSelection(discountId: string, formData: 
   const config = await getTimeDiscountsConfig()
   const discount = findDiscountOrThrow(config, discountId)
 
-  await assertPricingAllowed(resolvedMembers, discount.pricingMode)
+  await assertPricingAllowed(resolvedMembers, discount.pricingMode, discount.amount)
 
   const timezone = await getShopTimezone()
 
@@ -340,7 +342,7 @@ export async function updateTimeDiscountSchedule(discountId: string, formData: F
   const config = await getTimeDiscountsConfig()
   const discount = findDiscountOrThrow(config, discountId)
 
-  await assertPricingAllowed(discount.resolvedMembers, pricingMode)
+  await assertPricingAllowed(discount.resolvedMembers, pricingMode, amount)
 
   const timezone = await getShopTimezone()
 

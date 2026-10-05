@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { fixedPriceNotLowerError } from '@/timeDiscounts/config'
 
 /**
  * The pricing-mode radios + amount input, shared by the create form
@@ -17,6 +18,8 @@ export default function PricingAmountFields({
   defaultAmount,
   allowFixed = true,
   onAmountChange,
+  regularPrice,
+  onPricingModeChange,
 }: {
   defaultPricingMode: 'percent' | 'fixed'
   defaultAmount?: number
@@ -34,6 +37,15 @@ export default function PricingAmountFields({
    * gating and can omit it.
    */
   onAmountChange?: (value: string) => void
+  /**
+   * The products'/variants' shared regular price, when known. A fixed price
+   * at or above it discounts nothing and is almost certainly a typo, so an
+   * error is shown under the input. Omit (or pass null) when unknown —
+   * e.g. a collection selection, which the server action checks instead.
+   */
+  regularPrice?: number | null
+  /** Fires when the Percentage/Fixed radio changes, so the create form can gate its submit button on the same error. */
+  onPricingModeChange?: (mode: 'percent' | 'fixed') => void
 }) {
   const [pricingMode, setPricingMode] = useState<'percent' | 'fixed'>(defaultPricingMode)
   const [amount, setAmount] = useState(defaultAmount !== undefined ? String(defaultAmount) : '')
@@ -48,6 +60,12 @@ export default function PricingAmountFields({
   useEffect(() => {
     if (!allowFixed && pricingMode === 'fixed') setPricingMode('percent')
   }, [allowFixed, pricingMode])
+
+  useEffect(() => {
+    onPricingModeChange?.(pricingMode)
+  }, [pricingMode, onPricingModeChange])
+
+  const priceError = fixedPriceNotLowerError(pricingMode, Number(amount), regularPrice)
 
   return (
     <>
@@ -82,6 +100,7 @@ export default function PricingAmountFields({
         placeholder={pricingMode === 'percent' ? '% off (e.g. 20)' : 'Price each (e.g. 1.50)'}
         className="w-full border border-line rounded px-3 py-2 text-sm transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:border-accent"
       />
+      {priceError && <p role="alert" className="text-xs text-danger mt-2">{priceError}</p>}
       {!allowFixed && (
         <p className="text-xs text-muted mt-2">These products/variants have different prices, so only a percentage discount is available.</p>
       )}

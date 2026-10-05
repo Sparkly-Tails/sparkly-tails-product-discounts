@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation'
 import { headers } from 'next/headers'
-import { getTimeDiscountsConfig, computeTimeDiscountStatusLabel } from '@/timeDiscounts/config'
+import { getTimeDiscountsConfig, computeTimeDiscountStatusLabel, pricesUniform } from '@/timeDiscounts/config'
 import {
   updateTimeDiscountSelection, updateTimeDiscountSchedule, updateTimeDiscountTitle, deleteTimeDiscount,
 } from '@/timeDiscounts/actions'
@@ -110,7 +110,10 @@ export default async function TimeDiscountPage({
               />
             </div>
           </div>
-          <PricingAmountFields defaultPricingMode={discount.pricingMode} defaultAmount={discount.amount} />
+          <PricingAmountFields
+            defaultPricingMode={discount.pricingMode} defaultAmount={discount.amount}
+            regularPrice={pricesUniform(memberInfo.map((m) => m.price)) ? basePrice : null}
+          />
           <button type="submit" className="bg-surface border border-line hover:bg-line px-4 py-3 rounded text-sm transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent">
             Save schedule &amp; discount
           </button>

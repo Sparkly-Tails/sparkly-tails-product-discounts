@@ -92,6 +92,38 @@ describe('NewTimeDiscountForm', () => {
     expect(screen.getByText('These products/variants have different prices, so only a percentage discount is available.')).toBeInTheDocument()
   })
 
+  it('shows an error and blocks submit when a fixed price is not lower than the selected products\' regular price', async () => {
+    const user = userEvent.setup()
+    render(<NewTimeDiscountForm shopTimezone="Europe/London" />)
+
+    await user.type(screen.getByLabelText('Internal name'), 'Flash')
+    await user.type(screen.getByLabelText('Title'), 'Flash')
+    await user.type(screen.getByLabelText(/Starts/), '2026-07-01T12:00')
+    await user.type(screen.getByLabelText(/Ends/), '2026-07-02T12:00')
+    await user.click(screen.getByText('stub-select-uniform')) // regular price £10
+    await user.click(screen.getByRole('radio', { name: 'Fixed price' }))
+    await user.type(screen.getByLabelText('Amount'), '12')
+
+    expect(screen.getByRole('alert')).toHaveTextContent('The fixed price (£12.00) is not lower than the regular price (£10.00)')
+    expect(screen.getByRole('button', { name: 'Create discount' })).toBeDisabled()
+
+    await user.clear(screen.getByLabelText('Amount'))
+    await user.type(screen.getByLabelText('Amount'), '9.5')
+
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Create discount' })).toBeEnabled()
+  })
+
+  it('does not apply the fixed-price check to a percentage discount', async () => {
+    const user = userEvent.setup()
+    render(<NewTimeDiscountForm shopTimezone="Europe/London" />)
+
+    await user.click(screen.getByText('stub-select-uniform'))
+    await user.type(screen.getByLabelText('Amount'), '50')
+
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
   it('clears selection when toggling between modes, disabling submit until a new selection is made', async () => {
     const user = userEvent.setup()
     render(<NewTimeDiscountForm shopTimezone="Europe/London" />)
