@@ -308,6 +308,39 @@ Resumed from context compaction and completed all 4 UI refinement tasks for time
 
 ---
 
+## ⚠️ Deployment Sync Issue — 2026-10-05 (post-merge troubleshooting)
+
+**What Happened:**
+User merged PR #21 to main on GitHub and deployed via Shopify CLI. Vercel shows v0.3.66 (new app version), but live storefront still displays v0.18.0 (old version from Sept 30) with no countdown widget UI refinements visible. Root cause: PR #21 merged on GitHub but user's local main branch wasn't synced, and theme extension didn't propagate changes to live Shopify theme.
+
+**Key Findings:**
+- **GitHub PR #21:** Merged successfully with all 4 commits (45c3adc, d2ae9d4, b863011, b14bb0b)
+- **Local git log:** Still showed b129a9c (Sept 30) as latest on main — out of sync with remote
+- **Shopify deployment:** App version updated to v0.3.66 but storefront code unchanged (still v0.18.0)
+- **Theme blocks:** New `time-based-discount.liquid` block not visible in Shopify admin theme editor
+- **Vercel:** Code published correctly there (separate from Shopify deployment)
+
+**Root Causes:**
+1. Local main branch not synced after GitHub merge (required `git fetch` + `git pull`)
+2. Theme extension changes didn't propagate to live Shopify theme during deploy
+3. No `--force` flag used on initial deploy (may have skipped full rebuild)
+
+**Resolution Steps (pending user confirmation):**
+- [ ] `git fetch origin && git checkout main && git pull origin main`
+- [ ] Verify local git log shows 4 UI refinement commits at HEAD
+- [ ] `shopify app deploy --force` (forces full rebuild of all extensions)
+- [ ] Hard refresh storefront (Cmd+Shift+R)
+- [ ] Verify `time-based-discount.liquid` appears in Shopify admin theme blocks
+- [ ] Confirm storefront shows new countdown widget, strikethrough prices, and discount hints
+
+**Next Steps:**
+1. User syncs local main and runs force deploy
+2. Verify theme blocks appear in Shopify admin
+3. Test countdown widget, strikethrough pricing, and collection card hints on storefront
+4. Update session log with final deployment confirmation
+
+---
+
 ## ⚠️ CRITICAL: Deployment Mismatch — 2026-10-05 (investigation)
 
 **What Happened:**
