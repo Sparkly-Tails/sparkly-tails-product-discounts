@@ -52,24 +52,36 @@ function formatCountdownUnit(n) {
   return String(n).padStart(2, '0')
 }
 
+function paintCountdown({ active, days, hours, minutes, seconds, title }) {
+  if (!active) {
+    return { hidden: true }
+  }
+  return {
+    hidden: false,
+    label: title ? `${title} ends in:` : 'Sale ends in:',
+    days: formatCountdownUnit(days),
+    hours: formatCountdownUnit(hours),
+    minutes: formatCountdownUnit(minutes),
+    seconds: formatCountdownUnit(seconds)
+  }
+}
+
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { computeCountdown, formatCountdownUnit }
+  module.exports = { computeCountdown, formatCountdownUnit, paintCountdown }
 }
 
 // DOM: element painting and per-widget setup
 
 if (typeof document !== 'undefined') {
-  function paintCountdown(elements, countdown, title) {
-    if (!countdown.active) {
-      elements.container.hidden = true
-      return
+  function applyCountdownState(elements, state) {
+    elements.container.hidden = state.hidden
+    if (!state.hidden) {
+      elements.label.textContent = state.label
+      elements.days.textContent = state.days
+      elements.hours.textContent = state.hours
+      elements.minutes.textContent = state.minutes
+      elements.seconds.textContent = state.seconds
     }
-    elements.container.hidden = false
-    elements.label.textContent = title ? `${title} ends in:` : 'Sale ends in:'
-    elements.days.textContent = formatCountdownUnit(countdown.days)
-    elements.hours.textContent = formatCountdownUnit(countdown.hours)
-    elements.minutes.textContent = formatCountdownUnit(countdown.minutes)
-    elements.seconds.textContent = formatCountdownUnit(countdown.seconds)
   }
 
   function queryWidgetElements(container) {
@@ -92,7 +104,15 @@ if (typeof document !== 'undefined') {
 
       function tick() {
         const countdown = computeCountdown(discount.startsAt, discount.endsAt, new Date())
-        paintCountdown(elements, countdown, discount.title)
+        const state = paintCountdown({
+          active: countdown.active,
+          days: countdown.days,
+          hours: countdown.hours,
+          minutes: countdown.minutes,
+          seconds: countdown.seconds,
+          title: discount.title
+        })
+        applyCountdownState(elements, state)
       }
 
       tick()
