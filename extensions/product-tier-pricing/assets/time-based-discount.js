@@ -98,7 +98,7 @@ if (typeof document !== 'undefined') {
   function initTimeDiscountWidget() {
     document.querySelectorAll('[data-sparkly-time-discount]').forEach((container) => {
       const discount = JSON.parse(container.dataset.discount)
-      if (!discount) return // no time discount configured on this product — leave hidden, no timer needed
+      if (!discount || !discount.startsAt || !discount.endsAt) return // no time discount or missing dates — leave hidden
 
       const elements = queryWidgetElements(container)
 
