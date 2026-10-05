@@ -1,0 +1,64 @@
+{% comment %}
+  Product card component that displays a time-based discount hint below the
+  price when an active discount window exists (startsAt <= now < endsAt).
+
+  Reusable snippet for collection pages, widgets, and search results.
+
+  Accepts:
+    product: Shopify product object
+    show_price: Show the price (default true)
+    show_discount_hint: Show the discount hint (default true)
+{% endcomment %}
+
+{%- assign show_price = show_price | default: true -%}
+{%- assign show_discount_hint = show_discount_hint | default: true -%}
+{%- assign time_discount = product.metafields.sparkly_product_discounts.time_based_discount -%}
+
+<div class="sparkly-product-card-with-discount">
+  {%- if show_price -%}
+    <div class="sparkly-product-card-price">
+      {{ product.price | money }}
+    </div>
+  {%- endif -%}
+
+  {%- if show_discount_hint and time_discount != blank -%}
+    {%- assign starts_at = time_discount.value.startsAt | date: '%s' | times: 1 -%}
+    {%- assign ends_at = time_discount.value.endsAt | date: '%s' | times: 1 -%}
+    {%- assign now = 'now' | date: '%s' | times: 1 -%}
+
+    {%- if now >= starts_at and now < ends_at -%}
+      <div class="sparkly-product-card-discount-hint">
+        from {{ product.price | money }} — buy today
+      </div>
+    {%- endif -%}
+  {%- endif -%}
+</div>
+
+<style>
+  .sparkly-product-card-with-discount {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .sparkly-product-card-price {
+    font-weight: 600;
+    font-size: 1rem;
+  }
+
+  .sparkly-product-card-discount-hint {
+    font-size: 0.75rem;
+    color: #ffdc4c;
+    font-weight: 500;
+    text-truncate;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  @media (max-width: 480px) {
+    .sparkly-product-card-discount-hint {
+      font-size: 0.6875rem;
+    }
+  }
+</style>
