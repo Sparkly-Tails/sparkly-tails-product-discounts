@@ -669,6 +669,12 @@ if (typeof document !== 'undefined') {
       })
       paintWidget(elements, viewModel, basePrice, addingQty, tierButtonsSignatureRef)
 
+      const timeDiscountJson = container.dataset.timeDiscount
+      if (timeDiscountJson) {
+        const isActive = isTimeDiscountActive(timeDiscountJson)
+        updateTimeDiscountDisplay(container, isActive)
+      }
+
       if (config.isGroup && elements.listEl && !elements.listEl.hidden) {
         renderMixMatchList(elements.listEl, buildDisplayMixMatchItems(config), lastCartItems)
       }
@@ -769,6 +775,34 @@ if (typeof document !== 'undefined') {
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') render()
     })
+  }
+
+  function isTimeDiscountActive(timeDiscountJson) {
+    if (!timeDiscountJson) return false
+    try {
+      const discount = typeof timeDiscountJson === 'string' ? JSON.parse(timeDiscountJson) : timeDiscountJson
+      if (!discount.startsAt || !discount.endsAt) return false
+      const now = new Date()
+      const start = new Date(discount.startsAt)
+      const end = new Date(discount.endsAt)
+      return now >= start && now < end
+    } catch {
+      return false
+    }
+  }
+
+  function updateTimeDiscountDisplay(container, isActive) {
+    const originalPrice = container.querySelector('[data-original-price]')
+    const discountedPrice = container.querySelector('[data-discounted-price]')
+    if (!originalPrice || !discountedPrice) return
+
+    if (isActive) {
+      originalPrice.setAttribute('data-strike', 'true')
+      discountedPrice.hidden = false
+    } else {
+      originalPrice.removeAttribute('data-strike')
+      discountedPrice.hidden = true
+    }
   }
 
   function initTierPricing() {

@@ -42,11 +42,24 @@
   {%- endcapture -%}
   {%- assign discount_json = discount_json_raw | strip | escape -%}
 {%- endif -%}
+{%- assign time_discount_metafield = product.metafields.sparkly_product_discounts.time_based_discount -%}
+{%- assign time_discount_json = '{}' -%}
+{%- if time_discount_metafield != blank -%}
+  {%- capture time_discount_data -%}
+    {
+      "startsAt": {{ time_discount_metafield.value.startsAt | json }},
+      "endsAt": {{ time_discount_metafield.value.endsAt | json }}
+    }
+  {%- endcapture -%}
+  {%- assign time_discount_json = time_discount_data | strip | escape -%}
+{%- endif -%}
+
 <div
   id="sparkly-tier-pricing-{{ block.id }}"
   class="sparkly-tier-pricing"
   data-sparkly-tier-pricing
   data-discount='{{ discount_json }}'
+  data-time-discount='{{ time_discount_json }}'
   data-product-handle='{{ product.handle | json | escape }}'
   data-product-id='{{ product.id | prepend: "gid://shopify/Product/" | json }}'
   data-base-price="{{ product.selected_or_first_available_variant.price | divided_by: 100.0 | json }}"
@@ -55,7 +68,10 @@
   style="--sparkly-tier-price-font-size: {{ block.settings.price_font_size }}px; --sparkly-tier-moss: {{ block.settings.moss_color }}; --sparkly-tier-cream: {{ block.settings.cream_color }}; --sparkly-tier-sun: {{ block.settings.sun_color }};"
 >
   <div class="sparkly-tier-pricing__price-row">
-    <span class="sparkly-tier-pricing__price" data-tier-pricing-price>
+    <span class="sparkly-tier-pricing__price sparkly-tier-pricing__original-price" data-tier-pricing-price data-original-price="true">
+      {{ product.selected_or_first_available_variant.price | money }}
+    </span>
+    <span class="sparkly-tier-pricing__price sparkly-tier-pricing__discounted-price" data-discounted-price hidden>
       {{ product.selected_or_first_available_variant.price | money }}
     </span>
     <span class="sparkly-tier-pricing__each-label" data-tier-pricing-each-label>each</span>
@@ -81,6 +97,22 @@
     {%- endif -%}
   </div>
 </div>
+
+<style>
+  .sparkly-tier-pricing__original-price {
+    transition: all 0.3s ease;
+  }
+
+  .sparkly-tier-pricing__original-price[data-strike="true"] {
+    text-decoration: line-through;
+    opacity: 0.65;
+  }
+
+  .sparkly-tier-pricing__discounted-price {
+    color: var(--sparkly-tier-sun, #ffdc4c);
+    font-weight: 700;
+  }
+</style>
 
 {%- if block.settings.custom_css != blank -%}
   <style>
