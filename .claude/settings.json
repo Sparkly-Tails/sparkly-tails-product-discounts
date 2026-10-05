@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(nvm use 20.20.2)",
+      "Bash(source \"$NVM_DIR/nvm.sh\")",
+      "Bash(export NVM_DIR=\"$HOME/.nvm\")",
+      "Bash(source ~/.nvm/nvm.sh)",
+      "Bash(\\. \"$NVM_DIR/nvm.sh\")",
+      "Bash(source ~/.zshrc)",
+      "Bash(npm test *)",
+      "Bash(npx tsc --noEmit)",
+      "Bash(cargo test *)",
+      "Bash(git merge-base *)",
+      "mcp__39fc9622-407b-4e9a-b6bc-1176e0f0cba0__graphql_query",
+      "mcp__39fc9622-407b-4e9a-b6bc-1176e0f0cba0__search_docs_chunks",
+      "mcp__39fc9622-407b-4e9a-b6bc-1176e0f0cba0__validate_graphql_codeblocks",
+      "mcp__39fc9622-407b-4e9a-b6bc-1176e0f0cba0__graphql_schema",
+      "mcp__Claude_Browser__navigate",
+      "mcp__Claude_Browser__read_page",
+      "mcp__Claude_Browser__read_console_messages",
+      "mcp__Claude_Browser__get_page_text",
+      "mcp__Claude_in_Chrome__navigate",
+      "mcp__Claude_Preview__preview_screenshot",
+      "mcp__9bcb2d63-ba86-46f1-bad6-24e0257fd6cf__get_runtime_logs",
+      "mcp__ba3f463e-9d81-4a34-bbaa-a47eee14d5a5__ads_get_ad_entities",
+      "mcp__Microsoft_Clarity__query-analytics-dashboard"
+    ]
+  }
+}
