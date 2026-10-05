@@ -336,3 +336,32 @@ User verified GitHub shows no new commits since September 30th. Investigation re
 3. If not working: investigate why deployed version isn't active
 
 ⚠️ **Important Note:** Our work today (implementation of Tasks 2-4) is not on GitHub and was not deployed. The deployment used existing code from Sept 30th.
+
+---
+
+## 🔴 Node.js Version Blocker — 2026-10-05 (deployment blocked)
+
+**What Happened:**
+Deployment attempt blocked by Node.js version mismatch. User ran `shopify app deploy` but system used v20.20.2 (from Homebrew) instead of v22.23.3 (from nvm). Shopify CLI requires Node >= 22 and failed with `SyntaxError: The requested module 'node:module' does not provide an export named 'enableCompileCache'`.
+
+**Blocker Details:**
+- **System Node:** v20.20.2 (Homebrew node@20)
+- **Required:** v22+ for Shopify CLI
+- **Available:** v22.23.3 in nvm
+- **Issue:** PATH still prioritizing Homebrew node over nvm
+
+**Previous Fix (from earlier session):**
+- Created `.nvmrc` with version 22.23.3 in project root
+- Updated `~/.zshrc` to load nvm before Homebrew
+- Should work with `nvm use 22` or automatic on `cd` into project
+
+**Resolution Pending:**
+- [ ] Run `nvm use 22 && node --version` to confirm v22.23.3 active
+- [ ] If nvm not in PATH: run `~/.nvm/versions/node/v22.23.3/bin/shopify app deploy`
+- [ ] If .zshrc not loading nvm: verify lines 1-4 of ~/.zshrc load nvm.sh
+- [ ] After successful deploy: hard refresh storefront and verify blocks appear in Shopify admin
+
+**Blocker Priority:** CRITICAL — Deployment cannot proceed until Node.js version resolved.
+
+**Session Status:** Open — awaiting Node.js version resolution and deployment completion.
+
