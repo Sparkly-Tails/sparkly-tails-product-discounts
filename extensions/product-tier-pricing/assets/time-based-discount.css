@@ -2,7 +2,6 @@
 
 .sparkly-time-discount {
   --sparkly-time-discount-ink: var(--color-text-main, #2a2a22);
-  --sparkly-time-discount-radius: var(--border-radius-cards, 8px);
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -44,8 +43,8 @@
   line-height: 1;
   min-width: 2.5rem;
   text-align: center;
-  padding: 8px 6px;
-  border-radius: var(--sparkly-time-discount-radius);
+  padding: 14px;
+  border-radius: 14px;
 }
 
 .sparkly-time-discount__unit {
