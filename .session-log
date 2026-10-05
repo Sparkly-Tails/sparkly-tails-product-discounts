@@ -422,3 +422,36 @@ Blocks deployed successfully to Shopify admin (time-based-discount.liquid visibl
 
 **Session Status:** Open — awaiting git log verification and clean rebuild attempt.
 
+
+---
+
+## 🐛 Widget Visibility Bug Fixed — 2026-10-05 (logic correction)
+
+**What Happened:**
+Countdown widget deployed but showed on ALL products regardless of whether an active discount existed. Products without time-based discount metafield still displayed widget with "NaN : NaN : NaN : NaN" countdown. Root cause: JavaScript check `if (!discount)` doesn't work for empty objects `{}` — when no metafield exists, Liquid passes `data-discount='{}'`, which is truthy, so widget runs with undefined dates.
+
+**Bug Details:**
+- Affected: All products without time-based discount metafield (e.g., Gizzls Itchy & Scratchy treats)
+- Symptom: Widget visible with NaN countdown values
+- Root Cause: Empty discount object `{}` is truthy in JavaScript
+- Check needed: Verify discount has required fields (startsAt, endsAt) before running
+
+**Fix Applied:**
+- **File:** `extensions/product-tier-pricing/assets/time-based-discount.js`
+- **Change:** Updated validation from `if (!discount)` to `if (!discount || !discount.startsAt || !discount.endsAt) return`
+- **Result:** Widget only shows on products with valid time-based discount metafield containing both dates
+
+**Deployment Steps:**
+1. Commit: `git commit -m "fix: only show countdown widget when discount has valid dates"`
+2. Deploy: `shopify app deploy`
+3. Verify: Hard refresh storefront — widget should only appear on products with active discount
+
+**Widget Visibility Rules After Fix:**
+- ✅ Shows: Product has time_based_discount metafield with startsAt and endsAt
+- ✅ Shows: Countdown displays when now is between startsAt and endsAt (active window)
+- ❌ Hidden: Product has no time_based_discount metafield
+- ❌ Hidden: Metafield exists but missing startsAt or endsAt
+- ❌ Hidden: Current time is outside discount window (before start or after end)
+
+**Session Status:** Bug fix applied. Pending user deployment and verification.
+
