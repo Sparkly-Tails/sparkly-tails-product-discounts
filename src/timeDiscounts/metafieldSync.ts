@@ -2,13 +2,14 @@ import { shopifyQuery } from '@/lib/shopify-client'
 import { zonedTimeToUtc } from '@/lib/shop'
 import type { TimeDiscount } from '@/timeDiscounts/config'
 
-const NAMESPACE = 'sparkly_time_discounts'
+const NAMESPACE = 'sparkly_product_discounts'
 
 interface TimeDiscountMetafieldValue {
   discountId: string
   title: string
   startsAt: string
   endsAt: string
+  discountedPrice: number
 }
 
 /**
@@ -25,14 +26,10 @@ interface TimeDiscountMetafieldValue {
  */
 export async function syncTimeDiscountMetafields(discount: TimeDiscount, timeZone: string): Promise<void> {
   const uniqueProductIds = [...new Set(discount.resolvedMembers.map((m) => m.productId))]
-  const value: TimeDiscountMetafieldValue = {
-    discountId: discount.discountId,
-    title: discount.title,
-    startsAt: zonedTimeToUtc(discount.startsAt, timeZone),
-    endsAt: zonedTimeToUtc(discount.endsAt, timeZone),
-  }
 
-  const results = await Promise.allSettled(uniqueProductIds.map((productId) => setTimeDiscountMetafield(productId, value)))
+  const results = await Promise.allSettled(
+    uniqueProductIds.map((productId) => setTimeDiscountMetafieldWithPrice(productId, discount, timeZone))
+  )
 
   const rejected = results.filter((r) => r.status === 'rejected')
   if (rejected.length > 0) {
@@ -40,7 +37,36 @@ export async function syncTimeDiscountMetafields(discount: TimeDiscount, timeZon
   }
 }
 
-async function setTimeDiscountMetafield(productId: string, value: TimeDiscountMetafieldValue): Promise<void> {
+async function setTimeDiscountMetafieldWithPrice(productId: string, discount: TimeDiscount, timeZone: string): Promise<void> {
+  const productData = await shopifyQuery<{
+    product: { id: string; priceRange: { minVariantPrice: { amount: string } } } | null
+  }>(
+    `query getProductPrice($id: ID!) {
+      product(id: $id) {
+        id
+        priceRange { minVariantPrice { amount } }
+      }
+    }`,
+    { id: productId }
+  )
+
+  if (!productData.product) {
+    throw new Error(`Product ${productId} not found`)
+  }
+
+  const originalPrice = parseFloat(productData.product.priceRange.minVariantPrice.amount)
+  const discountedPrice = discount.pricingMode === 'percent'
+    ? originalPrice * (1 - discount.amount / 100)
+    : originalPrice - discount.amount
+
+  const value: TimeDiscountMetafieldValue = {
+    discountId: discount.discountId,
+    title: discount.title,
+    startsAt: zonedTimeToUtc(discount.startsAt, timeZone),
+    endsAt: zonedTimeToUtc(discount.endsAt, timeZone),
+    discountedPrice,
+  }
+
   const data = await shopifyQuery<{
     metafieldsSet: { userErrors: { field: string[]; message: string }[] }
   }>(
@@ -51,7 +77,7 @@ async function setTimeDiscountMetafield(productId: string, value: TimeDiscountMe
     }`,
     {
       metafields: [
-        { ownerId: productId, namespace: NAMESPACE, key: 'discount', type: 'json', value: JSON.stringify(value) },
+        { ownerId: productId, namespace: NAMESPACE, key: 'time_based_discount', type: 'json', value: JSON.stringify(value) },
       ],
     },
   )
@@ -75,7 +101,7 @@ export async function clearTimeDiscountMetafields(members: { productId: string }
             userErrors { field message }
           }
         }`,
-        { metafields: [{ ownerId: productId, namespace: NAMESPACE, key: 'discount' }] },
+        { metafields: [{ ownerId: productId, namespace: NAMESPACE, key: 'time_based_discount' }] },
       )
 
       if (data.metafieldsDelete.userErrors.length > 0) {

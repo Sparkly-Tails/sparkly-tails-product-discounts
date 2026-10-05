@@ -26,6 +26,16 @@
   class="sparkly-time-discount"
   hidden
 >
+  {%- if discount_metafield != blank and discount_metafield.value.discountedPrice -%}
+    <div class="sparkly-time-discount__price-row">
+      <span class="sparkly-time-discount__original-price" data-original-price>
+        {{ product.selected_or_first_available_variant.price | money }}
+      </span>
+      <span class="sparkly-time-discount__discounted-price" data-discounted-price>
+        {{ discount_metafield.value.discountedPrice | money }}
+      </span>
+    </div>
+  {%- endif -%}
   <div class="sparkly-time-discount__label" data-time-discount-label>
     Sale ends in:
   </div>
@@ -44,6 +54,25 @@
   .sparkly-time-discount {
     font-family: inherit;
     line-height: 1.4;
+  }
+
+  .sparkly-time-discount__price-row {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+    align-items: baseline;
+  }
+
+  .sparkly-time-discount__discounted-price {
+    font-weight: 700;
+    font-size: 1.125rem;
+    color: var(--sparkly-tier-moss, #434625);
+  }
+
+  .sparkly-time-discount__original-price {
+    font-size: 0.875rem;
+    color: #999;
+    text-decoration: line-through;
   }
 
   .sparkly-time-discount__label {
