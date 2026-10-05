@@ -365,3 +365,28 @@ Deployment attempt blocked by Node.js version mismatch. User ran `shopify app de
 
 **Session Status:** Open — awaiting Node.js version resolution and deployment completion.
 
+
+---
+
+## 🔧 Schema Validation Error Fixed — 2026-10-05 (deployment unblocked)
+
+**What Happened:**
+Initial deployment attempt revealed schema validation error: block name "Time-Based Discount Countdown" (29 characters) exceeded Shopify's 25-character maximum for schema names. Error prevented app version creation. Issue resolved by shortening name to "Countdown Timer" (14 characters).
+
+**Fix Applied:**
+- **File:** `extensions/product-tier-pricing/blocks/time-based-discount.liquid`
+- **Change:** Schema name shortened from "Time-Based Discount Countdown" → "Countdown Timer"
+- **Commit:** 027ffa1
+
+**Resolution:**
+- Validation error now resolved
+- Ready for `shopify app deploy` with correct Node.js version (v22.23.3 via nvm)
+
+**Next Steps:**
+1. Run `nvm use 22` to activate correct Node.js version
+2. Run `shopify app deploy` to deploy UI refinements
+3. Hard refresh storefront and verify countdown widget, strikethrough prices, and discount hints appear
+4. Confirm version updates from v0.18.0 to new version in theme
+
+**Session Status:** Unblocked — deployment ready once user runs deploy command with nvm.
+
