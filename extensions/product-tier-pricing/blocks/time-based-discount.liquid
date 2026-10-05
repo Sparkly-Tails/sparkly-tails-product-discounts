@@ -1,11 +1,10 @@
 {% comment %}
-  Time-based discount widget: the discounted price (struck-through original
-  beside it) above a countdown to the end of the discount. The whole widget is
-  hidden outside the active window (before startsAt / after endsAt), for
-  variants the discount doesn't cover, and whenever the discounted price
-  wouldn't actually be lower. All of that is decided in time-based-discount.js
-  from the data below — the prices are derived from the live variant price, so
-  they follow variant changes and product price edits.
+  Time-based discount widget: a countdown to the end of the discount. The sale
+  price itself is shown by the tier-pricing price block. The widget is hidden
+  outside the active window (before startsAt / after endsAt), for variants the
+  discount doesn't cover, and whenever the discounted price wouldn't actually
+  be lower. All of that is decided in time-based-discount.js from the data
+  below, using the live variant price, so it follows variant changes.
 {% endcomment %}
 
 {%- assign discount_metafield = product.metafields.sparkly_product_discounts.time_based_discount -%}
@@ -34,15 +33,9 @@
 <div
   data-sparkly-time-discount
   data-discount='{{ discount_data }}'
-  data-money-format='{{ shop.money_format | json | escape }}'
   class="sparkly-time-discount"
-  style="--sparkly-time-discount-price-font-size: {{ block.settings.price_font_size }}px;"
   hidden
 >
-  <div class="sparkly-time-discount__price-row" data-time-discount-price-row hidden>
-    <span class="sparkly-time-discount__price" data-time-discount-discounted></span>
-    <s class="sparkly-time-discount__original-price" data-time-discount-original></s>
-  </div>
   <div class="sparkly-time-discount__label" data-time-discount-label>
     Sale ends in:
   </div>
@@ -62,30 +55,6 @@
     font-family: var(--font-stack-body, inherit);
     color: var(--color-text-main, inherit);
     line-height: 1.4;
-  }
-
-  /* Same price treatment as the tier-pricing block: theme heading font, bold
-     primary price, the struck original smaller and muted — no accent colour. */
-  .sparkly-time-discount__price-row:not([hidden]) {
-    display: flex;
-    align-items: baseline;
-    gap: 10px;
-    margin-bottom: 4px;
-  }
-
-  .sparkly-time-discount__price {
-    font-family: var(--font-stack-headings);
-    font-weight: 700;
-    font-size: var(--sparkly-time-discount-price-font-size, 44px);
-    color: var(--color-text-main, inherit);
-  }
-
-  .sparkly-time-discount__original-price {
-    font-family: var(--font-stack-headings);
-    font-weight: 400;
-    font-size: calc(var(--sparkly-time-discount-price-font-size, 44px) * 0.75);
-    opacity: 0.6;
-    text-decoration: line-through;
   }
 
   .sparkly-time-discount__label {
@@ -116,18 +85,6 @@
 {
   "name": "Countdown Timer",
   "target": "section",
-  "javascript": "time-based-discount.js",
-  "settings": [
-    {
-      "type": "range",
-      "id": "price_font_size",
-      "label": "Price font size",
-      "min": 12,
-      "max": 64,
-      "step": 1,
-      "unit": "px",
-      "default": 44
-    }
-  ]
+  "javascript": "time-based-discount.js"
 }
 {% endschema %}
