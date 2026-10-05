@@ -1,12 +1,14 @@
 {% comment %}
-  Time-based discount countdown timer widget. Displays a countdown to the
-  end of an active time-based discount. Hidden when discount is not active
-  (before startsAt or after endsAt). Layout: title on first line, timer digits
-  on second line.
+  Time-based discount widget: the discounted price (struck-through original
+  beside it) above a countdown to the end of the discount. The whole widget is
+  hidden outside the active window (before startsAt / after endsAt), for
+  variants the discount doesn't cover, and whenever the discounted price
+  wouldn't actually be lower. All of that is decided in time-based-discount.js
+  from the data below — the prices are derived from the live variant price, so
+  they follow variant changes and product price edits.
 {% endcomment %}
 
 {%- assign discount_metafield = product.metafields.sparkly_product_discounts.time_based_discount -%}
-{%- assign selected_variant_id = product.selected_or_first_available_variant.id | prepend: 'gid://shopify/ProductVariant/' -%}
 {%- assign discount_data = '{}' -%}
 
 {%- if discount_metafield != blank -%}
@@ -14,7 +16,16 @@
     {
       "title": {{ discount_metafield.value.title | json }},
       "startsAt": {{ discount_metafield.value.startsAt | json }},
-      "endsAt": {{ discount_metafield.value.endsAt | json }}
+      "endsAt": {{ discount_metafield.value.endsAt | json }},
+      "pricingMode": {% if discount_metafield.value.pricingMode != nil %}{{ discount_metafield.value.pricingMode | json }}{% else %}null{% endif %},
+      "amount": {% if discount_metafield.value.amount != nil %}{{ discount_metafield.value.amount | json }}{% else %}null{% endif %},
+      "variantIds": {% if discount_metafield.value.variantIds != nil %}{{ discount_metafield.value.variantIds | json }}{% else %}null{% endif %},
+      "selectedVariantId": {{ product.selected_or_first_available_variant.id | json }},
+      "variantPrices": {
+        {%- for variant in product.variants -%}
+          "{{ variant.id }}": {{ variant.price }}{%- unless forloop.last -%},{%- endunless -%}
+        {%- endfor -%}
+      }
     }
   {%- endcapture -%}
   {%- assign discount_data = discount_data_raw | strip | escape -%}
@@ -23,19 +34,15 @@
 <div
   data-sparkly-time-discount
   data-discount='{{ discount_data }}'
+  data-money-format='{{ shop.money_format | json | escape }}'
   class="sparkly-time-discount"
+  style="--sparkly-time-discount-price-font-size: {{ block.settings.price_font_size }}px;"
   hidden
 >
-  {%- if discount_metafield != blank and discount_metafield.value.discountedPrice -%}
-    <div class="sparkly-time-discount__price-row">
-      <span class="sparkly-time-discount__original-price" data-original-price>
-        {{ product.selected_or_first_available_variant.price | money }}
-      </span>
-      <span class="sparkly-time-discount__discounted-price" data-discounted-price>
-        {{ discount_metafield.value.discountedPrice | money }}
-      </span>
-    </div>
-  {%- endif -%}
+  <div class="sparkly-time-discount__price-row" data-time-discount-price-row hidden>
+    <span class="sparkly-time-discount__price" data-time-discount-discounted></span>
+    <s class="sparkly-time-discount__original-price" data-time-discount-original></s>
+  </div>
   <div class="sparkly-time-discount__label" data-time-discount-label>
     Sale ends in:
   </div>
@@ -52,26 +59,32 @@
 
 <style>
   .sparkly-time-discount {
-    font-family: inherit;
+    font-family: var(--font-stack-body, inherit);
+    color: var(--color-text-main, inherit);
     line-height: 1.4;
   }
 
-  .sparkly-time-discount__price-row {
+  /* Same price treatment as the tier-pricing block: theme heading font, bold
+     primary price, the struck original smaller and muted — no accent colour. */
+  .sparkly-time-discount__price-row:not([hidden]) {
     display: flex;
-    gap: 0.5rem;
-    margin-bottom: 0.75rem;
     align-items: baseline;
+    gap: 10px;
+    margin-bottom: 4px;
   }
 
-  .sparkly-time-discount__discounted-price {
+  .sparkly-time-discount__price {
+    font-family: var(--font-stack-headings);
     font-weight: 700;
-    font-size: 1.125rem;
-    color: var(--sparkly-tier-moss, #434625);
+    font-size: var(--sparkly-time-discount-price-font-size, 44px);
+    color: var(--color-text-main, inherit);
   }
 
   .sparkly-time-discount__original-price {
-    font-size: 0.875rem;
-    color: #999;
+    font-family: var(--font-stack-headings);
+    font-weight: 400;
+    font-size: calc(var(--sparkly-time-discount-price-font-size, 44px) * 0.75);
+    opacity: 0.6;
     text-decoration: line-through;
   }
 
@@ -103,6 +116,18 @@
 {
   "name": "Countdown Timer",
   "target": "section",
-  "javascript": "time-based-discount.js"
+  "javascript": "time-based-discount.js",
+  "settings": [
+    {
+      "type": "range",
+      "id": "price_font_size",
+      "label": "Price font size",
+      "min": 12,
+      "max": 64,
+      "step": 1,
+      "unit": "px",
+      "default": 44
+    }
+  ]
 }
 {% endschema %}
