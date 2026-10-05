@@ -2,7 +2,7 @@ import { shopifyQuery } from '@/lib/shopify-client'
 import { zonedTimeToUtc } from '@/lib/shop'
 import type { TimeDiscount } from '@/timeDiscounts/config'
 
-const NAMESPACE = 'sparkly_time_discounts'
+const NAMESPACE = 'sparkly_product_discounts'
 
 interface TimeDiscountMetafieldValue {
   discountId: string
@@ -51,7 +51,7 @@ async function setTimeDiscountMetafield(productId: string, value: TimeDiscountMe
     }`,
     {
       metafields: [
-        { ownerId: productId, namespace: NAMESPACE, key: 'discount', type: 'json', value: JSON.stringify(value) },
+        { ownerId: productId, namespace: NAMESPACE, key: 'time_based_discount', type: 'json', value: JSON.stringify(value) },
       ],
     },
   )
@@ -75,7 +75,7 @@ export async function clearTimeDiscountMetafields(members: { productId: string }
             userErrors { field message }
           }
         }`,
-        { metafields: [{ ownerId: productId, namespace: NAMESPACE, key: 'discount' }] },
+        { metafields: [{ ownerId: productId, namespace: NAMESPACE, key: 'time_based_discount' }] },
       )
 
       if (data.metafieldsDelete.userErrors.length > 0) {
