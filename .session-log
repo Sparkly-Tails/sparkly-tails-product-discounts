@@ -492,3 +492,31 @@ Session completed with widget visibility bug fixed and deployed. User reinforced
 
 **Session Closed:** All code changes documented, workflow rules clarified, deployment ready for final verification.
 
+
+---
+
+## ⏳ Widget Fix Pending Deployment — 2026-10-05 (awaiting user action)
+
+**What Happened:**
+User asked where the widget visibility fix is on GitHub. Fix was applied locally (JavaScript validation added for startsAt/endsAt) but NOT YET committed or pushed to GitHub. The Edit operation modified `extensions/product-tier-pricing/assets/time-based-discount.js` in the working tree, but deployment commands were never executed by user.
+
+**Current Status:**
+- **Local:** Fix exists in working tree (changed `if (!discount)` to `if (!discount || !discount.startsAt || !discount.endsAt)`)
+- **GitHub:** Fix NOT pushed — last commit is 556d758 (final session log)
+- **Shopify:** Fix NOT deployed — storefront still running old code
+
+**Pending User Actions:**
+```bash
+git add extensions/product-tier-pricing/assets/time-based-discount.js
+git commit -m "fix: only show countdown widget when discount has valid dates"
+git push origin main
+shopify app deploy
+```
+
+**Fix Summary:**
+- Validation checks that discount object has both startsAt and endsAt before running countdown
+- Prevents widget from showing on products without time-based discount metafield
+- Stops NaN countdown from appearing on all products
+
+**Session Status:** OPEN — awaiting user to commit, push, and deploy the widget visibility fix.
+
