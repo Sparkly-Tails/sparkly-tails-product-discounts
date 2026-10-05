@@ -4,10 +4,16 @@
   --sparkly-time-discount-ink: var(--color-text-main, #2a2a22);
   --sparkly-time-discount-radius: var(--border-radius-cards, 8px);
   display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
   font-family: var(--font-stack-body);
+}
+
+/* `display: flex` above would otherwise override the hidden attribute the
+   script toggles, leaving the widget visible outside the discount window. */
+.sparkly-time-discount[hidden] {
+  display: none;
 }
 
 .sparkly-time-discount__label {
