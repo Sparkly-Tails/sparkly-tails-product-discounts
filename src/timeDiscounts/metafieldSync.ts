@@ -57,7 +57,7 @@ async function setTimeDiscountMetafieldWithPrice(productId: string, discount: Ti
   const originalPrice = parseFloat(productData.product.priceRange.minVariantPrice.amount)
   const discountedPrice = discount.pricingMode === 'percent'
     ? originalPrice * (1 - discount.amount / 100)
-    : originalPrice - discount.amount
+    : discount.amount
 
   const value: TimeDiscountMetafieldValue = {
     discountId: discount.discountId,
