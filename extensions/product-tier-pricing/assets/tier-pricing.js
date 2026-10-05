@@ -378,8 +378,27 @@ function buildDisplayMixMatchItems(config) {
   return ownRows.concat(config.mixMatchListItems)
 }
 
+// Sale price (in the shop currency's major unit, like basePrice) of an active
+// time-based discount for ONE variant, or null when there is no sale to show:
+// the variant isn't covered by the discount, the discount carries no pricing
+// data (older metafield), or the price wouldn't actually be lower — a fixed
+// price at or above the variant's price applies no discount at checkout, so
+// nothing is advertised. Percent: that much off the variant's own price.
+// Fixed: the amount IS the final price, whatever the variant's price is.
+// variantIds is null/empty when the discount covers every variant.
+function timeDiscountSalePrice({ basePrice, pricingMode, amount, variantIds, variantId }) {
+  if (pricingMode !== 'percent' && pricingMode !== 'fixed') return null
+  if (typeof amount !== 'number' || !(basePrice > 0)) return null
+  const covered = !variantIds || variantIds.length === 0 || variantIds.map(extractNumericId).includes(String(variantId))
+  if (!covered) return null
+  const sale = pricingMode === 'fixed' ? amount : basePrice * (1 - clamp(amount, 0, 100) / 100)
+  const rounded = Math.round(sale * 100) / 100
+  return rounded < basePrice ? rounded : null
+}
+
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
+    timeDiscountSalePrice,
     clamp,
     sortTiersByMinQty,
     normalizeTierPricing,
@@ -671,8 +690,7 @@ if (typeof document !== 'undefined') {
 
       const timeDiscountJson = container.dataset.timeDiscount
       if (timeDiscountJson) {
-        const isActive = isTimeDiscountActive(timeDiscountJson)
-        updateTimeDiscountDisplay(container, isActive)
+        updateTimeDiscountDisplay(container, timeDiscountJson, basePrice, variantStateRef.value, formatMoneyFn)
       }
 
       if (config.isGroup && elements.listEl && !elements.listEl.hidden) {
@@ -777,31 +795,41 @@ if (typeof document !== 'undefined') {
     })
   }
 
-  function isTimeDiscountActive(timeDiscountJson) {
-    if (!timeDiscountJson) return false
+  function parseActiveTimeDiscount(timeDiscountJson) {
     try {
-      const discount = typeof timeDiscountJson === 'string' ? JSON.parse(timeDiscountJson) : timeDiscountJson
-      if (!discount.startsAt || !discount.endsAt) return false
+      const discount = JSON.parse(timeDiscountJson)
+      if (!discount.startsAt || !discount.endsAt) return null
       const now = new Date()
-      const start = new Date(discount.startsAt)
-      const end = new Date(discount.endsAt)
-      return now >= start && now < end
+      return now >= new Date(discount.startsAt) && now < new Date(discount.endsAt) ? discount : null
     } catch {
-      return false
+      return null
     }
   }
 
-  function updateTimeDiscountDisplay(container, isActive) {
+  // While a time-based discount is running, the same price row the tier
+  // discounts use shows the sale price with the regular price struck beside
+  // it (the CSS in tier-pricing.liquid puts the sale price on the left).
+  function updateTimeDiscountDisplay(container, timeDiscountJson, basePrice, variantId, formatMoneyFn) {
     const originalPrice = container.querySelector('[data-original-price]')
     const discountedPrice = container.querySelector('[data-discounted-price]')
     if (!originalPrice || !discountedPrice) return
 
-    if (isActive) {
-      originalPrice.setAttribute('data-strike', 'true')
+    const discount = parseActiveTimeDiscount(timeDiscountJson)
+    const salePrice = discount && timeDiscountSalePrice({
+      basePrice,
+      pricingMode: discount.pricingMode,
+      amount: discount.amount,
+      variantIds: discount.variantIds,
+      variantId,
+    })
+
+    if (salePrice != null) {
+      discountedPrice.textContent = formatMoneyFn(salePrice)
       discountedPrice.hidden = false
+      originalPrice.setAttribute('data-strike', 'true')
     } else {
-      originalPrice.removeAttribute('data-strike')
       discountedPrice.hidden = true
+      originalPrice.removeAttribute('data-strike')
     }
   }
 
