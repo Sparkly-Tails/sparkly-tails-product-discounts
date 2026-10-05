@@ -1,6 +1,6 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
-const { timeDiscountSalePrice, computeTierState, perUnitPrice, extractNumericId, sumMemberQuantityInCart, resolveEligibility, unitPriceAtTier, totalAtTier, computeProgressState, computeProgressTrack, pluralizeTitle, formatAddMoreText, formatTempBoxLabel, joinNaturally, buildPromoText, computeOrderSummary, computeTierButtonsSignature, withUnitAnchor, cartBaselineOtherQty, clamp, sortTiersByMinQty, normalizeTierPricing, formatMoney, computeWidgetViewModel, buildMixMatchRows, buildDisplayMixMatchItems } = require('../product-tier-pricing/assets/tier-pricing.js')
+const { isTimeDiscountWindowActive, timeDiscountSalePrice, computeTierState, perUnitPrice, extractNumericId, sumMemberQuantityInCart, resolveEligibility, unitPriceAtTier, totalAtTier, computeProgressState, computeProgressTrack, pluralizeTitle, formatAddMoreText, formatTempBoxLabel, joinNaturally, buildPromoText, computeOrderSummary, computeTierButtonsSignature, withUnitAnchor, cartBaselineOtherQty, clamp, sortTiersByMinQty, normalizeTierPricing, formatMoney, computeWidgetViewModel, buildMixMatchRows, buildDisplayMixMatchItems } = require('../product-tier-pricing/assets/tier-pricing.js')
 
 test('below every tier: no discount, lists every tier as a delta from current quantity', () => {
   const tiers = [{ minQty: 7, percentOff: 5 }, { minQty: 14, percentOff: 10 }]
@@ -866,4 +866,22 @@ test('timeDiscountSalePrice: null without pricing data (older metafield) or with
   assert.equal(timeDiscountSalePrice({ basePrice: 20, pricingMode: null, amount: null, variantIds: null, variantId: '1' }), null)
   assert.equal(timeDiscountSalePrice({ basePrice: 20, pricingMode: 'fixed', amount: undefined, variantIds: null, variantId: '1' }), null)
   assert.equal(timeDiscountSalePrice({ basePrice: Number.NaN, pricingMode: 'fixed', amount: 5, variantIds: null, variantId: '1' }), null)
+})
+
+// Time-based discount window
+
+test('isTimeDiscountWindowActive: active from startsAt up to, but not including, endsAt', () => {
+  const d = { startsAt: '2026-06-01T00:00:00.000Z', endsAt: '2026-06-02T00:00:00.000Z' }
+  assert.equal(isTimeDiscountWindowActive(d, new Date('2026-05-31T23:59:59.999Z')), false)
+  assert.equal(isTimeDiscountWindowActive(d, new Date('2026-06-01T00:00:00.000Z')), true)
+  assert.equal(isTimeDiscountWindowActive(d, new Date('2026-06-01T23:59:59.999Z')), true)
+  assert.equal(isTimeDiscountWindowActive(d, new Date('2026-06-02T00:00:00.000Z')), false)
+})
+
+test('isTimeDiscountWindowActive: never active without both dates, with unparseable dates, or without a discount', () => {
+  const now = new Date('2026-06-01T12:00:00.000Z')
+  assert.equal(isTimeDiscountWindowActive({}, now), false)
+  assert.equal(isTimeDiscountWindowActive({ startsAt: '2026-06-01T00:00:00.000Z' }, now), false)
+  assert.equal(isTimeDiscountWindowActive({ startsAt: 'nope', endsAt: 'nope' }, now), false)
+  assert.equal(isTimeDiscountWindowActive(null, now), false)
 })

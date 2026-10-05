@@ -396,8 +396,19 @@ function timeDiscountSalePrice({ basePrice, pricingMode, amount, variantIds, var
   return rounded < basePrice ? rounded : null
 }
 
+// True from startsAt up to (not including) endsAt. A discount without both
+// dates (or with unparseable ones) is never active.
+function isTimeDiscountWindowActive(discount, now) {
+  if (!discount || !discount.startsAt || !discount.endsAt) return false
+  const start = new Date(discount.startsAt).getTime()
+  const end = new Date(discount.endsAt).getTime()
+  const nowMs = now.getTime()
+  return nowMs >= start && nowMs < end
+}
+
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
+    isTimeDiscountWindowActive,
     timeDiscountSalePrice,
     clamp,
     sortTiersByMinQty,
@@ -795,15 +806,17 @@ if (typeof document !== 'undefined') {
     })
   }
 
-  function parseActiveTimeDiscount(timeDiscountJson) {
+  function parseTimeDiscount(timeDiscountJson) {
     try {
-      const discount = JSON.parse(timeDiscountJson)
-      if (!discount.startsAt || !discount.endsAt) return null
-      const now = new Date()
-      return now >= new Date(discount.startsAt) && now < new Date(discount.endsAt) ? discount : null
+      return JSON.parse(timeDiscountJson)
     } catch {
       return null
     }
+  }
+
+  function parseActiveTimeDiscount(timeDiscountJson) {
+    const discount = parseTimeDiscount(timeDiscountJson)
+    return isTimeDiscountWindowActive(discount, new Date()) ? discount : null
   }
 
   // While a time-based discount is running, the same price row the tier
@@ -833,6 +846,31 @@ if (typeof document !== 'undefined') {
     }
   }
 
+  // The price row is only repainted when the block re-renders, and a product
+  // with just a time discount (no tiers) renders once on load — so without
+  // this the sale price would stay on screen after the discount ends (and
+  // appear late if the page was opened before it starts) until a refresh.
+  // Re-render the moment the window opens or closes. Checking each second
+  // rather than using one long setTimeout avoids the ~24.8 day timer limit
+  // and survives a sleeping tab, which is re-checked when it wakes.
+  function wireTimeDiscountBoundaries(container, render) {
+    const json = container.dataset.timeDiscount
+    const discount = json && parseTimeDiscount(json)
+    if (!discount || !discount.startsAt || !discount.endsAt) return
+
+    let wasActive = isTimeDiscountWindowActive(discount, new Date())
+    function check() {
+      const isActive = isTimeDiscountWindowActive(discount, new Date())
+      if (isActive === wasActive) return
+      wasActive = isActive
+      render()
+    }
+    setInterval(check, 1000)
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') check()
+    })
+  }
+
   function initTierPricing() {
     document.querySelectorAll('[data-sparkly-tier-pricing]').forEach((container) => {
       const config = parseWidgetConfig(container)
@@ -846,6 +884,7 @@ if (typeof document !== 'undefined') {
       wireVariantChange(container, render)
       wireLoopSubscriptionsPricePoll(container, render)
       if (config.hasTiers) wireCartAwarePolling(render)
+      wireTimeDiscountBoundaries(container, render)
     })
   }
 
