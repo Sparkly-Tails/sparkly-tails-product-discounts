@@ -390,3 +390,35 @@ Initial deployment attempt revealed schema validation error: block name "Time-Ba
 
 **Session Status:** Unblocked — deployment ready once user runs deploy command with nvm.
 
+
+---
+
+## ⚠️ JavaScript Assets Not Updated — 2026-10-05 (deployment incomplete)
+
+**What Happened:**
+Blocks deployed successfully to Shopify admin (time-based-discount.liquid visible), but storefront still shows v0.18.0 with old code. JavaScript assets (tier-pricing.js, time-based-discount.js) contain stale code — new functions `isTimeDiscountActive()`, `updateTimeDiscountDisplay()`, and countdown refinements are not executing on storefront.
+
+**Symptoms:**
+- Blocks (time-based-discount.liquid, tier-pricing.liquid updates) are present in Shopify admin
+- Storefront version stuck at v0.18.0 (should be higher after deploy)
+- Countdown widget not showing new two-line layout
+- Strikethrough pricing not displaying
+- Collection discount hints not appearing
+- Console likely shows old version number from cached JS
+
+**Root Cause Analysis (pending):**
+- [ ] Check if `isTimeDiscountActive()` function exists in deployed tier-pricing.js
+- [ ] Verify JS commits (45c3adc, b863011) are on main branch
+- [ ] Build may have used cached/stale JS files (dist/ not cleaned before deploy)
+
+**Resolution Steps (pending user confirmation):**
+1. Run `git log main --oneline | grep -i "discount" | head -5` to verify commits on main
+2. Clean build artifacts: `rm -rf dist build .shopify`
+3. Force full rebuild: `shopify app deploy`
+4. Hard refresh storefront (Cmd+Shift+R)
+5. Verify version updates and new countdown widget displays
+
+**Blocker Priority:** CRITICAL — Deployment shows partial success (blocks present) but JS logic not active.
+
+**Session Status:** Open — awaiting git log verification and clean rebuild attempt.
+
