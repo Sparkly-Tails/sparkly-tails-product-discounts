@@ -87,6 +87,7 @@ describe('createTimeDiscount', () => {
   })
 
   it('allows a fixed-price amount over 100 (no regression — a fixed price is a real currency amount, not a percentage)', async () => {
+    vi.spyOn(productsLib, 'getMemberInfo').mockResolvedValue([{ productId: 'gid://shopify/Product/1', title: 'X', price: 200, handle: 'x', imageUrl: null }])
     vi.spyOn(timeConfigLib, 'getTimeDiscountsConfig').mockResolvedValue({ discounts: [] })
     vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({
       discountAutomaticAppCreate: { automaticAppDiscount: { discountId: 'gid://shopify/DiscountAutomaticApp/99' }, userErrors: [] },
@@ -97,6 +98,32 @@ describe('createTimeDiscount', () => {
       ['name', 'N'], ['title', 'T'], ['startsAt', '2026-01-01T00:00'], ['endsAt', '2026-01-02T00:00'],
       ['pricingMode', 'fixed'], ['amount', '150'], ['selectionMode', 'products'], ['member-0-productId', 'gid://shopify/Product/1'],
     ]))).resolves.toBeUndefined()
+  })
+
+  it.each([['higher than', '12'], ['equal to', '10']])('rejects a fixed price %s the regular price, before anything is created in Shopify', async (_label, amount) => {
+    vi.spyOn(timeConfigLib, 'getTimeDiscountsConfig').mockResolvedValue({ discounts: [] })
+    const shopifyQuerySpy = vi.spyOn(shopifyClient, 'shopifyQuery')
+
+    await expect(createTimeDiscount(formData([
+      ['name', 'N'], ['title', 'T'], ['startsAt', '2026-01-01T00:00'], ['endsAt', '2026-01-02T00:00'],
+      ['pricingMode', 'fixed'], ['amount', amount], ['selectionMode', 'products'], ['member-0-productId', 'gid://shopify/Product/1'],
+    ]))).rejects.toThrow(`The fixed price (£${Number(amount).toFixed(2)}) is not lower than the regular price (£10.00)`)
+    expect(shopifyQuerySpy).not.toHaveBeenCalled()
+  })
+
+  it('accepts a fixed price below the regular price, and never applies the check to percentage discounts', async () => {
+    vi.spyOn(timeConfigLib, 'getTimeDiscountsConfig').mockResolvedValue({ discounts: [] })
+    vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({
+      discountAutomaticAppCreate: { automaticAppDiscount: { discountId: 'gid://shopify/DiscountAutomaticApp/99' }, userErrors: [] },
+    })
+    vi.spyOn(timeConfigLib, 'saveTimeDiscountsConfig').mockResolvedValue(undefined)
+    const base: [string, string][] = [
+      ['name', 'N'], ['title', 'T'], ['startsAt', '2026-01-01T00:00'], ['endsAt', '2026-01-02T00:00'],
+      ['selectionMode', 'products'], ['member-0-productId', 'gid://shopify/Product/1'],
+    ]
+
+    await expect(createTimeDiscount(formData([...base, ['pricingMode', 'fixed'], ['amount', '9.99']]))).resolves.toBeUndefined()
+    await expect(createTimeDiscount(formData([...base, ['pricingMode', 'percent'], ['amount', '50']]))).resolves.toBeUndefined()
   })
 
   it('creates the Shopify discount record with UTC dates and the function-config metafield, then saves', async () => {
@@ -387,6 +414,17 @@ describe('updateTimeDiscountSelection', () => {
 })
 
 describe('updateTimeDiscountSchedule', () => {
+  it('rejects an edit that sets a fixed price not lower than the regular price, without touching Shopify or saving', async () => {
+    vi.spyOn(timeConfigLib, 'getTimeDiscountsConfig').mockResolvedValue({ discounts: [existingDiscount] })
+    const saveSpy = vi.spyOn(timeConfigLib, 'saveTimeDiscountsConfig').mockResolvedValue(undefined)
+    const shopifyQuerySpy = vi.spyOn(shopifyClient, 'shopifyQuery')
+
+    await expect(updateTimeDiscountSchedule('time_disc_1', formData([['startsAt', '2026-07-01T12:00'], ['endsAt', '2026-07-02T12:00'], ['pricingMode', 'fixed'], ['amount', '15']])))
+      .rejects.toThrow('is not lower than the regular price (£10.00)')
+    expect(shopifyQuerySpy).not.toHaveBeenCalled()
+    expect(saveSpy).not.toHaveBeenCalled()
+  })
+
   it('updates dates (converted to UTC), pricing mode, and amount on both the local config and the Shopify record', async () => {
     vi.spyOn(timeConfigLib, 'getTimeDiscountsConfig').mockResolvedValue({ discounts: [existingDiscount] })
     const saveSpy = vi.spyOn(timeConfigLib, 'saveTimeDiscountsConfig').mockResolvedValue(undefined)

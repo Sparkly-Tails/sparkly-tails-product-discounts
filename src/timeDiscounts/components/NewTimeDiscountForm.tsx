@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { createTimeDiscount } from '@/timeDiscounts/actions'
-import { pricesUniform } from '@/timeDiscounts/config'
+import { pricesUniform, fixedPriceNotLowerError } from '@/timeDiscounts/config'
 import TimeProductPicker, { type SelectedMember } from '@/timeDiscounts/components/TimeProductPicker'
 import TimeCollectionPicker, { type SelectedCollection } from '@/timeDiscounts/components/TimeCollectionPicker'
 import PricingAmountFields from '@/timeDiscounts/components/PricingAmountFields'
@@ -14,12 +14,16 @@ export default function NewTimeDiscountForm({ shopTimezone }: { shopTimezone: st
   const [startsAt, setStartsAt] = useState('')
   const [endsAt, setEndsAt] = useState('')
   const [amount, setAmount] = useState('')
+  const [pricingMode, setPricingMode] = useState<'percent' | 'fixed'>('percent')
 
   const allowFixed = selectionMode === 'products' ? pricesUniform(members.map((m) => m.price)) : true
   const hasSelection = selectionMode === 'products' ? members.length > 0 : collections.length > 0
   const hasValidSchedule = startsAt !== '' && endsAt !== '' && endsAt > startsAt
   const hasValidAmount = Number(amount) > 0
-  const canSubmit = hasSelection && hasValidSchedule && hasValidAmount
+  // Only known up front for a product/variant selection (collection members are priced server-side).
+  const regularPrice = selectionMode === 'products' && allowFixed && members.length > 0 ? members[0].price : null
+  const priceError = fixedPriceNotLowerError(pricingMode, Number(amount), regularPrice)
+  const canSubmit = hasSelection && hasValidSchedule && hasValidAmount && !priceError
 
   function handleSelectionModeChange(mode: 'products' | 'collections') {
     setSelectionMode(mode)
@@ -94,7 +98,10 @@ export default function NewTimeDiscountForm({ shopTimezone }: { shopTimezone: st
 
         <div>
           <p className="block text-sm font-medium mb-2">Discount</p>
-          <PricingAmountFields defaultPricingMode="percent" allowFixed={allowFixed} onAmountChange={setAmount} />
+          <PricingAmountFields
+            defaultPricingMode="percent" allowFixed={allowFixed} onAmountChange={setAmount}
+            regularPrice={regularPrice} onPricingModeChange={setPricingMode}
+          />
         </div>
 
         <div>

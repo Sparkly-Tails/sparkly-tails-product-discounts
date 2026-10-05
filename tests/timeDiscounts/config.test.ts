@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import {
-  getTimeDiscountsConfig, saveTimeDiscountsConfig, isTimeDiscountMemberAvailable, pricesUniform,
+  getTimeDiscountsConfig, saveTimeDiscountsConfig, isTimeDiscountMemberAvailable, pricesUniform, fixedPriceNotLowerError,
   computeTimeDiscountStatusLabel, type TimeDiscountsConfig,
 } from '@/timeDiscounts/config'
 import * as shopifyClient from '@/lib/shopify-client'
@@ -164,5 +164,25 @@ describe('computeTimeDiscountStatusLabel', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-01-02T00:00:01.000Z'))
     expect(computeTimeDiscountStatusLabel(startsAt, endsAt, TIME_ZONE)).toBe('Expired')
+  })
+})
+
+describe('fixedPriceNotLowerError', () => {
+  it('returns a message naming both prices when a fixed price is not below the regular price', () => {
+    expect(fixedPriceNotLowerError('fixed', 25, 20)).toBe('The fixed price (£25.00) is not lower than the regular price (£20.00), so it would not discount anything. Check the price you entered.')
+    expect(fixedPriceNotLowerError('fixed', 20, 20)).toContain('is not lower than the regular price (£20.00)')
+  })
+
+  it('returns null for a genuinely lower fixed price', () => {
+    expect(fixedPriceNotLowerError('fixed', 19.99, 20)).toBeNull()
+  })
+
+  it('returns null when it cannot or should not judge: percent mode, no amount yet, or no known regular price', () => {
+    expect(fixedPriceNotLowerError('percent', 50, 20)).toBeNull()
+    expect(fixedPriceNotLowerError('fixed', 0, 20)).toBeNull()
+    expect(fixedPriceNotLowerError('fixed', Number.NaN, 20)).toBeNull()
+    expect(fixedPriceNotLowerError('fixed', 25, null)).toBeNull()
+    expect(fixedPriceNotLowerError('fixed', 25, undefined)).toBeNull()
+    expect(fixedPriceNotLowerError('fixed', 25, 0)).toBeNull()
   })
 })
