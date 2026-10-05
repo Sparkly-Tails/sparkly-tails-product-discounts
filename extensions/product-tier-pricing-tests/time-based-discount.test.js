@@ -6,8 +6,7 @@ const {
   paintCountdown,
   computeDiscountedPriceCents,
   isVariantCovered,
-  computePriceDisplay,
-  formatTimeDiscountMoney,
+  discountReducesPrice,
   timeDiscountNumericId
 } = require('../product-tier-pricing/assets/time-based-discount.js')
 
@@ -98,32 +97,25 @@ test('isVariantCovered: null or empty list covers every variant; otherwise only 
   assert.equal(isVariantCovered(ids, '12'), false)
 })
 
-test('computePriceDisplay: shows original and discounted price for a covered variant with a real saving', () => {
-  const result = computePriceDisplay({ priceCents: 4999, pricingMode: 'fixed', amount: 22, variantIds: null, variantId: '1' })
-  assert.deepEqual(result, { show: true, originalCents: 4999, discountedCents: 2200 })
+test('discountReducesPrice: true for a covered variant with a real saving (fixed price is the final price)', () => {
+  assert.equal(discountReducesPrice({ priceCents: 4999, pricingMode: 'fixed', amount: 22, variantIds: null, variantId: '1' }), true)
+  assert.equal(discountReducesPrice({ priceCents: 4999, pricingMode: 'percent', amount: 20, variantIds: null, variantId: '1' }), true)
 })
 
-test('computePriceDisplay: hidden for a variant the discount does not cover', () => {
-  const result = computePriceDisplay({
+test('discountReducesPrice: false for a variant the discount does not cover', () => {
+  assert.equal(discountReducesPrice({
     priceCents: 4999, pricingMode: 'percent', amount: 20,
     variantIds: ['gid://shopify/ProductVariant/10'], variantId: '12'
-  })
-  assert.equal(result.show, false)
+  }), false)
 })
 
-test('computePriceDisplay: hidden when a fixed price is not below the variant price (checkout applies no discount then)', () => {
-  assert.equal(computePriceDisplay({ priceCents: 2000, pricingMode: 'fixed', amount: 25, variantIds: null, variantId: '1' }).show, false)
-  assert.equal(computePriceDisplay({ priceCents: 2000, pricingMode: 'fixed', amount: 20, variantIds: null, variantId: '1' }).show, false)
+test('discountReducesPrice: false when a fixed price is not below the variant price (checkout applies no discount then)', () => {
+  assert.equal(discountReducesPrice({ priceCents: 2000, pricingMode: 'fixed', amount: 25, variantIds: null, variantId: '1' }), false)
+  assert.equal(discountReducesPrice({ priceCents: 2000, pricingMode: 'fixed', amount: 20, variantIds: null, variantId: '1' }), false)
 })
 
-test('computePriceDisplay: hidden for a 0% discount', () => {
-  assert.equal(computePriceDisplay({ priceCents: 2000, pricingMode: 'percent', amount: 0, variantIds: null, variantId: '1' }).show, false)
-})
-
-test('formatTimeDiscountMoney: converts pence to the shop money format', () => {
-  assert.equal(formatTimeDiscountMoney(2200, '£{{amount}}'), '£22.00')
-  assert.equal(formatTimeDiscountMoney(4999, '£{{ amount }}'), '£49.99')
-  assert.equal(formatTimeDiscountMoney(5, '${{amount}} USD'), '$0.05 USD')
+test('discountReducesPrice: false for a 0% discount', () => {
+  assert.equal(discountReducesPrice({ priceCents: 2000, pricingMode: 'percent', amount: 0, variantIds: null, variantId: '1' }), false)
 })
 
 test('timeDiscountNumericId: takes the trailing id of a GID and leaves numeric ids alone', () => {
@@ -135,23 +127,18 @@ test('paintCountdown: hidden when the window is not active', () => {
   assert.deepEqual(paintCountdown({ active: false, days: 0, hours: 0, minutes: 0, seconds: 0 }), { hidden: true })
 })
 
-test('paintCountdown: hidden when active but the price display says there is no real sale', () => {
-  const state = paintCountdown({ active: true, days: 1, hours: 2, minutes: 3, seconds: 4, price: { show: false } })
-  assert.deepEqual(state, { hidden: true })
+test('paintCountdown: hidden when active but no sale applies to the selected variant', () => {
+  assert.deepEqual(paintCountdown({ active: true, days: 1, hours: 2, minutes: 3, seconds: 4, applies: false }), { hidden: true })
 })
 
-test('paintCountdown: shows the countdown alone when there is no price data (older metafield)', () => {
-  const state = paintCountdown({ active: true, days: 1, hours: 2, minutes: 3, seconds: 4, title: 'Summer Sale', price: null })
-  assert.equal(state.hidden, false)
-  assert.equal(state.label, 'Summer Sale ends in:')
-  assert.equal(state.days, '01')
-  assert.equal(state.price, null)
+test('paintCountdown: shows the countdown when a sale applies, with the discount title', () => {
+  const state = paintCountdown({ active: true, days: 1, hours: 2, minutes: 3, seconds: 4, title: 'Summer Sale', applies: true })
+  assert.deepEqual(state, { hidden: false, label: 'Summer Sale ends in:', days: '01', hours: '02', minutes: '03', seconds: '04' })
 })
 
-test('paintCountdown: passes the price through when active and the sale is real', () => {
-  const price = { show: true, discountedText: '£22.00', originalText: '£49.99' }
-  const state = paintCountdown({ active: true, days: 0, hours: 0, minutes: 0, seconds: 37, price })
+test('paintCountdown: shows the countdown alone when there is no pricing data (older metafield)', () => {
+  const state = paintCountdown({ active: true, days: 0, hours: 0, minutes: 0, seconds: 37, applies: null })
   assert.equal(state.hidden, false)
   assert.equal(state.label, 'Sale ends in:')
-  assert.deepEqual(state.price, price)
+  assert.equal(state.seconds, '37')
 })

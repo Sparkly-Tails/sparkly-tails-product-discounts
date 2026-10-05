@@ -1,6 +1,6 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
-const { computeTierState, perUnitPrice, extractNumericId, sumMemberQuantityInCart, resolveEligibility, unitPriceAtTier, totalAtTier, computeProgressState, computeProgressTrack, pluralizeTitle, formatAddMoreText, formatTempBoxLabel, joinNaturally, buildPromoText, computeOrderSummary, computeTierButtonsSignature, withUnitAnchor, cartBaselineOtherQty, clamp, sortTiersByMinQty, normalizeTierPricing, formatMoney, computeWidgetViewModel, buildMixMatchRows, buildDisplayMixMatchItems } = require('../product-tier-pricing/assets/tier-pricing.js')
+const { isTimeDiscountWindowActive, timeDiscountSalePrice, computeTierState, perUnitPrice, extractNumericId, sumMemberQuantityInCart, resolveEligibility, unitPriceAtTier, totalAtTier, computeProgressState, computeProgressTrack, pluralizeTitle, formatAddMoreText, formatTempBoxLabel, joinNaturally, buildPromoText, computeOrderSummary, computeTierButtonsSignature, withUnitAnchor, cartBaselineOtherQty, clamp, sortTiersByMinQty, normalizeTierPricing, formatMoney, computeWidgetViewModel, buildMixMatchRows, buildDisplayMixMatchItems } = require('../product-tier-pricing/assets/tier-pricing.js')
 
 test('below every tier: no discount, lists every tier as a delta from current quantity', () => {
   const tiers = [{ minQty: 7, percentOff: 5 }, { minQty: 14, percentOff: 10 }]
@@ -828,4 +828,60 @@ test('computeWidgetViewModel: standalone mode (isGroup false) uses "Buy more" pr
   const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 7, percentOff: 4 }]
   const vm = computeWidgetViewModel({ tiers, basePrice: 1.49, otherQty: 0, addingQty: 1, title: 'Canagan Tuna Soup', isGroup: false, formatMoney: fmt })
   assert.equal(vm.promoText, 'Buy Canagan Tuna Soup and get 7 or more for £1.43')
+})
+
+// Time-based discount sale price (major currency unit, like basePrice)
+
+test('timeDiscountSalePrice: fixed mode IS the final price, whatever the variant price is', () => {
+  assert.equal(timeDiscountSalePrice({ basePrice: 49.99, pricingMode: 'fixed', amount: 22, variantIds: null, variantId: '1' }), 22)
+  assert.equal(timeDiscountSalePrice({ basePrice: 1000, pricingMode: 'fixed', amount: 22.5, variantIds: null, variantId: '1' }), 22.5)
+})
+
+test('timeDiscountSalePrice: percent mode takes the percentage off the variant\'s own price, rounded to pence', () => {
+  assert.equal(timeDiscountSalePrice({ basePrice: 20, pricingMode: 'percent', amount: 20, variantIds: null, variantId: '1' }), 16)
+  assert.equal(timeDiscountSalePrice({ basePrice: 49.99, pricingMode: 'percent', amount: 10, variantIds: null, variantId: '1' }), 44.99)
+  assert.equal(timeDiscountSalePrice({ basePrice: 59.99, pricingMode: 'percent', amount: 12.5, variantIds: null, variantId: '1' }), 52.49)
+})
+
+test('timeDiscountSalePrice: percent is clamped to 0-100', () => {
+  assert.equal(timeDiscountSalePrice({ basePrice: 20, pricingMode: 'percent', amount: 150, variantIds: null, variantId: '1' }), 0)
+  assert.equal(timeDiscountSalePrice({ basePrice: 20, pricingMode: 'percent', amount: -5, variantIds: null, variantId: '1' }), null)
+})
+
+test('timeDiscountSalePrice: null for a variant the discount does not cover; covered variants accept GIDs or numeric ids', () => {
+  const ids = ['gid://shopify/ProductVariant/10', 'gid://shopify/ProductVariant/11']
+  assert.equal(timeDiscountSalePrice({ basePrice: 49.99, pricingMode: 'fixed', amount: 22, variantIds: ids, variantId: '12' }), null)
+  assert.equal(timeDiscountSalePrice({ basePrice: 49.99, pricingMode: 'fixed', amount: 22, variantIds: ids, variantId: '10' }), 22)
+  assert.equal(timeDiscountSalePrice({ basePrice: 49.99, pricingMode: 'fixed', amount: 22, variantIds: ids, variantId: 11 }), 22)
+  assert.equal(timeDiscountSalePrice({ basePrice: 49.99, pricingMode: 'fixed', amount: 22, variantIds: [], variantId: '99' }), 22)
+})
+
+test('timeDiscountSalePrice: null when the price would not actually be lower (checkout applies no discount)', () => {
+  assert.equal(timeDiscountSalePrice({ basePrice: 20, pricingMode: 'fixed', amount: 25, variantIds: null, variantId: '1' }), null)
+  assert.equal(timeDiscountSalePrice({ basePrice: 20, pricingMode: 'fixed', amount: 20, variantIds: null, variantId: '1' }), null)
+  assert.equal(timeDiscountSalePrice({ basePrice: 20, pricingMode: 'percent', amount: 0, variantIds: null, variantId: '1' }), null)
+})
+
+test('timeDiscountSalePrice: null without pricing data (older metafield) or without a usable base price', () => {
+  assert.equal(timeDiscountSalePrice({ basePrice: 20, pricingMode: null, amount: null, variantIds: null, variantId: '1' }), null)
+  assert.equal(timeDiscountSalePrice({ basePrice: 20, pricingMode: 'fixed', amount: undefined, variantIds: null, variantId: '1' }), null)
+  assert.equal(timeDiscountSalePrice({ basePrice: Number.NaN, pricingMode: 'fixed', amount: 5, variantIds: null, variantId: '1' }), null)
+})
+
+// Time-based discount window
+
+test('isTimeDiscountWindowActive: active from startsAt up to, but not including, endsAt', () => {
+  const d = { startsAt: '2026-06-01T00:00:00.000Z', endsAt: '2026-06-02T00:00:00.000Z' }
+  assert.equal(isTimeDiscountWindowActive(d, new Date('2026-05-31T23:59:59.999Z')), false)
+  assert.equal(isTimeDiscountWindowActive(d, new Date('2026-06-01T00:00:00.000Z')), true)
+  assert.equal(isTimeDiscountWindowActive(d, new Date('2026-06-01T23:59:59.999Z')), true)
+  assert.equal(isTimeDiscountWindowActive(d, new Date('2026-06-02T00:00:00.000Z')), false)
+})
+
+test('isTimeDiscountWindowActive: never active without both dates, with unparseable dates, or without a discount', () => {
+  const now = new Date('2026-06-01T12:00:00.000Z')
+  assert.equal(isTimeDiscountWindowActive({}, now), false)
+  assert.equal(isTimeDiscountWindowActive({ startsAt: '2026-06-01T00:00:00.000Z' }, now), false)
+  assert.equal(isTimeDiscountWindowActive({ startsAt: 'nope', endsAt: 'nope' }, now), false)
+  assert.equal(isTimeDiscountWindowActive(null, now), false)
 })

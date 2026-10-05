@@ -48,7 +48,10 @@
   {%- capture time_discount_data -%}
     {
       "startsAt": {{ time_discount_metafield.value.startsAt | json }},
-      "endsAt": {{ time_discount_metafield.value.endsAt | json }}
+      "endsAt": {{ time_discount_metafield.value.endsAt | json }},
+      "pricingMode": {% if time_discount_metafield.value.pricingMode != nil %}{{ time_discount_metafield.value.pricingMode | json }}{% else %}null{% endif %},
+      "amount": {% if time_discount_metafield.value.amount != nil %}{{ time_discount_metafield.value.amount | json }}{% else %}null{% endif %},
+      "variantIds": {% if time_discount_metafield.value.variantIds != nil %}{{ time_discount_metafield.value.variantIds | json }}{% else %}null{% endif %}
     }
   {%- endcapture -%}
   {%- assign time_discount_json = time_discount_data | strip | escape -%}
@@ -103,14 +106,20 @@
     transition: all 0.3s ease;
   }
 
+  /* While a time-based discount runs, the regular price drops to the same
+     struck, smaller, muted treatment the tier discounts use (see
+     `.sparkly-tier-pricing__price s`), and the sale price — which keeps the
+     normal price styling: theme heading font, bold, theme text colour — sits
+     to its left. */
   .sparkly-tier-pricing__original-price[data-strike="true"] {
+    font-weight: 400;
+    font-size: calc(var(--sparkly-tier-price-font-size, 2.5rem) * 0.75);
+    opacity: 0.6;
     text-decoration: line-through;
-    opacity: 0.65;
   }
 
   .sparkly-tier-pricing__discounted-price {
-    color: var(--sparkly-tier-sun, #ffdc4c);
-    font-weight: 700;
+    order: -1;
   }
 </style>
 
