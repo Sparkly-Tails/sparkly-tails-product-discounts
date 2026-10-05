@@ -1,6 +1,6 @@
 import { shopifyQuery } from '@/lib/shopify-client'
 import { zonedTimeToUtc } from '@/lib/shop'
-import type { TimeDiscount } from '@/timeDiscounts/config'
+import type { TimeDiscount, DiscountMember } from '@/timeDiscounts/config'
 
 const NAMESPACE = 'sparkly_product_discounts'
 
@@ -9,12 +9,21 @@ interface TimeDiscountMetafieldValue {
   title: string
   startsAt: string
   endsAt: string
-  discountedPrice: number
+  pricingMode: 'percent' | 'fixed'
+  /** Percent-off, or the fixed price in the shop's major currency unit (e.g. 22.5 = £22.50). */
+  amount: number
+  /** Variant GIDs this discount covers on the product; null means every variant. */
+  variantIds: string[] | null
 }
 
 /**
- * Writes the `discount` metafield to every unique product in resolvedMembers
- * — the storefront widget block reads this, keyed per product.
+ * Writes the `time_based_discount` metafield to every unique product in
+ * resolvedMembers — the storefront widget block reads this, keyed per product.
+ *
+ * The metafield carries the discount's parameters (pricingMode, amount,
+ * variantIds), not a computed price: the widget derives the discounted price
+ * from the live variant price, so it can't go stale when a merchant edits a
+ * product price, and it stays correct per variant.
  *
  * `discount.startsAt`/`endsAt` are always naive shop-local strings (no
  * timezone offset). The storefront widget parses the metafield value with
@@ -25,10 +34,26 @@ interface TimeDiscountMetafieldValue {
  * makes `new Date(...)` parse correctly in any browser, in any timezone.
  */
 export async function syncTimeDiscountMetafields(discount: TimeDiscount, timeZone: string): Promise<void> {
-  const uniqueProductIds = [...new Set(discount.resolvedMembers.map((m) => m.productId))]
+  const startsAt = zonedTimeToUtc(discount.startsAt, timeZone)
+  const endsAt = zonedTimeToUtc(discount.endsAt, timeZone)
+
+  const membersByProduct = new Map<string, DiscountMember[]>()
+  for (const member of discount.resolvedMembers) {
+    membersByProduct.set(member.productId, [...(membersByProduct.get(member.productId) ?? []), member])
+  }
 
   const results = await Promise.allSettled(
-    uniqueProductIds.map((productId) => setTimeDiscountMetafieldWithPrice(productId, discount, timeZone))
+    [...membersByProduct].map(([productId, members]) =>
+      setTimeDiscountMetafield(productId, {
+        discountId: discount.discountId,
+        title: discount.title,
+        startsAt,
+        endsAt,
+        pricingMode: discount.pricingMode,
+        amount: discount.amount,
+        variantIds: coveredVariantIds(members),
+      }),
+    ),
   )
 
   const rejected = results.filter((r) => r.status === 'rejected')
@@ -37,36 +62,13 @@ export async function syncTimeDiscountMetafields(discount: TimeDiscount, timeZon
   }
 }
 
-async function setTimeDiscountMetafieldWithPrice(productId: string, discount: TimeDiscount, timeZone: string): Promise<void> {
-  const productData = await shopifyQuery<{
-    product: { id: string; priceRange: { minVariantPrice: { amount: string } } } | null
-  }>(
-    `query getProductPrice($id: ID!) {
-      product(id: $id) {
-        id
-        priceRange { minVariantPrice { amount } }
-      }
-    }`,
-    { id: productId }
-  )
+/** A whole-product member covers every variant; otherwise only the listed variants are covered. */
+function coveredVariantIds(members: DiscountMember[]): string[] | null {
+  if (members.some((m) => !m.variantId)) return null
+  return [...new Set(members.map((m) => m.variantId as string))]
+}
 
-  if (!productData.product) {
-    throw new Error(`Product ${productId} not found`)
-  }
-
-  const originalPrice = parseFloat(productData.product.priceRange.minVariantPrice.amount)
-  const discountedPrice = discount.pricingMode === 'percent'
-    ? originalPrice * (1 - discount.amount / 100)
-    : discount.amount
-
-  const value: TimeDiscountMetafieldValue = {
-    discountId: discount.discountId,
-    title: discount.title,
-    startsAt: zonedTimeToUtc(discount.startsAt, timeZone),
-    endsAt: zonedTimeToUtc(discount.endsAt, timeZone),
-    discountedPrice,
-  }
-
+async function setTimeDiscountMetafield(productId: string, value: TimeDiscountMetafieldValue): Promise<void> {
   const data = await shopifyQuery<{
     metafieldsSet: { userErrors: { field: string[]; message: string }[] }
   }>(
@@ -87,7 +89,7 @@ async function setTimeDiscountMetafieldWithPrice(productId: string, discount: Ti
   }
 }
 
-/** Deletes the `discount` metafield from every unique product in the list. */
+/** Deletes the `time_based_discount` metafield from every unique product in the list. */
 export async function clearTimeDiscountMetafields(members: { productId: string }[]): Promise<void> {
   const uniqueProductIds = [...new Set(members.map((m) => m.productId))]
 
