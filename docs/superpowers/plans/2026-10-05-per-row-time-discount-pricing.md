@@ -12,7 +12,7 @@
 
 ## How this plan was verified
 
-Every code block below was built and run in a scratch git worktree before being written here, one commit per task, in the order shown. The scratch results are the "expected" results in each task: **PR 1 end:** 208 vitest tests (20 files), 135 `node --test` tests, 14 Rust tests; **PR 2 end:** 260 vitest tests (23 files), `tsc --noEmit` clean, `next build --webpack` succeeds, and the editor was rendered with the real compiled CSS and checked visually. Nothing from the scratch worktree is in this repository. If a step in your copy disagrees with the expected result, stop and report it rather than adjusting the code.
+Every code block below was built and run in a scratch git worktree before being written here, one commit per task, in the order shown. The scratch results are the "expected" results in each task: **PR 1 end:** 208 vitest tests (20 files), 135 `node --test` tests, 14 Rust tests; **PR 2 end:** 260 vitest tests (23 files; 209 and 261 once PR 1's final review added a shared-scope guard test), `tsc --noEmit` clean, `next build --webpack` succeeds, and the editor was rendered with the real compiled CSS and checked visually. Nothing from the scratch worktree is in this repository. If a step in your copy disagrees with the expected result, stop and report it rather than adjusting the code.
 
 ## Global Constraints
 
@@ -49,7 +49,7 @@ Branch: `feat/per-row-time-discount-engine`, from the latest `main`.
 git checkout main && git pull origin main && git checkout -b feat/per-row-time-discount-engine
 ```
 
-Nothing the merchant sees changes in PR 1: the existing admin is not touched, and a discount saved by it is read as one row per product carrying its one shared price. **Deploy order after merging PR 1:** deploy the Shopify app first (Function + theme scripts, which understand both shapes), then Vercel (which writes the new metafield shape).
+Nothing the merchant sees changes in PR 1: the existing admin is not touched, and a discount saved by it is read as one row per product carrying its one shared price. **Deploy order for PR 1:** Vercel deploys `main` automatically when the PR is merged, so "app first, then Vercel" is only possible if the Shopify app is deployed **before merging**: run `shopify app deploy --config shopify.app.toml` from the reviewed PR branch (its Function and theme scripts read both the old and the new shapes, so this is safe against the current admin), confirm the new version is active, and only then merge. If the merge comes first, a time-discount save in the existing admin during the gap writes the new metafield shape that the old live scripts cannot read (the countdown would show on variants the discount does not cover and no sale price would show) until the app deploy; checkout prices are unaffected.
 
 
 ### Task 1: One reader for a discount's price rows
@@ -1153,7 +1153,7 @@ index 1fea06d..0615f8e 100644
 
 - [ ] **Step 2: Run the tests and watch them fail**
 
-Run: `node --test extensions/product-tier-pricing-tests/ ; npx vitest run tests/storefront`
+Run: `node --test extensions/product-tier-pricing-tests/*.test.js ; npx vitest run tests/storefront`
 Expected: FAIL — `tierTimeDiscountItems`, `countdownDiscountItems` etc. are not exported, and the browser-level test finds no sale price for rows in `items`.
 
 - [ ] **Step 3: Implement the scripts**
@@ -1390,7 +1390,7 @@ index 2627cc3..e9c4cd2 100644
 
 - [ ] **Step 5: Run everything**
 
-Run: `node --test extensions/product-tier-pricing-tests/ && npx vitest run && npx tsc --noEmit -p .`
+Run: `node --test extensions/product-tier-pricing-tests/*.test.js && npx vitest run && npx tsc --noEmit -p .`  (use the glob: a directory argument fails on Node 22)
 Expected: 135 `node --test` tests pass; vitest: 208 tests in 20 files pass (9 of them are the new browser-level tests); `tsc` prints nothing.
 
 To see the first-paint fix is real, temporarily change `: container.dataset.selectedVariantId || null,` to `: null,` in `tier-pricing.js` and run `npx vitest run tests/storefront`: three tests fail ("uses the selected variant from first paint, not only after a variant change", "lets a variant row beat the whole-product row" and "still understands a metafield written before per-row pricing" — each needs the selected variant at first paint); put it back and all nine pass.
@@ -1404,10 +1404,10 @@ git commit -m "feat: storefront scripts and blocks read per-row items; fix initi
 
 ### PR 1 hand-off
 
-- [ ] Run the full check once more: `npx vitest run && npx tsc --noEmit -p . && node --test extensions/product-tier-pricing-tests/ && (cd extensions/time-based-discount && cargo test)` — expect 208 / clean / 135 / 14.
+- [ ] Run the full check once more: `npx vitest run && npx tsc --noEmit -p . && node --test extensions/product-tier-pricing-tests/*.test.js && (cd extensions/time-based-discount && cargo test)` — expect 208 / clean / 135 / 14 (209 once the final-review guard test below is added).
 - [ ] `git push -u origin feat/per-row-time-discount-engine`, then open the PR (title: "Per-row pricing engine: Function, storefront sync and scripts (backwards compatible)"). Body: what changed per task, "no admin change", the deploy order above, and the first-paint variant fix.
-- [ ] Get a non-author review, merge.
-- [ ] Deploy the Shopify app: `git checkout main && git pull origin main && shopify app deploy --config shopify.app.toml`; confirm with `shopify app versions list --config shopify.app.toml` that a new version is active. Then confirm Vercel has deployed `main`.
+- [ ] **Deploy the Shopify app BEFORE merging** (Vercel auto-deploys `main` on merge): from the PR branch run `shopify app deploy --config shopify.app.toml`; confirm with `shopify app versions list --config shopify.app.toml` that the new version is active.
+- [ ] Get a non-author review, merge, and confirm Vercel has deployed `main`.
 - [ ] Live check: in the existing admin re-save the active time discount (this rewrites its storefront metafield in the new shape), hard-refresh a covered product page and confirm the countdown and sale price still show; for a variant-specific discount, confirm the sale price shows **on first load**.
 
 ---
@@ -4882,8 +4882,8 @@ Expected: `tsc` prints nothing; the `grep` matches only the tier-discount module
 
 - [ ] **Step 10: Run everything**
 
-Run: `npx vitest run && npx tsc --noEmit -p . && node --test extensions/product-tier-pricing-tests/ && NEXT_PUBLIC_SHOPIFY_API_KEY=x SHOPIFY_SHOP=x.myshopify.com npx next build`
-Expected: vitest 260 tests in 23 files pass; `tsc` prints nothing; 135 extension tests pass; the build lists `/time-discounts/[discountId]` and `/time-discounts/new` without errors. (If Turbopack objects to your `node_modules`, add `--webpack` to `next build`.) `npx eslint src/timeDiscounts src/components/SavedToast.tsx src/app/time-discounts tests/timeDiscounts tests/components tests/storefront` prints nothing; `npx eslint src` still reports 4 errors in files this PR does not touch (the tier-discount pages, `layout.tsx`'s script tag and `PricingModeTierFields.tsx`).
+Run: `npx vitest run && npx tsc --noEmit -p . && node --test extensions/product-tier-pricing-tests/*.test.js && NEXT_PUBLIC_SHOPIFY_API_KEY=x SHOPIFY_SHOP=x.myshopify.com npx next build`
+Expected: vitest 261 tests in 23 files pass (260 plus the shared-scope guard test PR 1's final review added); `tsc` prints nothing; 135 extension tests pass; the build lists `/time-discounts/[discountId]` and `/time-discounts/new` without errors. (If Turbopack objects to your `node_modules`, add `--webpack` to `next build`.) `npx eslint src/timeDiscounts src/components/SavedToast.tsx src/app/time-discounts tests/timeDiscounts tests/components tests/storefront` prints nothing; `npx eslint src` still reports 4 errors in files this PR does not touch (the tier-discount pages, `layout.tsx`'s script tag and `PricingModeTierFields.tsx`).
 
 - [ ] **Step 11: Commit**
 
