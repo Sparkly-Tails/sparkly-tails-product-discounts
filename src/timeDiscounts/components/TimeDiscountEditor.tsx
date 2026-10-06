@@ -3,10 +3,11 @@
 import { useEffect, useRef, useState } from 'react'
 import ConfirmForm from '@/components/ConfirmForm'
 import { useSavedToast } from '@/components/SavedToast'
+import { itemKey, scheduleProblem } from '@/timeDiscounts/items'
 import {
-  saveTimeDiscountTitle, saveTimeDiscountSchedule, saveTimeDiscountItem, removeTimeDiscountItem,
-} from '@/timeDiscounts/actions'
-import { itemKey, productAdminUrl, scheduleProblem } from '@/timeDiscounts/items'
+  addDraftRow, dropUnsavedRows, keepRow, newDraftRow, omitKey, removeRow, settledTitle, shouldSaveSchedule, titleSaveDecision, type Rule,
+} from '@/timeDiscounts/rows'
+import { requestRowRemoval, requestRowSave, requestScheduleSave, requestTitleSave } from '@/timeDiscounts/saveRequests'
 import AddItemPicker, { type PickedItem } from '@/timeDiscounts/components/AddItemPicker'
 import type { DisplayRow } from '@/timeDiscounts/components/ItemRow'
 import ItemsTable from '@/timeDiscounts/components/ItemsTable'
@@ -14,16 +15,6 @@ import { useSaveQueue } from '@/timeDiscounts/components/useSaveQueue'
 
 /** How long after the last change to either date the schedule is saved. */
 export const SCHEDULE_SAVE_DELAY_MS = 600
-
-/** What a save resolves to when the call itself is rejected (network drop, or a stale action after a deploy). */
-const UNREACHABLE = { ok: false as const, error: "Couldn't reach the server — reload the page and try again" }
-const unreachable = () => UNREACHABLE
-
-function without(record: Record<string, string>, key: string): Record<string, string> {
-  const next = { ...record }
-  delete next[key]
-  return next
-}
 
 const inputClass =
   'w-full border border-line rounded px-3 py-2 text-sm transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:border-accent'
@@ -80,20 +71,21 @@ export default function TimeDiscountEditor({
   }
 
   function saveTitle() {
-    const next = title.trim()
-    if (!next) {
-      setTitleError('A title is required')
+    const decision = titleSaveDecision(title, requestedTitle.current)
+    if (decision.action === 'error') {
+      setTitleError(decision.message)
       return
     }
-    if (next === requestedTitle.current) return
+    if (decision.action === 'skip') return
+    const next = decision.title
     requestedTitle.current = next
     setTitleError(null)
-    enqueue(() => saveTimeDiscountTitle(discountId, next)).catch(unreachable).then((result) => {
+    requestTitleSave(enqueue, discountId, next).then((result) => {
       if (result.ok) {
         savedTitle.current = next
         if (requestedTitle.current === next) setTitleError(null) // a stale error must not sit beside a live title
         // Tidy the saved value, but never overwrite what was typed since the blur.
-        setTitle((current) => (current.trim() === next ? next : current))
+        setTitle((current) => settledTitle(current, next))
         showSaved()
       } else {
         // Let the same value be retried, unless a newer one has been queued since.
@@ -105,13 +97,12 @@ export default function TimeDiscountEditor({
 
   // The schedule saves itself once both dates are valid and have settled.
   useEffect(() => {
-    if (!startsAt || !endsAt || scheduleProblem(startsAt, endsAt)) return
-    if (startsAt === requestedSchedule.current.startsAt && endsAt === requestedSchedule.current.endsAt) return
+    if (!shouldSaveSchedule(startsAt, endsAt, requestedSchedule.current)) return
 
     const timer = setTimeout(() => {
       const requested = { startsAt, endsAt }
       requestedSchedule.current = requested
-      enqueue(() => saveTimeDiscountSchedule(discountId, startsAt, endsAt)).catch(unreachable).then((result) => {
+      requestScheduleSave(enqueue, discountId, startsAt, endsAt).then((result) => {
         if (result.ok) {
           savedSchedule.current = requested
           setScheduleError(null)
@@ -126,30 +117,25 @@ export default function TimeDiscountEditor({
     return () => clearTimeout(timer)
   }, [startsAt, endsAt, discountId, enqueue, showSaved])
 
-  /** Drops rows that were added but never saved — except the one being edited and the one whose save is in flight. */
-  function withoutUnsavedRows(list: DisplayRow[], keep?: string) {
-    return list.filter((row) => !row.isNew || itemKey(row) === keep || itemKey(row) === busyKeyRef.current)
-  }
-
   function startEdit(row: DisplayRow) {
-    setRows((current) => withoutUnsavedRows(current, itemKey(row)))
+    setRows((current) => dropUnsavedRows(current, itemKey(row), busyKeyRef.current))
     setEditingKey(itemKey(row))
   }
 
   function cancelEdit(row: DisplayRow) {
-    setRows((current) => withoutUnsavedRows(current))
-    setRowErrors((errors) => without(errors, itemKey(row)))
+    setRows((current) => dropUnsavedRows(current, null, busyKeyRef.current))
+    setRowErrors((errors) => omitKey(errors, itemKey(row)))
     setEditingKey(null)
   }
 
-  function saveRow(row: DisplayRow, rule: { pricingMode: 'percent' | 'fixed'; amount: number }) {
+  function saveRow(row: DisplayRow, rule: Rule) {
     const key = itemKey(row)
     markBusy(key)
-    setRowErrors((errors) => without(errors, key))
-    enqueue(() => saveTimeDiscountItem(discountId, { productId: row.productId, variantId: row.variantId, ...rule })).catch(unreachable).then((result) => {
+    setRowErrors((errors) => omitKey(errors, key))
+    requestRowSave(enqueue, discountId, row, rule).then((result) => {
       markBusy(null)
       if (result.ok) {
-        setRows((current) => current.map((r) => (itemKey(r) === key ? { ...r, ...rule, isNew: false } : r)))
+        setRows((current) => keepRow(current, key, rule))
         setEditingKey((current) => (current === key ? null : current))
         showSaved()
       } else {
@@ -166,11 +152,11 @@ export default function TimeDiscountEditor({
     }
     const key = itemKey(row)
     markBusy(key)
-    setRowErrors((errors) => without(errors, key))
-    enqueue(() => removeTimeDiscountItem(discountId, { productId: row.productId, variantId: row.variantId })).catch(unreachable).then((result) => {
+    setRowErrors((errors) => omitKey(errors, key))
+    requestRowRemoval(enqueue, discountId, row).then((result) => {
       markBusy(null)
       if (result.ok) {
-        setRows((current) => current.filter((r) => itemKey(r) !== key))
+        setRows((current) => removeRow(current, key))
         showSaved()
       } else {
         setRowErrors((errors) => ({ ...errors, [key]: result.error }))
@@ -180,17 +166,8 @@ export default function TimeDiscountEditor({
 
   function addRow(item: PickedItem) {
     if (busyKeyRef.current !== null) return // a row save is in flight; its row must stay as it is
-    const row: DisplayRow = {
-      productId: item.productId,
-      variantId: item.variantId,
-      title: item.title,
-      adminUrl: productAdminUrl(adminProductBaseUrl, item.productId),
-      regularPrice: item.price,
-      pricingMode: 'percent',
-      amount: 0,
-      isNew: true,
-    }
-    setRows((current) => [...withoutUnsavedRows(current), row])
+    const row = newDraftRow(item, adminProductBaseUrl)
+    setRows((current) => addDraftRow(current, row, busyKeyRef.current))
     setEditingKey(itemKey(row))
   }
 
