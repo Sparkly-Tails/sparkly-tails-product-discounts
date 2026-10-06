@@ -47,18 +47,32 @@ export default function TimeDiscountEditor({
 
   const [title, setTitle] = useState(initialTitle)
   const [titleError, setTitleError] = useState<string | null>(null)
-  const savedTitle = useRef(initialTitle)
+  const savedTitle = useRef(initialTitle) // last value the server acknowledged
+  const requestedTitle = useRef(initialTitle) // last value a save was queued for
 
   const [startsAt, setStartsAt] = useState(initialStartsAt)
   const [endsAt, setEndsAt] = useState(initialEndsAt)
   const [scheduleError, setScheduleError] = useState<string | null>(null)
-  const savedSchedule = useRef({ startsAt: initialStartsAt, endsAt: initialEndsAt })
+  const savedSchedule = useRef({ startsAt: initialStartsAt, endsAt: initialEndsAt }) // last acknowledged
+  const requestedSchedule = useRef({ startsAt: initialStartsAt, endsAt: initialEndsAt }) // last queued
   const scheduleInvalid = startsAt !== '' && endsAt !== '' && endsAt <= startsAt ? 'End must be after start.' : null
 
   const [rows, setRows] = useState<DisplayRow[]>(initialRows)
   const [editingKey, setEditingKey] = useState<string | null>(null)
   const [busyKey, setBusyKey] = useState<string | null>(null)
+  // Mirrors busyKey so handlers always see the row whose save is in flight, even from a stale closure.
+  const busyKeyRef = useRef<string | null>(null)
+  function markBusy(key: string | null) {
+    busyKeyRef.current = key
+    setBusyKey(key)
+  }
   const [rowErrors, setRowErrors] = useState<Record<string, string>>({})
+
+  // Deleting rewrites the same shop config the saves do, so it waits its turn in the queue.
+  // The redirect thrown by the server action propagates through the queue's own promise.
+  async function deleteQueued() {
+    await enqueue(deleteAction)
+  }
 
   function saveTitle() {
     const next = title.trim()
@@ -66,14 +80,18 @@ export default function TimeDiscountEditor({
       setTitleError('A title is required')
       return
     }
-    if (next === savedTitle.current) return
+    if (next === requestedTitle.current) return
+    requestedTitle.current = next
     setTitleError(null)
     enqueue(() => saveTimeDiscountTitle(discountId, next)).then((result) => {
       if (result.ok) {
         savedTitle.current = next
-        setTitle(next)
+        // Tidy the saved value, but never overwrite what was typed since the blur.
+        setTitle((current) => (current.trim() === next ? next : current))
         showSaved()
       } else {
+        // Let the same value be retried, unless a newer one has been queued since.
+        if (requestedTitle.current === next) requestedTitle.current = savedTitle.current
         setTitleError(result.error)
       }
     })
@@ -82,15 +100,19 @@ export default function TimeDiscountEditor({
   // The schedule saves itself once both dates are valid and have settled.
   useEffect(() => {
     if (!startsAt || !endsAt || endsAt <= startsAt) return
-    if (startsAt === savedSchedule.current.startsAt && endsAt === savedSchedule.current.endsAt) return
+    if (startsAt === requestedSchedule.current.startsAt && endsAt === requestedSchedule.current.endsAt) return
 
     const timer = setTimeout(() => {
+      const requested = { startsAt, endsAt }
+      requestedSchedule.current = requested
       enqueue(() => saveTimeDiscountSchedule(discountId, startsAt, endsAt)).then((result) => {
         if (result.ok) {
-          savedSchedule.current = { startsAt, endsAt }
+          savedSchedule.current = requested
           setScheduleError(null)
           showSaved()
         } else {
+          // Let the same dates be retried, unless newer ones have been queued since.
+          if (requestedSchedule.current === requested) requestedSchedule.current = savedSchedule.current
           setScheduleError(result.error)
         }
       })
@@ -98,8 +120,9 @@ export default function TimeDiscountEditor({
     return () => clearTimeout(timer)
   }, [startsAt, endsAt, discountId, enqueue, showSaved])
 
+  /** Drops rows that were added but never saved — except the one being edited and the one whose save is in flight. */
   function withoutUnsavedRows(list: DisplayRow[], keep?: string) {
-    return list.filter((row) => !row.isNew || itemKey(row) === keep)
+    return list.filter((row) => !row.isNew || itemKey(row) === keep || itemKey(row) === busyKeyRef.current)
   }
 
   function startEdit(row: DisplayRow) {
@@ -115,13 +138,13 @@ export default function TimeDiscountEditor({
 
   function saveRow(row: DisplayRow, rule: { pricingMode: 'percent' | 'fixed'; amount: number }) {
     const key = itemKey(row)
-    setBusyKey(key)
+    markBusy(key)
     setRowErrors((errors) => without(errors, key))
     enqueue(() => saveTimeDiscountItem(discountId, { productId: row.productId, variantId: row.variantId, ...rule })).then((result) => {
-      setBusyKey(null)
+      markBusy(null)
       if (result.ok) {
         setRows((current) => current.map((r) => (itemKey(r) === key ? { ...r, ...rule, isNew: false } : r)))
-        setEditingKey(null)
+        setEditingKey((current) => (current === key ? null : current))
         showSaved()
       } else {
         setRowErrors((errors) => ({ ...errors, [key]: result.error }))
@@ -136,10 +159,10 @@ export default function TimeDiscountEditor({
       return
     }
     const key = itemKey(row)
-    setBusyKey(key)
+    markBusy(key)
     setRowErrors((errors) => without(errors, key))
     enqueue(() => removeTimeDiscountItem(discountId, { productId: row.productId, variantId: row.variantId })).then((result) => {
-      setBusyKey(null)
+      markBusy(null)
       if (result.ok) {
         setRows((current) => current.filter((r) => itemKey(r) !== key))
         showSaved()
@@ -150,6 +173,7 @@ export default function TimeDiscountEditor({
   }
 
   function addRow(item: PickedItem) {
+    if (busyKeyRef.current !== null) return // a row save is in flight; its row must stay as it is
     const row: DisplayRow = {
       productId: item.productId,
       variantId: item.variantId,
@@ -219,7 +243,7 @@ export default function TimeDiscountEditor({
                     key={key}
                     row={row}
                     editing={editingKey === key}
-                    busy={busyKey === key}
+                    busy={busyKey !== null}
                     error={rowErrors[key] ?? null}
                     onEdit={() => startEdit(row)}
                     onCancel={() => cancelEdit(row)}
@@ -235,7 +259,7 @@ export default function TimeDiscountEditor({
       </section>
 
       <section className="flex gap-3">
-        <ConfirmForm action={deleteAction} confirmMessage="Delete this discount entirely? This cannot be undone.">
+        <ConfirmForm action={deleteQueued} confirmMessage="Delete this discount entirely? This cannot be undone.">
           <button type="submit" className="bg-surface border border-line hover:bg-line px-4 py-3 rounded text-sm transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger">
             Delete
           </button>

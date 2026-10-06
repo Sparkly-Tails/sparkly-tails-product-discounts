@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, cleanup, within, act } from '@testing-library/react'
+import { render, screen, cleanup, within, act, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import '@testing-library/jest-dom/vitest'
 import TimeDiscountEditor, { SCHEDULE_SAVE_DELAY_MS } from '@/timeDiscounts/components/TimeDiscountEditor'
@@ -352,5 +352,96 @@ describe('TimeDiscountEditor — saving one request at a time', () => {
 
     await act(async () => { finishTitle({ ok: true }) })
     expect(mocked.saveTimeDiscountItem).toHaveBeenCalledTimes(1)
+  })
+})
+
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((res) => { resolve = res })
+  return { promise, resolve }
+}
+
+describe('TimeDiscountEditor — races while a save is in flight', () => {
+  it('keeps a new row whose save is in flight, locks the other rows, and does not close a different edit', async () => {
+    const user = userNow()
+    const pending = deferred<{ ok: true }>()
+    mocked.saveTimeDiscountItem.mockReturnValue(pending.promise)
+    setup()
+    await user.click(screen.getByRole('button', { name: 'stub-add' }))
+    await user.type(within(rowOf('New Bed')).getByLabelText(/Percent off for New Bed/), '20')
+    await user.click(within(rowOf('New Bed')).getByRole('button', { name: 'Save' }))
+    expect(mocked.saveTimeDiscountItem).toHaveBeenCalledTimes(1)
+
+    expect(screen.getByRole('button', { name: 'Edit Scruffs Boucle Cat Bed' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Delete Roll Up Bed – Grey' })).toBeDisabled()
+
+    await user.click(screen.getByRole('button', { name: 'stub-add' })) // picking again must not discard the in-flight row
+    expect(screen.getAllByRole('link', { name: 'New Bed' })).toHaveLength(1)
+
+    await act(async () => { pending.resolve({ ok: true }) })
+    expect(await screen.findByText('Saved')).toBeInTheDocument()
+    const row = rowOf('New Bed')
+    expect(within(row).getByText('20% off')).toBeInTheDocument()
+    expect(within(row).getByText('£24.00')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Edit Scruffs Boucle Cat Bed' })).toBeEnabled()
+  })
+
+  it('saves the schedule again when it is changed back while the earlier change is still being saved', async () => {
+    const user = userNow()
+    const pending = deferred<{ ok: true }>()
+    mocked.saveTimeDiscountSchedule.mockReturnValueOnce(pending.promise)
+    setup()
+    const end = screen.getByLabelText(/Ends/)
+
+    await user.clear(end)
+    await user.type(end, '2026-07-03T12:00')
+    await act(async () => { await vi.advanceTimersByTimeAsync(SCHEDULE_SAVE_DELAY_MS) })
+    expect(mocked.saveTimeDiscountSchedule).toHaveBeenCalledTimes(1) // save B, still pending
+
+    await user.clear(end)
+    await user.type(end, '2026-07-02T12:00') // back to the schedule that was first loaded
+    await act(async () => { await vi.advanceTimersByTimeAsync(SCHEDULE_SAVE_DELAY_MS) })
+    await act(async () => { pending.resolve({ ok: true }) })
+
+    await waitFor(() => expect(mocked.saveTimeDiscountSchedule).toHaveBeenCalledTimes(2))
+    expect(mocked.saveTimeDiscountSchedule).toHaveBeenLastCalledWith('time_disc_1', '2026-07-01T12:00', '2026-07-02T12:00')
+  })
+
+  it('saves the title again when it is restored while the earlier change is still being saved', async () => {
+    const user = userNow()
+    const pending = deferred<{ ok: true }>()
+    mocked.saveTimeDiscountTitle.mockReturnValueOnce(pending.promise)
+    setup()
+    const title = screen.getByLabelText('Title')
+
+    await user.clear(title)
+    await user.type(title, 'Winter Sale')
+    await user.tab()
+    expect(mocked.saveTimeDiscountTitle).toHaveBeenCalledTimes(1) // pending
+
+    await user.clear(title)
+    await user.type(title, 'Summer Sale')
+    await user.tab()
+    await act(async () => { pending.resolve({ ok: true }) })
+
+    await waitFor(() => expect(mocked.saveTimeDiscountTitle).toHaveBeenCalledTimes(2))
+    expect(mocked.saveTimeDiscountTitle).toHaveBeenLastCalledWith('time_disc_1', 'Summer Sale')
+    expect(screen.getByLabelText('Title')).toHaveValue('Summer Sale')
+  })
+
+  it('does not run Delete until the saves ahead of it have finished', async () => {
+    const user = userNow()
+    const pending = deferred<{ ok: true }>()
+    mocked.saveTimeDiscountTitle.mockReturnValue(pending.promise)
+    const { deleteAction } = setup()
+
+    await user.type(screen.getByLabelText('Title'), '!')
+    await user.tab() // title save in flight
+    await user.click(screen.getByRole('button', { name: 'Delete' }))
+    expect(deleteAction).not.toHaveBeenCalled()
+
+    await act(async () => { pending.resolve({ ok: true }) })
+    await waitFor(() => expect(deleteAction).toHaveBeenCalledTimes(1))
   })
 })
