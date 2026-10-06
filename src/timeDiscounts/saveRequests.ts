@@ -1,6 +1,9 @@
 import {
   saveTimeDiscountTitle, saveTimeDiscountSchedule, saveTimeDiscountItem, removeTimeDiscountItem, type SaveResult,
 } from '@/timeDiscounts/actions'
+import { saveGroupRule, saveGroupSelection } from '@/timeDiscounts/groupActions'
+import type { GroupSaveResult } from '@/timeDiscounts/group'
+import type { GroupSelection } from '@/timeDiscounts/config'
 import type { Rule } from '@/timeDiscounts/rows'
 
 /** Runs one save at a time, in order (see useSaveQueue). */
@@ -29,4 +32,12 @@ export function requestRowSave(enqueue: Enqueue, discountId: string, row: Produc
 
 export function requestRowRemoval(enqueue: Enqueue, discountId: string, row: ProductKey): Promise<SaveResult> {
   return enqueue(() => removeTimeDiscountItem(discountId, { productId: row.productId, variantId: row.variantId })).catch(unreachable)
+}
+
+export function requestGroupRuleSave(enqueue: Enqueue, discountId: string, rule: Rule): Promise<GroupSaveResult> {
+  return enqueue(() => saveGroupRule(discountId, rule)).catch(unreachable)
+}
+
+export function requestGroupSelectionSave(enqueue: Enqueue, discountId: string, selection: GroupSelection): Promise<GroupSaveResult> {
+  return enqueue(() => saveGroupSelection(discountId, selection)).catch(unreachable)
 }
