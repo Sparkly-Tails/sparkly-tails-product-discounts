@@ -1,0 +1,96 @@
+import { describe, it, expect } from 'vitest'
+import {
+  itemKey, discountedPrice, validateRule, validateItemsStructure,
+  functionConfigBytes, assertItemsFitFunctionConfig, FUNCTION_CONFIG_MAX_BYTES,
+} from '@/timeDiscounts/items'
+import type { TimeDiscountItem } from '@/timeDiscounts/config'
+
+const P1 = 'gid://shopify/Product/1'
+const V10 = 'gid://shopify/ProductVariant/10'
+const V11 = 'gid://shopify/ProductVariant/11'
+
+describe('itemKey', () => {
+  it('distinguishes a whole product from its variants', () => {
+    expect(itemKey({ productId: P1 })).not.toBe(itemKey({ productId: P1, variantId: V10 }))
+    expect(itemKey({ productId: P1, variantId: V10 })).toBe(itemKey({ productId: P1, variantId: V10 }))
+  })
+})
+
+describe('discountedPrice', () => {
+  it('takes the percentage off the regular price, rounded to pence', () => {
+    expect(discountedPrice({ pricingMode: 'percent', amount: 20 }, 22)).toBe(17.6)
+    expect(discountedPrice({ pricingMode: 'percent', amount: 12.5 }, 59.99)).toBe(52.49)
+  })
+
+  it('uses a fixed amount as the final price, whatever the regular price is', () => {
+    expect(discountedPrice({ pricingMode: 'fixed', amount: 22 }, 49.99)).toBe(22)
+  })
+
+  it('never shows a fixed price above the regular price (checkout clamps it)', () => {
+    expect(discountedPrice({ pricingMode: 'fixed', amount: 30 }, 25)).toBe(25)
+  })
+
+  it('clamps a percentage to 0-100', () => {
+    expect(discountedPrice({ pricingMode: 'percent', amount: 150 }, 20)).toBe(0)
+    expect(discountedPrice({ pricingMode: 'percent', amount: -5 }, 20)).toBe(20)
+  })
+})
+
+describe('validateRule', () => {
+  it('requires an amount above zero', () => {
+    expect(validateRule({ pricingMode: 'percent', amount: 0 }, 20)).toBe('Enter an amount greater than zero')
+    expect(validateRule({ pricingMode: 'fixed', amount: Number.NaN }, 20)).toBe('Enter an amount greater than zero')
+  })
+
+  it('caps a percentage at 100', () => {
+    expect(validateRule({ pricingMode: 'percent', amount: 101 }, 20)).toBe('A percentage discount cannot exceed 100%')
+    expect(validateRule({ pricingMode: 'percent', amount: 100 }, 20)).toBeNull()
+  })
+
+  it('rejects a fixed price not lower than the regular price, naming both', () => {
+    expect(validateRule({ pricingMode: 'fixed', amount: 25 }, 20)).toContain('The fixed price (£25.00) is not lower than the regular price (£20.00)')
+    expect(validateRule({ pricingMode: 'fixed', amount: 20 }, 20)).not.toBeNull()
+    expect(validateRule({ pricingMode: 'fixed', amount: 19.99 }, 20)).toBeNull()
+  })
+
+  it('cannot judge a fixed price when the regular price is unknown', () => {
+    expect(validateRule({ pricingMode: 'fixed', amount: 25 }, null)).toBeNull()
+  })
+})
+
+describe('validateItemsStructure', () => {
+  const row = (productId: string, variantId?: string): TimeDiscountItem => ({ productId, ...(variantId ? { variantId } : {}), pricingMode: 'percent', amount: 10 })
+
+  it('accepts distinct products and distinct variants of one product', () => {
+    expect(validateItemsStructure([row(P1, V10), row(P1, V11), row('gid://shopify/Product/2')])).toBeNull()
+  })
+
+  it('rejects the same product/variant twice', () => {
+    expect(validateItemsStructure([row(P1, V10), row(P1, V10)])).toBe('This product or variant is already in the discount')
+    expect(validateItemsStructure([row(P1), row(P1)])).toBe('This product or variant is already in the discount')
+  })
+
+  it('rejects a whole-product row alongside a variant row of the same product', () => {
+    expect(validateItemsStructure([row(P1), row(P1, V10)])).toBe('A product cannot have both a whole-product row and variant rows')
+    expect(validateItemsStructure([row(P1, V10), row(P1)])).toBe('A product cannot have both a whole-product row and variant rows')
+  })
+})
+
+describe('function config size', () => {
+  const rows = (n: number): TimeDiscountItem[] =>
+    Array.from({ length: n }, (_, i) => ({
+      productId: `gid://shopify/Product/${10_000_000_000_000 + i}`,
+      variantId: `gid://shopify/ProductVariant/${50_000_000_000_000 + i}`,
+      pricingMode: 'percent' as const,
+      amount: 20.5,
+    }))
+
+  it('fits about 60 realistic variant rows under the guard', () => {
+    expect(functionConfigBytes(rows(60))).toBeLessThan(FUNCTION_CONFIG_MAX_BYTES)
+    expect(() => assertItemsFitFunctionConfig(rows(60))).not.toThrow()
+  })
+
+  it('rejects a discount that would exceed the guard, with a clear message', () => {
+    expect(() => assertItemsFitFunctionConfig(rows(70))).toThrow('too many products/variants')
+  })
+})
