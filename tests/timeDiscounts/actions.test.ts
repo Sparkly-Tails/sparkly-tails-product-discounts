@@ -10,6 +10,7 @@ import * as metafieldSync from '@/timeDiscounts/metafieldSync'
 import * as authRedirect from '@/lib/auth-redirect'
 import * as shopLib from '@/lib/shop'
 import * as shopifyClient from '@/lib/shopify-client'
+import * as groupServer from '@/timeDiscounts/groupServer'
 import type { TimeDiscount, TimeDiscountItem } from '@/timeDiscounts/config'
 
 const P1 = 'gid://shopify/Product/1'
@@ -215,6 +216,67 @@ describe('createTimeDiscount', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
     expect(await createTimeDiscount(null, form())).toEqual({ ok: true })
     expect(redirectSpy).toHaveBeenCalled()
+  })
+})
+
+describe('createTimeDiscount — group', () => {
+  const rule = { pricingMode: 'percent', amount: 20 }
+  const selection = { mode: 'collections', collections: [{ id: 'gid://shopify/Collection/1', title: 'Summer' }] }
+  const rows = [{ productId: P1, pricingMode: 'percent' as const, amount: 20 }, { productId: P2, pricingMode: 'percent' as const, amount: 20 }]
+  const form = (over: Record<string, string> = {}) =>
+    formData(Object.entries({
+      title: 'Summer Sale', startsAt: '2026-07-01T12:00', endsAt: '2026-07-02T12:00', kind: 'group',
+      group: JSON.stringify({ ...rule, selection }), ...over,
+    }))
+  const created = () => shopifyQuerySpy.mockResolvedValueOnce({
+    discountAutomaticAppCreate: { automaticAppDiscount: { discountId: 'gid://shopify/DiscountAutomaticApp/99' }, userErrors: [] },
+  })
+  let resolveSpy: MockInstance<typeof groupServer.resolveGroup>
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-06-01T00:00:00Z'))
+    resolveSpy = vi.spyOn(groupServer, 'resolveGroup').mockResolvedValue({ items: rows, covered: [] })
+  })
+  afterEach(() => vi.useRealTimers())
+
+  it('creates the discount with the rows the group expands to, and stores the group beside them', async () => {
+    created()
+    expect(await createTimeDiscount(null, form())).toEqual({ ok: true })
+
+    expect(resolveSpy).toHaveBeenCalledWith({ ...rule, selection }, undefined, expect.stringContaining('/admin/products/'))
+    expect(functionConfigSent().parsed).toEqual({ items: rows })
+    const [saved] = saveSpy.mock.calls[0][0].discounts as TimeDiscount[]
+    expect(saved).toMatchObject({ kind: 'group', title: 'Summer Sale', items: rows, group: { ...rule, selection } })
+    expect(metafieldSync.syncTimeDiscountMetafields).toHaveBeenCalledWith(expect.objectContaining({ kind: 'group' }), 'Europe/London', undefined)
+    expect(redirectSpy).toHaveBeenCalledWith(`/time-discounts/${encodeURIComponent(saved.discountId)}`)
+  })
+
+  it('creates nothing and shows the reason when the group cannot be resolved', async () => {
+    resolveSpy.mockRejectedValue(new Error('Cat Toy: This product already belongs to another discount'))
+    expect(await createTimeDiscount(null, form())).toEqual({ ok: false, error: 'Cat Toy: This product already belongs to another discount' })
+    expect(shopifyQuerySpy).not.toHaveBeenCalled()
+    expect(saveSpy).not.toHaveBeenCalled()
+  })
+
+  it('creates nothing when the group cannot be read', async () => {
+    expect(await createTimeDiscount(null, form({ group: 'not json' }))).toEqual({ ok: false, error: expect.stringContaining('could not be read') })
+    expect(resolveSpy).not.toHaveBeenCalled()
+    expect(shopifyQuerySpy).not.toHaveBeenCalled()
+  })
+
+  it('still refuses an end time that has already passed', async () => {
+    vi.setSystemTime(new Date('2026-07-02T12:00:00Z'))
+    expect(await createTimeDiscount(null, form())).toEqual({ ok: false, error: 'The end time has already passed. Choose a later end time.' })
+    expect(resolveSpy).not.toHaveBeenCalled()
+  })
+
+  it('rolls back the Shopify record when saving the app config fails', async () => {
+    created()
+    shopifyQuerySpy.mockResolvedValueOnce({ discountAutomaticDelete: { userErrors: [] } })
+    saveSpy.mockRejectedValueOnce(new Error('metafield write failed'))
+    expect(await createTimeDiscount(null, form())).toEqual({ ok: false, error: 'metafield write failed' })
+    expect(shopifyQuerySpy).toHaveBeenLastCalledWith(expect.stringContaining('discountAutomaticDelete'), { id: 'gid://shopify/DiscountAutomaticApp/99' })
   })
 })
 

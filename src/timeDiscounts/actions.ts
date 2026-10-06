@@ -2,7 +2,7 @@
 
 import {
   getTimeDiscountsConfig, saveTimeDiscountsConfig,
-  type TimeDiscount, type TimeDiscountItem,
+  type TimeDiscount, type TimeDiscountItem, type GroupSpec,
 } from '@/timeDiscounts/config'
 import { isAvailableEverywhere, fetchAvailabilityConfigs } from '@/lib/discount-availability'
 import { getMemberInfo } from '@/lib/products'
@@ -12,8 +12,10 @@ import { redirectWithToken } from '@/lib/auth-redirect'
 import { itemKey, validateRule, validateItemsStructure, assertItemsFitFunctionConfig, END_PASSED_MESSAGE } from '@/timeDiscounts/items'
 import {
   createShopifyDiscountRecord, updateShopifyDiscountRecord, deleteShopifyDiscountRecord,
-  parseSchedule, findDiscountOrThrow, syncBestEffort, errorMessage,
+  parseSchedule, findDiscountOrThrow, syncBestEffort, errorMessage, adminProductBaseUrl,
 } from '@/timeDiscounts/shopifyRecord'
+import { resolveGroup } from '@/timeDiscounts/groupServer'
+import { parseGroupSpec } from '@/timeDiscounts/group'
 
 /** What the autosaving page shows: success, or the reason to display inline. */
 export type SaveResult = { ok: true } | { ok: false; error: string }
@@ -111,6 +113,13 @@ async function buildItemsForNewDiscount(raw: string): Promise<TimeDiscountItem[]
   return items
 }
 
+/** A new group: its picks are resolved now, and its rows come from them. */
+async function buildGroupForNewDiscount(raw: string): Promise<{ items: TimeDiscountItem[]; group: GroupSpec }> {
+  const group = parseGroupSpec(raw)
+  const { items } = await resolveGroup(group, undefined, adminProductBaseUrl())
+  return { items, group }
+}
+
 /**
  * Creates a discount with all of its rows in one request — nothing exists in
  * Shopify until the merchant presses Save on a complete form. Every problem
@@ -139,17 +148,24 @@ async function createDiscountFromForm(formData: FormData): Promise<string> {
   // Filling in the form can take a while: refuse an end time that has slipped into the past.
   if (Date.parse(endsAtUtc) <= Date.now()) throw new Error(END_PASSED_MESSAGE)
 
-  const items = await buildItemsForNewDiscount(String(formData.get('items') ?? '[]'))
+  const kind = formData.get('kind') === 'group' ? 'group' : 'perProduct'
+  const content: { items: TimeDiscountItem[]; group?: GroupSpec } =
+    kind === 'group'
+      ? await buildGroupForNewDiscount(String(formData.get('group') ?? ''))
+      : { items: await buildItemsForNewDiscount(String(formData.get('items') ?? '[]')) }
 
   const shopifyDiscountId = await createShopifyDiscountRecord({
     title,
     startsAtUtc: zonedTimeToUtc(startsAt, timezone),
     endsAtUtc,
-    items,
+    items: content.items,
   })
 
   const discountId = `time_disc_${crypto.randomUUID()}`
-  const newDiscount: TimeDiscount = { discountId, shopifyDiscountId, name: title, title, kind: 'perProduct', startsAt, endsAt, items }
+  const newDiscount: TimeDiscount = {
+    discountId, shopifyDiscountId, name: title, title, kind, startsAt, endsAt, items: content.items,
+    ...(content.group ? { group: content.group } : {}),
+  }
 
   try {
     const config = await getTimeDiscountsConfig()
