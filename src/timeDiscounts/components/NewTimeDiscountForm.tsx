@@ -1,27 +1,15 @@
 'use client'
 
 import { useActionState, useEffect, useReducer, useState } from 'react'
-import { createTimeDiscount, type SaveResult } from '@/timeDiscounts/actions'
 import { endTimeHasPassed, itemKey, scheduleProblem, shopLocalNow } from '@/timeDiscounts/items'
 import {
-  addDraftRow, dropUnsavedRows, hasUnsavedWork, isRedirectError, itemsPayload, keepRow, keptRows, newDraftRow, removeRow, saveBlocker, type Rule,
+  addDraftRow, dropUnsavedRows, hasUnsavedWork, itemsPayload, keepRow, keptRows, newDraftRow, removeRow, saveBlocker, type Rule,
 } from '@/timeDiscounts/rows'
-import { UNREACHABLE } from '@/timeDiscounts/saveRequests'
+import { submitNewDiscount } from '@/timeDiscounts/newDiscountSubmit'
 import AddItemPicker, { type PickedItem } from '@/timeDiscounts/components/AddItemPicker'
 import type { DisplayRow } from '@/timeDiscounts/components/ItemRow'
 import ItemsTable from '@/timeDiscounts/components/ItemsTable'
-
-const inputClass =
-  'w-full border border-line rounded px-3 py-2 text-sm transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:border-accent'
-
-async function submit(previous: SaveResult | null, formData: FormData): Promise<SaveResult> {
-  try {
-    return await createTimeDiscount(previous, formData)
-  } catch (err) {
-    if (isRedirectError(err)) throw err
-    return UNREACHABLE
-  }
-}
+import TitleScheduleFields from '@/timeDiscounts/components/TitleScheduleFields'
 
 /**
  * Title, schedule and products on one page. Nothing exists in Shopify until
@@ -36,7 +24,7 @@ export default function NewTimeDiscountForm({
   /** Ends with `/admin/products/` — used to link added rows. */
   adminProductBaseUrl: string
 }) {
-  const [state, formAction, pending] = useActionState(submit, null)
+  const [state, formAction, pending] = useActionState(submitNewDiscount, null)
 
   const [title, setTitle] = useState('')
   const [startsAt, setStartsAt] = useState('')
@@ -118,30 +106,10 @@ export default function NewTimeDiscountForm({
       >
         <input type="hidden" name="items" value={itemsJson} />
 
-        <section className="mb-8">
-          <label htmlFor="title" className="block text-sm font-medium mb-2">Title</label>
-          <input
-            id="title" name="title" type="text" placeholder="e.g. Spring Flash Sale"
-            value={title} onChange={(e) => setTitle(e.target.value)}
-            className={inputClass}
-          />
-          <p className="text-xs text-muted mt-2">Shown to customers in the countdown widget.</p>
-        </section>
-
-        <section className="mb-8">
-          <h2 className="font-medium mb-2">Schedule</h2>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="startsAt" className="block text-sm font-medium mb-2">Starts ({shopTimezone})</label>
-              <input id="startsAt" name="startsAt" type="datetime-local" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} className={inputClass} />
-            </div>
-            <div>
-              <label htmlFor="endsAt" className="block text-sm font-medium mb-2">Ends ({shopTimezone})</label>
-              <input id="endsAt" name="endsAt" type="datetime-local" value={endsAt} onChange={(e) => setEndsAt(e.target.value)} className={inputClass} />
-            </div>
-          </div>
-          {problem && <p role="alert" className="text-xs text-danger mt-2">{problem}</p>}
-        </section>
+        <TitleScheduleFields
+          title={title} startsAt={startsAt} endsAt={endsAt} problem={problem} shopTimezone={shopTimezone}
+          onTitleChange={setTitle} onStartsAtChange={setStartsAt} onEndsAtChange={setEndsAt}
+        />
 
         <section className="mb-8">
           <h2 className="font-medium mb-2">Products</h2>
