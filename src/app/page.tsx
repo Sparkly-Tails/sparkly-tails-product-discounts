@@ -81,7 +81,7 @@ export default async function Home() {
                 {row.title}
               </AuthLink>
               <p className="text-sm text-muted">
-                {scheduleLabel(row.startsAt, row.endsAt)} · {row.startsAt} → {row.endsAt} · {row.items.length} product{row.items.length === 1 ? '' : 's'}
+                {row.kind === 'group' ? 'Group' : 'Per product'} · {scheduleLabel(row.startsAt, row.endsAt)} · {row.startsAt} → {row.endsAt} · {row.items.length} product{row.items.length === 1 ? '' : 's'}
               </p>
             </li>
           ))}

@@ -132,6 +132,17 @@ describe('NewTimeDiscountForm', () => {
     ])
   })
 
+  it('marks what it sends as a per-product discount', async () => {
+    const user = userEvent.setup()
+    create.mockResolvedValue({ ok: true })
+    setup()
+    await fillBasics(user)
+    await addKeptRow(user)
+    await user.click(saveButton())
+    await waitFor(() => expect(create).toHaveBeenCalled())
+    expect((create.mock.calls[0][1] as FormData).get('kind')).toBe('perProduct')
+  })
+
   it('shows the server\'s reason next to Save and keeps everything that was entered', async () => {
     const user = userEvent.setup()
     create.mockResolvedValue({ ok: false, error: 'Cat Toy: This product already belongs to another discount' })

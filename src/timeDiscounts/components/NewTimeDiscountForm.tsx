@@ -87,57 +87,54 @@ export default function NewTimeDiscountForm({
   const itemsJson = itemsPayload(rows)
 
   return (
-    <main className="p-8 max-w-3xl mx-auto">
-      <h1 className="text-2xl font-semibold mb-6">Add time-based discount</h1>
+    <form
+      action={formAction}
+      // The end time may have passed since Save last looked enabled: check the clock again right before submitting.
+      onSubmit={(e) => {
+        if (endTimeHasPassed(endsAt, shopTimezone, new Date())) {
+          e.preventDefault()
+          recheck()
+        }
+      }}
+      // Enter in a text box (the title, the product search) must not save the whole discount.
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' && (e.target as HTMLElement).tagName === 'INPUT') e.preventDefault()
+      }}
+    >
+      <input type="hidden" name="kind" value="perProduct" />
+      <input type="hidden" name="items" value={itemsJson} />
 
-      <form
-        action={formAction}
-        // The end time may have passed since Save last looked enabled: check the clock again right before submitting.
-        onSubmit={(e) => {
-          if (endTimeHasPassed(endsAt, shopTimezone, new Date())) {
-            e.preventDefault()
-            recheck()
-          }
-        }}
-        // Enter in a text box (the title, the product search) must not save the whole discount.
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' && (e.target as HTMLElement).tagName === 'INPUT') e.preventDefault()
-        }}
-      >
-        <input type="hidden" name="items" value={itemsJson} />
+      <TitleScheduleFields
+        title={title} startsAt={startsAt} endsAt={endsAt} problem={problem} shopTimezone={shopTimezone}
+        onTitleChange={setTitle} onStartsAtChange={setStartsAt} onEndsAtChange={setEndsAt}
+      />
 
-        <TitleScheduleFields
-          title={title} startsAt={startsAt} endsAt={endsAt} problem={problem} shopTimezone={shopTimezone}
-          onTitleChange={setTitle} onStartsAtChange={setStartsAt} onEndsAtChange={setEndsAt}
+      <section className="mb-8">
+        <h2 className="font-medium mb-2">Products</h2>
+        <ItemsTable
+          rows={rows}
+          editingKey={editingKey}
+          busy={pending}
+          rowErrors={{}}
+          onEdit={startEdit}
+          onCancel={cancelEdit}
+          onSave={keepRowWithRule}
+          onDelete={deleteRow}
         />
+        <AddItemPicker existingKeys={rows.map(itemKey)} onSelect={addRow} />
+      </section>
 
-        <section className="mb-8">
-          <h2 className="font-medium mb-2">Products</h2>
-          <ItemsTable
-            rows={rows}
-            editingKey={editingKey}
-            busy={pending}
-            rowErrors={{}}
-            onEdit={startEdit}
-            onCancel={cancelEdit}
-            onSave={keepRowWithRule}
-            onDelete={deleteRow}
-          />
-          <AddItemPicker existingKeys={rows.map(itemKey)} onSelect={addRow} />
-        </section>
-
-        <section>
-          <button
-            type="submit" disabled={missing !== null || pending}
-            aria-describedby={missing ? 'save-hint' : undefined}
-            className="bg-accent hover:bg-accent-hover text-white px-4 py-3 rounded transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-accent"
-          >
-            {pending ? 'Saving…' : 'Save discount'}
-          </button>
-          {missing && <p id="save-hint" className="text-xs text-muted mt-2">{missing}</p>}
-          {state && !state.ok && <p role="alert" className="text-sm text-danger mt-3">{state.error}</p>}
-        </section>
-      </form>
-    </main>
+      <section>
+        <button
+          type="submit" disabled={missing !== null || pending}
+          aria-describedby={missing ? 'save-hint' : undefined}
+          className="bg-accent hover:bg-accent-hover text-white px-4 py-3 rounded transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-accent"
+        >
+          {pending ? 'Saving…' : 'Save discount'}
+        </button>
+        {missing && <p id="save-hint" className="text-xs text-muted mt-2">{missing}</p>}
+        {state && !state.ok && <p role="alert" className="text-sm text-danger mt-3">{state.error}</p>}
+      </section>
+    </form>
   )
 }
