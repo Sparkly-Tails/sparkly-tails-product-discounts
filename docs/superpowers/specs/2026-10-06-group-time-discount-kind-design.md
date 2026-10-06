@@ -38,7 +38,7 @@ interface GroupSpec {
   pricingMode: 'percent' | 'fixed'
   amount: number                  // percent off (0 < n <= 100) or the final price, major units
   selection:
-    | { mode: 'products'; members: DiscountMember[] }
+    | { mode: 'products'; members: GroupMember[] }          // GroupMember = DiscountMember + the title shown on its chip
     | { mode: 'collections'; collections: { id: string; title: string }[] }   // titles stored so the chips need no lookup
 }
 
@@ -81,7 +81,7 @@ Collections are resolved on the server, so the form cannot know what a pick cove
 
 - It resolves the picks (§4.2), reads the prices (§4.4) and runs every save check.
 - It returns `{ ok: true, covered }` (the rows' names, links, discounted and regular prices) or `{ ok: false, error }` with the first failure (an empty collection, a product already in another discount, a fixed price not lower than a product's price, too many rows).
-- The new-discount form and the Group page call it when the rule or the picks change, after 600 ms of quiet. If a newer call has started, an older answer is ignored.
+- The **new-discount form** calls it when the rule or the picks change, after 600 ms of quiet. If a newer call has started, an older answer is ignored. The **Group page** does not need it: every autosave on that page runs the same checks, refuses a bad change with the reason, and returns the covered rows.
 - The save actions run the same checks again; the server stays the authority.
 
 ## 5. Admin UI
@@ -105,7 +105,7 @@ The server component loads the discount and renders `TimeDiscountEditor` for `pe
 
 1. **Title** — saves on blur, as today.
 2. **Schedule** — start and end, 600 ms debounce, same validation as today (end after start, years 2000–2100).
-3. **Shared price** — type (Fixed price / Percentage off) and amount. The preview (§4.5) shows any product the rule would break before it is saved. Saves when the type changes and 600 ms after the amount stops changing.
+3. **Shared price** — type (Fixed price / Percentage off) and amount. A rule that breaks a product is refused by the save, with the product named. Saves at once when the type changes and 600 ms after the amount stops changing.
 4. **Pick by** — "Products and variants" or "Collections".
    - Products and variants: the existing search and variant picker. Each pick is a removable chip; removing asks for confirmation.
    - Collections: a collection search (`searchCollections`, `resolveCollectionMembers` and the original `TimeCollectionPicker`, restored from git history at `37d32dd^`, the parent of the commit that deleted them in #30). Each pick is a removable chip showing its stored title; removing asks for confirmation.
