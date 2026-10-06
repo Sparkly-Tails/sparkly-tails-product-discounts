@@ -37,6 +37,15 @@ export default function AddItemPicker({
   const alreadyAdded = (productId: string, variantId?: string) => existingKeys.includes(itemKey({ productId, variantId }))
   const rowsForProduct = (productId: string) => existingKeys.filter((key) => key.startsWith(`${productId}|`)).length
 
+  async function checkAvailable(productId: string, variantId?: string): Promise<string | null> {
+    try {
+      const check = await validateTimeDiscountMemberAction(productId, variantId, excludeDiscountId)
+      return check.ok ? null : check.error
+    } catch {
+      return "Couldn't check this product — please try again"
+    }
+  }
+
   function handleQueryChange(value: string) {
     setQuery(value)
     setError(null)
@@ -82,14 +91,19 @@ export default function AddItemPicker({
       return
     }
 
-    const check = await validateTimeDiscountMemberAction(candidate.id, undefined, excludeDiscountId)
-    if (!check.ok) {
-      setError(check.error)
+    const availError = await checkAvailable(candidate.id, undefined)
+    if (availError) {
+      setError(availError)
       return
     }
 
     const [onlyVariant] = await getTimeDiscountProductVariantsAction(candidate.id)
-    onSelect({ productId: candidate.id, title: candidate.title, price: onlyVariant?.price ?? 0 })
+    if (!onlyVariant) {
+      setError("Couldn't load this product's price — please try again")
+      return
+    }
+
+    onSelect({ productId: candidate.id, title: candidate.title, price: onlyVariant.price })
   }
 
   async function chooseVariant(option: ProductVariantOption) {
@@ -100,9 +114,9 @@ export default function AddItemPicker({
       return
     }
 
-    const check = await validateTimeDiscountMemberAction(expanding.id, option.variantId, excludeDiscountId)
-    if (!check.ok) {
-      setError(check.error)
+    const availError = await checkAvailable(expanding.id, option.variantId)
+    if (availError) {
+      setError(availError)
       return
     }
 

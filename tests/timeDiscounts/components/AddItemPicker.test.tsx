@@ -102,4 +102,52 @@ describe('AddItemPicker', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('This product already belongs to another discount')
     expect(onSelect).not.toHaveBeenCalled()
   })
+
+  it('shows an error and does not select when a single-variant product\'s price lookup returns empty', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    vi.spyOn(pickerActions, 'searchTimeDiscountProductsAction').mockResolvedValue([{ id: 'gid://shopify/Product/1', title: 'Tuna Soup', variantCount: 1 }])
+    vi.spyOn(pickerActions, 'getTimeDiscountProductVariantsAction').mockResolvedValue([])
+    vi.spyOn(pickerActions, 'validateTimeDiscountMemberAction').mockResolvedValue({ ok: true })
+    const onSelect = vi.fn()
+
+    render(<AddItemPicker existingKeys={[]} onSelect={onSelect} />)
+    await search(user, 'tuna')
+    await pick(user, 'Tuna Soup')
+
+    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't load this product's price — please try again")
+    expect(onSelect).not.toHaveBeenCalled()
+  })
+
+  it('shows an error and does not select when validateTimeDiscountMemberAction throws during single-variant selection', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    vi.spyOn(pickerActions, 'searchTimeDiscountProductsAction').mockResolvedValue([{ id: 'gid://shopify/Product/1', title: 'Tuna Soup', variantCount: 1 }])
+    vi.spyOn(pickerActions, 'validateTimeDiscountMemberAction').mockRejectedValue(new Error('boom'))
+    const onSelect = vi.fn()
+
+    render(<AddItemPicker existingKeys={[]} onSelect={onSelect} />)
+    await search(user, 'tuna')
+    await pick(user, 'Tuna Soup')
+
+    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't check this product — please try again")
+    expect(onSelect).not.toHaveBeenCalled()
+  })
+
+  it('shows an error and does not select when validateTimeDiscountMemberAction throws during multi-variant selection', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    vi.spyOn(pickerActions, 'searchTimeDiscountProductsAction').mockResolvedValue([{ id: 'gid://shopify/Product/2', title: 'Salmon Bowl', variantCount: 2 }])
+    vi.spyOn(pickerActions, 'getTimeDiscountProductVariantsAction').mockResolvedValue([
+      { variantId: 'gid://shopify/ProductVariant/901', title: 'Small', price: 3 },
+      { variantId: 'gid://shopify/ProductVariant/902', title: 'Large', price: 5 },
+    ])
+    vi.spyOn(pickerActions, 'validateTimeDiscountMemberAction').mockRejectedValue(new Error('boom'))
+    const onSelect = vi.fn()
+
+    render(<AddItemPicker existingKeys={[]} onSelect={onSelect} />)
+    await search(user, 'salmon')
+    await pick(user, 'Salmon Bowl')
+    await user.click(await screen.findByRole('button', { name: /Large — £5.00/ }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't check this product — please try again")
+    expect(onSelect).not.toHaveBeenCalled()
+  })
 })
