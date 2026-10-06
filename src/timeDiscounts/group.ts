@@ -218,3 +218,12 @@ export function sameRule(a: Rule | null, b: Rule | null): boolean {
   if (a === null || b === null) return a === b
   return a.pricingMode === b.pricingMode && a.amount === b.amount
 }
+
+/** A refused rule and the reason, kept together so the reason is shown only beside that rule. */
+export type RuleError = { rule: Rule; message: string }
+
+/** What to show under the rule fields: a typed-in problem first, else the server's reason while the rule it refused is still the one typed. */
+export function visibleRuleProblem(problem: string | null, rule: Rule | null, error: RuleError | null): string | null {
+  if (problem) return problem
+  return error !== null && rule !== null && sameRule(rule, error.rule) ? error.message : null
+}

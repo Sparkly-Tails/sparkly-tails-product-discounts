@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import ConfirmForm from '@/components/ConfirmForm'
 import { useSavedToast } from '@/components/SavedToast'
-import { parseRuleInput, ruleSaveDelay, sameRule, type CoveredRow } from '@/timeDiscounts/group'
+import { parseRuleInput, ruleSaveDelay, sameRule, visibleRuleProblem, type CoveredRow, type RuleError } from '@/timeDiscounts/group'
 import type { GroupSelection } from '@/timeDiscounts/config'
 import type { Rule } from '@/timeDiscounts/rows'
 import { requestGroupRuleSave, requestGroupSelectionSave } from '@/timeDiscounts/saveRequests'
@@ -47,7 +47,7 @@ export default function GroupDiscountEditor({
   // Shared price
   const [pricingMode, setPricingMode] = useState(initialPricingMode)
   const [amountText, setAmountText] = useState(String(initialAmount))
-  const [ruleError, setRuleError] = useState<string | null>(null)
+  const [ruleError, setRuleError] = useState<RuleError | null>(null)
   const savedRule = useRef<Rule>({ pricingMode: initialPricingMode, amount: initialAmount }) // last the server acknowledged
   const requestedRule = useRef<Rule>({ pricingMode: initialPricingMode, amount: initialAmount }) // last queued
   const { rule, problem: ruleProblem } = parseRuleInput(pricingMode, amountText)
@@ -71,7 +71,7 @@ export default function GroupDiscountEditor({
         } else {
           // Let the same rule be retried, unless a newer one has been queued since.
           if (sameRule(requestedRule.current, next)) requestedRule.current = savedRule.current
-          setRuleError(result.error)
+          setRuleError({ rule: next, message: result.error })
         }
       })
     }, ruleSaveDelay(requestedRule.current, ruleMode))
@@ -138,7 +138,7 @@ export default function GroupDiscountEditor({
       </section>
 
       <GroupRuleFields
-        pricingMode={pricingMode} amountText={amountText} problem={ruleProblem ?? ruleError}
+        pricingMode={pricingMode} amountText={amountText} problem={visibleRuleProblem(ruleProblem, rule, ruleError)}
         onChange={(mode, text) => { setPricingMode(mode); setAmountText(text) }}
       />
 

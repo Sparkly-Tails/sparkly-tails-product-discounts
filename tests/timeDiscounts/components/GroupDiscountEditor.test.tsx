@@ -125,6 +125,73 @@ describe('GroupDiscountEditor — shared price', () => {
   })
 })
 
+describe('GroupDiscountEditor — shared price, refused and restored', () => {
+  const REFUSED = 'Cat Toy: This price is not allowed'
+
+  it('hides a refused rule\'s error once the saved value is typed back, without saving again', async () => {
+    saveRule.mockResolvedValue({ ok: false, error: REFUSED })
+    const { user } = setup()
+    const amount = screen.getByLabelText('Percent off')
+    await user.clear(amount)
+    await user.type(amount, '30')
+    await vi.advanceTimersByTimeAsync(RULE_SAVE_DELAY_MS)
+    expect(await screen.findByRole('alert')).toHaveTextContent(REFUSED)
+    expect(saveRule).toHaveBeenCalledTimes(1)
+
+    await user.clear(amount)
+    await user.type(amount, '20')
+    await vi.advanceTimersByTimeAsync(RULE_SAVE_DELAY_MS * 3)
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(saveRule).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not save when nothing changed, however long it waits', async () => {
+    setup()
+    await vi.advanceTimersByTimeAsync(RULE_SAVE_DELAY_MS * 5)
+    expect(saveRule).not.toHaveBeenCalled()
+  })
+
+  it('does not save when the amount is changed and changed back before the pause ends', async () => {
+    const { user } = setup()
+    const amount = screen.getByLabelText('Percent off')
+    await user.clear(amount)
+    await user.type(amount, '30')
+    await user.clear(amount)
+    await user.type(amount, '20')
+    await vi.advanceTimersByTimeAsync(RULE_SAVE_DELAY_MS * 3)
+    expect(saveRule).not.toHaveBeenCalled()
+  })
+
+  it('lets a refused rule be retried with a different amount, which clears the error', async () => {
+    saveRule.mockResolvedValueOnce({ ok: false, error: REFUSED })
+    const { user } = setup()
+    const amount = screen.getByLabelText('Percent off')
+    await user.clear(amount)
+    await user.type(amount, '30')
+    await vi.advanceTimersByTimeAsync(RULE_SAVE_DELAY_MS)
+    expect(await screen.findByRole('alert')).toHaveTextContent(REFUSED)
+
+    await user.clear(amount)
+    await user.type(amount, '25')
+    await vi.advanceTimersByTimeAsync(RULE_SAVE_DELAY_MS)
+    await waitFor(() => expect(saveRule).toHaveBeenLastCalledWith('time_disc_1', { pricingMode: 'percent', amount: 25 }))
+    expect(await screen.findByText('Saved')).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('keeps showing the error while the refused rule itself is still typed', async () => {
+    saveRule.mockResolvedValue({ ok: false, error: REFUSED })
+    const { user } = setup()
+    const amount = screen.getByLabelText('Percent off')
+    await user.clear(amount)
+    await user.type(amount, '30')
+    await vi.advanceTimersByTimeAsync(RULE_SAVE_DELAY_MS)
+    expect(await screen.findByRole('alert')).toHaveTextContent(REFUSED)
+    await vi.advanceTimersByTimeAsync(RULE_SAVE_DELAY_MS * 3)
+    expect(screen.getByRole('alert')).toHaveTextContent(REFUSED)
+  })
+})
+
 describe('GroupDiscountEditor — picks', () => {
   it('saves a newly picked product at once and shows what it now covers', async () => {
     const { user } = setup()

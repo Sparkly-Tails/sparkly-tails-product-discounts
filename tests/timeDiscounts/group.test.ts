@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   expandGroup, summariseFailures, groupSizeMessage, coveredRows, cleanRule, cleanSelection, parseGroupSpec, parseRuleInput,
   ruleSaveDelay, isSelectionEmpty, selectionCount, memberKeys, addMember, removeMember, switchMode, previewKey, groupSaveBlocker,
-  collectionsNotPicked, withCollection, withoutCollection, sameRule,
+  collectionsNotPicked, withCollection, withoutCollection, sameRule, visibleRuleProblem,
   EMPTY_SELECTION_MESSAGE, type GroupFormState,
 } from '@/timeDiscounts/group'
 import type { GroupSelection } from '@/timeDiscounts/config'
@@ -214,5 +214,23 @@ describe('sameRule', () => {
     expect(sameRule({ pricingMode: 'percent', amount: 20 }, { pricingMode: 'percent', amount: 25 })).toBe(false)
     expect(sameRule(null, null)).toBe(true)
     expect(sameRule(null, { pricingMode: 'percent', amount: 20 })).toBe(false)
+  })
+})
+
+describe('visibleRuleProblem', () => {
+  const refused = { rule: { pricingMode: 'percent' as const, amount: 30 }, message: 'Cat Toy: Not allowed' }
+  it('shows a typed-in problem before anything else', () => {
+    expect(visibleRuleProblem('Too big', null, refused)).toBe('Too big')
+  })
+  it('shows the server reason while the refused rule is still the one typed', () => {
+    expect(visibleRuleProblem(null, { pricingMode: 'percent', amount: 30 }, refused)).toBe('Cat Toy: Not allowed')
+  })
+  it('hides the server reason once a different rule is typed', () => {
+    expect(visibleRuleProblem(null, { pricingMode: 'percent', amount: 20 }, refused)).toBeNull()
+    expect(visibleRuleProblem(null, { pricingMode: 'fixed', amount: 30 }, refused)).toBeNull()
+  })
+  it('shows nothing without a valid rule or without a refusal', () => {
+    expect(visibleRuleProblem(null, null, refused)).toBeNull()
+    expect(visibleRuleProblem(null, { pricingMode: 'percent', amount: 30 }, null)).toBeNull()
   })
 })
