@@ -445,3 +445,73 @@ describe('TimeDiscountEditor — races while a save is in flight', () => {
     await waitFor(() => expect(deleteAction).toHaveBeenCalledTimes(1))
   })
 })
+
+const UNREACHABLE = "Couldn't reach the server — reload the page and try again"
+
+describe('TimeDiscountEditor — a rejected server call', () => {
+  it('title: shows the error and lets the same value be retried', async () => {
+    const user = userNow()
+    mocked.saveTimeDiscountTitle.mockRejectedValueOnce(new Error('network'))
+    setup()
+    await user.type(screen.getByLabelText('Title'), '!')
+    await user.tab()
+    expect(await screen.findByText(UNREACHABLE)).toBeInTheDocument()
+    expect(screen.queryByText('Saved')).not.toBeInTheDocument()
+
+    await user.click(screen.getByLabelText('Title'))
+    await user.tab() // same value again
+    expect(mocked.saveTimeDiscountTitle).toHaveBeenCalledTimes(2)
+    expect(await screen.findByText('Saved')).toBeInTheDocument()
+    expect(screen.queryByText(UNREACHABLE)).not.toBeInTheDocument() // a stale error does not sit beside a live title
+  })
+
+  it('schedule: shows the error and does not claim it is saved', async () => {
+    const user = userNow()
+    mocked.saveTimeDiscountSchedule.mockRejectedValueOnce(new Error('network'))
+    setup()
+    const end = screen.getByLabelText(/Ends/)
+    await user.clear(end)
+    await user.type(end, '2026-07-03T12:00')
+    await act(async () => { await vi.advanceTimersByTimeAsync(SCHEDULE_SAVE_DELAY_MS) })
+    expect(await screen.findByText(UNREACHABLE)).toBeInTheDocument()
+    expect(screen.queryByText('Saved')).not.toBeInTheDocument()
+  })
+
+  it('row save: shows the error, keeps the form open and unlocks the table', async () => {
+    const user = userNow()
+    mocked.saveTimeDiscountItem.mockRejectedValueOnce(new Error('network'))
+    setup()
+    await user.click(screen.getByRole('button', { name: 'Edit Roll Up Bed – Grey' }))
+    await user.clear(screen.getByLabelText(/Percent off for/))
+    await user.type(screen.getByLabelText(/Percent off for/), '30')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(await screen.findByText(UNREACHABLE)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Delete Scruffs Boucle Cat Bed' })).toBeEnabled()
+  })
+
+  it('row delete: shows the error, keeps the row and unlocks the table', async () => {
+    const user = userNow()
+    mocked.removeTimeDiscountItem.mockRejectedValueOnce(new Error('network'))
+    setup()
+    await user.click(screen.getByRole('button', { name: 'Delete Scruffs Boucle Cat Bed' }))
+
+    expect(await screen.findByText(UNREACHABLE)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Scruffs Boucle Cat Bed' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Delete Roll Up Bed – Grey' })).toBeEnabled()
+  })
+})
+
+describe('TimeDiscountEditor — implausible years', () => {
+  it('does not save a half-typed year and says why', async () => {
+    const user = userNow()
+    setup()
+    const start = screen.getByLabelText(/Starts/)
+    await user.clear(start)
+    await user.type(start, '0202-07-01T12:00')
+    await act(async () => { await vi.advanceTimersByTimeAsync(SCHEDULE_SAVE_DELAY_MS * 2) })
+    expect(mocked.saveTimeDiscountSchedule).not.toHaveBeenCalled()
+    expect(screen.getByRole('alert')).toHaveTextContent('Enter a year between 2000 and 2100.')
+  })
+})

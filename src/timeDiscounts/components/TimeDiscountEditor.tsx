@@ -14,6 +14,16 @@ import { useSaveQueue } from '@/timeDiscounts/components/useSaveQueue'
 /** How long after the last change to either date the schedule is saved. */
 export const SCHEDULE_SAVE_DELAY_MS = 600
 
+/** What a save resolves to when the call itself is rejected (network drop, or a stale action after a deploy). */
+const UNREACHABLE = { ok: false as const, error: "Couldn't reach the server — reload the page and try again" }
+const unreachable = () => UNREACHABLE
+
+function yearOutOfRange(value: string): boolean {
+  if (value === '') return false
+  const year = Number(value.slice(0, 4))
+  return !(year >= 2000 && year <= 2100)
+}
+
 function without(record: Record<string, string>, key: string): Record<string, string> {
   const next = { ...record }
   delete next[key]
@@ -55,7 +65,10 @@ export default function TimeDiscountEditor({
   const [scheduleError, setScheduleError] = useState<string | null>(null)
   const savedSchedule = useRef({ startsAt: initialStartsAt, endsAt: initialEndsAt }) // last acknowledged
   const requestedSchedule = useRef({ startsAt: initialStartsAt, endsAt: initialEndsAt }) // last queued
-  const scheduleInvalid = startsAt !== '' && endsAt !== '' && endsAt <= startsAt ? 'End must be after start.' : null
+  const scheduleInvalid =
+    yearOutOfRange(startsAt) || yearOutOfRange(endsAt) ? 'Enter a year between 2000 and 2100.'
+    : startsAt !== '' && endsAt !== '' && endsAt <= startsAt ? 'End must be after start.'
+    : null
 
   const [rows, setRows] = useState<DisplayRow[]>(initialRows)
   const [editingKey, setEditingKey] = useState<string | null>(null)
@@ -83,9 +96,10 @@ export default function TimeDiscountEditor({
     if (next === requestedTitle.current) return
     requestedTitle.current = next
     setTitleError(null)
-    enqueue(() => saveTimeDiscountTitle(discountId, next)).then((result) => {
+    enqueue(() => saveTimeDiscountTitle(discountId, next)).catch(unreachable).then((result) => {
       if (result.ok) {
         savedTitle.current = next
+        if (requestedTitle.current === next) setTitleError(null) // a stale error must not sit beside a live title
         // Tidy the saved value, but never overwrite what was typed since the blur.
         setTitle((current) => (current.trim() === next ? next : current))
         showSaved()
@@ -99,13 +113,13 @@ export default function TimeDiscountEditor({
 
   // The schedule saves itself once both dates are valid and have settled.
   useEffect(() => {
-    if (!startsAt || !endsAt || endsAt <= startsAt) return
+    if (!startsAt || !endsAt || endsAt <= startsAt || yearOutOfRange(startsAt) || yearOutOfRange(endsAt)) return
     if (startsAt === requestedSchedule.current.startsAt && endsAt === requestedSchedule.current.endsAt) return
 
     const timer = setTimeout(() => {
       const requested = { startsAt, endsAt }
       requestedSchedule.current = requested
-      enqueue(() => saveTimeDiscountSchedule(discountId, startsAt, endsAt)).then((result) => {
+      enqueue(() => saveTimeDiscountSchedule(discountId, startsAt, endsAt)).catch(unreachable).then((result) => {
         if (result.ok) {
           savedSchedule.current = requested
           setScheduleError(null)
@@ -140,7 +154,7 @@ export default function TimeDiscountEditor({
     const key = itemKey(row)
     markBusy(key)
     setRowErrors((errors) => without(errors, key))
-    enqueue(() => saveTimeDiscountItem(discountId, { productId: row.productId, variantId: row.variantId, ...rule })).then((result) => {
+    enqueue(() => saveTimeDiscountItem(discountId, { productId: row.productId, variantId: row.variantId, ...rule })).catch(unreachable).then((result) => {
       markBusy(null)
       if (result.ok) {
         setRows((current) => current.map((r) => (itemKey(r) === key ? { ...r, ...rule, isNew: false } : r)))
@@ -161,7 +175,7 @@ export default function TimeDiscountEditor({
     const key = itemKey(row)
     markBusy(key)
     setRowErrors((errors) => without(errors, key))
-    enqueue(() => removeTimeDiscountItem(discountId, { productId: row.productId, variantId: row.variantId })).then((result) => {
+    enqueue(() => removeTimeDiscountItem(discountId, { productId: row.productId, variantId: row.variantId })).catch(unreachable).then((result) => {
       markBusy(null)
       if (result.ok) {
         setRows((current) => current.filter((r) => itemKey(r) !== key))
