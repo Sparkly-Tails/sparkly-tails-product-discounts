@@ -1,8 +1,8 @@
 'use client'
 
-import { useActionState, useEffect, useState } from 'react'
+import { useActionState, useEffect, useReducer, useState } from 'react'
 import { createTimeDiscount, type SaveResult } from '@/timeDiscounts/actions'
-import { itemKey, scheduleProblem, shopLocalNow } from '@/timeDiscounts/items'
+import { endTimeHasPassed, itemKey, scheduleProblem, shopLocalNow } from '@/timeDiscounts/items'
 import {
   addDraftRow, dropUnsavedRows, hasUnsavedWork, isRedirectError, itemsPayload, keepRow, keptRows, newDraftRow, removeRow, saveBlocker, type Rule,
 } from '@/timeDiscounts/rows'
@@ -21,19 +21,6 @@ async function submit(previous: SaveResult | null, formData: FormData): Promise<
     if (isRedirectError(err)) throw err
     return UNREACHABLE
   }
-}
-
-/** How often the form re-checks the clock, so an end time that slips into the past turns Save off by itself. */
-const CLOCK_CHECK_MS = 15_000
-
-/** The current time on the shop's clock, kept fresh while the page is open. */
-function useShopNow(timeZone: string): string {
-  const [now, setNow] = useState(() => shopLocalNow(timeZone))
-  useEffect(() => {
-    const timer = setInterval(() => setNow(shopLocalNow(timeZone)), CLOCK_CHECK_MS)
-    return () => clearInterval(timer)
-  }, [timeZone])
-  return now
 }
 
 /**
@@ -58,8 +45,10 @@ export default function NewTimeDiscountForm({
   const [editingKey, setEditingKey] = useState<string | null>(null)
 
   const kept = keptRows(rows)
-  const now = useShopNow(shopTimezone)
-  const problem = scheduleProblem(startsAt, endsAt, now)
+  // Read the clock each time Save's state is worked out, rather than from a timer that could be stale.
+  const problem = scheduleProblem(startsAt, endsAt, shopLocalNow(shopTimezone, new Date()))
+  // Bumped to work Save's state out again after a submit was stopped because the end time had passed.
+  const [, recheck] = useReducer((count: number) => count + 1, 0)
   const missing = saveBlocker({ title, startsAt, endsAt, scheduleProblem: problem, editingKey, keptCount: kept.length })
 
   // The draft lives only in this page, so closing or reloading it would lose it.
@@ -115,6 +104,13 @@ export default function NewTimeDiscountForm({
 
       <form
         action={formAction}
+        // The end time may have passed since Save last looked enabled: check the clock again right before submitting.
+        onSubmit={(e) => {
+          if (endTimeHasPassed(endsAt, shopTimezone, new Date())) {
+            e.preventDefault()
+            recheck()
+          }
+        }}
         // Enter in a text box (the title, the product search) must not save the whole discount.
         onKeyDown={(e) => {
           if (e.key === 'Enter' && (e.target as HTMLElement).tagName === 'INPUT') e.preventDefault()
