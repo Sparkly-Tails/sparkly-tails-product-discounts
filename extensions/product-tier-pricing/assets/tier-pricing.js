@@ -378,20 +378,39 @@ function buildDisplayMixMatchItems(config) {
   return ownRows.concat(config.mixMatchListItems)
 }
 
+// Rows of a time-based discount for ONE product: [{ variantId: string|null,
+// pricingMode, amount }]. Current metafields carry `items`; metafields written
+// before per-row pricing carry one rule at the top level (pricingMode/amount)
+// plus `variantIds` (null/empty = every variant). Named with a tier prefix
+// because this file shares one global scope with time-based-discount.js.
+function tierTimeDiscountItems(discount) {
+  if (Array.isArray(discount.items)) return discount.items
+  if (discount.pricingMode !== 'percent' && discount.pricingMode !== 'fixed') return []
+  const rule = { pricingMode: discount.pricingMode, amount: discount.amount }
+  const ids = discount.variantIds
+  if (!ids || ids.length === 0) return [{ variantId: null, ...rule }]
+  return ids.map((id) => ({ variantId: id, ...rule }))
+}
+
+// The variant's own row wins; otherwise the whole-product row (variantId null).
+function tierTimeDiscountItemFor(items, variantId) {
+  const own = items.find((item) => item.variantId != null && extractNumericId(item.variantId) === String(variantId))
+  return own || items.find((item) => item.variantId == null) || null
+}
+
 // Sale price (in the shop currency's major unit, like basePrice) of an active
 // time-based discount for ONE variant, or null when there is no sale to show:
-// the variant isn't covered by the discount, the discount carries no pricing
-// data (older metafield), or the price wouldn't actually be lower — a fixed
-// price at or above the variant's price applies no discount at checkout, so
-// nothing is advertised. Percent: that much off the variant's own price.
-// Fixed: the amount IS the final price, whatever the variant's price is.
-// variantIds is null/empty when the discount covers every variant.
-function timeDiscountSalePrice({ basePrice, pricingMode, amount, variantIds, variantId }) {
-  if (pricingMode !== 'percent' && pricingMode !== 'fixed') return null
-  if (typeof amount !== 'number' || !(basePrice > 0)) return null
-  const covered = !variantIds || variantIds.length === 0 || variantIds.map(extractNumericId).includes(String(variantId))
-  if (!covered) return null
-  const sale = pricingMode === 'fixed' ? amount : basePrice * (1 - clamp(amount, 0, 100) / 100)
+// the variant has no row, the discount carries no pricing data, or the price
+// wouldn't actually be lower — a fixed price at or above the variant's price
+// applies no discount at checkout, so nothing is advertised. Percent: that
+// much off the variant's own price. Fixed: the amount IS the final price,
+// whatever the variant's price is.
+function timeDiscountSalePrice({ basePrice, discount, variantId }) {
+  if (!discount || !(basePrice > 0)) return null
+  const item = tierTimeDiscountItemFor(tierTimeDiscountItems(discount), variantId)
+  if (!item || typeof item.amount !== 'number') return null
+  if (item.pricingMode !== 'percent' && item.pricingMode !== 'fixed') return null
+  const sale = item.pricingMode === 'fixed' ? item.amount : basePrice * (1 - clamp(item.amount, 0, 100) / 100)
   const rounded = Math.round(sale * 100) / 100
   return rounded < basePrice ? rounded : null
 }
@@ -409,6 +428,8 @@ function isTimeDiscountWindowActive(discount, now) {
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     isTimeDiscountWindowActive,
+    tierTimeDiscountItems,
+    tierTimeDiscountItemFor,
     timeDiscountSalePrice,
     clamp,
     sortTiersByMinQty,
@@ -631,7 +652,12 @@ if (typeof document !== 'undefined') {
       hasTiers: !!(tiers && tiers.length > 0),
       ownVariantIds,
       ownVariantOptions,
-      initialVariantId: discount.selfVariantId ? extractNumericId(discount.selfVariantId) : null,
+      // A product with only a time-based discount has no tier discount blob
+      // (so no selfVariantId); the block still renders the selected variant's
+      // id on the container, and the sale price depends on it from first paint.
+      initialVariantId: discount.selfVariantId
+        ? extractNumericId(discount.selfVariantId)
+        : container.dataset.selectedVariantId || null,
       allMembers,
       mixMatchListItems: discount.siblings || [],
       isGroup: allMembers.length > 1,
@@ -828,13 +854,7 @@ if (typeof document !== 'undefined') {
     if (!originalPrice || !discountedPrice) return
 
     const discount = parseActiveTimeDiscount(timeDiscountJson)
-    const salePrice = discount && timeDiscountSalePrice({
-      basePrice,
-      pricingMode: discount.pricingMode,
-      amount: discount.amount,
-      variantIds: discount.variantIds,
-      variantId,
-    })
+    const salePrice = discount && timeDiscountSalePrice({ basePrice, discount, variantId })
 
     if (salePrice != null) {
       discountedPrice.textContent = formatMoneyFn(salePrice)

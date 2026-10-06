@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import {
-  getTimeDiscountsConfig, saveTimeDiscountsConfig, isTimeDiscountMemberAvailable, pricesUniform, fixedPriceNotLowerError,
+  getTimeDiscountsConfig, saveTimeDiscountsConfig, isTimeDiscountMemberAvailable, pricesUniform, fixedPriceNotLowerError, getDiscountItems,
   computeTimeDiscountStatusLabel, type TimeDiscountsConfig,
 } from '@/timeDiscounts/config'
 import * as shopifyClient from '@/lib/shopify-client'
@@ -184,5 +184,37 @@ describe('fixedPriceNotLowerError', () => {
     expect(fixedPriceNotLowerError('fixed', 25, null)).toBeNull()
     expect(fixedPriceNotLowerError('fixed', 25, undefined)).toBeNull()
     expect(fixedPriceNotLowerError('fixed', 25, 0)).toBeNull()
+  })
+})
+
+describe('getDiscountItems', () => {
+  const base = {
+    pricingMode: 'fixed' as const,
+    amount: 22,
+    resolvedMembers: [
+      { productId: 'gid://shopify/Product/1' },
+      { productId: 'gid://shopify/Product/2', variantId: 'gid://shopify/ProductVariant/20' },
+    ],
+  }
+
+  it('turns each resolved member of an older discount into a row carrying the discount\'s one shared rule', () => {
+    expect(getDiscountItems(base)).toEqual([
+      { productId: 'gid://shopify/Product/1', pricingMode: 'fixed', amount: 22 },
+      { productId: 'gid://shopify/Product/2', variantId: 'gid://shopify/ProductVariant/20', pricingMode: 'fixed', amount: 22 },
+    ])
+  })
+
+  it('omits variantId on whole-product rows instead of writing undefined', () => {
+    const [whole] = getDiscountItems(base)
+    expect('variantId' in whole).toBe(false)
+  })
+
+  it('returns stored items as they are, ignoring the older fields', () => {
+    const items = [{ productId: 'gid://shopify/Product/9', pricingMode: 'percent' as const, amount: 10 }]
+    expect(getDiscountItems({ ...base, items })).toBe(items)
+  })
+
+  it('returns no rows for a discount with no members', () => {
+    expect(getDiscountItems({ ...base, resolvedMembers: [] })).toEqual([])
   })
 })
