@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   itemKey, productAdminUrl, discountedPrice, validateRule, validateItemsStructure,
-  functionConfigBytes, assertItemsFitFunctionConfig, FUNCTION_CONFIG_MAX_BYTES, scheduleProblem, shopLocalNow,
+  functionConfigBytes, assertItemsFitFunctionConfig, FUNCTION_CONFIG_MAX_BYTES, scheduleProblem, shopLocalNow, endTimeHasPassed,
 } from '@/timeDiscounts/items'
 import type { TimeDiscountItem } from '@/timeDiscounts/config'
 
@@ -161,5 +161,27 @@ describe('scheduleProblem with the current time', () => {
 
   it('is unchanged without a current time (the discount page, which edits existing schedules)', () => {
     expect(scheduleProblem('2026-06-01T00:00', '2026-06-30T00:00')).toBeNull()
+  })
+})
+
+describe('endTimeHasPassed', () => {
+  const now = new Date('2026-07-01T11:00:00Z') // 12:00 on the shop's clock in London (BST)
+
+  it('is true for an end time before now, and for one exactly now', () => {
+    expect(endTimeHasPassed('2026-07-01T11:59', 'Europe/London', now)).toBe(true)
+    expect(endTimeHasPassed('2026-07-01T12:00', 'Europe/London', now)).toBe(true)
+  })
+
+  it('is false for an end time still ahead', () => {
+    expect(endTimeHasPassed('2026-07-01T12:01', 'Europe/London', now)).toBe(false)
+  })
+
+  it('reads the end time on the shop\'s clock, not UTC', () => {
+    expect(endTimeHasPassed('2026-07-01T11:30', 'Europe/London', now)).toBe(true) // 10:30 UTC: before now in both
+    expect(endTimeHasPassed('2026-07-01T11:30', 'America/New_York', now)).toBe(false) // 07:00 in New York: 11:30 is ahead
+  })
+
+  it('is false while there is no end time yet', () => {
+    expect(endTimeHasPassed('', 'Europe/London', now)).toBe(false)
   })
 })

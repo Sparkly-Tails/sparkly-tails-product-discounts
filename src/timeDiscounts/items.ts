@@ -98,6 +98,15 @@ export function shopLocalNow(timeZone: string, now: Date = new Date()): string {
 }
 
 /**
+ * True when `endsAt` (a datetime-local value on the shop's clock) is not in
+ * the future at `now`. Standalone, so it can be called at the moment it
+ * matters — when Save's state is worked out, and again just before submitting.
+ */
+export function endTimeHasPassed(endsAt: string, timeZone: string, now: Date): boolean {
+  return endsAt !== '' && endsAt <= shopLocalNow(timeZone, now)
+}
+
+/**
  * The message for a schedule that must not be saved, or null. An empty date is
  * not a problem yet (the person is still typing); a half-typed year (0202)
  * is, because it can still form a valid-looking pair. Pass `nowLocal`

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, cleanup, waitFor, act } from '@testing-library/react'
+import { render, screen, cleanup, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import '@testing-library/jest-dom/vitest'
 import NewTimeDiscountForm from '@/timeDiscounts/components/NewTimeDiscountForm'
@@ -291,23 +291,44 @@ describe('NewTimeDiscountForm', () => {
       expect(saveButton()).toBeEnabled()
     })
 
-    it('turns Save off when the end time passes while the form is open', async () => {
+    it('works out whether Save is allowed with the clock as it is at that moment, not as it was a while ago', async () => {
       const user = userEvent.setup()
-      vi.useRealTimers() // replace the Date-only clock from beforeEach so the form's interval can be driven too
-      vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] })
-      vi.setSystemTime(new Date(NOW))
       setup()
       await typeSchedule(user, '2026-06-01T00:30', '2026-06-01T01:30') // ends 01:30 on the shop's clock; it is 01:00
       await addKeptRow(user)
       expect(saveButton()).toBeEnabled()
 
-      act(() => {
-        vi.setSystemTime(new Date('2026-06-01T00:45:00Z')) // 01:45 on the shop's clock
-        vi.advanceTimersByTime(15_000)
-      })
+      vi.setSystemTime(new Date('2026-06-01T00:45:00Z')) // 01:45 on the shop's clock
+      await user.type(screen.getByLabelText('Title'), '!') // any change re-works out Save
 
       expect(screen.getByText(PASSED)).toBeInTheDocument()
       expect(saveButton()).toBeDisabled()
+    })
+
+    it('checks the clock again the moment Save is pressed, and does not submit if the end time has passed', async () => {
+      const user = userEvent.setup()
+      create.mockResolvedValue({ ok: true })
+      setup()
+      await typeSchedule(user, '2026-06-01T00:30', '2026-06-01T01:30')
+      await addKeptRow(user)
+      expect(saveButton()).toBeEnabled()
+
+      vi.setSystemTime(new Date('2026-06-01T00:45:00Z')) // the end time passes while the page sits idle, Save still looks enabled
+      await user.click(saveButton())
+
+      expect(create).not.toHaveBeenCalled()
+      expect(screen.getByText(PASSED)).toBeInTheDocument()
+      expect(saveButton()).toBeDisabled()
+    })
+
+    it('submits normally when the end time is still ahead at the moment Save is pressed', async () => {
+      const user = userEvent.setup()
+      create.mockResolvedValue({ ok: true })
+      setup()
+      await typeSchedule(user, '2026-06-01T00:30', '2026-06-01T01:30')
+      await addKeptRow(user)
+      await user.click(saveButton())
+      await waitFor(() => expect(create).toHaveBeenCalledTimes(1))
     })
   })
 
