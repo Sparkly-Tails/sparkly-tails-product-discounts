@@ -21,7 +21,7 @@ Checkout, the storefront price and the countdown work the same for both kinds.
 ## 3. Decisions (agreed in brainstorming)
 
 1. **Group keeps collections.** A group is picked by products/variants **or** by collections (see §4.3 for why not both).
-2. **One "New time-based discount" button.** Its page first asks for the kind, then title and schedule.
+2. **One "New time-based discount" button.** Its page first asks for the kind, then shows that kind's full form. **Nothing is created until Save is pressed on a complete form** (see §5.1, and the per-product form already built this way in #32). Once created, the discount's own page autosaves.
 3. **One time-based discount per product or variant, across both kinds.** The existing availability check (`isTimeDiscountMemberAvailable`, plus the tier-discount check) runs on every resolved product.
 4. **The Group page autosaves**, with the same "Saved" pill, save queue and failed-request handling as the per-product page. No page-wide Save button.
 5. **Approach A: a group expands to rows on save.** The shared rule and the picks are what the merchant edits. Every save rebuilds `items` (one row per product or variant, all with the shared rule). The checkout Function, the storefront metafields and both scripts read only `items` and need no new behaviour.
@@ -75,7 +75,13 @@ A product picked by variant and also inside a chosen collection would produce a 
 
 ### 5.1 New discount (`/time-discounts/new`)
 
-One form: **Kind** (two options, "Group — one price for a set of products" and "Per product — each product has its own price"), **Title**, **Schedule**. **Create discount** is disabled until all are valid and opens that kind's page. The discount exists with no rows until picks or rows are added.
+The page opens with **Kind** (two options, "Group — one price for a set of products" and "Per product — each product has its own price"). Choosing one shows that kind's form. The whole form lives in the browser; **nothing exists in Shopify until Save is pressed**, so a long fill-in cannot run past the end time of a discount that is already live. **Save discount** is at the bottom, and a line under it says what is missing while it is off.
+
+- **Per product:** title, schedule and the products table, as built in #32. Save is off until there is a title, a valid schedule, at least one kept row, and no row open for editing.
+- **Group:** title, schedule, the shared price (type and amount), the picks (products and variants, or collections) and the read-only covered-products preview. Save is off until there is a title, a valid schedule, a valid shared price, and **at least one pick** that resolves to at least one product.
+- One request validates everything and creates the discount with its rows; any failure creates nothing and shows the reason next to Save. The server also refuses an end time that has already passed when Save is pressed.
+- Closing or reloading the page with something entered shows the browser's "Leave site?" warning.
+- After Save, the discount's own page opens and works as in §5.2–§5.3 (autosave with the "Saved" pill).
 
 ### 5.2 Discount page (`/time-discounts/[discountId]`)
 
@@ -103,7 +109,7 @@ Every entry shows its title, schedule label and "{n} products" (the rows), plus 
 
 New actions (all return `{ ok: true, ... } | { ok: false, error }` via `guarded()`), following the save order used today: validate, update the Shopify discount record, save the app config, then best-effort storefront metafield sync.
 
-- `createTimeDiscount(formData)` — gains `kind`; creates an empty group (no picks) or an empty per-product discount.
+- `createTimeDiscount(previous, formData)` — gains `kind`. For a per-product discount it already takes the rows (#32). For a group it takes the shared rule and the picks, resolves them per §4.2, runs the same checks as a save, and creates the discount with its rows in one request. It returns a result to show next to Save, or redirects to the new discount.
 - `saveGroupRule(discountId, { pricingMode, amount })`
 - `saveGroupSelection(discountId, selection)` — replaces the whole selection (used for add, remove and mode switch).
 - Both group actions rebuild `items` per §4.2 and return the covered-products list.
