@@ -16,6 +16,11 @@ export function itemKey(item: Key): string {
   return `${item.productId}|${item.variantId ?? ''}`
 }
 
+/** Link to a product's Shopify admin page; `baseUrl` ends with `/admin/products/`. */
+export function productAdminUrl(baseUrl: string, productId: string): string {
+  return `${baseUrl}${productId.split('/').pop()}`
+}
+
 /**
  * What a customer pays for one unit, in major currency units, rounded to
  * pence. A fixed price at or above the regular price discounts nothing (the

@@ -7,10 +7,12 @@ import type { TimeDiscount } from '@/timeDiscounts/config'
 const TIME_ZONE = 'Europe/London'
 
 const discount: TimeDiscount = {
-  discountId: 'time_disc_1', shopifyDiscountId: 'gid://shopify/DiscountAutomaticApp/1', name: 'Flash', title: 'Flash Sale', pricingMode: 'percent', amount: 20,
+  discountId: 'time_disc_1', shopifyDiscountId: 'gid://shopify/DiscountAutomaticApp/1', name: 'Flash', title: 'Flash Sale',
   startsAt: '2026-01-01T00:00', endsAt: '2026-01-02T00:00',
-  selection: { mode: 'products', members: [{ productId: 'gid://shopify/Product/1' }, { productId: 'gid://shopify/Product/2' }] },
-  resolvedMembers: [{ productId: 'gid://shopify/Product/1' }, { productId: 'gid://shopify/Product/2' }],
+  items: [
+    { productId: 'gid://shopify/Product/1', pricingMode: 'percent', amount: 20 },
+    { productId: 'gid://shopify/Product/2', pricingMode: 'fixed', amount: 22.5 },
+  ],
 }
 
 type MetafieldCall = { ownerId: string; namespace: string; key: string; type: string; value: string }
@@ -38,48 +40,44 @@ describe('syncTimeDiscountMetafields', () => {
     })
   })
 
-  it('carries the fixed price as-is (no price lookup — the scripts derive the display from the live variant price)', async () => {
+  it('carries each product\'s own rule as-is — no price lookup, the scripts derive the display from the live variant price', async () => {
     const spy = vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({ metafieldsSet: { userErrors: [] } })
-    await syncTimeDiscountMetafields({ ...discount, pricingMode: 'fixed', amount: 22.5 }, TIME_ZONE)
+    await syncTimeDiscountMetafields(discount, TIME_ZONE)
 
-    expect(spy).toHaveBeenCalledTimes(2)
-    expect(JSON.parse(writtenMetafields(spy)[0].value).items).toEqual([{ variantId: null, pricingMode: 'fixed', amount: 22.5 }])
+    const byProduct = Object.fromEntries(writtenMetafields(spy).map((m) => [m.ownerId, JSON.parse(m.value).items]))
+    expect(byProduct['gid://shopify/Product/1']).toEqual([{ variantId: null, pricingMode: 'percent', amount: 20 }])
+    expect(byProduct['gid://shopify/Product/2']).toEqual([{ variantId: null, pricingMode: 'fixed', amount: 22.5 }])
   })
 
-  it('writes one metafield for a product with several variant rows, listing each row', async () => {
-    const spy = vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({ metafieldsSet: { userErrors: [] } })
-    await syncTimeDiscountMetafields({
-      ...discount,
-      resolvedMembers: [
-        { productId: 'gid://shopify/Product/1', variantId: 'gid://shopify/ProductVariant/10' },
-        { productId: 'gid://shopify/Product/1', variantId: 'gid://shopify/ProductVariant/11' },
-      ],
-    }, TIME_ZONE)
-
-    expect(spy).toHaveBeenCalledTimes(1)
-    expect(JSON.parse(writtenMetafields(spy)[0].value).items).toEqual([
-      { variantId: 'gid://shopify/ProductVariant/10', pricingMode: 'percent', amount: 20 },
-      { variantId: 'gid://shopify/ProductVariant/11', pricingMode: 'percent', amount: 20 },
-    ])
-  })
-
-  it('writes each stored item\'s own rule, and only that product\'s rows', async () => {
+  it('writes one metafield for a product with several variant rows, each with its own rule', async () => {
     const spy = vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({ metafieldsSet: { userErrors: [] } })
     await syncTimeDiscountMetafields({
       ...discount,
       items: [
         { productId: 'gid://shopify/Product/1', variantId: 'gid://shopify/ProductVariant/10', pricingMode: 'fixed', amount: 22 },
         { productId: 'gid://shopify/Product/1', variantId: 'gid://shopify/ProductVariant/11', pricingMode: 'percent', amount: 50 },
-        { productId: 'gid://shopify/Product/2', pricingMode: 'percent', amount: 10 },
       ],
     }, TIME_ZONE)
 
-    const byProduct = Object.fromEntries(writtenMetafields(spy).map((m) => [m.ownerId, JSON.parse(m.value).items]))
-    expect(byProduct['gid://shopify/Product/1']).toEqual([
+    expect(spy).toHaveBeenCalledTimes(1)
+    expect(JSON.parse(writtenMetafields(spy)[0].value).items).toEqual([
       { variantId: 'gid://shopify/ProductVariant/10', pricingMode: 'fixed', amount: 22 },
       { variantId: 'gid://shopify/ProductVariant/11', pricingMode: 'percent', amount: 50 },
     ])
-    expect(byProduct['gid://shopify/Product/2']).toEqual([{ variantId: null, pricingMode: 'percent', amount: 10 }])
+  })
+
+  it('can be limited to some products, so changing one row does not rewrite every product', async () => {
+    const spy = vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({ metafieldsSet: { userErrors: [] } })
+    await syncTimeDiscountMetafields(discount, TIME_ZONE, ['gid://shopify/Product/2'])
+
+    expect(spy).toHaveBeenCalledTimes(1)
+    expect(writtenMetafields(spy)[0].ownerId).toBe('gid://shopify/Product/2')
+  })
+
+  it('writes nothing for a discount with no rows', async () => {
+    const spy = vi.spyOn(shopifyClient, 'shopifyQuery')
+    await syncTimeDiscountMetafields({ ...discount, items: [] }, TIME_ZONE)
+    expect(spy).not.toHaveBeenCalled()
   })
 
   it('aggregates and throws on any rejected write instead of swallowing it', async () => {

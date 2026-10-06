@@ -74,10 +74,10 @@ export default function ItemRow({
         <tr className="border-b border-line align-middle">
           <td className="py-3 pr-3"><ProductLink row={row} /></td>
           <td className="py-3 pr-3 text-sm">{row.pricingMode === 'fixed' ? 'Fixed price' : `${row.amount}% off`}</td>
-          <td className="py-3 pr-3 text-sm font-medium">
+          <td className="py-3 pr-3 text-sm font-medium whitespace-nowrap">
             {row.regularPrice == null ? '—' : money(discountedPrice(row, row.regularPrice))}
           </td>
-          <td className="py-3 pr-3 text-sm text-muted">{row.regularPrice == null ? '—' : money(row.regularPrice)}</td>
+          <td className="py-3 pr-3 text-sm text-muted whitespace-nowrap">{row.regularPrice == null ? '—' : money(row.regularPrice)}</td>
           <td className="py-3 text-right">
             <button type="button" onClick={onEdit} disabled={busy} aria-label={`Edit ${row.title}`} className={iconButton}><PencilIcon /></button>
           </td>
@@ -140,7 +140,7 @@ function EditCells({
         </div>
         {amountText.trim() !== '' && message && <p role="alert" className="mt-1 text-xs text-danger">{message}</p>}
       </td>
-      <td className="py-3 pr-3 text-sm text-muted">{row.regularPrice == null ? '—' : money(row.regularPrice)}</td>
+      <td className="py-3 pr-3 text-sm text-muted whitespace-nowrap">{row.regularPrice == null ? '—' : money(row.regularPrice)}</td>
       <td colSpan={2} className="py-3 text-right whitespace-nowrap">
         <button
           type="button" disabled={!valid || busy} onClick={() => onSave(rule)}

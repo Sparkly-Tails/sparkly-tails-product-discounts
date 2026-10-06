@@ -1,7 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, type MockInstance } from 'vitest'
 import {
-  createTimeDiscount, updateTimeDiscountSelection, updateTimeDiscountSchedule,
-  updateTimeDiscountTitle, deleteTimeDiscount,
+  createTimeDiscount, saveTimeDiscountTitle, saveTimeDiscountSchedule,
+  saveTimeDiscountItem, removeTimeDiscountItem, deleteTimeDiscount,
 } from '@/timeDiscounts/actions'
 import * as timeConfigLib from '@/timeDiscounts/config'
 import * as configLib from '@/lib/config'
@@ -10,7 +10,12 @@ import * as metafieldSync from '@/timeDiscounts/metafieldSync'
 import * as authRedirect from '@/lib/auth-redirect'
 import * as shopLib from '@/lib/shop'
 import * as shopifyClient from '@/lib/shopify-client'
-import type { TimeDiscount } from '@/timeDiscounts/config'
+import type { TimeDiscount, TimeDiscountItem } from '@/timeDiscounts/config'
+
+const P1 = 'gid://shopify/Product/1'
+const P2 = 'gid://shopify/Product/2'
+const V10 = 'gid://shopify/ProductVariant/10'
+const V11 = 'gid://shopify/ProductVariant/11'
 
 function formData(entries: [string, string][]): FormData {
   const fd = new FormData()
@@ -18,560 +23,362 @@ function formData(entries: [string, string][]): FormData {
   return fd
 }
 
-const existingDiscount: TimeDiscount = {
-  discountId: 'time_disc_1', shopifyDiscountId: 'gid://shopify/DiscountAutomaticApp/1', name: 'Flash', title: 'Flash Sale',
-  pricingMode: 'percent', amount: 20, startsAt: '2026-01-01T00:00', endsAt: '2026-01-02T00:00',
-  selection: { mode: 'products', members: [{ productId: 'gid://shopify/Product/1' }] },
-  resolvedMembers: [{ productId: 'gid://shopify/Product/1' }],
+function discountWith(items: TimeDiscountItem[], overrides: Partial<TimeDiscount> = {}): TimeDiscount {
+  return {
+    discountId: 'time_disc_1', shopifyDiscountId: 'gid://shopify/DiscountAutomaticApp/1', name: 'Flash', title: 'Flash Sale',
+    startsAt: '2026-01-01T00:00', endsAt: '2026-01-02T00:00', items,
+    ...overrides,
+  }
+}
+
+const pct = (productId: string, amount: number, variantId?: string): TimeDiscountItem => ({ productId, ...(variantId ? { variantId } : {}), pricingMode: 'percent', amount })
+
+let saveSpy: MockInstance<typeof timeConfigLib.saveTimeDiscountsConfig>
+let shopifyQuerySpy: MockInstance<typeof shopifyClient.shopifyQuery>
+let redirectSpy: MockInstance<typeof authRedirect.redirectWithToken>
+
+/** Sets up the stored config and a Shopify that accepts every mutation. */
+function storedDiscounts(discounts: TimeDiscount[]) {
+  vi.spyOn(timeConfigLib, 'getTimeDiscountsConfig').mockImplementation(async () => structuredClone({ discounts }))
 }
 
 beforeEach(() => {
   vi.restoreAllMocks()
   vi.spyOn(configLib, 'getConfig').mockResolvedValue({ discounts: [] })
-  vi.spyOn(authRedirect, 'redirectWithToken').mockResolvedValue(undefined as never)
-  vi.spyOn(productsLib, 'getMemberInfo').mockResolvedValue([{ productId: 'gid://shopify/Product/1', title: 'X', price: 10, handle: 'x', imageUrl: null }])
+  redirectSpy = vi.spyOn(authRedirect, 'redirectWithToken').mockResolvedValue(undefined as never)
+  vi.spyOn(productsLib, 'getMemberInfo').mockResolvedValue([{ productId: P1, title: 'X', price: 10, handle: 'x', imageUrl: null }])
   vi.spyOn(shopLib, 'getShopTimezone').mockResolvedValue('Europe/London')
   vi.spyOn(metafieldSync, 'syncTimeDiscountMetafields').mockResolvedValue(undefined)
   vi.spyOn(metafieldSync, 'clearTimeDiscountMetafields').mockResolvedValue(undefined)
+  saveSpy = vi.spyOn(timeConfigLib, 'saveTimeDiscountsConfig').mockResolvedValue(undefined)
+  shopifyQuerySpy = vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({ discountAutomaticAppUpdate: { userErrors: [] } })
+  storedDiscounts([])
 })
+
+/** The `automaticAppDiscount` input of the Shopify mutation call at `index`. */
+function sentToShopify(index = 0) {
+  return (shopifyQuerySpy.mock.calls[index][1] as { automaticAppDiscount: Record<string, unknown> }).automaticAppDiscount
+}
+
+function functionConfigSent(index = 0) {
+  const metafields = sentToShopify(index).metafields as { namespace: string; key: string; value: string }[]
+  return { metafield: metafields[0], parsed: JSON.parse(metafields[0].value) }
+}
 
 describe('createTimeDiscount', () => {
-  it('rejects a submission with no name', async () => {
-    await expect(createTimeDiscount(formData([['title', 'T'], ['startsAt', '2026-01-01T00:00'], ['endsAt', '2026-01-02T00:00'], ['pricingMode', 'percent'], ['amount', '10'], ['selectionMode', 'products'], ['member-0-productId', 'gid://shopify/Product/1']])))
-      .rejects.toThrow('A name is required')
+  const valid: [string, string][] = [['title', 'Summer Sale'], ['startsAt', '2026-01-01T00:00'], ['endsAt', '2026-01-02T00:00']]
+
+  it('rejects a submission with no title', async () => {
+    await expect(createTimeDiscount(formData([['startsAt', '2026-01-01T00:00'], ['endsAt', '2026-01-02T00:00']]))).rejects.toThrow('A title is required')
   })
 
-  it('rejects end before start', async () => {
-    await expect(createTimeDiscount(formData([['name', 'N'], ['title', 'T'], ['startsAt', '2026-01-02T00:00'], ['endsAt', '2026-01-01T00:00'], ['pricingMode', 'percent'], ['amount', '10'], ['selectionMode', 'products'], ['member-0-productId', 'gid://shopify/Product/1']])))
-      .rejects.toThrow('End must be after start')
-  })
-
-  it('rejects a fixed-price discount whose members have different prices', async () => {
-    vi.spyOn(timeConfigLib, 'getTimeDiscountsConfig').mockResolvedValue({ discounts: [] })
-    vi.spyOn(productsLib, 'getMemberInfo').mockResolvedValue([
-      { productId: 'gid://shopify/Product/1', title: 'A', price: 10, handle: 'a', imageUrl: null },
-      { productId: 'gid://shopify/Product/2', title: 'B', price: 20, handle: 'b', imageUrl: null },
-    ])
-    await expect(createTimeDiscount(formData([
-      ['name', 'N'], ['title', 'T'], ['startsAt', '2026-01-01T00:00'], ['endsAt', '2026-01-02T00:00'],
-      ['pricingMode', 'fixed'], ['amount', '5'], ['selectionMode', 'products'],
-      ['member-0-productId', 'gid://shopify/Product/1'], ['member-1-productId', 'gid://shopify/Product/2'],
-    ]))).rejects.toThrow('different prices')
-  })
-
-  it('rejects a percent amount over 100', async () => {
-    await expect(createTimeDiscount(formData([
-      ['name', 'N'], ['title', 'T'], ['startsAt', '2026-01-01T00:00'], ['endsAt', '2026-01-02T00:00'],
-      ['pricingMode', 'percent'], ['amount', '101'], ['selectionMode', 'products'], ['member-0-productId', 'gid://shopify/Product/1'],
-    ]))).rejects.toThrow('cannot exceed 100%')
-  })
-
-  it('rejects a percent amount of 100.01', async () => {
-    await expect(createTimeDiscount(formData([
-      ['name', 'N'], ['title', 'T'], ['startsAt', '2026-01-01T00:00'], ['endsAt', '2026-01-02T00:00'],
-      ['pricingMode', 'percent'], ['amount', '100.01'], ['selectionMode', 'products'], ['member-0-productId', 'gid://shopify/Product/1'],
-    ]))).rejects.toThrow('cannot exceed 100%')
-  })
-
-  it('allows a percent amount of exactly 100', async () => {
-    vi.spyOn(timeConfigLib, 'getTimeDiscountsConfig').mockResolvedValue({ discounts: [] })
-    vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({
-      discountAutomaticAppCreate: { automaticAppDiscount: { discountId: 'gid://shopify/DiscountAutomaticApp/99' }, userErrors: [] },
-    })
-    vi.spyOn(timeConfigLib, 'saveTimeDiscountsConfig').mockResolvedValue(undefined)
-
-    await expect(createTimeDiscount(formData([
-      ['name', 'N'], ['title', 'T'], ['startsAt', '2026-01-01T00:00'], ['endsAt', '2026-01-02T00:00'],
-      ['pricingMode', 'percent'], ['amount', '100'], ['selectionMode', 'products'], ['member-0-productId', 'gid://shopify/Product/1'],
-    ]))).resolves.toBeUndefined()
-  })
-
-  it('allows a fixed-price amount over 100 (no regression — a fixed price is a real currency amount, not a percentage)', async () => {
-    vi.spyOn(productsLib, 'getMemberInfo').mockResolvedValue([{ productId: 'gid://shopify/Product/1', title: 'X', price: 200, handle: 'x', imageUrl: null }])
-    vi.spyOn(timeConfigLib, 'getTimeDiscountsConfig').mockResolvedValue({ discounts: [] })
-    vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({
-      discountAutomaticAppCreate: { automaticAppDiscount: { discountId: 'gid://shopify/DiscountAutomaticApp/99' }, userErrors: [] },
-    })
-    vi.spyOn(timeConfigLib, 'saveTimeDiscountsConfig').mockResolvedValue(undefined)
-
-    await expect(createTimeDiscount(formData([
-      ['name', 'N'], ['title', 'T'], ['startsAt', '2026-01-01T00:00'], ['endsAt', '2026-01-02T00:00'],
-      ['pricingMode', 'fixed'], ['amount', '150'], ['selectionMode', 'products'], ['member-0-productId', 'gid://shopify/Product/1'],
-    ]))).resolves.toBeUndefined()
-  })
-
-  it.each([['higher than', '12'], ['equal to', '10']])('rejects a fixed price %s the regular price, before anything is created in Shopify', async (_label, amount) => {
-    vi.spyOn(timeConfigLib, 'getTimeDiscountsConfig').mockResolvedValue({ discounts: [] })
-    const shopifyQuerySpy = vi.spyOn(shopifyClient, 'shopifyQuery')
-
-    await expect(createTimeDiscount(formData([
-      ['name', 'N'], ['title', 'T'], ['startsAt', '2026-01-01T00:00'], ['endsAt', '2026-01-02T00:00'],
-      ['pricingMode', 'fixed'], ['amount', amount], ['selectionMode', 'products'], ['member-0-productId', 'gid://shopify/Product/1'],
-    ]))).rejects.toThrow(`The fixed price (£${Number(amount).toFixed(2)}) is not lower than the regular price (£10.00)`)
+  it('rejects an end before the start, before anything is created in Shopify', async () => {
+    await expect(createTimeDiscount(formData([['title', 'T'], ['startsAt', '2026-01-02T00:00'], ['endsAt', '2026-01-01T00:00']]))).rejects.toThrow('End must be after start')
     expect(shopifyQuerySpy).not.toHaveBeenCalled()
   })
 
-  it('accepts a fixed price below the regular price, and never applies the check to percentage discounts', async () => {
-    vi.spyOn(timeConfigLib, 'getTimeDiscountsConfig').mockResolvedValue({ discounts: [] })
-    vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({
-      discountAutomaticAppCreate: { automaticAppDiscount: { discountId: 'gid://shopify/DiscountAutomaticApp/99' }, userErrors: [] },
-    })
-    vi.spyOn(timeConfigLib, 'saveTimeDiscountsConfig').mockResolvedValue(undefined)
-    const base: [string, string][] = [
-      ['name', 'N'], ['title', 'T'], ['startsAt', '2026-01-01T00:00'], ['endsAt', '2026-01-02T00:00'],
-      ['selectionMode', 'products'], ['member-0-productId', 'gid://shopify/Product/1'],
-    ]
-
-    await expect(createTimeDiscount(formData([...base, ['pricingMode', 'fixed'], ['amount', '9.99']]))).resolves.toBeUndefined()
-    await expect(createTimeDiscount(formData([...base, ['pricingMode', 'percent'], ['amount', '50']]))).resolves.toBeUndefined()
-  })
-
-  it('creates the Shopify discount record with UTC dates and the function-config metafield, then saves', async () => {
-    const shopifyQuerySpy = vi.spyOn(shopifyClient, 'shopifyQuery')
+  it('creates the Shopify record with UTC dates and an empty function config, saves a discount with no rows, and opens it', async () => {
     shopifyQuerySpy.mockResolvedValueOnce({
-      discountAutomaticAppCreate: {
-        automaticAppDiscount: { discountId: 'gid://shopify/DiscountAutomaticApp/99' },
-        userErrors: [],
-      },
-    })
-    const saveSpy = vi.spyOn(timeConfigLib, 'saveTimeDiscountsConfig').mockResolvedValue(undefined)
-    vi.spyOn(timeConfigLib, 'getTimeDiscountsConfig').mockResolvedValue({ discounts: [] })
-
-    await createTimeDiscount(formData([
-      ['name', 'Flash'], ['title', 'Flash Sale'], ['startsAt', '2026-07-01T12:00'], ['endsAt', '2026-07-02T12:00'],
-      ['pricingMode', 'percent'], ['amount', '20'], ['selectionMode', 'products'], ['member-0-productId', 'gid://shopify/Product/1'],
-    ]))
-
-    expect(shopifyQuerySpy).toHaveBeenCalledWith(
-      expect.stringContaining('discountAutomaticAppCreate'),
-      expect.objectContaining({
-        automaticAppDiscount: expect.objectContaining({
-          title: 'Flash Sale',
-          functionHandle: 'time-based-discount',
-          discountClasses: ['PRODUCT'],
-          startsAt: '2026-07-01T11:00:00.000Z',
-          endsAt: '2026-07-02T11:00:00.000Z',
-          metafields: [expect.objectContaining({
-            namespace: 'sparkly_time_discounts', key: 'function_config', type: 'json',
-            value: JSON.stringify({ resolvedMembers: [{ productId: 'gid://shopify/Product/1' }], pricingMode: 'percent', amount: 20 }),
-          })],
-        }),
-      }),
-    )
-    expect(saveSpy).toHaveBeenCalledWith({
-      discounts: [expect.objectContaining({
-        name: 'Flash', title: 'Flash Sale', shopifyDiscountId: 'gid://shopify/DiscountAutomaticApp/99', pricingMode: 'percent', amount: 20,
-        selection: { mode: 'products', members: [{ productId: 'gid://shopify/Product/1' }] },
-        resolvedMembers: [{ productId: 'gid://shopify/Product/1' }],
-      })],
-    })
-  })
-
-  it('creates a collections-mode discount, resolving members from the collection', async () => {
-    vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({
       discountAutomaticAppCreate: { automaticAppDiscount: { discountId: 'gid://shopify/DiscountAutomaticApp/99' }, userErrors: [] },
     })
-    const saveSpy = vi.spyOn(timeConfigLib, 'saveTimeDiscountsConfig').mockResolvedValue(undefined)
-    vi.spyOn(timeConfigLib, 'getTimeDiscountsConfig').mockResolvedValue({ discounts: [] })
-    const collectionsLib = await import('@/lib/collections')
-    vi.spyOn(collectionsLib, 'resolveCollectionMembers').mockResolvedValue([{ productId: 'gid://shopify/Product/1' }, { productId: 'gid://shopify/Product/2' }])
-    vi.spyOn(productsLib, 'getMemberInfo').mockResolvedValue([
-      { productId: 'gid://shopify/Product/1', title: 'A', price: 10, handle: 'a', imageUrl: null },
-      { productId: 'gid://shopify/Product/2', title: 'B', price: 10, handle: 'b', imageUrl: null },
-    ])
 
-    await createTimeDiscount(formData([
-      ['name', 'Flash'], ['title', 'Flash Sale'], ['startsAt', '2026-01-01T00:00'], ['endsAt', '2026-01-02T00:00'],
-      ['pricingMode', 'percent'], ['amount', '20'], ['selectionMode', 'collections'], ['collectionId', 'gid://shopify/Collection/1'],
-    ]))
+    await createTimeDiscount(formData([['title', 'Summer Sale'], ['startsAt', '2026-07-01T12:00'], ['endsAt', '2026-07-02T12:00']]))
 
-    expect(saveSpy).toHaveBeenCalledWith({
-      discounts: [expect.objectContaining({
-        selection: { mode: 'collections', collectionIds: ['gid://shopify/Collection/1'] },
-        resolvedMembers: [{ productId: 'gid://shopify/Product/1' }, { productId: 'gid://shopify/Product/2' }],
-      })],
+    const sent = sentToShopify()
+    expect(sent.title).toBe('Summer Sale')
+    expect(sent.startsAt).toBe('2026-07-01T11:00:00.000Z') // BST is UTC+1
+    expect(sent.endsAt).toBe('2026-07-02T11:00:00.000Z')
+    expect(sent.functionHandle).toBe('time-based-discount')
+    expect(functionConfigSent().metafield).toMatchObject({ namespace: 'sparkly_time_discounts', key: 'function_config' })
+    expect(functionConfigSent().parsed).toEqual({ items: [] })
+
+    const [saved] = saveSpy.mock.calls[0][0].discounts as TimeDiscount[]
+    expect(saved).toMatchObject({
+      shopifyDiscountId: 'gid://shopify/DiscountAutomaticApp/99', title: 'Summer Sale', name: 'Summer Sale',
+      startsAt: '2026-07-01T12:00', endsAt: '2026-07-02T12:00', items: [],
     })
+    expect(redirectSpy).toHaveBeenCalledWith(`/time-discounts/${encodeURIComponent(saved.discountId)}`)
   })
 
-  it('rejects a collections-mode submission whose collection(s) resolve to no products', async () => {
-    vi.spyOn(timeConfigLib, 'getTimeDiscountsConfig').mockResolvedValue({ discounts: [] })
-    const collectionsLib = await import('@/lib/collections')
-    vi.spyOn(collectionsLib, 'resolveCollectionMembers').mockResolvedValue([])
+  it('rolls back the Shopify record when saving the app config fails, so no invisible live discount is left behind', async () => {
+    shopifyQuerySpy
+      .mockResolvedValueOnce({ discountAutomaticAppCreate: { automaticAppDiscount: { discountId: 'gid://shopify/DiscountAutomaticApp/99' }, userErrors: [] } })
+      .mockResolvedValueOnce({ discountAutomaticDelete: { userErrors: [] } })
+    saveSpy.mockRejectedValueOnce(new Error('metafield write failed'))
 
-    await expect(createTimeDiscount(formData([
-      ['name', 'Flash'], ['title', 'Flash Sale'], ['startsAt', '2026-01-01T00:00'], ['endsAt', '2026-01-02T00:00'],
-      ['pricingMode', 'percent'], ['amount', '20'], ['selectionMode', 'collections'], ['collectionId', 'gid://shopify/Collection/1'],
-    ]))).rejects.toThrow('contain no products')
+    await expect(createTimeDiscount(formData(valid))).rejects.toThrow('metafield write failed')
+
+    expect(shopifyQuerySpy).toHaveBeenLastCalledWith(expect.stringContaining('discountAutomaticDelete'), { id: 'gid://shopify/DiscountAutomaticApp/99' })
   })
 
-  it('rounds a sub-cent amount to the nearest cent before saving/sending to Shopify', async () => {
-    vi.spyOn(timeConfigLib, 'getTimeDiscountsConfig').mockResolvedValue({ discounts: [] })
-    const shopifyQuerySpy = vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({
-      discountAutomaticAppCreate: { automaticAppDiscount: { discountId: 'gid://shopify/DiscountAutomaticApp/99' }, userErrors: [] },
-    })
-    const saveSpy = vi.spyOn(timeConfigLib, 'saveTimeDiscountsConfig').mockResolvedValue(undefined)
-
-    await createTimeDiscount(formData([
-      ['name', 'Flash'], ['title', 'Flash Sale'], ['startsAt', '2026-01-01T00:00'], ['endsAt', '2026-01-02T00:00'],
-      ['pricingMode', 'percent'], ['amount', '7.567'], ['selectionMode', 'products'], ['member-0-productId', 'gid://shopify/Product/1'],
-    ]))
-
-    expect(shopifyQuerySpy).toHaveBeenCalledWith(
-      expect.stringContaining('discountAutomaticAppCreate'),
-      expect.objectContaining({
-        automaticAppDiscount: expect.objectContaining({
-          metafields: [expect.objectContaining({
-            value: expect.stringContaining('"amount":7.57'),
-          })],
-        }),
-      }),
-    )
-    expect(saveSpy).toHaveBeenCalledWith({
-      discounts: [expect.objectContaining({ amount: 7.57 })],
-    })
-  })
-
-  it('does not fail the create when the storefront metafield sync fails — the discount is already live and saved', async () => {
-    vi.spyOn(timeConfigLib, 'getTimeDiscountsConfig').mockResolvedValue({ discounts: [] })
-    vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({
-      discountAutomaticAppCreate: { automaticAppDiscount: { discountId: 'gid://shopify/DiscountAutomaticApp/99' }, userErrors: [] },
-    })
-    vi.spyOn(timeConfigLib, 'saveTimeDiscountsConfig').mockResolvedValue(undefined)
-    vi.spyOn(metafieldSync, 'syncTimeDiscountMetafields').mockRejectedValue(new Error('metafield boom'))
-    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
-    const redirectSpy = vi.spyOn(authRedirect, 'redirectWithToken').mockResolvedValue(undefined as never)
-
-    await expect(createTimeDiscount(formData([
-      ['name', 'Flash'], ['title', 'Flash Sale'], ['startsAt', '2026-01-01T00:00'], ['endsAt', '2026-01-02T00:00'],
-      ['pricingMode', 'percent'], ['amount', '20'], ['selectionMode', 'products'], ['member-0-productId', 'gid://shopify/Product/1'],
-    ]))).resolves.toBeUndefined()
-
-    expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('[createTimeDiscount]'), expect.any(Error))
-    expect(redirectSpy).toHaveBeenCalled()
-  })
-
-  describe('orphan cleanup when the local config save fails after the Shopify record already exists', () => {
-    it('rolls back (deletes) the newly-created Shopify record and rethrows the original error when the compensating delete succeeds', async () => {
-      // First call is the pre-create availability check (assertMembersAvailable
-      // -> fetchAvailabilityConfigs), which must succeed so the flow actually
-      // reaches createShopifyDiscountRecord; only the SECOND call — the
-      // post-create read used to build the saved config — fails.
-      vi.spyOn(timeConfigLib, 'getTimeDiscountsConfig')
-        .mockResolvedValueOnce({ discounts: [] })
-        .mockRejectedValueOnce(new Error('config fetch down'))
-      const shopifyQuerySpy = vi.spyOn(shopifyClient, 'shopifyQuery')
-      shopifyQuerySpy.mockResolvedValueOnce({
-        discountAutomaticAppCreate: { automaticAppDiscount: { discountId: 'gid://shopify/DiscountAutomaticApp/99' }, userErrors: [] },
-      })
-      shopifyQuerySpy.mockResolvedValueOnce({ discountAutomaticDelete: { userErrors: [] } })
-
-      await expect(createTimeDiscount(formData([
-        ['name', 'Flash'], ['title', 'Flash Sale'], ['startsAt', '2026-01-01T00:00'], ['endsAt', '2026-01-02T00:00'],
-        ['pricingMode', 'percent'], ['amount', '20'], ['selectionMode', 'products'], ['member-0-productId', 'gid://shopify/Product/1'],
-      ]))).rejects.toThrow('config fetch down')
-
-      expect(shopifyQuerySpy).toHaveBeenCalledWith(
-        expect.stringContaining('discountAutomaticDelete'),
-        { id: 'gid://shopify/DiscountAutomaticApp/99' },
-      )
-    })
-
-    it('throws a cleanup-failed error naming the orphaned discount id, and logs both failures, when the compensating delete also fails', async () => {
-      vi.spyOn(timeConfigLib, 'getTimeDiscountsConfig')
-        .mockResolvedValueOnce({ discounts: [] })
-        .mockRejectedValueOnce(new Error('config fetch down'))
-      const shopifyQuerySpy = vi.spyOn(shopifyClient, 'shopifyQuery')
-      shopifyQuerySpy.mockResolvedValueOnce({
-        discountAutomaticAppCreate: { automaticAppDiscount: { discountId: 'gid://shopify/DiscountAutomaticApp/99' }, userErrors: [] },
-      })
-      shopifyQuerySpy.mockRejectedValueOnce(new Error('delete also down'))
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
-
-      await expect(createTimeDiscount(formData([
-        ['name', 'Flash'], ['title', 'Flash Sale'], ['startsAt', '2026-01-01T00:00'], ['endsAt', '2026-01-02T00:00'],
-        ['pricingMode', 'percent'], ['amount', '20'], ['selectionMode', 'products'], ['member-0-productId', 'gid://shopify/Product/1'],
-      ]))).rejects.toThrow(/automatic cleanup also failed.*gid:\/\/shopify\/DiscountAutomaticApp\/99/)
-
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        expect.stringContaining('FAILED TO ROLL BACK'),
-        expect.any(Error),
-      )
-    })
-  })
-
-  it('rejects a member already claimed by the existing tiered-discount system', async () => {
-    vi.spyOn(configLib, 'getConfig').mockResolvedValue({
-      discounts: [{ discountId: 'disc_1', name: 'X', title: 'X', status: 'live', pricingMode: 'percent', members: [{ productId: 'gid://shopify/Product/1' }], tiers: [] }],
-    })
-    vi.spyOn(timeConfigLib, 'getTimeDiscountsConfig').mockResolvedValue({ discounts: [] })
-
-    await expect(createTimeDiscount(formData([
-      ['name', 'N'], ['title', 'T'], ['startsAt', '2026-01-01T00:00'], ['endsAt', '2026-01-02T00:00'],
-      ['pricingMode', 'percent'], ['amount', '10'], ['selectionMode', 'products'], ['member-0-productId', 'gid://shopify/Product/1'],
-    ]))).rejects.toThrow('already belongs to another discount')
-  })
-
-  it('throws when Shopify reports userErrors creating the discount record', async () => {
-    vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({
-      discountAutomaticAppCreate: { automaticAppDiscount: null, userErrors: [{ field: ['startsAt'], message: 'Invalid date' }] },
-    })
-    vi.spyOn(timeConfigLib, 'getTimeDiscountsConfig').mockResolvedValue({ discounts: [] })
-    await expect(createTimeDiscount(formData([
-      ['name', 'N'], ['title', 'T'], ['startsAt', '2026-01-01T00:00'], ['endsAt', '2026-01-02T00:00'],
-      ['pricingMode', 'percent'], ['amount', '10'], ['selectionMode', 'products'], ['member-0-productId', 'gid://shopify/Product/1'],
-    ]))).rejects.toThrow('Invalid date')
-  })
-
-  it('rejects a discount whose resolvedMembers would not fit in a single function_config metafield', async () => {
-    vi.spyOn(timeConfigLib, 'getTimeDiscountsConfig').mockResolvedValue({ discounts: [] })
-
-    // Compute exactly how many members are needed to exceed the 9500-byte
-    // safety threshold, rather than guessing a round number — this keeps
-    // the test honest if the guard's margin or the GID shape ever changes.
-    let memberCount = 0
-    let byteLength = 0
-    do {
-      memberCount++
-      const resolvedMembers = Array.from({ length: memberCount }, (_, n) => ({ productId: `gid://shopify/Product/${1000000 + n}` }))
-      byteLength = new TextEncoder().encode(JSON.stringify({ resolvedMembers, pricingMode: 'percent', amount: 20 })).length
-    } while (byteLength <= 9500)
-
-    const formEntries: [string, string][] = [
-      ['name', 'Big'], ['title', 'Big Sale'], ['startsAt', '2026-01-01T00:00'], ['endsAt', '2026-01-02T00:00'],
-      ['pricingMode', 'percent'], ['amount', '20'], ['selectionMode', 'products'],
-    ]
-    for (let n = 0; n < memberCount; n++) {
-      formEntries.push([`member-${n}-productId`, `gid://shopify/Product/${1000000 + n}`])
-    }
-
-    await expect(createTimeDiscount(formData(formEntries))).rejects.toThrow(/too many products\/variants.*split it into multiple/)
-  })
-
-  it('does not reject a normal-sized resolvedMembers list', async () => {
-    vi.spyOn(timeConfigLib, 'getTimeDiscountsConfig').mockResolvedValue({ discounts: [] })
-    vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({
-      discountAutomaticAppCreate: { automaticAppDiscount: { discountId: 'gid://shopify/DiscountAutomaticApp/99' }, userErrors: [] },
-    })
-    vi.spyOn(timeConfigLib, 'saveTimeDiscountsConfig').mockResolvedValue(undefined)
-
-    await expect(createTimeDiscount(formData([
-      ['name', 'Small'], ['title', 'Small Sale'], ['startsAt', '2026-01-01T00:00'], ['endsAt', '2026-01-02T00:00'],
-      ['pricingMode', 'percent'], ['amount', '20'], ['selectionMode', 'products'], ['member-0-productId', 'gid://shopify/Product/1'],
-    ]))).resolves.toBeUndefined()
+  it('throws Shopify userErrors instead of saving anything', async () => {
+    shopifyQuerySpy.mockResolvedValueOnce({ discountAutomaticAppCreate: { automaticAppDiscount: null, userErrors: [{ field: ['x'], message: 'Title taken' }] } })
+    await expect(createTimeDiscount(formData(valid))).rejects.toThrow('Title taken')
+    expect(saveSpy).not.toHaveBeenCalled()
   })
 })
 
-describe('updateTimeDiscountSelection', () => {
-  it('updates the Shopify record\'s function-config metafield and clears/syncs product metafields', async () => {
-    vi.spyOn(timeConfigLib, 'getTimeDiscountsConfig').mockResolvedValue({ discounts: [{ ...existingDiscount }] })
-    vi.spyOn(timeConfigLib, 'saveTimeDiscountsConfig').mockResolvedValue(undefined)
-    const shopifyQuerySpy = vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({ discountAutomaticAppUpdate: { userErrors: [] } })
-    const clearSpy = vi.spyOn(metafieldSync, 'clearTimeDiscountMetafields')
-    const syncSpy = vi.spyOn(metafieldSync, 'syncTimeDiscountMetafields')
+describe('saveTimeDiscountTitle', () => {
+  it('updates the Shopify record, the title and the legacy name, then re-syncs the storefront', async () => {
+    storedDiscounts([discountWith([pct(P1, 20)], { name: 'Old internal name' })])
 
-    await updateTimeDiscountSelection('time_disc_1', formData([['selectionMode', 'products'], ['member-0-productId', 'gid://shopify/Product/2']]))
+    expect(await saveTimeDiscountTitle('time_disc_1', '  Winter Sale ')).toEqual({ ok: true })
 
-    expect(shopifyQuerySpy).toHaveBeenCalledWith(
-      expect.stringContaining('discountAutomaticAppUpdate'),
-      expect.objectContaining({
-        id: 'gid://shopify/DiscountAutomaticApp/1',
-        automaticAppDiscount: expect.objectContaining({
-          metafields: [expect.objectContaining({ value: JSON.stringify({ resolvedMembers: [{ productId: 'gid://shopify/Product/2' }], pricingMode: 'percent', amount: 20 }) })],
-        }),
-      }),
-    )
-    expect(clearSpy).toHaveBeenCalledWith([{ productId: 'gid://shopify/Product/1' }])
-    expect(syncSpy).toHaveBeenCalled()
+    expect(sentToShopify()).toEqual({ title: 'Winter Sale' })
+    expect(saveSpy.mock.calls[0][0].discounts[0]).toMatchObject({ title: 'Winter Sale', name: 'Winter Sale' })
+    expect(metafieldSync.syncTimeDiscountMetafields).toHaveBeenCalledWith(expect.objectContaining({ title: 'Winter Sale' }), 'Europe/London', undefined)
   })
 
-  it('does not save the local config when the Shopify update fails, so the two never drift out of sync', async () => {
-    vi.spyOn(timeConfigLib, 'getTimeDiscountsConfig').mockResolvedValue({ discounts: [{ ...existingDiscount }] })
-    const saveSpy = vi.spyOn(timeConfigLib, 'saveTimeDiscountsConfig').mockResolvedValue(undefined)
-    vi.spyOn(shopifyClient, 'shopifyQuery').mockRejectedValue(new Error('network down'))
+  it('refuses an empty title without touching Shopify', async () => {
+    storedDiscounts([discountWith([])])
+    expect(await saveTimeDiscountTitle('time_disc_1', '   ')).toEqual({ ok: false, error: 'A title is required' })
+    expect(shopifyQuerySpy).not.toHaveBeenCalled()
+  })
 
-    await expect(
-      updateTimeDiscountSelection('time_disc_1', formData([['selectionMode', 'products'], ['member-0-productId', 'gid://shopify/Product/2']])),
-    ).rejects.toThrow('network down')
+  it('reports an unknown discount as a result, not a thrown error', async () => {
+    const result = await saveTimeDiscountTitle('nope', 'X')
+    expect(result.ok).toBe(false)
+    expect(result.ok === false && result.error).toContain('not found')
+  })
 
+  it('does not save the app config when Shopify rejects the update', async () => {
+    storedDiscounts([discountWith([])])
+    shopifyQuerySpy.mockResolvedValueOnce({ discountAutomaticAppUpdate: { userErrors: [{ field: ['title'], message: 'Nope' }] } })
+    expect(await saveTimeDiscountTitle('time_disc_1', 'X')).toEqual({ ok: false, error: 'Nope' })
     expect(saveSpy).not.toHaveBeenCalled()
   })
 
-  it('does not fail the update when the storefront metafield sync fails — the discount is already saved and live', async () => {
-    vi.spyOn(timeConfigLib, 'getTimeDiscountsConfig').mockResolvedValue({ discounts: [{ ...existingDiscount }] })
-    vi.spyOn(timeConfigLib, 'saveTimeDiscountsConfig').mockResolvedValue(undefined)
-    vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({ discountAutomaticAppUpdate: { userErrors: [] } })
-    vi.spyOn(metafieldSync, 'syncTimeDiscountMetafields').mockRejectedValue(new Error('metafield boom'))
-    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
-    const redirectSpy = vi.spyOn(authRedirect, 'redirectWithToken').mockResolvedValue(undefined as never)
-
-    await expect(
-      updateTimeDiscountSelection('time_disc_1', formData([['selectionMode', 'products'], ['member-0-productId', 'gid://shopify/Product/2']])),
-    ).resolves.toBeUndefined()
-
-    expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('[updateTimeDiscountSelection]'), expect.any(Error))
-    expect(redirectSpy).toHaveBeenCalled()
+  it('still reports success when only the storefront sync fails (the discount is saved and live)', async () => {
+    storedDiscounts([discountWith([pct(P1, 20)])])
+    vi.spyOn(metafieldSync, 'syncTimeDiscountMetafields').mockRejectedValue(new Error('sync down'))
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    expect(await saveTimeDiscountTitle('time_disc_1', 'X')).toEqual({ ok: true })
   })
 })
 
-describe('updateTimeDiscountSchedule', () => {
-  it('rejects an edit that sets a fixed price not lower than the regular price, without touching Shopify or saving', async () => {
-    vi.spyOn(timeConfigLib, 'getTimeDiscountsConfig').mockResolvedValue({ discounts: [existingDiscount] })
-    const saveSpy = vi.spyOn(timeConfigLib, 'saveTimeDiscountsConfig').mockResolvedValue(undefined)
-    const shopifyQuerySpy = vi.spyOn(shopifyClient, 'shopifyQuery')
+describe('saveTimeDiscountSchedule', () => {
+  it('sends UTC dates to Shopify, saves the shop-local dates, and re-syncs', async () => {
+    storedDiscounts([discountWith([pct(P1, 20)])])
 
-    await expect(updateTimeDiscountSchedule('time_disc_1', formData([['startsAt', '2026-07-01T12:00'], ['endsAt', '2026-07-02T12:00'], ['pricingMode', 'fixed'], ['amount', '15']])))
-      .rejects.toThrow('is not lower than the regular price (£10.00)')
+    expect(await saveTimeDiscountSchedule('time_disc_1', '2026-07-01T12:00', '2026-07-02T12:00')).toEqual({ ok: true })
+
+    expect(sentToShopify()).toEqual({ startsAt: '2026-07-01T11:00:00.000Z', endsAt: '2026-07-02T11:00:00.000Z' })
+    expect(saveSpy.mock.calls[0][0].discounts[0]).toMatchObject({ startsAt: '2026-07-01T12:00', endsAt: '2026-07-02T12:00' })
+    expect(metafieldSync.syncTimeDiscountMetafields).toHaveBeenCalled()
+  })
+
+  it('rejects an end that is not after the start, without touching Shopify', async () => {
+    storedDiscounts([discountWith([])])
+    expect(await saveTimeDiscountSchedule('time_disc_1', '2026-07-02T12:00', '2026-07-02T12:00')).toEqual({ ok: false, error: 'End must be after start' })
+    expect(shopifyQuerySpy).not.toHaveBeenCalled()
+  })
+
+  it('rejects a missing date', async () => {
+    storedDiscounts([discountWith([])])
+    expect(await saveTimeDiscountSchedule('time_disc_1', '', '2026-07-02T12:00')).toEqual({ ok: false, error: 'Start and end date/time are required' })
+  })
+})
+
+describe('saveTimeDiscountItem', () => {
+  it('adds a new row: updates the Shopify function config, saves, and syncs only that product', async () => {
+    storedDiscounts([discountWith([pct(P2, 10)])])
+
+    expect(await saveTimeDiscountItem('time_disc_1', { productId: P1, pricingMode: 'percent', amount: 20 })).toEqual({ ok: true })
+
+    expect(functionConfigSent().parsed).toEqual({ items: [pct(P2, 10), pct(P1, 20)] })
+    expect(saveSpy.mock.calls[0][0].discounts[0].items).toEqual([pct(P2, 10), pct(P1, 20)])
+    expect(metafieldSync.syncTimeDiscountMetafields).toHaveBeenCalledWith(expect.anything(), 'Europe/London', [P1])
+  })
+
+  it('replaces the rule of an existing row instead of adding a second one', async () => {
+    storedDiscounts([discountWith([pct(P1, 10, V10), pct(P1, 30, V11)])])
+
+    await saveTimeDiscountItem('time_disc_1', { productId: P1, variantId: V10, pricingMode: 'fixed', amount: 5 })
+
+    expect(saveSpy.mock.calls[0][0].discounts[0].items).toEqual([
+      { productId: P1, variantId: V10, pricingMode: 'fixed', amount: 5 },
+      pct(P1, 30, V11),
+    ])
+  })
+
+  it('rounds the amount to pence', async () => {
+    storedDiscounts([discountWith([])])
+    await saveTimeDiscountItem('time_disc_1', { productId: P1, pricingMode: 'percent', amount: 12.345 })
+    expect(saveSpy.mock.calls[0][0].discounts[0].items[0].amount).toBe(12.35)
+  })
+
+  it('accepts a fixed price below the regular price', async () => {
+    storedDiscounts([discountWith([])])
+    expect(await saveTimeDiscountItem('time_disc_1', { productId: P1, pricingMode: 'fixed', amount: 9.99 })).toEqual({ ok: true })
+    expect(saveSpy.mock.calls[0][0].discounts[0].items).toEqual([{ productId: P1, pricingMode: 'fixed', amount: 9.99 }])
+  })
+
+  it.each([['higher than', 12], ['equal to', 10]])('rejects a fixed price %s the regular price, before anything is sent to Shopify', async (_label, amount) => {
+    storedDiscounts([discountWith([])])
+    const result = await saveTimeDiscountItem('time_disc_1', { productId: P1, pricingMode: 'fixed', amount })
+    expect(result).toEqual({ ok: false, error: expect.stringContaining('is not lower than the regular price (£10.00)') })
     expect(shopifyQuerySpy).not.toHaveBeenCalled()
     expect(saveSpy).not.toHaveBeenCalled()
   })
 
-  it('updates dates (converted to UTC), pricing mode, and amount on both the local config and the Shopify record', async () => {
-    vi.spyOn(timeConfigLib, 'getTimeDiscountsConfig').mockResolvedValue({ discounts: [existingDiscount] })
-    const saveSpy = vi.spyOn(timeConfigLib, 'saveTimeDiscountsConfig').mockResolvedValue(undefined)
-    const shopifyQuerySpy = vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({ discountAutomaticAppUpdate: { userErrors: [] } })
-
-    await updateTimeDiscountSchedule('time_disc_1', formData([['startsAt', '2026-07-01T12:00'], ['endsAt', '2026-07-02T12:00'], ['pricingMode', 'fixed'], ['amount', '5']]))
-
-    expect(saveSpy).toHaveBeenCalledWith({
-      discounts: [expect.objectContaining({ startsAt: '2026-07-01T12:00', endsAt: '2026-07-02T12:00', pricingMode: 'fixed', amount: 5 })],
-    })
-    expect(shopifyQuerySpy).toHaveBeenCalledWith(
-      expect.stringContaining('discountAutomaticAppUpdate'),
-      expect.objectContaining({
-        id: 'gid://shopify/DiscountAutomaticApp/1',
-        automaticAppDiscount: expect.objectContaining({ startsAt: '2026-07-01T11:00:00.000Z', endsAt: '2026-07-02T11:00:00.000Z' }),
-      }),
-    )
+  it('judges each row against its own regular price', async () => {
+    storedDiscounts([discountWith([])])
+    vi.spyOn(productsLib, 'getMemberInfo').mockResolvedValue([{ productId: P1, variantId: V10, title: 'X – Large', price: 60, handle: 'x', imageUrl: null }])
+    expect(await saveTimeDiscountItem('time_disc_1', { productId: P1, variantId: V10, pricingMode: 'fixed', amount: 50 })).toEqual({ ok: true })
+    expect(productsLib.getMemberInfo).toHaveBeenCalledWith([{ productId: P1, variantId: V10 }])
   })
 
-  it('rounds a sub-cent amount to the nearest cent before saving/sending to Shopify', async () => {
-    vi.spyOn(timeConfigLib, 'getTimeDiscountsConfig').mockResolvedValue({ discounts: [{ ...existingDiscount }] })
-    const saveSpy = vi.spyOn(timeConfigLib, 'saveTimeDiscountsConfig').mockResolvedValue(undefined)
-    const shopifyQuerySpy = vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({ discountAutomaticAppUpdate: { userErrors: [] } })
-
-    await updateTimeDiscountSchedule('time_disc_1', formData([['startsAt', '2026-07-01T12:00'], ['endsAt', '2026-07-02T12:00'], ['pricingMode', 'fixed'], ['amount', '7.567']]))
-
-    expect(saveSpy).toHaveBeenCalledWith({ discounts: [expect.objectContaining({ amount: 7.57 })] })
-    expect(shopifyQuerySpy).toHaveBeenCalledWith(
-      expect.stringContaining('discountAutomaticAppUpdate'),
-      expect.objectContaining({
-        automaticAppDiscount: expect.objectContaining({
-          metafields: [expect.objectContaining({ value: expect.stringContaining('"amount":7.57') })],
-        }),
-      }),
-    )
+  it('does not look up a price for a percentage row', async () => {
+    storedDiscounts([discountWith([])])
+    await saveTimeDiscountItem('time_disc_1', { productId: P1, pricingMode: 'percent', amount: 20 })
+    expect(productsLib.getMemberInfo).not.toHaveBeenCalled()
   })
 
-  it('does not fail the update when the storefront metafield sync fails — the discount is already saved and live', async () => {
-    vi.spyOn(timeConfigLib, 'getTimeDiscountsConfig').mockResolvedValue({ discounts: [{ ...existingDiscount }] })
-    vi.spyOn(timeConfigLib, 'saveTimeDiscountsConfig').mockResolvedValue(undefined)
-    vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({ discountAutomaticAppUpdate: { userErrors: [] } })
-    vi.spyOn(metafieldSync, 'syncTimeDiscountMetafields').mockRejectedValue(new Error('metafield boom'))
-    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
-    const redirectSpy = vi.spyOn(authRedirect, 'redirectWithToken').mockResolvedValue(undefined as never)
-
-    await expect(
-      updateTimeDiscountSchedule('time_disc_1', formData([['startsAt', '2026-07-01T12:00'], ['endsAt', '2026-07-02T12:00'], ['pricingMode', 'fixed'], ['amount', '5']])),
-    ).resolves.toBeUndefined()
-
-    expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('[updateTimeDiscountSchedule]'), expect.any(Error))
-    expect(redirectSpy).toHaveBeenCalled()
-  })
-})
-
-describe('updateTimeDiscountTitle', () => {
-  it('updates the title locally and on the Shopify record', async () => {
-    vi.spyOn(timeConfigLib, 'getTimeDiscountsConfig').mockResolvedValue({ discounts: [{ ...existingDiscount }] })
-    const saveSpy = vi.spyOn(timeConfigLib, 'saveTimeDiscountsConfig').mockResolvedValue(undefined)
-    const shopifyQuerySpy = vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({ discountAutomaticAppUpdate: { userErrors: [] } })
-
-    await updateTimeDiscountTitle('time_disc_1', formData([['title', 'New Title']]))
-
-    expect(saveSpy).toHaveBeenCalledWith({ discounts: [expect.objectContaining({ title: 'New Title' })] })
-    expect(shopifyQuerySpy).toHaveBeenCalledWith(
-      expect.stringContaining('discountAutomaticAppUpdate'),
-      expect.objectContaining({ id: 'gid://shopify/DiscountAutomaticApp/1', automaticAppDiscount: { title: 'New Title' } }),
-    )
+  it('reports a product Shopify cannot find', async () => {
+    storedDiscounts([discountWith([])])
+    vi.spyOn(productsLib, 'getMemberInfo').mockResolvedValue([])
+    expect(await saveTimeDiscountItem('time_disc_1', { productId: P1, pricingMode: 'fixed', amount: 5 })).toEqual({ ok: false, error: 'This product could not be found in Shopify' })
   })
 
-  it('does not save the local config when the Shopify update fails, so the two never drift out of sync', async () => {
-    vi.spyOn(timeConfigLib, 'getTimeDiscountsConfig').mockResolvedValue({ discounts: [{ ...existingDiscount }] })
-    const saveSpy = vi.spyOn(timeConfigLib, 'saveTimeDiscountsConfig').mockResolvedValue(undefined)
-    vi.spyOn(shopifyClient, 'shopifyQuery').mockRejectedValue(new Error('network down'))
+  it.each([[0], [-5], [Number.NaN]])('rejects an amount of %s', async (amount) => {
+    storedDiscounts([discountWith([])])
+    const result = await saveTimeDiscountItem('time_disc_1', { productId: P1, pricingMode: 'percent', amount })
+    expect(result).toEqual({ ok: false, error: 'Enter an amount greater than zero' })
+  })
 
-    await expect(
-      updateTimeDiscountTitle('time_disc_1', formData([['title', 'New Title']])),
-    ).rejects.toThrow('network down')
+  it('rejects a percentage over 100', async () => {
+    storedDiscounts([discountWith([])])
+    expect(await saveTimeDiscountItem('time_disc_1', { productId: P1, pricingMode: 'percent', amount: 101 })).toEqual({ ok: false, error: 'A percentage discount cannot exceed 100%' })
+  })
 
+  it('rejects a product that already belongs to another discount', async () => {
+    storedDiscounts([
+      discountWith([]),
+      discountWith([pct(P1, 10)], { discountId: 'time_disc_2' }),
+    ])
+    expect(await saveTimeDiscountItem('time_disc_1', { productId: P1, pricingMode: 'percent', amount: 20 })).toEqual({ ok: false, error: 'This product already belongs to another discount' })
     expect(saveSpy).not.toHaveBeenCalled()
   })
 
-  it('does not fail the update when the storefront metafield sync fails — the discount is already saved and live', async () => {
-    vi.spyOn(timeConfigLib, 'getTimeDiscountsConfig').mockResolvedValue({ discounts: [{ ...existingDiscount }] })
-    vi.spyOn(timeConfigLib, 'saveTimeDiscountsConfig').mockResolvedValue(undefined)
-    vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({ discountAutomaticAppUpdate: { userErrors: [] } })
-    vi.spyOn(metafieldSync, 'syncTimeDiscountMetafields').mockRejectedValue(new Error('metafield boom'))
-    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
-    const redirectSpy = vi.spyOn(authRedirect, 'redirectWithToken').mockResolvedValue(undefined as never)
+  it('rejects a product that already belongs to a tier discount', async () => {
+    storedDiscounts([discountWith([])])
+    vi.spyOn(configLib, 'getConfig').mockResolvedValue({
+      discounts: [{ discountId: 'tier_1', name: 'Tiers', status: 'active', pricingMode: 'percent', tiers: [], members: [{ productId: P1 }] }],
+    } as never)
+    const result = await saveTimeDiscountItem('time_disc_1', { productId: P1, pricingMode: 'percent', amount: 20 })
+    expect(result).toEqual({ ok: false, error: 'This product already belongs to another discount' })
+  })
 
-    await expect(
-      updateTimeDiscountTitle('time_disc_1', formData([['title', 'New Title']])),
-    ).resolves.toBeUndefined()
+  it('does not re-check availability when only editing a row already in this discount', async () => {
+    storedDiscounts([discountWith([pct(P1, 10)])])
+    // The only discount holding P1 is this one, so availability would pass anyway; make the check observable instead.
+    const availability = await import('@/lib/discount-availability')
+    const spy = vi.spyOn(availability, 'isAvailableEverywhere')
+    await saveTimeDiscountItem('time_disc_1', { productId: P1, pricingMode: 'percent', amount: 30 })
+    expect(spy).not.toHaveBeenCalled()
+  })
 
-    expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('[updateTimeDiscountTitle]'), expect.any(Error))
-    expect(redirectSpy).toHaveBeenCalled()
+  it('rejects a variant row next to a whole-product row of the same product', async () => {
+    storedDiscounts([discountWith([pct(P1, 10)])])
+    expect(await saveTimeDiscountItem('time_disc_1', { productId: P1, variantId: V10, pricingMode: 'percent', amount: 20 })).toEqual({
+      ok: false, error: 'A product cannot have both a whole-product row and variant rows',
+    })
+  })
+
+  it('rejects a row that would not fit the Function config, leaving everything unchanged', async () => {
+    const many: TimeDiscountItem[] = Array.from({ length: 70 }, (_, i) => ({
+      productId: `gid://shopify/Product/${10_000_000_000_000 + i}`,
+      variantId: `gid://shopify/ProductVariant/${50_000_000_000_000 + i}`,
+      pricingMode: 'percent', amount: 20.5,
+    }))
+    storedDiscounts([discountWith(many)])
+    const result = await saveTimeDiscountItem('time_disc_1', { productId: P1, pricingMode: 'percent', amount: 20 })
+    expect(result.ok).toBe(false)
+    expect(result.ok === false && result.error).toContain('too many products/variants')
+    expect(shopifyQuerySpy).not.toHaveBeenCalled()
+    expect(saveSpy).not.toHaveBeenCalled()
+  })
+
+  it('does not save the app config when Shopify rejects the update', async () => {
+    storedDiscounts([discountWith([])])
+    shopifyQuerySpy.mockResolvedValueOnce({ discountAutomaticAppUpdate: { userErrors: [{ field: ['metafields'], message: 'Function failed' }] } })
+    expect(await saveTimeDiscountItem('time_disc_1', { productId: P1, pricingMode: 'percent', amount: 20 })).toEqual({ ok: false, error: 'Function failed' })
+    expect(saveSpy).not.toHaveBeenCalled()
+  })
+
+  it('reports an unknown discount as a result', async () => {
+    const result = await saveTimeDiscountItem('nope', { productId: P1, pricingMode: 'percent', amount: 20 })
+    expect(result.ok).toBe(false)
+  })
+})
+
+describe('removeTimeDiscountItem', () => {
+  it('removes the row, updates Shopify and the app config, and clears the product\'s storefront metafield when it has no rows left', async () => {
+    storedDiscounts([discountWith([pct(P1, 10), pct(P2, 20)])])
+
+    expect(await removeTimeDiscountItem('time_disc_1', { productId: P1 })).toEqual({ ok: true })
+
+    expect(functionConfigSent().parsed).toEqual({ items: [pct(P2, 20)] })
+    expect(saveSpy.mock.calls[0][0].discounts[0].items).toEqual([pct(P2, 20)])
+    expect(metafieldSync.clearTimeDiscountMetafields).toHaveBeenCalledWith([{ productId: P1 }])
+    expect(metafieldSync.syncTimeDiscountMetafields).not.toHaveBeenCalled()
+  })
+
+  it('re-syncs instead of clearing when the product still has other variant rows', async () => {
+    storedDiscounts([discountWith([pct(P1, 10, V10), pct(P1, 20, V11)])])
+
+    await removeTimeDiscountItem('time_disc_1', { productId: P1, variantId: V10 })
+
+    expect(saveSpy.mock.calls[0][0].discounts[0].items).toEqual([pct(P1, 20, V11)])
+    expect(metafieldSync.syncTimeDiscountMetafields).toHaveBeenCalledWith(expect.anything(), 'Europe/London', [P1])
+    expect(metafieldSync.clearTimeDiscountMetafields).not.toHaveBeenCalled()
+  })
+
+  it('removing a row that is already gone is a harmless no-op', async () => {
+    storedDiscounts([discountWith([pct(P2, 20)])])
+    expect(await removeTimeDiscountItem('time_disc_1', { productId: P1 })).toEqual({ ok: true })
+    expect(shopifyQuerySpy).not.toHaveBeenCalled()
+    expect(saveSpy).not.toHaveBeenCalled()
+  })
+
+  it('can remove the last row, leaving a valid discount that applies to nothing', async () => {
+    storedDiscounts([discountWith([pct(P1, 10)])])
+    expect(await removeTimeDiscountItem('time_disc_1', { productId: P1 })).toEqual({ ok: true })
+    expect(functionConfigSent().parsed).toEqual({ items: [] })
+  })
+
+  it('does not save the app config when Shopify rejects the update', async () => {
+    storedDiscounts([discountWith([pct(P1, 10)])])
+    shopifyQuerySpy.mockResolvedValueOnce({ discountAutomaticAppUpdate: { userErrors: [{ field: ['x'], message: 'Nope' }] } })
+    expect(await removeTimeDiscountItem('time_disc_1', { productId: P1 })).toEqual({ ok: false, error: 'Nope' })
+    expect(saveSpy).not.toHaveBeenCalled()
   })
 })
 
 describe('deleteTimeDiscount', () => {
-  it('removes the discount, deletes the Shopify record, and clears product metafields', async () => {
-    vi.spyOn(timeConfigLib, 'getTimeDiscountsConfig').mockResolvedValue({ discounts: [existingDiscount] })
-    const saveSpy = vi.spyOn(timeConfigLib, 'saveTimeDiscountsConfig').mockResolvedValue(undefined)
-    const shopifyQuerySpy = vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({ discountAutomaticDelete: { userErrors: [] } })
-    const clearSpy = vi.spyOn(metafieldSync, 'clearTimeDiscountMetafields')
+  it('deletes the Shopify record first, then the app entry, clears every product\'s metafield, and returns to the list', async () => {
+    storedDiscounts([discountWith([pct(P1, 10), pct(P2, 20)]), discountWith([], { discountId: 'time_disc_2' })])
+    shopifyQuerySpy.mockResolvedValueOnce({ discountAutomaticDelete: { userErrors: [] } })
 
     await deleteTimeDiscount('time_disc_1')
 
-    expect(saveSpy).toHaveBeenCalledWith({ discounts: [] })
     expect(shopifyQuerySpy).toHaveBeenCalledWith(expect.stringContaining('discountAutomaticDelete'), { id: 'gid://shopify/DiscountAutomaticApp/1' })
-    expect(clearSpy).toHaveBeenCalledWith([{ productId: 'gid://shopify/Product/1' }])
+    expect(saveSpy).toHaveBeenCalledWith({ discounts: [expect.objectContaining({ discountId: 'time_disc_2' })] })
+    expect(metafieldSync.clearTimeDiscountMetafields).toHaveBeenCalledWith([pct(P1, 10), pct(P2, 20)])
+    expect(redirectSpy).toHaveBeenCalledWith('/')
   })
 
-  it('does not remove the discount from local config when the Shopify delete fails', async () => {
-    vi.spyOn(timeConfigLib, 'getTimeDiscountsConfig').mockResolvedValue({ discounts: [{ ...existingDiscount }] })
-    const saveSpy = vi.spyOn(timeConfigLib, 'saveTimeDiscountsConfig').mockResolvedValue(undefined)
-    vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({
-      discountAutomaticDelete: { userErrors: [{ field: [], message: 'Something went wrong' }] },
-    })
-
-    await expect(deleteTimeDiscount('time_disc_1')).rejects.toThrow('Something went wrong')
-
+  it('keeps the app entry when Shopify refuses the delete, so the merchant can retry', async () => {
+    storedDiscounts([discountWith([])])
+    shopifyQuerySpy.mockResolvedValueOnce({ discountAutomaticDelete: { userErrors: [{ field: ['id'], message: 'Locked' }] } })
+    await expect(deleteTimeDiscount('time_disc_1')).rejects.toThrow('Locked')
     expect(saveSpy).not.toHaveBeenCalled()
   })
 
-  it('treats a "not found" delete error as a successful no-op, so a retry after a partial failure still succeeds', async () => {
-    vi.spyOn(timeConfigLib, 'getTimeDiscountsConfig').mockResolvedValue({ discounts: [{ ...existingDiscount }] })
-    const saveSpy = vi.spyOn(timeConfigLib, 'saveTimeDiscountsConfig').mockResolvedValue(undefined)
-    vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({
-      discountAutomaticDelete: { userErrors: [{ field: ['id'], message: 'Discount does not exist' }] },
-    })
-
+  it('treats a Shopify record that is already gone as deleted', async () => {
+    storedDiscounts([discountWith([])])
+    shopifyQuerySpy.mockResolvedValueOnce({ discountAutomaticDelete: { userErrors: [{ field: ['id'], message: 'Discount not found' }] } })
     await expect(deleteTimeDiscount('time_disc_1')).resolves.toBeUndefined()
-
     expect(saveSpy).toHaveBeenCalledWith({ discounts: [] })
-  })
-
-  it('does not fail the delete when the storefront metafield clear fails — the discount is already deleted', async () => {
-    vi.spyOn(timeConfigLib, 'getTimeDiscountsConfig').mockResolvedValue({ discounts: [{ ...existingDiscount }] })
-    vi.spyOn(timeConfigLib, 'saveTimeDiscountsConfig').mockResolvedValue(undefined)
-    vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({ discountAutomaticDelete: { userErrors: [] } })
-    vi.spyOn(metafieldSync, 'clearTimeDiscountMetafields').mockRejectedValue(new Error('metafield boom'))
-    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
-    const redirectSpy = vi.spyOn(authRedirect, 'redirectWithToken').mockResolvedValue(undefined as never)
-
-    await expect(deleteTimeDiscount('time_disc_1')).resolves.toBeUndefined()
-
-    expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('[deleteTimeDiscount]'), expect.any(Error))
-    expect(redirectSpy).toHaveBeenCalled()
   })
 })

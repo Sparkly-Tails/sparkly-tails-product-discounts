@@ -1,9 +1,9 @@
 import { shopifyQuery } from '@/lib/shopify-client'
 import { zonedTimeToUtc } from '@/lib/shop'
 
+/** A product/variant as stored by discounts saved before per-row pricing. Only read when normalizing them. */
 export interface DiscountMember {
   productId: string
-  /** Omitted for a whole-product member (single-variant products, or Collections-mode resolution — see spec §3, §5). */
   variantId?: string
 }
 
@@ -17,34 +17,64 @@ export interface TimeDiscountItem {
   amount: number
 }
 
-export type TimeDiscountSelection =
-  | { mode: 'products'; members: DiscountMember[] }
-  | { mode: 'collections'; collectionIds: string[] }
-
 export interface TimeDiscount {
   discountId: string
-  /** GID of the real Shopify DiscountAutomaticApp record this discount owns — see spec §5. Shopify's own native startsAt/endsAt on that record govern activation; this app has no local status field. */
+  /** GID of the real Shopify DiscountAutomaticApp record this discount owns. Shopify's own native startsAt/endsAt on that record govern activation; this app has no local status field. */
   shopifyDiscountId: string
-  /** Internal admin-facing label. */
+  /** Legacy internal label — kept equal to `title` on every title save and never shown. */
   name: string
-  /** Customer-facing copy shown in the countdown widget. */
+  /** Shown to customers in the countdown widget and used as the admin label. */
   title: string
-  pricingMode: 'percent' | 'fixed'
-  /** Single flat value — percent-off, or the fixed price. No tiers (see spec §2). */
-  amount: number
-  /** Naive (no offset) ISO datetime; entered/displayed in shop timezone by the admin UI. Converted to UTC only at the Admin API boundary, when writing this discount's native startsAt/endsAt (see spec §5). */
+  /** Naive (no offset) ISO datetime; entered/displayed in shop timezone by the admin UI. Converted to UTC only at the Admin API boundary, when writing this discount's native startsAt/endsAt. */
   startsAt: string
   endsAt: string
-  /** Admin source of truth: how the merchant chose members — shown/edited on the discount page. */
-  selection: TimeDiscountSelection
-  /** Function-facing snapshot, recomputed at save time from `selection` (see spec §3, §5). The Function only ever reads this. */
-  resolvedMembers: DiscountMember[]
-  /**
-   * Per-row pricing. Not stored yet — a discount saved before per-row pricing
-   * has none, and its resolvedMembers all share the discount's one
-   * pricingMode/amount. Always read it through getDiscountItems().
-   */
+  /** The rows: each product/variant with its own price rule. */
+  items: TimeDiscountItem[]
+}
+
+/**
+ * What may be on disk: a discount saved before per-row pricing has one shared
+ * `pricingMode`/`amount` plus `resolvedMembers` (and a `selection`, ignored)
+ * instead of `items`.
+ */
+export interface StoredTimeDiscount {
+  discountId: string
+  shopifyDiscountId: string
+  name: string
+  title: string
+  startsAt: string
+  endsAt: string
   items?: TimeDiscountItem[]
+  pricingMode?: 'percent' | 'fixed'
+  amount?: number
+  resolvedMembers?: DiscountMember[]
+}
+
+/**
+ * Converts a stored discount to the current shape, in memory only (nothing is
+ * rewritten until the discount is next saved): an older discount becomes one
+ * row per product/variant it covered, each carrying its one shared rule. A
+ * collection discount needs no lookup — resolvedMembers already is the
+ * snapshot of the products it covered.
+ */
+export function normalizeTimeDiscount(stored: StoredTimeDiscount): TimeDiscount {
+  const items: TimeDiscountItem[] =
+    stored.items ??
+    (stored.resolvedMembers ?? []).map((member) => ({
+      productId: member.productId,
+      ...(member.variantId ? { variantId: member.variantId } : {}),
+      pricingMode: stored.pricingMode ?? 'percent',
+      amount: stored.amount ?? 0,
+    }))
+  return {
+    discountId: stored.discountId,
+    shopifyDiscountId: stored.shopifyDiscountId,
+    name: stored.name,
+    title: stored.title,
+    startsAt: stored.startsAt,
+    endsAt: stored.endsAt,
+    items,
+  }
 }
 
 export interface TimeDiscountsConfig {
@@ -72,8 +102,8 @@ export async function getTimeDiscountsConfig(): Promise<TimeDiscountsConfig> {
 
   if (!data.shop.metafield) return { discounts: [] }
 
-  const parsed = JSON.parse(data.shop.metafield.value) as Partial<TimeDiscountsConfig>
-  return { discounts: Array.isArray(parsed.discounts) ? parsed.discounts : [] }
+  const parsed = JSON.parse(data.shop.metafield.value) as { discounts?: StoredTimeDiscount[] }
+  return { discounts: Array.isArray(parsed.discounts) ? parsed.discounts.map(normalizeTimeDiscount) : [] }
 }
 
 export async function saveTimeDiscountsConfig(config: TimeDiscountsConfig): Promise<void> {
@@ -100,8 +130,8 @@ export async function saveTimeDiscountsConfig(config: TimeDiscountsConfig): Prom
 }
 
 /**
- * True when (productId, variantId) isn't already a resolvedMembers entry of
- * another time discount. Same matching rule as the existing app's
+ * True when (productId, variantId) isn't already a row of another time
+ * discount. Same matching rule as the existing app's
  * isProductAvailable: a whole-product claim blocks every variant and vice
  * versa. Pass the discount's own id as excludeDiscountId when validating an
  * in-progress edit.
@@ -114,23 +144,12 @@ export function isTimeDiscountMemberAvailable(
 ): boolean {
   return !config.discounts.some((discount) => {
     if (discount.discountId === excludeDiscountId) return false
-    return discount.resolvedMembers.some((member) => {
+    return discount.items.some((member) => {
       if (member.productId !== productId) return false
       if (member.variantId == null || variantId == null) return true
       return member.variantId === variantId
     })
   })
-}
-
-/**
- * True when every price in the list is equal, within floating-point
- * rounding. Deliberately redefined here rather than imported from
- * @/lib/config — see this plan's Global Constraints for why.
- */
-export function pricesUniform(prices: number[]): boolean {
-  if (prices.length <= 1) return true
-  const [first, ...rest] = prices
-  return rest.every((p) => Math.abs(p - first) <= 0.001)
 }
 
 /**
@@ -149,23 +168,6 @@ export function fixedPriceNotLowerError(
   if (pricingMode !== 'fixed' || !(amount > 0) || !regularPrice || regularPrice <= 0) return null
   if (amount < regularPrice) return null
   return `The fixed price (£${amount.toFixed(2)}) is not lower than the regular price (£${regularPrice.toFixed(2)}), so it would not discount anything. Check the price you entered.`
-}
-
-/**
- * The discount's price rows: its stored `items`, or — for a discount saved
- * before per-row pricing — one row per resolved member carrying the
- * discount's single shared pricingMode/amount.
- */
-export function getDiscountItems(
-  discount: Pick<TimeDiscount, 'pricingMode' | 'amount' | 'resolvedMembers' | 'items'>,
-): TimeDiscountItem[] {
-  if (discount.items) return discount.items
-  return discount.resolvedMembers.map((member) => ({
-    productId: member.productId,
-    ...(member.variantId ? { variantId: member.variantId } : {}),
-    pricingMode: discount.pricingMode,
-    amount: discount.amount,
-  }))
 }
 
 /**

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  itemKey, discountedPrice, validateRule, validateItemsStructure,
+  itemKey, productAdminUrl, discountedPrice, validateRule, validateItemsStructure,
   functionConfigBytes, assertItemsFitFunctionConfig, FUNCTION_CONFIG_MAX_BYTES,
 } from '@/timeDiscounts/items'
 import type { TimeDiscountItem } from '@/timeDiscounts/config'
@@ -13,6 +13,12 @@ describe('itemKey', () => {
   it('distinguishes a whole product from its variants', () => {
     expect(itemKey({ productId: P1 })).not.toBe(itemKey({ productId: P1, variantId: V10 }))
     expect(itemKey({ productId: P1, variantId: V10 })).toBe(itemKey({ productId: P1, variantId: V10 }))
+  })
+})
+
+describe('productAdminUrl', () => {
+  it('links to the product\'s admin page by its numeric id', () => {
+    expect(productAdminUrl('https://shop.myshopify.com/admin/products/', 'gid://shopify/Product/9876543210')).toBe('https://shop.myshopify.com/admin/products/9876543210')
   })
 })
 

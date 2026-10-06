@@ -78,10 +78,10 @@ export default async function Home() {
                 token={token}
                 className="font-medium hover:underline transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded"
               >
-                {row.name}
+                {row.title}
               </AuthLink>
               <p className="text-sm text-muted">
-                {scheduleLabel(row.startsAt, row.endsAt)} · {row.pricingMode === 'fixed' ? 'Fixed price' : 'Percentage'} · {row.startsAt} → {row.endsAt} · {row.resolvedMembers.length} product{row.resolvedMembers.length === 1 ? '' : 's'}
+                {scheduleLabel(row.startsAt, row.endsAt)} · {row.startsAt} → {row.endsAt} · {row.items.length} product{row.items.length === 1 ? '' : 's'}
               </p>
             </li>
           ))}
