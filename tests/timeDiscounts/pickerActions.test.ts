@@ -1,10 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import {
   searchTimeDiscountProductsAction, getTimeDiscountProductVariantsAction,
-  validateTimeDiscountMemberAction, searchTimeDiscountCollectionsAction,
+  validateTimeDiscountMemberAction,
 } from '@/timeDiscounts/pickerActions'
 import * as productsLib from '@/lib/products'
-import * as collectionsLib from '@/lib/collections'
 import * as configLib from '@/lib/config'
 import * as timeConfigLib from '@/timeDiscounts/config'
 
@@ -32,10 +31,9 @@ describe('searchTimeDiscountProductsAction', () => {
     vi.spyOn(productsLib, 'searchProducts').mockResolvedValue([{ id: 'gid://shopify/Product/1', title: 'Tuna Soup', variantCount: 1 }])
     vi.spyOn(timeConfigLib, 'getTimeDiscountsConfig').mockResolvedValue({
       discounts: [{
-        discountId: 'time_disc_1', shopifyDiscountId: 'gid://shopify/DiscountAutomaticApp/1', name: 'X', title: 'X', pricingMode: 'percent', amount: 10,
+        discountId: 'time_disc_1', shopifyDiscountId: 'gid://shopify/DiscountAutomaticApp/1', name: 'X', title: 'X',
         startsAt: '2026-01-01T00:00', endsAt: '2026-01-02T00:00',
-        selection: { mode: 'products', members: [{ productId: 'gid://shopify/Product/1' }] },
-        resolvedMembers: [{ productId: 'gid://shopify/Product/1' }],
+        items: [{ productId: 'gid://shopify/Product/1', pricingMode: 'percent', amount: 10 }],
       }],
     })
     expect(await searchTimeDiscountProductsAction('tuna')).toEqual([])
@@ -45,10 +43,9 @@ describe('searchTimeDiscountProductsAction', () => {
     vi.spyOn(productsLib, 'searchProducts').mockResolvedValue([{ id: 'gid://shopify/Product/1', title: 'Tuna Soup', variantCount: 1 }])
     vi.spyOn(timeConfigLib, 'getTimeDiscountsConfig').mockResolvedValue({
       discounts: [{
-        discountId: 'time_disc_1', shopifyDiscountId: 'gid://shopify/DiscountAutomaticApp/1', name: 'X', title: 'X', pricingMode: 'percent', amount: 10,
+        discountId: 'time_disc_1', shopifyDiscountId: 'gid://shopify/DiscountAutomaticApp/1', name: 'X', title: 'X',
         startsAt: '2026-01-01T00:00', endsAt: '2026-01-02T00:00',
-        selection: { mode: 'products', members: [{ productId: 'gid://shopify/Product/1' }] },
-        resolvedMembers: [{ productId: 'gid://shopify/Product/1' }],
+        items: [{ productId: 'gid://shopify/Product/1', pricingMode: 'percent', amount: 10 }],
       }],
     })
     expect(await searchTimeDiscountProductsAction('tuna', 'time_disc_1')).toEqual([{ id: 'gid://shopify/Product/1', title: 'Tuna Soup', variantCount: 1 }])
@@ -72,17 +69,5 @@ describe('validateTimeDiscountMemberAction', () => {
 
   it('allows a product that is free', async () => {
     expect(await validateTimeDiscountMemberAction('gid://shopify/Product/1', undefined)).toEqual({ ok: true })
-  })
-})
-
-describe('searchTimeDiscountCollectionsAction', () => {
-  it('returns [] instead of throwing when the search fails', async () => {
-    vi.spyOn(collectionsLib, 'searchCollections').mockRejectedValue(new Error('boom'))
-    expect(await searchTimeDiscountCollectionsAction('summer')).toEqual([])
-  })
-
-  it('passes through results on success', async () => {
-    vi.spyOn(collectionsLib, 'searchCollections').mockResolvedValue([{ id: 'gid://shopify/Collection/1', title: 'Summer' }])
-    expect(await searchTimeDiscountCollectionsAction('summer')).toEqual([{ id: 'gid://shopify/Collection/1', title: 'Summer' }])
   })
 })

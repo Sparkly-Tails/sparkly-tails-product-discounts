@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import AuthTokenInit from "@/components/AuthTokenInit";
+import { SavedToastProvider } from "@/components/SavedToast";
 import packageJson from "../../package.json";
 import "./globals.css";
 
@@ -28,7 +29,7 @@ export default async function RootLayout({
         <div className="text-xs text-subtle text-right px-4 pt-1">
           v{packageJson.version}
         </div>
-        {children}
+        <SavedToastProvider>{children}</SavedToastProvider>
       </body>
     </html>
   );

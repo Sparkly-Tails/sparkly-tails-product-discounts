@@ -1,6 +1,6 @@
 import { shopifyQuery } from '@/lib/shopify-client'
 import { zonedTimeToUtc } from '@/lib/shop'
-import { getDiscountItems, type TimeDiscount } from '@/timeDiscounts/config'
+import type { TimeDiscount } from '@/timeDiscounts/config'
 
 const NAMESPACE = 'sparkly_product_discounts'
 
@@ -24,6 +24,8 @@ interface TimeDiscountMetafieldValue {
 /**
  * Writes the `time_based_discount` metafield to every unique product in the
  * discount's rows — the storefront scripts read this, keyed per product.
+ * `onlyProductIds` limits the writes to those products (a single-row change
+ * need not rewrite every product).
  *
  * The metafield carries each row's rule (pricingMode, amount, variant), not a
  * computed price: the scripts derive the displayed price from the live variant
@@ -38,12 +40,13 @@ interface TimeDiscountMetafieldValue {
  * instant here (the same conversion used at the Shopify Admin API boundary)
  * makes `new Date(...)` parse correctly in any browser, in any timezone.
  */
-export async function syncTimeDiscountMetafields(discount: TimeDiscount, timeZone: string): Promise<void> {
+export async function syncTimeDiscountMetafields(discount: TimeDiscount, timeZone: string, onlyProductIds?: string[]): Promise<void> {
   const startsAt = zonedTimeToUtc(discount.startsAt, timeZone)
   const endsAt = zonedTimeToUtc(discount.endsAt, timeZone)
 
   const itemsByProduct = new Map<string, TimeDiscountMetafieldItem[]>()
-  for (const item of getDiscountItems(discount)) {
+  for (const item of discount.items) {
+    if (onlyProductIds && !onlyProductIds.includes(item.productId)) continue
     const row: TimeDiscountMetafieldItem = { variantId: item.variantId ?? null, pricingMode: item.pricingMode, amount: item.amount }
     itemsByProduct.set(item.productId, [...(itemsByProduct.get(item.productId) ?? []), row])
   }

@@ -1,27 +1,29 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import {
   searchTimeDiscountProductsAction, getTimeDiscountProductVariantsAction, validateTimeDiscountMemberAction,
 } from '@/timeDiscounts/pickerActions'
+import { itemKey } from '@/timeDiscounts/items'
 import type { ProductSearchResult, ProductVariantOption } from '@/lib/products'
 
-export type SelectedMember = { productId: string; variantId?: string; title: string; price: number }
+export type PickedItem = { productId: string; variantId?: string; title: string; price: number }
 
-function isMemberSelected(members: SelectedMember[], productId: string, variantId?: string): boolean {
-  return members.some((m) => m.productId === productId && m.variantId === variantId)
-}
-
-export default function TimeProductPicker({
-  initialMembers,
+/**
+ * Search box that adds one product or variant at a time. It keeps no list of
+ * its own: the chosen item is handed to `onSelect`, and `existingKeys` (the
+ * itemKey of every row already in the discount) keeps already-added products
+ * out of the results.
+ */
+export default function AddItemPicker({
   excludeDiscountId,
-  onMembersChange,
+  existingKeys,
+  onSelect,
 }: {
-  initialMembers?: SelectedMember[]
   excludeDiscountId?: string
-  onMembersChange?: (members: SelectedMember[]) => void
+  existingKeys: string[]
+  onSelect: (item: PickedItem) => void
 }) {
-  const [selected, setSelected] = useState<SelectedMember[]>(initialMembers ?? [])
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<ProductSearchResult[]>([])
   const [open, setOpen] = useState(false)
@@ -32,9 +34,17 @@ export default function TimeProductPicker({
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const generationRef = useRef(0)
 
-  useEffect(() => {
-    onMembersChange?.(selected)
-  }, [selected, onMembersChange])
+  const alreadyAdded = (productId: string, variantId?: string) => existingKeys.includes(itemKey({ productId, variantId }))
+  const rowsForProduct = (productId: string) => existingKeys.filter((key) => key.startsWith(`${productId}|`)).length
+
+  async function checkAvailable(productId: string, variantId?: string): Promise<string | null> {
+    try {
+      const check = await validateTimeDiscountMemberAction(productId, variantId, excludeDiscountId)
+      return check.ok ? null : check.error
+    } catch {
+      return "Couldn't check this product — please try again"
+    }
+  }
 
   function handleQueryChange(value: string) {
     setQuery(value)
@@ -54,19 +64,16 @@ export default function TimeProductPicker({
     debounceRef.current = setTimeout(async () => {
       const matches = await searchTimeDiscountProductsAction(value, excludeDiscountId)
       if (generation === generationRef.current) {
-        const filtered = matches.filter((m) => {
-          if (m.variantCount <= 1) return !isMemberSelected(selected, m.id, undefined)
-          const selectedCount = selected.filter((s) => s.productId === m.id).length
-          return selectedCount < m.variantCount
-        })
-        setResults(filtered)
+        setResults(
+          matches.filter((m) => (m.variantCount <= 1 ? !alreadyAdded(m.id) : rowsForProduct(m.id) < m.variantCount)),
+        )
         setSearching(false)
         setOpen(true)
       }
     }, 300)
   }
 
-  async function addWholeProduct(candidate: ProductSearchResult) {
+  async function chooseProduct(candidate: ProductSearchResult) {
     setQuery('')
     setResults([])
     setOpen(false)
@@ -75,82 +82,59 @@ export default function TimeProductPicker({
     if (candidate.variantCount > 1) {
       const options = await getTimeDiscountProductVariantsAction(candidate.id, excludeDiscountId)
       setExpanding(candidate)
-      setVariantOptions(options.filter((o) => !isMemberSelected(selected, candidate.id, o.variantId)))
+      setVariantOptions(options.filter((o) => !alreadyAdded(candidate.id, o.variantId)))
       return
     }
 
-    if (isMemberSelected(selected, candidate.id, undefined)) {
+    if (alreadyAdded(candidate.id)) {
       setError('This product is already added')
       return
     }
 
-    const check = await validateTimeDiscountMemberAction(candidate.id, undefined, excludeDiscountId)
-    if (!check.ok) {
-      setError(check.error)
+    const availError = await checkAvailable(candidate.id, undefined)
+    if (availError) {
+      setError(availError)
       return
     }
 
     const [onlyVariant] = await getTimeDiscountProductVariantsAction(candidate.id)
-    const member: SelectedMember = { productId: candidate.id, title: candidate.title, price: onlyVariant?.price ?? 0 }
-    setSelected((prev) => (isMemberSelected(prev, member.productId, member.variantId) ? prev : [...prev, member]))
+    if (!onlyVariant) {
+      setError("Couldn't load this product's price — please try again")
+      return
+    }
+
+    onSelect({ productId: candidate.id, title: candidate.title, price: onlyVariant.price })
   }
 
-  async function addVariant(option: ProductVariantOption) {
+  async function chooseVariant(option: ProductVariantOption) {
     if (!expanding) return
 
-    if (isMemberSelected(selected, expanding.id, option.variantId)) {
+    if (alreadyAdded(expanding.id, option.variantId)) {
       setError('This variant is already added')
       return
     }
 
-    const check = await validateTimeDiscountMemberAction(expanding.id, option.variantId, excludeDiscountId)
-    if (!check.ok) {
-      setError(check.error)
+    const availError = await checkAvailable(expanding.id, option.variantId)
+    if (availError) {
+      setError(availError)
       return
     }
-    const member: SelectedMember = {
-      productId: expanding.id,
-      variantId: option.variantId,
-      title: `${expanding.title} – ${option.title}`,
-      price: option.price,
-    }
-    setSelected((prev) => (isMemberSelected(prev, member.productId, member.variantId) ? prev : [...prev, member]))
+
+    onSelect({ productId: expanding.id, variantId: option.variantId, title: `${expanding.title} – ${option.title}`, price: option.price })
     setExpanding(null)
     setVariantOptions([])
   }
 
-  function removeMember(index: number) {
-    setSelected((prev) => prev.filter((_, i) => i !== index))
-  }
-
   return (
     <div>
-      {selected.map((m, i) => (
-        <div key={`${m.productId}-${m.variantId ?? ''}`} className="flex items-center justify-between gap-2 border border-line rounded px-3 py-2 mb-2">
-          <input type="hidden" name={`member-${i}-productId`} value={m.productId} />
-          {m.variantId && <input type="hidden" name={`member-${i}-variantId`} value={m.variantId} />}
-          <span className="text-sm truncate">
-            {m.title} — £{m.price.toFixed(2)}
-          </span>
-          <button
-            type="button"
-            onClick={() => removeMember(i)}
-            aria-label={`Remove ${m.title}`}
-            className="text-danger hover:text-danger-hover shrink-0 px-2 py-1 rounded transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger"
-          >
-            Remove
-          </button>
-        </div>
-      ))}
-
       {expanding && (
         <div className="border border-line rounded p-3 mb-2 space-y-2">
-          <p className="text-sm font-medium">{expanding.title} — select variant(s):</p>
+          <p className="text-sm font-medium">{expanding.title} — select a variant:</p>
           {variantOptions.map((option) => (
             <button
               key={option.variantId}
               type="button"
-              onClick={() => addVariant(option)}
+              onClick={() => chooseVariant(option)}
               className="w-full text-left px-3 py-2 border border-line rounded hover:bg-line transition-colors duration-200 text-sm"
             >
               {option.title} — £{option.price.toFixed(2)}
@@ -181,14 +165,14 @@ export default function TimeProductPicker({
           className="w-full border border-line rounded px-3 py-2 text-sm transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:border-accent"
         />
         {searching && <p className="text-xs text-muted mt-1">Searching…</p>}
-        {error && <p className="text-xs text-danger mt-1">{error}</p>}
+        {error && <p role="alert" className="text-xs text-danger mt-1">{error}</p>}
         {open && results.length > 0 && (
           <ul className="absolute z-10 mt-1 w-full bg-surface border border-line rounded shadow-lg text-sm overflow-hidden">
             {results.map((product) => (
               <li key={product.id}>
                 <button
                   type="button"
-                  onMouseDown={() => addWholeProduct(product)}
+                  onMouseDown={() => chooseProduct(product)}
                   className="w-full text-left px-3 py-2 hover:bg-line transition-colors duration-200"
                 >
                   {product.title}
