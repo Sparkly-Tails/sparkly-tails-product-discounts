@@ -2,7 +2,11 @@
 
 import { useActionState, useEffect, useState } from 'react'
 import { createTimeDiscount, type SaveResult } from '@/timeDiscounts/actions'
-import { itemKey, productAdminUrl, scheduleProblem, shopLocalNow } from '@/timeDiscounts/items'
+import { itemKey, scheduleProblem, shopLocalNow } from '@/timeDiscounts/items'
+import {
+  addDraftRow, dropUnsavedRows, hasUnsavedWork, isRedirectError, itemsPayload, keepRow, keptRows, newDraftRow, removeRow, saveBlocker, type Rule,
+} from '@/timeDiscounts/rows'
+import { UNREACHABLE } from '@/timeDiscounts/saveRequests'
 import AddItemPicker, { type PickedItem } from '@/timeDiscounts/components/AddItemPicker'
 import type { DisplayRow } from '@/timeDiscounts/components/ItemRow'
 import ItemsTable from '@/timeDiscounts/components/ItemsTable'
@@ -10,19 +14,11 @@ import ItemsTable from '@/timeDiscounts/components/ItemsTable'
 const inputClass =
   'w-full border border-line rounded px-3 py-2 text-sm transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:border-accent'
 
-/** What a save resolves to when the call itself is rejected (network drop, or a stale action after a deploy). */
-const UNREACHABLE: SaveResult = { ok: false, error: "Couldn't reach the server — reload the page and try again" }
-
-/** A redirect after a successful create reaches us as a thrown error; it must go on to navigate, not be shown as a failure. */
-function isRedirect(err: unknown): boolean {
-  return typeof err === 'object' && err !== null && String((err as { digest?: unknown }).digest ?? '').startsWith('NEXT_REDIRECT')
-}
-
 async function submit(previous: SaveResult | null, formData: FormData): Promise<SaveResult> {
   try {
     return await createTimeDiscount(previous, formData)
   } catch (err) {
-    if (isRedirect(err)) throw err
+    if (isRedirectError(err)) throw err
     return UNREACHABLE
   }
 }
@@ -38,11 +34,6 @@ function useShopNow(timeZone: string): string {
     return () => clearInterval(timer)
   }, [timeZone])
   return now
-}
-
-/** Drops rows that were added but never kept — except the one being edited. */
-function withoutUnsavedRows(list: DisplayRow[], keep?: string) {
-  return list.filter((row) => !row.isNew || itemKey(row) === keep)
 }
 
 /**
@@ -66,21 +57,13 @@ export default function NewTimeDiscountForm({
   const [rows, setRows] = useState<DisplayRow[]>([])
   const [editingKey, setEditingKey] = useState<string | null>(null)
 
-  const keptRows = rows.filter((row) => !row.isNew)
+  const kept = keptRows(rows)
   const now = useShopNow(shopTimezone)
   const problem = scheduleProblem(startsAt, endsAt, now)
-
-  // Why Save is off, most basic reason first.
-  const missing =
-    title.trim() === '' ? 'Add a title to save.'
-    : startsAt === '' || endsAt === '' ? 'Set a start and an end time to save.'
-    : problem ? 'Fix the schedule to save.'
-    : editingKey !== null ? "Save or cancel the row you're editing."
-    : keptRows.length === 0 ? 'Add at least one product to save.'
-    : null
+  const missing = saveBlocker({ title, startsAt, endsAt, scheduleProblem: problem, editingKey, keptCount: kept.length })
 
   // The draft lives only in this page, so closing or reloading it would lose it.
-  const hasWork = title !== '' || startsAt !== '' || endsAt !== '' || rows.length > 0
+  const hasWork = hasUnsavedWork({ title, startsAt, endsAt, rowCount: rows.length })
   useEffect(() => {
     if (!hasWork || pending) return
     const warn = (event: BeforeUnloadEvent) => {
@@ -92,33 +75,24 @@ export default function NewTimeDiscountForm({
   }, [hasWork, pending])
 
   function addRow(item: PickedItem) {
-    const row: DisplayRow = {
-      productId: item.productId,
-      variantId: item.variantId,
-      title: item.title,
-      adminUrl: productAdminUrl(adminProductBaseUrl, item.productId),
-      regularPrice: item.price,
-      pricingMode: 'percent',
-      amount: 0,
-      isNew: true,
-    }
-    setRows((current) => [...withoutUnsavedRows(current), row])
+    const row = newDraftRow(item, adminProductBaseUrl)
+    setRows((current) => addDraftRow(current, row, null))
     setEditingKey(itemKey(row))
   }
 
   function startEdit(row: DisplayRow) {
-    setRows((current) => withoutUnsavedRows(current, itemKey(row)))
+    setRows((current) => dropUnsavedRows(current, itemKey(row), null))
     setEditingKey(itemKey(row))
   }
 
   function cancelEdit() {
-    setRows((current) => withoutUnsavedRows(current))
+    setRows((current) => dropUnsavedRows(current, null, null))
     setEditingKey(null)
   }
 
-  function keepRow(row: DisplayRow, rule: { pricingMode: 'percent' | 'fixed'; amount: number }) {
+  function keepRowWithRule(row: DisplayRow, rule: Rule) {
     const key = itemKey(row)
-    setRows((current) => current.map((r) => (itemKey(r) === key ? { ...r, ...rule, isNew: false } : r)))
+    setRows((current) => keepRow(current, key, rule))
     setEditingKey((current) => (current === key ? null : current))
   }
 
@@ -129,18 +103,11 @@ export default function NewTimeDiscountForm({
       return
     }
     const key = itemKey(row)
-    setRows((current) => current.filter((r) => itemKey(r) !== key))
+    setRows((current) => removeRow(current, key))
     setEditingKey((current) => (current === key ? null : current))
   }
 
-  const itemsJson = JSON.stringify(
-    keptRows.map((row) => ({
-      productId: row.productId,
-      ...(row.variantId ? { variantId: row.variantId } : {}),
-      pricingMode: row.pricingMode,
-      amount: row.amount,
-    })),
-  )
+  const itemsJson = itemsPayload(rows)
 
   return (
     <main className="p-8 max-w-3xl mx-auto">
@@ -189,7 +156,7 @@ export default function NewTimeDiscountForm({
             rowErrors={{}}
             onEdit={startEdit}
             onCancel={cancelEdit}
-            onSave={keepRow}
+            onSave={keepRowWithRule}
             onDelete={deleteRow}
           />
           <AddItemPicker existingKeys={rows.map(itemKey)} onSelect={addRow} />

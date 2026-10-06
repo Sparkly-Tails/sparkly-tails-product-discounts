@@ -4,10 +4,20 @@ import { useRef, useState } from 'react'
 import {
   searchTimeDiscountProductsAction, getTimeDiscountProductVariantsAction, validateTimeDiscountMemberAction,
 } from '@/timeDiscounts/pickerActions'
-import { itemKey } from '@/timeDiscounts/items'
+import { alreadyAdded, availableVariants, pickedProduct, pickedVariant, visibleResults } from '@/timeDiscounts/picker'
 import type { ProductSearchResult, ProductVariantOption } from '@/lib/products'
 
 export type PickedItem = { productId: string; variantId?: string; title: string; price: number }
+
+/** The reason a product/variant cannot be added (it belongs to another discount, or the check failed), or null when it can. */
+async function checkAvailable(productId: string, variantId: string | undefined, excludeDiscountId: string | undefined): Promise<string | null> {
+  try {
+    const check = await validateTimeDiscountMemberAction(productId, variantId, excludeDiscountId)
+    return check.ok ? null : check.error
+  } catch {
+    return "Couldn't check this product — please try again"
+  }
+}
 
 /**
  * Search box that adds one product or variant at a time. It keeps no list of
@@ -34,18 +44,6 @@ export default function AddItemPicker({
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const generationRef = useRef(0)
 
-  const alreadyAdded = (productId: string, variantId?: string) => existingKeys.includes(itemKey({ productId, variantId }))
-  const rowsForProduct = (productId: string) => existingKeys.filter((key) => key.startsWith(`${productId}|`)).length
-
-  async function checkAvailable(productId: string, variantId?: string): Promise<string | null> {
-    try {
-      const check = await validateTimeDiscountMemberAction(productId, variantId, excludeDiscountId)
-      return check.ok ? null : check.error
-    } catch {
-      return "Couldn't check this product — please try again"
-    }
-  }
-
   function handleQueryChange(value: string) {
     setQuery(value)
     setError(null)
@@ -64,9 +62,7 @@ export default function AddItemPicker({
     debounceRef.current = setTimeout(async () => {
       const matches = await searchTimeDiscountProductsAction(value, excludeDiscountId)
       if (generation === generationRef.current) {
-        setResults(
-          matches.filter((m) => (m.variantCount <= 1 ? !alreadyAdded(m.id) : rowsForProduct(m.id) < m.variantCount)),
-        )
+        setResults(visibleResults(matches, existingKeys))
         setSearching(false)
         setOpen(true)
       }
@@ -82,16 +78,16 @@ export default function AddItemPicker({
     if (candidate.variantCount > 1) {
       const options = await getTimeDiscountProductVariantsAction(candidate.id, excludeDiscountId)
       setExpanding(candidate)
-      setVariantOptions(options.filter((o) => !alreadyAdded(candidate.id, o.variantId)))
+      setVariantOptions(availableVariants(options, existingKeys, candidate.id))
       return
     }
 
-    if (alreadyAdded(candidate.id)) {
+    if (alreadyAdded(existingKeys, candidate.id)) {
       setError('This product is already added')
       return
     }
 
-    const availError = await checkAvailable(candidate.id, undefined)
+    const availError = await checkAvailable(candidate.id, undefined, excludeDiscountId)
     if (availError) {
       setError(availError)
       return
@@ -103,24 +99,24 @@ export default function AddItemPicker({
       return
     }
 
-    onSelect({ productId: candidate.id, title: candidate.title, price: onlyVariant.price })
+    onSelect(pickedProduct(candidate, onlyVariant.price))
   }
 
   async function chooseVariant(option: ProductVariantOption) {
     if (!expanding) return
 
-    if (alreadyAdded(expanding.id, option.variantId)) {
+    if (alreadyAdded(existingKeys, expanding.id, option.variantId)) {
       setError('This variant is already added')
       return
     }
 
-    const availError = await checkAvailable(expanding.id, option.variantId)
+    const availError = await checkAvailable(expanding.id, option.variantId, excludeDiscountId)
     if (availError) {
       setError(availError)
       return
     }
 
-    onSelect({ productId: expanding.id, variantId: option.variantId, title: `${expanding.title} – ${option.title}`, price: option.price })
+    onSelect(pickedVariant(expanding, option))
     setExpanding(null)
     setVariantOptions([])
   }
