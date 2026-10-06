@@ -1543,7 +1543,7 @@ import * as metafieldSync from '@/timeDiscounts/metafieldSync'
 import * as shopLib from '@/lib/shop'
 import * as shopifyClient from '@/lib/shopify-client'
 import { NOT_A_GROUP_MESSAGE } from '@/timeDiscounts/group'
-import type { TimeDiscount, GroupSpec } from '@/timeDiscounts/config'
+import type { TimeDiscount } from '@/timeDiscounts/config'
 
 const P2 = 'gid://shopify/Product/2'
 
