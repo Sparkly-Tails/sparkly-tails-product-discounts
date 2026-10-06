@@ -10,7 +10,7 @@ import { syncTimeDiscountMetafields, clearTimeDiscountMetafields } from '@/timeD
 import { getShopTimezone, zonedTimeToUtc } from '@/lib/shop'
 import { shopifyQuery } from '@/lib/shopify-client'
 import { redirectWithToken } from '@/lib/auth-redirect'
-import { itemKey, validateRule, validateItemsStructure, assertItemsFitFunctionConfig, functionConfigBytes, FUNCTION_CONFIG_MAX_BYTES } from '@/timeDiscounts/items'
+import { itemKey, validateRule, validateItemsStructure, assertItemsFitFunctionConfig, functionConfigBytes, FUNCTION_CONFIG_MAX_BYTES, END_PASSED_MESSAGE } from '@/timeDiscounts/items'
 
 const METAFIELD_NAMESPACE = 'sparkly_time_discounts'
 /** Must match the `handle` in extensions/time-based-discount/shopify.extension.toml. */
@@ -292,7 +292,7 @@ async function createDiscountFromForm(formData: FormData): Promise<string> {
   const timezone = await getShopTimezone()
   const endsAtUtc = zonedTimeToUtc(endsAt, timezone)
   // Filling in the form can take a while: refuse an end time that has slipped into the past.
-  if (Date.parse(endsAtUtc) <= Date.now()) throw new Error('The end time has already passed. Choose a later end time.')
+  if (Date.parse(endsAtUtc) <= Date.now()) throw new Error(END_PASSED_MESSAGE)
 
   const items = await buildItemsForNewDiscount(String(formData.get('items') ?? '[]'))
 

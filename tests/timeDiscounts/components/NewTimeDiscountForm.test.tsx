@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, cleanup, waitFor } from '@testing-library/react'
+import { render, screen, cleanup, waitFor, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import '@testing-library/jest-dom/vitest'
 import NewTimeDiscountForm from '@/timeDiscounts/components/NewTimeDiscountForm'
@@ -40,11 +40,19 @@ async function addKeptRow(user: ReturnType<typeof userEvent.setup>, which: 'toy'
   await user.click(screen.getByRole('button', { name: 'Save' }))
 }
 
+// Only the clock is frozen: the dates below are in 2026, so "now" must be before them.
+const NOW = '2026-06-01T00:00:00Z' // 01:00 on the shop's clock (BST)
+
 beforeEach(() => {
   create.mockReset()
   vi.spyOn(window, 'confirm').mockReturnValue(true)
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date(NOW))
 })
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  vi.useRealTimers()
+})
 
 describe('NewTimeDiscountForm', () => {
   it('shows the title, the schedule and the products table, with the Save button last', () => {
@@ -226,6 +234,81 @@ describe('NewTimeDiscountForm', () => {
     await addKeptRow(user)
     expect(screen.getByText('End must be after start.')).toBeInTheDocument()
     expect(saveButton()).toBeDisabled()
+  })
+
+  describe('an end time that is not in the future', () => {
+    const PASSED = 'The end time has already passed. Choose a later end time.'
+
+    async function typeSchedule(user: ReturnType<typeof userEvent.setup>, startsAt: string, endsAt: string) {
+      await user.type(screen.getByLabelText('Title'), 'Summer Sale')
+      await user.type(screen.getByLabelText(/Starts/), startsAt)
+      await user.type(screen.getByLabelText(/Ends/), endsAt)
+    }
+
+    it('keeps Save disabled, and says why, when the end time has already passed', async () => {
+      const user = userEvent.setup()
+      setup()
+      await typeSchedule(user, '2026-05-30T12:00', '2026-05-31T12:00')
+      await addKeptRow(user)
+
+      expect(screen.getByText(PASSED)).toBeInTheDocument()
+      expect(screen.getByText('Fix the schedule to save.')).toBeInTheDocument()
+      expect(saveButton()).toBeDisabled()
+    })
+
+    it('judges the end time on the shop\'s clock, not the browser\'s', async () => {
+      const user = userEvent.setup()
+      vi.setSystemTime(new Date('2026-06-01T23:30:00Z')) // 00:30 on 2 June in London, still 1 June in UTC
+      setup()
+      await typeSchedule(user, '2026-06-01T12:00', '2026-06-02T00:15')
+      await addKeptRow(user)
+
+      expect(screen.getByText(PASSED)).toBeInTheDocument()
+      expect(saveButton()).toBeDisabled()
+    })
+
+    it('allows a start that is already past while the end is still ahead', async () => {
+      const user = userEvent.setup()
+      setup()
+      await typeSchedule(user, '2026-05-30T12:00', '2026-06-02T12:00')
+      await addKeptRow(user)
+
+      expect(screen.queryByText(PASSED)).not.toBeInTheDocument()
+      expect(saveButton()).toBeEnabled()
+    })
+
+    it('enables Save again once the end time is moved to the future', async () => {
+      const user = userEvent.setup()
+      setup()
+      await typeSchedule(user, '2026-05-30T12:00', '2026-05-31T12:00')
+      await addKeptRow(user)
+      expect(saveButton()).toBeDisabled()
+
+      const ends = screen.getByLabelText(/Ends/)
+      await user.clear(ends)
+      await user.type(ends, '2026-06-05T12:00')
+      expect(screen.queryByText(PASSED)).not.toBeInTheDocument()
+      expect(saveButton()).toBeEnabled()
+    })
+
+    it('turns Save off when the end time passes while the form is open', async () => {
+      const user = userEvent.setup()
+      vi.useRealTimers() // replace the Date-only clock from beforeEach so the form's interval can be driven too
+      vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] })
+      vi.setSystemTime(new Date(NOW))
+      setup()
+      await typeSchedule(user, '2026-06-01T00:30', '2026-06-01T01:30') // ends 01:30 on the shop's clock; it is 01:00
+      await addKeptRow(user)
+      expect(saveButton()).toBeEnabled()
+
+      act(() => {
+        vi.setSystemTime(new Date('2026-06-01T00:45:00Z')) // 01:45 on the shop's clock
+        vi.advanceTimersByTime(15_000)
+      })
+
+      expect(screen.getByText(PASSED)).toBeInTheDocument()
+      expect(saveButton()).toBeDisabled()
+    })
   })
 
   it('does not accept a half-typed year', async () => {
