@@ -51,7 +51,8 @@
       "endsAt": {{ time_discount_metafield.value.endsAt | json }},
       "pricingMode": {% if time_discount_metafield.value.pricingMode != nil %}{{ time_discount_metafield.value.pricingMode | json }}{% else %}null{% endif %},
       "amount": {% if time_discount_metafield.value.amount != nil %}{{ time_discount_metafield.value.amount | json }}{% else %}null{% endif %},
-      "variantIds": {% if time_discount_metafield.value.variantIds != nil %}{{ time_discount_metafield.value.variantIds | json }}{% else %}null{% endif %}
+      "variantIds": {% if time_discount_metafield.value.variantIds != nil %}{{ time_discount_metafield.value.variantIds | json }}{% else %}null{% endif %},
+      "items": {% if time_discount_metafield.value.items != nil %}{{ time_discount_metafield.value.items | json }}{% else %}null{% endif %}
     }
   {%- endcapture -%}
   {%- assign time_discount_json = time_discount_data | strip | escape -%}
@@ -63,6 +64,7 @@
   data-sparkly-tier-pricing
   data-discount='{{ discount_json }}'
   data-time-discount='{{ time_discount_json }}'
+  data-selected-variant-id="{{ product.selected_or_first_available_variant.id }}"
   data-product-handle='{{ product.handle | json | escape }}'
   data-product-id='{{ product.id | prepend: "gid://shopify/Product/" | json }}'
   data-base-price="{{ product.selected_or_first_available_variant.price | divided_by: 100.0 | json }}"

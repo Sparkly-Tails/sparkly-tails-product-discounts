@@ -68,21 +68,35 @@ function computeDiscountedPriceCents(priceCents, pricingMode, amount) {
   return Math.round((priceCents * (100 - percent)) / 100)
 }
 
-// variantIds is null/empty when the discount covers every variant of the
-// product, otherwise the GIDs of the covered variants only.
-function isVariantCovered(variantIds, variantId) {
-  if (!variantIds || variantIds.length === 0) return true
-  return variantIds.map(timeDiscountNumericId).includes(String(variantId))
+// Rows of a time-based discount for ONE product: [{ variantId: string|null,
+// pricingMode, amount }]. Current metafields carry `items`; metafields written
+// before per-row pricing carry one rule at the top level (pricingMode/amount)
+// plus `variantIds` (null/empty = every variant). Named with a countdown
+// prefix because this file shares one global scope with tier-pricing.js.
+function countdownDiscountItems(discount) {
+  if (Array.isArray(discount.items)) return discount.items
+  if (discount.pricingMode !== 'percent' && discount.pricingMode !== 'fixed') return []
+  const rule = { pricingMode: discount.pricingMode, amount: discount.amount }
+  const ids = discount.variantIds
+  if (!ids || ids.length === 0) return [{ variantId: null, ...rule }]
+  return ids.map((id) => ({ variantId: id, ...rule }))
 }
 
-// Whether a sale actually applies to this variant: it must be covered by the
-// discount AND the discounted price must be genuinely lower — a fixed price at
-// or above the variant's price applies no discount at checkout (the Function
-// clamps it), so the widget must not advertise one. The sale price itself is
-// shown by the tier-pricing price block.
-function discountReducesPrice({ priceCents, pricingMode, amount, variantIds, variantId }) {
-  if (!isVariantCovered(variantIds, variantId)) return false
-  return computeDiscountedPriceCents(priceCents, pricingMode, amount) < priceCents
+// The variant's own row wins; otherwise the whole-product row (variantId null).
+function countdownDiscountItemFor(items, variantId) {
+  const own = items.find((item) => item.variantId != null && timeDiscountNumericId(item.variantId) === String(variantId))
+  return own || items.find((item) => item.variantId == null) || null
+}
+
+// Whether a sale actually applies to this variant: it must have a row AND the
+// discounted price must be genuinely lower — a fixed price at or above the
+// variant's price applies no discount at checkout (the Function clamps it), so
+// the widget must not advertise one. The sale price itself is shown by the
+// tier-pricing price block.
+function discountReducesPrice({ priceCents, discount, variantId }) {
+  const item = countdownDiscountItemFor(countdownDiscountItems(discount), variantId)
+  if (!item) return false
+  return computeDiscountedPriceCents(priceCents, item.pricingMode, item.amount) < priceCents
 }
 
 // `applies` is optional: null means "no pricing data" (older metafield) and
@@ -107,7 +121,8 @@ if (typeof module !== 'undefined' && module.exports) {
     formatCountdownUnit,
     paintCountdown,
     computeDiscountedPriceCents,
-    isVariantCovered,
+    countdownDiscountItems,
+    countdownDiscountItemFor,
     discountReducesPrice,
     timeDiscountNumericId
   }
@@ -149,14 +164,8 @@ if (typeof document !== 'undefined') {
       // null = no pricing data (older metafield): countdown only.
       function discountApplies() {
         const priceCents = discount.variantPrices && discount.variantPrices[variantId]
-        if (!discount.pricingMode || typeof priceCents !== 'number') return null
-        return discountReducesPrice({
-          priceCents,
-          pricingMode: discount.pricingMode,
-          amount: discount.amount,
-          variantIds: discount.variantIds,
-          variantId
-        })
+        if (countdownDiscountItems(discount).length === 0 || typeof priceCents !== 'number') return null
+        return discountReducesPrice({ priceCents, discount, variantId })
       }
 
       function tick() {

@@ -21,6 +21,7 @@
       "pricingMode": {% if discount_metafield.value.pricingMode != nil %}{{ discount_metafield.value.pricingMode | json }}{% else %}null{% endif %},
       "amount": {% if discount_metafield.value.amount != nil %}{{ discount_metafield.value.amount | json }}{% else %}null{% endif %},
       "variantIds": {% if discount_metafield.value.variantIds != nil %}{{ discount_metafield.value.variantIds | json }}{% else %}null{% endif %},
+      "items": {% if discount_metafield.value.items != nil %}{{ discount_metafield.value.items | json }}{% else %}null{% endif %},
       "selectedVariantId": {{ product.selected_or_first_available_variant.id | json }},
       "variantPrices": {
         {%- for variant in product.variants -%}

@@ -5,7 +5,8 @@ const {
   formatCountdownUnit,
   paintCountdown,
   computeDiscountedPriceCents,
-  isVariantCovered,
+  countdownDiscountItems,
+  countdownDiscountItemFor,
   discountReducesPrice,
   timeDiscountNumericId
 } = require('../product-tier-pricing/assets/time-based-discount.js')
@@ -88,34 +89,51 @@ test('computeDiscountedPriceCents: percent is clamped to 0-100 so the price neve
   assert.equal(computeDiscountedPriceCents(2000, 'percent', -10), 2000)
 })
 
-test('isVariantCovered: null or empty list covers every variant; otherwise only the listed ones (GIDs vs numeric ids)', () => {
-  assert.equal(isVariantCovered(null, '10'), true)
-  assert.equal(isVariantCovered([], '10'), true)
-  const ids = ['gid://shopify/ProductVariant/10', 'gid://shopify/ProductVariant/11']
-  assert.equal(isVariantCovered(ids, '10'), true)
-  assert.equal(isVariantCovered(ids, 11), true)
-  assert.equal(isVariantCovered(ids, '12'), false)
+const CV10 = 'gid://shopify/ProductVariant/10'
+
+test('countdownDiscountItems: current metafields carry rows; an older single-rule metafield becomes rows; no pricing means no rows', () => {
+  const items = [{ variantId: CV10, pricingMode: 'fixed', amount: 22 }]
+  assert.deepEqual(countdownDiscountItems({ items }), items)
+  assert.deepEqual(countdownDiscountItems({ pricingMode: 'percent', amount: 20, variantIds: null }), [{ variantId: null, pricingMode: 'percent', amount: 20 }])
+  assert.deepEqual(countdownDiscountItems({ pricingMode: 'fixed', amount: 22, variantIds: [CV10] }), [{ variantId: CV10, pricingMode: 'fixed', amount: 22 }])
+  assert.deepEqual(countdownDiscountItems({ pricingMode: null, amount: null, variantIds: null }), [])
 })
 
-test('discountReducesPrice: true for a covered variant with a real saving (fixed price is the final price)', () => {
-  assert.equal(discountReducesPrice({ priceCents: 4999, pricingMode: 'fixed', amount: 22, variantIds: null, variantId: '1' }), true)
-  assert.equal(discountReducesPrice({ priceCents: 4999, pricingMode: 'percent', amount: 20, variantIds: null, variantId: '1' }), true)
+test('countdownDiscountItemFor: the variant\'s own row wins over the whole-product row', () => {
+  const whole = { variantId: null, pricingMode: 'percent', amount: 10 }
+  const own = { variantId: CV10, pricingMode: 'fixed', amount: 5 }
+  assert.equal(countdownDiscountItemFor([whole, own], '10'), own)
+  assert.equal(countdownDiscountItemFor([whole, own], 10), own)
+  assert.equal(countdownDiscountItemFor([whole, own], '11'), whole)
+  assert.equal(countdownDiscountItemFor([own], '11'), null)
 })
 
-test('discountReducesPrice: false for a variant the discount does not cover', () => {
-  assert.equal(discountReducesPrice({
-    priceCents: 4999, pricingMode: 'percent', amount: 20,
-    variantIds: ['gid://shopify/ProductVariant/10'], variantId: '12'
-  }), false)
+test('discountReducesPrice: true for a variant with a row and a real saving (fixed price is the final price)', () => {
+  const fixed = { items: [{ variantId: null, pricingMode: 'fixed', amount: 22 }] }
+  const percent = { items: [{ variantId: null, pricingMode: 'percent', amount: 20 }] }
+  assert.equal(discountReducesPrice({ priceCents: 4999, discount: fixed, variantId: '1' }), true)
+  assert.equal(discountReducesPrice({ priceCents: 4999, discount: percent, variantId: '1' }), true)
+})
+
+test('discountReducesPrice: false for a variant with no row', () => {
+  const discount = { items: [{ variantId: CV10, pricingMode: 'percent', amount: 20 }] }
+  assert.equal(discountReducesPrice({ priceCents: 4999, discount, variantId: '12' }), false)
+})
+
+test('discountReducesPrice: each variant is judged by its own row', () => {
+  const discount = { items: [{ variantId: CV10, pricingMode: 'fixed', amount: 25 }, { variantId: 'gid://shopify/ProductVariant/11', pricingMode: 'fixed', amount: 5 }] }
+  assert.equal(discountReducesPrice({ priceCents: 2000, discount, variantId: '10' }), false) // £25 is not below £20
+  assert.equal(discountReducesPrice({ priceCents: 2000, discount, variantId: '11' }), true)
 })
 
 test('discountReducesPrice: false when a fixed price is not below the variant price (checkout applies no discount then)', () => {
-  assert.equal(discountReducesPrice({ priceCents: 2000, pricingMode: 'fixed', amount: 25, variantIds: null, variantId: '1' }), false)
-  assert.equal(discountReducesPrice({ priceCents: 2000, pricingMode: 'fixed', amount: 20, variantIds: null, variantId: '1' }), false)
+  const fixed = (amount) => ({ items: [{ variantId: null, pricingMode: 'fixed', amount }] })
+  assert.equal(discountReducesPrice({ priceCents: 2000, discount: fixed(25), variantId: '1' }), false)
+  assert.equal(discountReducesPrice({ priceCents: 2000, discount: fixed(20), variantId: '1' }), false)
 })
 
 test('discountReducesPrice: false for a 0% discount', () => {
-  assert.equal(discountReducesPrice({ priceCents: 2000, pricingMode: 'percent', amount: 0, variantIds: null, variantId: '1' }), false)
+  assert.equal(discountReducesPrice({ priceCents: 2000, discount: { items: [{ variantId: null, pricingMode: 'percent', amount: 0 }] }, variantId: '1' }), false)
 })
 
 test('timeDiscountNumericId: takes the trailing id of a GID and leaves numeric ids alone', () => {
