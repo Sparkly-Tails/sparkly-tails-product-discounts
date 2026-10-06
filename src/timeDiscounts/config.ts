@@ -7,6 +7,16 @@ export interface DiscountMember {
   variantId?: string
 }
 
+/** One product or variant with its OWN price rule. */
+export interface TimeDiscountItem {
+  productId: string
+  /** Omitted = the whole (single-variant) product. */
+  variantId?: string
+  pricingMode: 'percent' | 'fixed'
+  /** Percent off (0 < n <= 100), or the final price in major currency units. */
+  amount: number
+}
+
 export type TimeDiscountSelection =
   | { mode: 'products'; members: DiscountMember[] }
   | { mode: 'collections'; collectionIds: string[] }
@@ -29,6 +39,12 @@ export interface TimeDiscount {
   selection: TimeDiscountSelection
   /** Function-facing snapshot, recomputed at save time from `selection` (see spec §3, §5). The Function only ever reads this. */
   resolvedMembers: DiscountMember[]
+  /**
+   * Per-row pricing. Not stored yet — a discount saved before per-row pricing
+   * has none, and its resolvedMembers all share the discount's one
+   * pricingMode/amount. Always read it through getDiscountItems().
+   */
+  items?: TimeDiscountItem[]
 }
 
 export interface TimeDiscountsConfig {
@@ -133,6 +149,23 @@ export function fixedPriceNotLowerError(
   if (pricingMode !== 'fixed' || !(amount > 0) || !regularPrice || regularPrice <= 0) return null
   if (amount < regularPrice) return null
   return `The fixed price (£${amount.toFixed(2)}) is not lower than the regular price (£${regularPrice.toFixed(2)}), so it would not discount anything. Check the price you entered.`
+}
+
+/**
+ * The discount's price rows: its stored `items`, or — for a discount saved
+ * before per-row pricing — one row per resolved member carrying the
+ * discount's single shared pricingMode/amount.
+ */
+export function getDiscountItems(
+  discount: Pick<TimeDiscount, 'pricingMode' | 'amount' | 'resolvedMembers' | 'items'>,
+): TimeDiscountItem[] {
+  if (discount.items) return discount.items
+  return discount.resolvedMembers.map((member) => ({
+    productId: member.productId,
+    ...(member.variantId ? { variantId: member.variantId } : {}),
+    pricingMode: discount.pricingMode,
+    amount: discount.amount,
+  }))
 }
 
 /**
