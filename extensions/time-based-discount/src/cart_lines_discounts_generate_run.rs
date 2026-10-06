@@ -117,7 +117,7 @@ fn cart_lines_discounts_generate_run(
 
         let item = match items_by_product
             .get(product_id.as_str())
-            .and_then(|candidates| select_item(candidates, variant_id))
+            .and_then(|product_items| select_item(product_items, variant_id))
         {
             Some(item) => item,
             None => continue,

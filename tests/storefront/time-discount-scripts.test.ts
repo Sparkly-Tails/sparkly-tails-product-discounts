@@ -141,3 +141,19 @@ describe('time-based discount storefront scripts', () => {
     expect(view()).toMatchObject({ sale: null, regularStruck: false, countdownVisible: true })
   })
 })
+
+describe('storefront scripts share one global scope', () => {
+  // Names declared at column 0 of a line. Indented declarations (inside the
+  // `if (typeof document ...) { ... }` blocks) are not top-level and are skipped.
+  const topLevelNames = (source: string): string[] =>
+    [...source.matchAll(/^(?:async\s+function|function|const|let|var|class)\s+([A-Za-z_$][\w$]*)/gm)].map((m) => m[1])
+
+  it('declares no top-level name in both scripts', () => {
+    const tierNames = topLevelNames(tierScript)
+    const countdownNames = topLevelNames(countdownScript)
+    // The extraction itself must keep working, or the intersection check below proves nothing.
+    expect(tierNames.length).toBeGreaterThan(0)
+    expect(countdownNames.length).toBeGreaterThan(0)
+    expect(tierNames.filter((name) => countdownNames.includes(name))).toEqual([])
+  })
+})
