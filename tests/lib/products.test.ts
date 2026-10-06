@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { searchProducts, getProductVariantOptions, getMemberInfo } from '@/lib/products'
+import { searchProducts, getProductVariantOptions, getMemberInfo, getLowestVariantPrices } from '@/lib/products'
 import * as shopifyClient from '@/lib/shopify-client'
 
 describe('searchProducts', () => {
@@ -134,5 +134,41 @@ describe('getMemberInfo', () => {
     }
     expect(info).toHaveLength(memberCount)
     expect(new Set(info.map((m) => m.productId)).size).toBe(memberCount)
+  })
+})
+
+describe('getLowestVariantPrices', () => {
+  beforeEach(() => vi.restoreAllMocks())
+
+  it('returns each product\'s lowest variant price with its title', async () => {
+    vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({
+      nodes: [
+        { id: 'gid://shopify/Product/1', title: 'Cat Bed', variants: { edges: [{ node: { price: '30.00' } }, { node: { price: '24.50' } }, { node: { price: '40.00' } }] } },
+        { id: 'gid://shopify/Product/2', title: 'Toy', variants: { edges: [{ node: { price: '5.00' } }] } },
+      ],
+    })
+    expect(await getLowestVariantPrices(['gid://shopify/Product/1', 'gid://shopify/Product/2'])).toEqual([
+      { productId: 'gid://shopify/Product/1', title: 'Cat Bed', price: 24.5 },
+      { productId: 'gid://shopify/Product/2', title: 'Toy', price: 5 },
+    ])
+  })
+
+  it('skips a product that no longer resolves or has no variants, and makes no call for an empty list', async () => {
+    const spy = vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({
+      nodes: [null, { id: 'gid://shopify/Product/3', title: 'Empty', variants: { edges: [] } }],
+    })
+    expect(await getLowestVariantPrices(['gid://shopify/Product/9', 'gid://shopify/Product/3'])).toEqual([])
+    spy.mockClear()
+    expect(await getLowestVariantPrices([])).toEqual([])
+    expect(spy).not.toHaveBeenCalled()
+  })
+
+  it('asks for each product once, in chunks of at most 250', async () => {
+    const spy = vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({ nodes: [] })
+    const ids = Array.from({ length: 300 }, (_, i) => `gid://shopify/Product/${i}`)
+    await getLowestVariantPrices([...ids, ids[0]])
+    expect(spy).toHaveBeenCalledTimes(2)
+    expect((spy.mock.calls[0][1] as { ids: string[] }).ids).toHaveLength(250)
+    expect((spy.mock.calls[1][1] as { ids: string[] }).ids).toHaveLength(50)
   })
 })
