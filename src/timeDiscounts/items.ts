@@ -82,13 +82,31 @@ function yearOutOfRange(value: string): boolean {
   return !(year >= 2000 && year <= 2100)
 }
 
+/** Shown (and thrown) when a discount's end time is no longer in the future. */
+export const END_PASSED_MESSAGE = 'The end time has already passed. Choose a later end time.'
+
+/**
+ * The current time on the shop's wall clock, in the same `YYYY-MM-DDTHH:mm`
+ * form a datetime-local input holds, so the two can be compared as text.
+ */
+export function shopLocalNow(timeZone: string, now: Date = new Date()): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+  }).formatToParts(now)
+  const part = (type: string) => parts.find((p) => p.type === type)?.value ?? ''
+  return `${part('year')}-${part('month')}-${part('day')}T${part('hour')}:${part('minute')}`
+}
+
 /**
  * The message for a schedule that must not be saved, or null. An empty date is
  * not a problem yet (the person is still typing); a half-typed year (0202)
- * is, because it can still form a valid-looking pair.
+ * is, because it can still form a valid-looking pair. Pass `nowLocal`
+ * (see shopLocalNow) to also refuse an end time that is not in the future —
+ * for a discount that does not exist yet; an existing one may be edited after it ended.
  */
-export function scheduleProblem(startsAt: string, endsAt: string): string | null {
+export function scheduleProblem(startsAt: string, endsAt: string, nowLocal?: string): string | null {
   if (yearOutOfRange(startsAt) || yearOutOfRange(endsAt)) return 'Enter a year between 2000 and 2100.'
   if (startsAt !== '' && endsAt !== '' && endsAt <= startsAt) return 'End must be after start.'
+  if (nowLocal !== undefined && endsAt !== '' && endsAt <= nowLocal) return END_PASSED_MESSAGE
   return null
 }

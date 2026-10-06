@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useState } from 'react'
 import { createTimeDiscount, type SaveResult } from '@/timeDiscounts/actions'
-import { itemKey, productAdminUrl, scheduleProblem } from '@/timeDiscounts/items'
+import { itemKey, productAdminUrl, scheduleProblem, shopLocalNow } from '@/timeDiscounts/items'
 import AddItemPicker, { type PickedItem } from '@/timeDiscounts/components/AddItemPicker'
 import type { DisplayRow } from '@/timeDiscounts/components/ItemRow'
 import ItemsTable from '@/timeDiscounts/components/ItemsTable'
@@ -25,6 +25,19 @@ async function submit(previous: SaveResult | null, formData: FormData): Promise<
     if (isRedirect(err)) throw err
     return UNREACHABLE
   }
+}
+
+/** How often the form re-checks the clock, so an end time that slips into the past turns Save off by itself. */
+const CLOCK_CHECK_MS = 15_000
+
+/** The current time on the shop's clock, kept fresh while the page is open. */
+function useShopNow(timeZone: string): string {
+  const [now, setNow] = useState(() => shopLocalNow(timeZone))
+  useEffect(() => {
+    const timer = setInterval(() => setNow(shopLocalNow(timeZone)), CLOCK_CHECK_MS)
+    return () => clearInterval(timer)
+  }, [timeZone])
+  return now
 }
 
 /** Drops rows that were added but never kept — except the one being edited. */
@@ -54,7 +67,8 @@ export default function NewTimeDiscountForm({
   const [editingKey, setEditingKey] = useState<string | null>(null)
 
   const keptRows = rows.filter((row) => !row.isNew)
-  const problem = scheduleProblem(startsAt, endsAt)
+  const now = useShopNow(shopTimezone)
+  const problem = scheduleProblem(startsAt, endsAt, now)
 
   // Why Save is off, most basic reason first.
   const missing =
