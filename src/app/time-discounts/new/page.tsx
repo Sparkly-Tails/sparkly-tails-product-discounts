@@ -3,5 +3,6 @@ import NewTimeDiscountForm from '@/timeDiscounts/components/NewTimeDiscountForm'
 
 export default async function NewTimeDiscountPage() {
   const shopTimezone = await getShopTimezone()
-  return <NewTimeDiscountForm shopTimezone={shopTimezone} />
+  const adminProductBaseUrl = `https://${process.env.SHOPIFY_SHOP}/admin/products/`
+  return <NewTimeDiscountForm shopTimezone={shopTimezone} adminProductBaseUrl={adminProductBaseUrl} />
 }

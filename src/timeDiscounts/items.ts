@@ -75,3 +75,20 @@ export function assertItemsFitFunctionConfig(items: TimeDiscountItem[]): void {
     )
   }
 }
+
+function yearOutOfRange(value: string): boolean {
+  if (value === '') return false
+  const year = Number(value.slice(0, 4))
+  return !(year >= 2000 && year <= 2100)
+}
+
+/**
+ * The message for a schedule that must not be saved, or null. An empty date is
+ * not a problem yet (the person is still typing); a half-typed year (0202)
+ * is, because it can still form a valid-looking pair.
+ */
+export function scheduleProblem(startsAt: string, endsAt: string): string | null {
+  if (yearOutOfRange(startsAt) || yearOutOfRange(endsAt)) return 'Enter a year between 2000 and 2100.'
+  if (startsAt !== '' && endsAt !== '' && endsAt <= startsAt) return 'End must be after start.'
+  return null
+}

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, type MockInstance } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach, type MockInstance } from 'vitest'
 import {
   createTimeDiscount, saveTimeDiscountTitle, saveTimeDiscountSchedule,
   saveTimeDiscountItem, removeTimeDiscountItem, deleteTimeDiscount,
@@ -67,55 +67,155 @@ function functionConfigSent(index = 0) {
 }
 
 describe('createTimeDiscount', () => {
-  const valid: [string, string][] = [['title', 'Summer Sale'], ['startsAt', '2026-01-01T00:00'], ['endsAt', '2026-01-02T00:00']]
-
-  it('rejects a submission with no title', async () => {
-    await expect(createTimeDiscount(formData([['startsAt', '2026-01-01T00:00'], ['endsAt', '2026-01-02T00:00']]))).rejects.toThrow('A title is required')
+  const rows = (...items: object[]) => JSON.stringify(items)
+  const form = (over: Record<string, string> = {}) =>
+    formData(Object.entries({ title: 'Summer Sale', startsAt: '2026-07-01T12:00', endsAt: '2026-07-02T12:00', items: rows({ productId: P1, pricingMode: 'percent', amount: 20 }), ...over }))
+  const created = () => shopifyQuerySpy.mockResolvedValueOnce({
+    discountAutomaticAppCreate: { automaticAppDiscount: { discountId: 'gid://shopify/DiscountAutomaticApp/99' }, userErrors: [] },
   })
 
-  it('rejects an end before the start, before anything is created in Shopify', async () => {
-    await expect(createTimeDiscount(formData([['title', 'T'], ['startsAt', '2026-01-02T00:00'], ['endsAt', '2026-01-01T00:00']]))).rejects.toThrow('End must be after start')
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-06-01T00:00:00Z'))
+    vi.spyOn(productsLib, 'getMemberInfo').mockResolvedValue([
+      { productId: P1, title: 'Cat Toy', price: 10, handle: 'cat-toy', imageUrl: null },
+      { productId: P2, title: 'Dog Bed', price: 40, handle: 'dog-bed', imageUrl: null },
+    ])
+  })
+  afterEach(() => vi.useRealTimers())
+
+  it('creates nothing and reports an error when there is no title', async () => {
+    expect(await createTimeDiscount(null, form({ title: '  ' }))).toEqual({ ok: false, error: 'A title is required' })
     expect(shopifyQuerySpy).not.toHaveBeenCalled()
   })
 
-  it('creates the Shopify record with UTC dates and an empty function config, saves a discount with no rows, and opens it', async () => {
-    shopifyQuerySpy.mockResolvedValueOnce({
-      discountAutomaticAppCreate: { automaticAppDiscount: { discountId: 'gid://shopify/DiscountAutomaticApp/99' }, userErrors: [] },
-    })
+  it('creates nothing when the end is not after the start', async () => {
+    expect(await createTimeDiscount(null, form({ startsAt: '2026-07-02T00:00', endsAt: '2026-07-01T00:00' }))).toEqual({ ok: false, error: 'End must be after start' })
+    expect(shopifyQuerySpy).not.toHaveBeenCalled()
+  })
 
-    await createTimeDiscount(formData([['title', 'Summer Sale'], ['startsAt', '2026-07-01T12:00'], ['endsAt', '2026-07-02T12:00']]))
+  it('creates nothing for an implausible year', async () => {
+    expect(await createTimeDiscount(null, form({ startsAt: '0202-01-01T00:00' }))).toEqual({ ok: false, error: 'Enter dates between the years 2000 and 2100' })
+    expect(shopifyQuerySpy).not.toHaveBeenCalled()
+  })
 
+  it('creates nothing when the end time has already passed by the time Save is pressed', async () => {
+    vi.setSystemTime(new Date('2026-07-02T12:00:00Z')) // 13:00 in London: after the 12:00 end
+    const result = await createTimeDiscount(null, form())
+    expect(result).toEqual({ ok: false, error: 'The end time has already passed. Choose a later end time.' })
+    expect(shopifyQuerySpy).not.toHaveBeenCalled()
+  })
+
+  it('creates nothing when no product was added', async () => {
+    expect(await createTimeDiscount(null, form({ items: '[]' }))).toEqual({ ok: false, error: 'Add at least one product before saving' })
+    expect(shopifyQuerySpy).not.toHaveBeenCalled()
+  })
+
+  it('creates nothing when the products cannot be read', async () => {
+    expect(await createTimeDiscount(null, form({ items: 'not json' }))).toEqual({ ok: false, error: expect.stringContaining('reload the page') })
+    expect(shopifyQuerySpy).not.toHaveBeenCalled()
+  })
+
+  it('creates the Shopify record WITH its rows, saves them, syncs the storefront and opens the discount — all in one request', async () => {
+    created()
+    const result = await createTimeDiscount(null, form({
+      items: rows({ productId: P1, pricingMode: 'fixed', amount: 7.5 }, { productId: P2, pricingMode: 'percent', amount: 25 }),
+    }))
+
+    expect(shopifyQuerySpy).toHaveBeenCalledTimes(1)
     const sent = sentToShopify()
     expect(sent.title).toBe('Summer Sale')
     expect(sent.startsAt).toBe('2026-07-01T11:00:00.000Z') // BST is UTC+1
     expect(sent.endsAt).toBe('2026-07-02T11:00:00.000Z')
-    expect(sent.functionHandle).toBe('time-based-discount')
-    expect(functionConfigSent().metafield).toMatchObject({ namespace: 'sparkly_time_discounts', key: 'function_config' })
-    expect(functionConfigSent().parsed).toEqual({ items: [] })
+    expect(functionConfigSent().parsed).toEqual({
+      items: [{ productId: P1, pricingMode: 'fixed', amount: 7.5 }, { productId: P2, pricingMode: 'percent', amount: 25 }],
+    })
 
     const [saved] = saveSpy.mock.calls[0][0].discounts as TimeDiscount[]
     expect(saved).toMatchObject({
       shopifyDiscountId: 'gid://shopify/DiscountAutomaticApp/99', title: 'Summer Sale', name: 'Summer Sale',
-      startsAt: '2026-07-01T12:00', endsAt: '2026-07-02T12:00', items: [],
+      startsAt: '2026-07-01T12:00', endsAt: '2026-07-02T12:00',
+      items: [{ productId: P1, pricingMode: 'fixed', amount: 7.5 }, { productId: P2, pricingMode: 'percent', amount: 25 }],
     })
+    expect(metafieldSync.syncTimeDiscountMetafields).toHaveBeenCalledWith(expect.objectContaining({ discountId: saved.discountId }), 'Europe/London', undefined)
     expect(redirectSpy).toHaveBeenCalledWith(`/time-discounts/${encodeURIComponent(saved.discountId)}`)
+    expect(result).toEqual({ ok: true })
+  })
+
+  it('rounds each amount to pence and keeps a variant row\'s variant', async () => {
+    created()
+    vi.spyOn(productsLib, 'getMemberInfo').mockResolvedValue([{ productId: P1, variantId: V10, title: 'Cat Toy – Large', price: 60, handle: 'cat-toy', imageUrl: null }])
+    await createTimeDiscount(null, form({ items: rows({ productId: P1, variantId: V10, pricingMode: 'fixed', amount: 49.999 }) }))
+    expect(functionConfigSent().parsed).toEqual({ items: [{ productId: P1, variantId: V10, pricingMode: 'fixed', amount: 50 }] })
+  })
+
+  it.each([['higher than', 12], ['equal to', 10]])('creates nothing when a fixed price is %s the regular price, and names the product', async (_label, amount) => {
+    const result = await createTimeDiscount(null, form({ items: rows({ productId: P1, pricingMode: 'fixed', amount }) }))
+    expect(result).toEqual({ ok: false, error: expect.stringMatching(/^Cat Toy: .*is not lower than the regular price \(£10\.00\)/) })
+    expect(shopifyQuerySpy).not.toHaveBeenCalled()
+    expect(saveSpy).not.toHaveBeenCalled()
+  })
+
+  it('creates nothing when one product is not found in Shopify', async () => {
+    vi.spyOn(productsLib, 'getMemberInfo').mockResolvedValue([])
+    const result = await createTimeDiscount(null, form())
+    expect(result).toEqual({ ok: false, error: `Product 1: This product could not be found in Shopify` })
+    expect(shopifyQuerySpy).not.toHaveBeenCalled()
+  })
+
+  it('creates nothing when a product already belongs to another time discount, and names it', async () => {
+    storedDiscounts([discountWith([pct(P1, 10)], { discountId: 'time_disc_2' })])
+    const result = await createTimeDiscount(null, form())
+    expect(result).toEqual({ ok: false, error: 'Cat Toy: This product already belongs to another discount' })
+    expect(shopifyQuerySpy).not.toHaveBeenCalled()
+  })
+
+  it('creates nothing when a product already belongs to a tier discount', async () => {
+    vi.spyOn(configLib, 'getConfig').mockResolvedValue({
+      discounts: [{ discountId: 'tier_1', name: 'Tiers', status: 'active', pricingMode: 'percent', tiers: [], members: [{ productId: P1 }] }],
+    } as never)
+    expect(await createTimeDiscount(null, form())).toEqual({ ok: false, error: 'Cat Toy: This product already belongs to another discount' })
+    expect(shopifyQuerySpy).not.toHaveBeenCalled()
+  })
+
+  it('creates nothing when the same product is listed twice', async () => {
+    const result = await createTimeDiscount(null, form({ items: rows({ productId: P1, pricingMode: 'percent', amount: 10 }, { productId: P1, pricingMode: 'percent', amount: 20 }) }))
+    expect(result).toEqual({ ok: false, error: 'This product or variant is already in the discount' })
+    expect(shopifyQuerySpy).not.toHaveBeenCalled()
+  })
+
+  it('creates nothing when the rows would not fit the checkout config', async () => {
+    const many = Array.from({ length: 100 }, (_, i) => ({ productId: `gid://shopify/Product/${1000 + i}`, variantId:`gid://shopify/ProductVariant/${5000 + i}`, pricingMode: 'percent', amount: 10 }))
+    vi.spyOn(productsLib, 'getMemberInfo').mockResolvedValue(many.map((m) => ({ ...m, title: 'P', price: 10, handle: 'p', imageUrl: null })))
+    const result = await createTimeDiscount(null, form({ items: JSON.stringify(many) }))
+    expect(result).toEqual({ ok: false, error: expect.stringContaining('too many products/variants') })
+    expect(shopifyQuerySpy).not.toHaveBeenCalled()
   })
 
   it('rolls back the Shopify record when saving the app config fails, so no invisible live discount is left behind', async () => {
-    shopifyQuerySpy
-      .mockResolvedValueOnce({ discountAutomaticAppCreate: { automaticAppDiscount: { discountId: 'gid://shopify/DiscountAutomaticApp/99' }, userErrors: [] } })
-      .mockResolvedValueOnce({ discountAutomaticDelete: { userErrors: [] } })
+    created()
+    shopifyQuerySpy.mockResolvedValueOnce({ discountAutomaticDelete: { userErrors: [] } })
     saveSpy.mockRejectedValueOnce(new Error('metafield write failed'))
 
-    await expect(createTimeDiscount(formData(valid))).rejects.toThrow('metafield write failed')
+    expect(await createTimeDiscount(null, form())).toEqual({ ok: false, error: 'metafield write failed' })
 
     expect(shopifyQuerySpy).toHaveBeenLastCalledWith(expect.stringContaining('discountAutomaticDelete'), { id: 'gid://shopify/DiscountAutomaticApp/99' })
+    expect(redirectSpy).not.toHaveBeenCalled()
   })
 
-  it('throws Shopify userErrors instead of saving anything', async () => {
+  it('reports Shopify userErrors instead of saving anything', async () => {
     shopifyQuerySpy.mockResolvedValueOnce({ discountAutomaticAppCreate: { automaticAppDiscount: null, userErrors: [{ field: ['x'], message: 'Title taken' }] } })
-    await expect(createTimeDiscount(formData(valid))).rejects.toThrow('Title taken')
+    expect(await createTimeDiscount(null, form())).toEqual({ ok: false, error: 'Title taken' })
     expect(saveSpy).not.toHaveBeenCalled()
+    expect(redirectSpy).not.toHaveBeenCalled()
+  })
+
+  it('still opens the discount when only the storefront sync fails (it is saved and live)', async () => {
+    created()
+    vi.spyOn(metafieldSync, 'syncTimeDiscountMetafields').mockRejectedValue(new Error('sync down'))
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    expect(await createTimeDiscount(null, form())).toEqual({ ok: true })
+    expect(redirectSpy).toHaveBeenCalled()
   })
 })
 
@@ -374,11 +474,6 @@ describe('schedule years', () => {
   it.each([['1999-12-31T00:00', '2026-01-02T00:00'], ['2026-01-01T00:00', '2101-01-01T00:00']])('rejects %s → %s as implausible', async (startsAt, endsAt) => {
     storedDiscounts([discountWith([])])
     expect(await saveTimeDiscountSchedule('time_disc_1', startsAt, endsAt)).toEqual({ ok: false, error: 'Enter dates between the years 2000 and 2100' })
-    expect(shopifyQuerySpy).not.toHaveBeenCalled()
-  })
-
-  it('rejects an implausible year when creating a discount, before anything is created in Shopify', async () => {
-    await expect(createTimeDiscount(formData([['title', 'T'], ['startsAt', '0202-01-01T00:00'], ['endsAt', '2026-01-02T00:00']]))).rejects.toThrow('Enter dates between the years 2000 and 2100')
     expect(shopifyQuerySpy).not.toHaveBeenCalled()
   })
 

@@ -6,9 +6,10 @@ import { useSavedToast } from '@/components/SavedToast'
 import {
   saveTimeDiscountTitle, saveTimeDiscountSchedule, saveTimeDiscountItem, removeTimeDiscountItem,
 } from '@/timeDiscounts/actions'
-import { itemKey, productAdminUrl } from '@/timeDiscounts/items'
+import { itemKey, productAdminUrl, scheduleProblem } from '@/timeDiscounts/items'
 import AddItemPicker, { type PickedItem } from '@/timeDiscounts/components/AddItemPicker'
-import ItemRow, { type DisplayRow } from '@/timeDiscounts/components/ItemRow'
+import type { DisplayRow } from '@/timeDiscounts/components/ItemRow'
+import ItemsTable from '@/timeDiscounts/components/ItemsTable'
 import { useSaveQueue } from '@/timeDiscounts/components/useSaveQueue'
 
 /** How long after the last change to either date the schedule is saved. */
@@ -17,12 +18,6 @@ export const SCHEDULE_SAVE_DELAY_MS = 600
 /** What a save resolves to when the call itself is rejected (network drop, or a stale action after a deploy). */
 const UNREACHABLE = { ok: false as const, error: "Couldn't reach the server — reload the page and try again" }
 const unreachable = () => UNREACHABLE
-
-function yearOutOfRange(value: string): boolean {
-  if (value === '') return false
-  const year = Number(value.slice(0, 4))
-  return !(year >= 2000 && year <= 2100)
-}
 
 function without(record: Record<string, string>, key: string): Record<string, string> {
   const next = { ...record }
@@ -65,10 +60,7 @@ export default function TimeDiscountEditor({
   const [scheduleError, setScheduleError] = useState<string | null>(null)
   const savedSchedule = useRef({ startsAt: initialStartsAt, endsAt: initialEndsAt }) // last acknowledged
   const requestedSchedule = useRef({ startsAt: initialStartsAt, endsAt: initialEndsAt }) // last queued
-  const scheduleInvalid =
-    yearOutOfRange(startsAt) || yearOutOfRange(endsAt) ? 'Enter a year between 2000 and 2100.'
-    : startsAt !== '' && endsAt !== '' && endsAt <= startsAt ? 'End must be after start.'
-    : null
+  const scheduleInvalid = scheduleProblem(startsAt, endsAt)
 
   const [rows, setRows] = useState<DisplayRow[]>(initialRows)
   const [editingKey, setEditingKey] = useState<string | null>(null)
@@ -113,7 +105,7 @@ export default function TimeDiscountEditor({
 
   // The schedule saves itself once both dates are valid and have settled.
   useEffect(() => {
-    if (!startsAt || !endsAt || endsAt <= startsAt || yearOutOfRange(startsAt) || yearOutOfRange(endsAt)) return
+    if (!startsAt || !endsAt || scheduleProblem(startsAt, endsAt)) return
     if (startsAt === requestedSchedule.current.startsAt && endsAt === requestedSchedule.current.endsAt) return
 
     const timer = setTimeout(() => {
@@ -235,40 +227,16 @@ export default function TimeDiscountEditor({
 
       <section className="mb-8">
         <h2 className="font-medium mb-2">Products</h2>
-        {rows.length === 0 ? (
-          <p className="text-sm text-muted mb-3">No products yet — add one below.</p>
-        ) : (
-          <table className="w-full mb-3 text-left">
-            <thead>
-              <tr className="border-b border-line text-xs text-muted">
-                <th scope="col" className="py-2 pr-3 font-medium">Product</th>
-                <th scope="col" className="py-2 pr-3 font-medium">Discount type</th>
-                <th scope="col" className="py-2 pr-3 font-medium whitespace-nowrap">Discounted price</th>
-                <th scope="col" className="py-2 pr-3 font-medium whitespace-nowrap">Regular price</th>
-                <th scope="col" className="py-2"><span className="sr-only">Edit</span></th>
-                <th scope="col" className="py-2"><span className="sr-only">Delete</span></th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => {
-                const key = itemKey(row)
-                return (
-                  <ItemRow
-                    key={key}
-                    row={row}
-                    editing={editingKey === key}
-                    busy={busyKey !== null}
-                    error={rowErrors[key] ?? null}
-                    onEdit={() => startEdit(row)}
-                    onCancel={() => cancelEdit(row)}
-                    onSave={(rule) => saveRow(row, rule)}
-                    onDelete={() => deleteRow(row)}
-                  />
-                )
-              })}
-            </tbody>
-          </table>
-        )}
+        <ItemsTable
+          rows={rows}
+          editingKey={editingKey}
+          busy={busyKey !== null}
+          rowErrors={rowErrors}
+          onEdit={startEdit}
+          onCancel={cancelEdit}
+          onSave={saveRow}
+          onDelete={deleteRow}
+        />
         <AddItemPicker excludeDiscountId={discountId} existingKeys={rows.map(itemKey)} onSelect={addRow} />
       </section>
 
