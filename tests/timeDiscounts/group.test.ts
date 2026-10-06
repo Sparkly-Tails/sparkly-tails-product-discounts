@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   expandGroup, summariseFailures, groupSizeMessage, coveredRows, cleanRule, cleanSelection, parseGroupSpec, parseRuleInput,
   ruleSaveDelay, isSelectionEmpty, selectionCount, memberKeys, addMember, removeMember, switchMode, previewKey, groupSaveBlocker,
+  collectionsNotPicked, withCollection, withoutCollection, sameRule,
   EMPTY_SELECTION_MESSAGE, type GroupFormState,
 } from '@/timeDiscounts/group'
 import type { GroupSelection } from '@/timeDiscounts/config'
@@ -190,4 +191,28 @@ describe('groupSaveBlocker', () => {
 
 describe('messages', () => {
   it('has the empty-selection text the server and the form share', () => expect(EMPTY_SELECTION_MESSAGE).toBe('This selection covers no products.'))
+})
+
+describe('collection picks', () => {
+  const summer = { id: 'gid://shopify/Collection/1', title: 'Summer' }
+  const winter = { id: 'gid://shopify/Collection/2', title: 'Winter' }
+
+  it('hides collections that are already picked from the search results', () => {
+    expect(collectionsNotPicked([summer, winter], [summer])).toEqual([winter])
+  })
+  it('adds a collection once and removes one by id', () => {
+    expect(withCollection([summer], winter)).toEqual([summer, winter])
+    expect(withCollection([summer], summer)).toEqual([summer])
+    expect(withoutCollection([summer, winter], summer.id)).toEqual([winter])
+  })
+})
+
+describe('sameRule', () => {
+  it('compares two rules by value, and null only with null', () => {
+    expect(sameRule({ pricingMode: 'percent', amount: 20 }, { pricingMode: 'percent', amount: 20 })).toBe(true)
+    expect(sameRule({ pricingMode: 'percent', amount: 20 }, { pricingMode: 'fixed', amount: 20 })).toBe(false)
+    expect(sameRule({ pricingMode: 'percent', amount: 20 }, { pricingMode: 'percent', amount: 25 })).toBe(false)
+    expect(sameRule(null, null)).toBe(true)
+    expect(sameRule(null, { pricingMode: 'percent', amount: 20 })).toBe(false)
+  })
 })

@@ -200,3 +200,21 @@ export function groupSaveBlocker(form: GroupFormState): string | null {
   if (form.preview.status === 'error') return 'Fix the problem shown above to save.'
   return null
 }
+
+/** Search results minus the collections already picked. */
+export function collectionsNotPicked(results: GroupCollection[], picked: GroupCollection[]): GroupCollection[] {
+  return results.filter((result) => !picked.some((p) => p.id === result.id))
+}
+
+export function withCollection(picked: GroupCollection[], collection: GroupCollection): GroupCollection[] {
+  return picked.some((p) => p.id === collection.id) ? picked : [...picked, collection]
+}
+
+export function withoutCollection(picked: GroupCollection[], id: string): GroupCollection[] {
+  return picked.filter((p) => p.id !== id)
+}
+
+export function sameRule(a: Rule | null, b: Rule | null): boolean {
+  if (a === null || b === null) return a === b
+  return a.pricingMode === b.pricingMode && a.amount === b.amount
+}
