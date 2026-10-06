@@ -1,13 +1,13 @@
 'use client'
 
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 
 /** How long the pill stays down, counted from the moment it is shown. */
 export const SAVED_TOAST_VISIBLE_MS = 4000
 /** Slide duration — must match the `duration-300` class below. */
 export const SAVED_TOAST_SLIDE_MS = 300
-/** One tick after mounting, so the browser paints the pill above the top edge before it slides down. */
-const ENTER_DELAY_MS = 16
+/** A few frames after mounting, so the browser paints the pill above the top edge before it slides down. */
+const ENTER_DELAY_MS = 50
 
 type Phase = 'hidden' | 'entering' | 'visible' | 'leaving'
 
@@ -47,11 +47,14 @@ export function SavedToastProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => clearTimers, [clearTimers])
 
+  const value = useMemo(() => ({ showSaved }), [showSaved])
+
   return (
-    <SavedToastContext.Provider value={{ showSaved }}>
+    <SavedToastContext.Provider value={value}>
       {children}
-      {phase !== 'hidden' && (
-        <div role="status" aria-live="polite" className="pointer-events-none fixed inset-x-0 top-0 z-50 flex justify-center">
+      {/* The live region is always mounted (empty) so screen readers register it before the pill arrives. */}
+      <div role="status" aria-live="polite" className="pointer-events-none fixed inset-x-0 top-0 z-50 flex justify-center">
+        {phase !== 'hidden' && (
           <div
             className={`rounded-xl bg-accent px-4 py-2 text-sm font-medium text-white shadow-lg transition-[transform,opacity] duration-300 ease-out motion-reduce:transition-opacity ${
               phase === 'visible'
@@ -61,8 +64,8 @@ export function SavedToastProvider({ children }: { children: ReactNode }) {
           >
             Saved
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </SavedToastContext.Provider>
   )
 }

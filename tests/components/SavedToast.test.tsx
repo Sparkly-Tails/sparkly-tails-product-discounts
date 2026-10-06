@@ -10,7 +10,7 @@ function SaveButton() {
 }
 
 function setup() {
-  render(<SavedToastProvider><SaveButton /></SavedToastProvider>)
+  return render(<SavedToastProvider><SaveButton /></SavedToastProvider>)
 }
 
 const click = () => act(() => { screen.getByRole('button', { name: 'save' }).click() })
@@ -20,9 +20,10 @@ describe('SavedToast', () => {
   beforeEach(() => { vi.useFakeTimers() })
   afterEach(() => { cleanup(); vi.useRealTimers() })
 
-  it('is not in the page until something is saved', () => {
+  it('has an empty live region and no pill until something is saved', () => {
     setup()
-    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    expect(screen.getByRole('status')).toBeEmptyDOMElement()
+    expect(screen.queryByText('Saved')).not.toBeInTheDocument()
   })
 
   it('appears above the top edge, then slides down to 50px', () => {
@@ -30,7 +31,7 @@ describe('SavedToast', () => {
     click()
     const pill = screen.getByText('Saved')
     expect(pill).toHaveClass('-translate-y-[120%]')
-    advance(20)
+    advance(60)
     expect(pill).toHaveClass('translate-y-[50px]')
     expect(pill).not.toHaveClass('-translate-y-[120%]')
   })
@@ -48,10 +49,13 @@ describe('SavedToast', () => {
     expect(screen.queryByText('Saved')).not.toBeInTheDocument()
   })
 
-  it('is announced politely to assistive technology', () => {
+  it('is announced politely to assistive technology, via a region that exists before the first save', () => {
     setup()
+    const region = screen.getByRole('status')
+    expect(region).toHaveAttribute('aria-live', 'polite')
     click()
-    expect(screen.getByRole('status')).toHaveAttribute('aria-live', 'polite')
+    expect(screen.getByRole('status')).toBe(region)
+    expect(region).toContainElement(screen.getByText('Saved'))
   })
 
   it('restarts the 4 seconds on a second save instead of stacking another pill', () => {
@@ -71,7 +75,19 @@ describe('SavedToast', () => {
     click()
     advance(SAVED_TOAST_VISIBLE_MS + 100) // sliding out
     click()
-    advance(20)
+    advance(60)
     expect(screen.getByText('Saved')).toHaveClass('translate-y-[50px]')
+  })
+
+  it('cleans up its timers when unmounted mid-animation', () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const { unmount } = setup()
+    click()
+    advance(100)
+    unmount()
+    expect(() => act(() => { vi.runAllTimers() })).not.toThrow()
+    expect(vi.getTimerCount()).toBe(0)
+    expect(errorSpy).not.toHaveBeenCalled()
+    errorSpy.mockRestore()
   })
 })
