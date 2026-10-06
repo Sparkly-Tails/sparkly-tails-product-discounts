@@ -1,7 +1,8 @@
 import { resolveCollectionMembers } from '@/lib/collections'
 import { getMemberInfo, getLowestVariantPrices } from '@/lib/products'
 import { fetchAvailabilityConfigs, isAvailableEverywhere } from '@/lib/discount-availability'
-import type { DiscountMember, GroupSpec, GroupSelection, TimeDiscountItem } from '@/timeDiscounts/config'
+import type { DiscountMember, GroupSpec, GroupSelection, TimeDiscount, TimeDiscountItem } from '@/timeDiscounts/config'
+import { clearTimeDiscountMetafields, syncTimeDiscountMetafields } from '@/timeDiscounts/metafieldSync'
 import { FUNCTION_CONFIG_MAX_BYTES, functionConfigBytes, itemKey, validateItemsStructure, validateRule } from '@/timeDiscounts/items'
 import {
   EMPTY_SELECTION_MESSAGE, GROUP_RESOLVE_LIMIT, coveredRows, expandGroup, groupSizeMessage, summariseFailures,
@@ -90,4 +91,24 @@ export async function resolveGroup(
 /** The table rows for rows that already exist (the discount page's first paint). A product that can no longer be found is left out. */
 export async function loadCovered(items: TimeDiscountItem[], adminProductBaseUrl: string): Promise<CoveredRow[]> {
   return coveredRows(items, await regularPrices(items), adminProductBaseUrl)
+}
+
+/**
+ * Brings the storefront in line with a group's new rows: a product that was
+ * covered and no longer is loses its sale price, and the rest are written.
+ * (Without the clearing, a product dropped from the group would keep showing
+ * a sale price that checkout no longer gives.) Throws if either step failed.
+ */
+export async function syncGroupMetafields(before: TimeDiscountItem[], after: TimeDiscount, timezone: string): Promise<void> {
+  const stillCovered = new Set(after.items.map((item) => item.productId))
+  const dropped = [...new Set(before.map((item) => item.productId))]
+    .filter((productId) => !stillCovered.has(productId))
+    .map((productId) => ({ productId }))
+
+  const results = await Promise.allSettled([
+    dropped.length > 0 ? clearTimeDiscountMetafields(dropped) : Promise.resolve(),
+    after.items.length > 0 ? syncTimeDiscountMetafields(after, timezone) : Promise.resolve(),
+  ])
+  const failed = results.filter((r): r is PromiseRejectedResult => r.status === 'rejected')
+  if (failed.length > 0) throw new Error(failed.map((r) => r.reason?.message ?? String(r.reason)).join('; '))
 }

@@ -543,3 +543,22 @@ describe('schedule years', () => {
     expect(await saveTimeDiscountSchedule('time_disc_1', '2026-07-01T12:00', '2026-07-02T12:00')).toEqual({ ok: true })
   })
 })
+
+describe('per-product actions and a group discount', () => {
+  const group = (): TimeDiscount => discountWith([pct(P1, 10)], { kind: 'group', group: { pricingMode: 'percent', amount: 10, selection: { mode: 'products', members: [{ productId: P1, title: 'X' }] } } })
+
+  it('refuse to add, change or remove a single row of a group', async () => {
+    storedDiscounts([group()])
+    const message = 'This is a group discount: change its shared price or its picks instead.'
+    expect(await saveTimeDiscountItem('time_disc_1', { productId: P2, pricingMode: 'percent', amount: 20 })).toEqual({ ok: false, error: message })
+    expect(await removeTimeDiscountItem('time_disc_1', { productId: P1 })).toEqual({ ok: false, error: message })
+    expect(shopifyQuerySpy).not.toHaveBeenCalled()
+    expect(saveSpy).not.toHaveBeenCalled()
+  })
+
+  it('still lets a group be retitled and rescheduled', async () => {
+    storedDiscounts([group()])
+    expect(await saveTimeDiscountTitle('time_disc_1', 'New title')).toEqual({ ok: true })
+    expect(await saveTimeDiscountSchedule('time_disc_1', '2026-07-01T12:00', '2026-07-02T12:00')).toEqual({ ok: true })
+  })
+})

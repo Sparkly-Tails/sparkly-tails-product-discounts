@@ -15,7 +15,7 @@ import {
   parseSchedule, findDiscountOrThrow, syncBestEffort, errorMessage, adminProductBaseUrl,
 } from '@/timeDiscounts/shopifyRecord'
 import { resolveGroup } from '@/timeDiscounts/groupServer'
-import { parseGroupSpec } from '@/timeDiscounts/group'
+import { GROUP_DISCOUNT_MESSAGE, parseGroupSpec } from '@/timeDiscounts/group'
 
 /** What the autosaving page shows: success, or the reason to display inline. */
 export type SaveResult = { ok: true } | { ok: false; error: string }
@@ -243,6 +243,7 @@ export async function saveTimeDiscountItem(discountId: string, input: SaveItemIn
 
     const config = await getTimeDiscountsConfig()
     const discount = findDiscountOrThrow(config, discountId)
+    if (discount.kind === 'group') throw new Error(GROUP_DISCOUNT_MESSAGE)
 
     const regularPrice = pricingMode === 'fixed' ? await regularPriceOf(key) : null
     const ruleError = validateRule({ pricingMode, amount }, regularPrice)
@@ -271,6 +272,7 @@ export async function removeTimeDiscountItem(discountId: string, key: ProductKey
   return guarded(async () => {
     const config = await getTimeDiscountsConfig()
     const discount = findDiscountOrThrow(config, discountId)
+    if (discount.kind === 'group') throw new Error(GROUP_DISCOUNT_MESSAGE)
 
     const nextItems = discount.items.filter((existing) => itemKey(existing) !== itemKey(key))
     if (nextItems.length === discount.items.length) return // already gone — removing twice is a no-op
