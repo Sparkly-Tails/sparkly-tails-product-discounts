@@ -1,19 +1,21 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import {
-  getTimeDiscountsConfig, saveTimeDiscountsConfig, isTimeDiscountMemberAvailable, fixedPriceNotLowerError, normalizeTimeDiscount,
-  computeTimeDiscountStatusLabel, type TimeDiscountsConfig, type StoredTimeDiscount,
+  getTimeDiscountsConfig, saveTimeDiscountsConfig, isTimeDiscountMemberAvailable, fixedPriceNotLowerError,
+  computeTimeDiscountStatusLabel, type TimeDiscountsConfig,
 } from '@/timeDiscounts/config'
 import * as shopifyClient from '@/lib/shopify-client'
 
 describe('getTimeDiscountsConfig', () => {
   beforeEach(() => vi.restoreAllMocks())
 
+  const mockStoredConfig = (value: unknown) => vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({ shop: { metafield: { value: JSON.stringify(value) } } })
+
   it('parses the stored config JSON', async () => {
     const stored: TimeDiscountsConfig = {
       discounts: [
         {
           discountId: 'time_disc_1', shopifyDiscountId: 'gid://shopify/DiscountAutomaticApp/1', name: 'Flash Sale', title: 'Flash Sale',
-          startsAt: '2026-01-01T00:00', endsAt: '2026-01-02T00:00',
+          kind: 'perProduct', startsAt: '2026-01-01T00:00', endsAt: '2026-01-02T00:00',
           items: [{ productId: 'gid://shopify/Product/1', pricingMode: 'percent', amount: 20 }],
         },
       ],
@@ -24,22 +26,17 @@ describe('getTimeDiscountsConfig', () => {
     expect(config).toEqual(stored)
   })
 
-  it('converts a discount saved before per-row pricing into rows as it reads it', async () => {
-    const legacy = {
-      discountId: 'time_disc_1', shopifyDiscountId: 'gid://shopify/DiscountAutomaticApp/1', name: 'Flash Sale', title: 'Flash Sale',
-      pricingMode: 'fixed', amount: 22, startsAt: '2026-01-01T00:00', endsAt: '2026-01-02T00:00',
-      selection: { mode: 'collections', collectionIds: ['gid://shopify/Collection/1'] },
-      resolvedMembers: [{ productId: 'gid://shopify/Product/1' }, { productId: 'gid://shopify/Product/2', variantId: 'gid://shopify/ProductVariant/20' }],
-    }
-    vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({ shop: { metafield: { value: JSON.stringify({ discounts: [legacy] }) } } })
+  it('reads a discount stored without a kind as a per-product discount', async () => {
+    mockStoredConfig({ discounts: [{ discountId: 'd1', shopifyDiscountId: 'g1', name: 'A', title: 'A', startsAt: '2026-01-01T00:00', endsAt: '2026-01-02T00:00', items: [] }] })
+    const { discounts } = await getTimeDiscountsConfig()
+    expect(discounts[0].kind).toBe('perProduct')
+  })
 
-    const [discount] = (await getTimeDiscountsConfig()).discounts
-    expect(discount.items).toEqual([
-      { productId: 'gid://shopify/Product/1', pricingMode: 'fixed', amount: 22 },
-      { productId: 'gid://shopify/Product/2', variantId: 'gid://shopify/ProductVariant/20', pricingMode: 'fixed', amount: 22 },
-    ])
-    expect(discount).not.toHaveProperty('selection')
-    expect(discount).not.toHaveProperty('resolvedMembers')
+  it('keeps the kind and the group of a stored group discount', async () => {
+    const group = { pricingMode: 'percent', amount: 20, selection: { mode: 'collections', collections: [{ id: 'gid://shopify/Collection/1', title: 'Summer' }] } }
+    mockStoredConfig({ discounts: [{ discountId: 'd1', shopifyDiscountId: 'g1', name: 'A', title: 'A', startsAt: '2026-01-01T00:00', endsAt: '2026-01-02T00:00', kind: 'group', group, items: [] }] })
+    const { discounts } = await getTimeDiscountsConfig()
+    expect(discounts[0]).toMatchObject({ kind: 'group', group })
   })
 
   it('returns an empty discount list when no metafield exists yet', async () => {
@@ -94,12 +91,12 @@ describe('isTimeDiscountMemberAvailable', () => {
     discounts: [
       {
         discountId: 'time_disc_1', shopifyDiscountId: 'gid://shopify/DiscountAutomaticApp/1', name: 'X', title: 'X',
-        startsAt: '2026-01-01T00:00', endsAt: '2026-01-02T00:00',
+        kind: 'perProduct', startsAt: '2026-01-01T00:00', endsAt: '2026-01-02T00:00',
         items: [{ productId: 'gid://shopify/Product/1', pricingMode: 'percent', amount: 10 }],
       },
       {
         discountId: 'time_disc_2', shopifyDiscountId: 'gid://shopify/DiscountAutomaticApp/2', name: 'Y', title: 'Y',
-        startsAt: '2026-01-01T00:00', endsAt: '2026-01-02T00:00',
+        kind: 'perProduct', startsAt: '2026-01-01T00:00', endsAt: '2026-01-02T00:00',
         items: [
           { productId: 'gid://shopify/Product/2', variantId: 'gid://shopify/ProductVariant/20', pricingMode: 'percent', amount: 10 },
           { productId: 'gid://shopify/Product/3', pricingMode: 'fixed', amount: 5 },
@@ -184,40 +181,5 @@ describe('fixedPriceNotLowerError', () => {
     expect(fixedPriceNotLowerError('fixed', 25, null)).toBeNull()
     expect(fixedPriceNotLowerError('fixed', 25, undefined)).toBeNull()
     expect(fixedPriceNotLowerError('fixed', 25, 0)).toBeNull()
-  })
-})
-
-describe('normalizeTimeDiscount', () => {
-  const base: StoredTimeDiscount = {
-    discountId: 'time_disc_1', shopifyDiscountId: 'gid://shopify/DiscountAutomaticApp/1', name: 'Old name', title: 'Summer Sale',
-    startsAt: '2026-01-01T00:00', endsAt: '2026-01-02T00:00',
-  }
-
-  it('turns each resolved member of an older discount into a row carrying the discount\'s one shared rule', () => {
-    const result = normalizeTimeDiscount({
-      ...base, pricingMode: 'fixed', amount: 22,
-      resolvedMembers: [{ productId: 'gid://shopify/Product/1' }, { productId: 'gid://shopify/Product/2', variantId: 'gid://shopify/ProductVariant/20' }],
-    })
-    expect(result.items).toEqual([
-      { productId: 'gid://shopify/Product/1', pricingMode: 'fixed', amount: 22 },
-      { productId: 'gid://shopify/Product/2', variantId: 'gid://shopify/ProductVariant/20', pricingMode: 'fixed', amount: 22 },
-    ])
-  })
-
-  it('omits variantId on whole-product rows instead of writing undefined', () => {
-    const [whole] = normalizeTimeDiscount({ ...base, pricingMode: 'percent', amount: 10, resolvedMembers: [{ productId: 'gid://shopify/Product/1' }] }).items
-    expect('variantId' in whole).toBe(false)
-  })
-
-  it('keeps stored items as they are, ignoring the older fields', () => {
-    const items = [{ productId: 'gid://shopify/Product/9', pricingMode: 'percent' as const, amount: 10 }]
-    expect(normalizeTimeDiscount({ ...base, items, pricingMode: 'fixed', amount: 99, resolvedMembers: [{ productId: 'gid://shopify/Product/1' }] }).items).toBe(items)
-  })
-
-  it('gives a discount with no members no rows, and keeps the name, title and schedule', () => {
-    expect(normalizeTimeDiscount({ ...base, pricingMode: 'percent', amount: 10, resolvedMembers: [] })).toEqual({
-      discountId: 'time_disc_1', shopifyDiscountId: 'gid://shopify/DiscountAutomaticApp/1', name: 'Old name', title: 'Summer Sale',
-      startsAt: '2026-01-01T00:00', endsAt: '2026-01-02T00:00', items: [],
-    })
   })
 })

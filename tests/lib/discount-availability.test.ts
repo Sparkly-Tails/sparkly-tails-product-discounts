@@ -15,7 +15,7 @@ const timeConfig: TimeDiscountsConfig = {
   discounts: [
     {
       discountId: 'time_disc_1', shopifyDiscountId: 'gid://shopify/DiscountAutomaticApp/1', name: 'Y', title: 'Y',
-      startsAt: '2026-01-01T00:00', endsAt: '2026-01-02T00:00',
+      kind: 'perProduct', startsAt: '2026-01-01T00:00', endsAt: '2026-01-02T00:00',
       items: [{ productId: 'gid://shopify/Product/2', pricingMode: 'percent', amount: 10 }],
     },
   ],

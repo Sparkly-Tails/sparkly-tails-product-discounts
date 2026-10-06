@@ -10,7 +10,7 @@ import { syncTimeDiscountMetafields, clearTimeDiscountMetafields } from '@/timeD
 import { getShopTimezone, zonedTimeToUtc } from '@/lib/shop'
 import { shopifyQuery } from '@/lib/shopify-client'
 import { redirectWithToken } from '@/lib/auth-redirect'
-import { itemKey, validateRule, validateItemsStructure, assertItemsFitFunctionConfig, functionConfigBytes, FUNCTION_CONFIG_MAX_BYTES, END_PASSED_MESSAGE } from '@/timeDiscounts/items'
+import { itemKey, validateRule, validateItemsStructure, assertItemsFitFunctionConfig, END_PASSED_MESSAGE } from '@/timeDiscounts/items'
 
 const METAFIELD_NAMESPACE = 'sparkly_time_discounts'
 /** Must match the `handle` in extensions/time-based-discount/shopify.extension.toml. */
@@ -158,21 +158,6 @@ function findDiscountOrThrow(config: TimeDiscountsConfig, discountId: string): T
   return discount
 }
 
-/**
- * A discount converted from before per-row pricing can already be over the
- * Function config size cap, so the usual "split it into two discounts" advice
- * cannot be followed from its page. If the rows this change leaves do not fit
- * AND the current rows did not fit either, say so; a change that brings it
- * under the cap passes, and one that takes a fitting discount over the cap
- * keeps the generic message from assertItemsFitFunctionConfig.
- */
-function assertNotStuckOverCap(currentItems: TimeDiscountItem[], nextItems: TimeDiscountItem[]): void {
-  if (functionConfigBytes(nextItems) <= FUNCTION_CONFIG_MAX_BYTES) return
-  if (functionConfigBytes(currentItems) > FUNCTION_CONFIG_MAX_BYTES) {
-    throw new Error('This discount was created before per-row pricing and has too many products to edit row by row. Delete it and recreate it as smaller discounts.')
-  }
-}
-
 /** Runs a save and turns a thrown error into the result the page shows inline. */
 async function guarded(save: () => Promise<void>): Promise<SaveResult> {
   try {
@@ -304,7 +289,7 @@ async function createDiscountFromForm(formData: FormData): Promise<string> {
   })
 
   const discountId = `time_disc_${crypto.randomUUID()}`
-  const newDiscount: TimeDiscount = { discountId, shopifyDiscountId, name: title, title, startsAt, endsAt, items }
+  const newDiscount: TimeDiscount = { discountId, shopifyDiscountId, name: title, title, kind: 'perProduct', startsAt, endsAt, items }
 
   try {
     const config = await getTimeDiscountsConfig()
@@ -395,7 +380,6 @@ export async function saveTimeDiscountItem(discountId: string, input: SaveItemIn
 
     const structureError = validateItemsStructure(nextItems)
     if (structureError) throw new Error(structureError)
-    assertNotStuckOverCap(discount.items, nextItems)
     if (!exists) await assertAvailable(key, discountId)
 
     const timezone = await getShopTimezone()
@@ -414,7 +398,6 @@ export async function removeTimeDiscountItem(discountId: string, key: ProductKey
 
     const nextItems = discount.items.filter((existing) => itemKey(existing) !== itemKey(key))
     if (nextItems.length === discount.items.length) return // already gone — removing twice is a no-op
-    assertNotStuckOverCap(discount.items, nextItems)
 
     const timezone = await getShopTimezone()
     await updateShopifyDiscountRecord(discount.shopifyDiscountId, { items: nextItems })

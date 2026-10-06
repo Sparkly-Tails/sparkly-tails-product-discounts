@@ -11,7 +11,6 @@ import * as authRedirect from '@/lib/auth-redirect'
 import * as shopLib from '@/lib/shop'
 import * as shopifyClient from '@/lib/shopify-client'
 import type { TimeDiscount, TimeDiscountItem } from '@/timeDiscounts/config'
-import { functionConfigBytes, FUNCTION_CONFIG_MAX_BYTES } from '@/timeDiscounts/items'
 
 const P1 = 'gid://shopify/Product/1'
 const P2 = 'gid://shopify/Product/2'
@@ -27,7 +26,7 @@ function formData(entries: [string, string][]): FormData {
 function discountWith(items: TimeDiscountItem[], overrides: Partial<TimeDiscount> = {}): TimeDiscount {
   return {
     discountId: 'time_disc_1', shopifyDiscountId: 'gid://shopify/DiscountAutomaticApp/1', name: 'Flash', title: 'Flash Sale',
-    startsAt: '2026-01-01T00:00', endsAt: '2026-01-02T00:00', items,
+    kind: 'perProduct', startsAt: '2026-01-01T00:00', endsAt: '2026-01-02T00:00', items,
     ...overrides,
   }
 }
@@ -480,50 +479,5 @@ describe('schedule years', () => {
   it('still accepts ordinary dates', async () => {
     storedDiscounts([discountWith([])])
     expect(await saveTimeDiscountSchedule('time_disc_1', '2026-07-01T12:00', '2026-07-02T12:00')).toEqual({ ok: true })
-  })
-})
-
-describe('discounts converted from before per-row pricing that are over the size cap', () => {
-  const legacyRow = (i: number): TimeDiscountItem => ({
-    productId: `gid://shopify/Product/${10_000_000_000_000 + i}`,
-    variantId: `gid://shopify/ProductVariant/${50_000_000_000_000 + i}`,
-    pricingMode: 'percent', amount: 20.5,
-  })
-  const rowsOf = (n: number) => Array.from({ length: n }, (_, i) => legacyRow(i))
-  // The smallest row count that no longer fits, found with the same measure the guard uses.
-  let over = 1
-  while (functionConfigBytes(rowsOf(over)) <= FUNCTION_CONFIG_MAX_BYTES) over++
-
-  const TOO_BIG = 'This discount was created before per-row pricing and has too many products to edit row by row. Delete it and recreate it as smaller discounts.'
-
-  it('refuses to add or replace a row, with a message that can be acted on, and writes nothing', async () => {
-    storedDiscounts([discountWith(rowsOf(over + 10))])
-    expect(await saveTimeDiscountItem('time_disc_1', { productId: P1, pricingMode: 'percent', amount: 20 })).toEqual({ ok: false, error: TOO_BIG })
-    expect(await saveTimeDiscountItem('time_disc_1', { ...legacyRow(0), amount: 30 })).toEqual({ ok: false, error: TOO_BIG })
-    expect(shopifyQuerySpy).not.toHaveBeenCalled()
-    expect(saveSpy).not.toHaveBeenCalled()
-  })
-
-  it('refuses to remove a row when what is left is still too big, and writes nothing', async () => {
-    storedDiscounts([discountWith(rowsOf(over + 10))])
-    expect(await removeTimeDiscountItem('time_disc_1', legacyRow(0))).toEqual({ ok: false, error: TOO_BIG })
-    expect(shopifyQuerySpy).not.toHaveBeenCalled()
-    expect(saveSpy).not.toHaveBeenCalled()
-  })
-
-  it('lets a removal through when it brings the discount under the cap', async () => {
-    storedDiscounts([discountWith(rowsOf(over))])
-    expect(functionConfigBytes(rowsOf(over - 1))).toBeLessThanOrEqual(FUNCTION_CONFIG_MAX_BYTES)
-    expect(await removeTimeDiscountItem('time_disc_1', legacyRow(0))).toEqual({ ok: true })
-    expect(saveSpy.mock.calls[0][0].discounts[0].items).toHaveLength(over - 1)
-  })
-
-  it('keeps the generic message for a discount that was under the cap and goes over it', async () => {
-    storedDiscounts([discountWith(rowsOf(over - 1))])
-    const result = await saveTimeDiscountItem('time_disc_1', { ...legacyRow(over + 500), pricingMode: 'percent', amount: 20.5 })
-    expect(result.ok).toBe(false)
-    expect(result.ok === false && result.error).toContain('too many products/variants')
-    expect(shopifyQuerySpy).not.toHaveBeenCalled()
-    expect(saveSpy).not.toHaveBeenCalled()
   })
 })
