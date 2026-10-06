@@ -9,7 +9,7 @@ export type Enqueue = <T>(task: () => Promise<T>) => Promise<T>
 type ProductKey = { productId: string; variantId?: string }
 
 /** What a save resolves to when the call itself is rejected (network drop, or a stale action after a deploy). */
-export const UNREACHABLE: SaveResult = { ok: false, error: "Couldn't reach the server — reload the page and try again" }
+export const UNREACHABLE: Extract<SaveResult, { ok: false }> = { ok: false, error: "Couldn't reach the server — reload the page and try again" }
 
 const unreachable = () => UNREACHABLE
 
