@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   itemKey, productAdminUrl, discountedPrice, validateRule, validateItemsStructure,
-  functionConfigBytes, assertItemsFitFunctionConfig, FUNCTION_CONFIG_MAX_BYTES,
+  functionConfigBytes, assertItemsFitFunctionConfig, FUNCTION_CONFIG_MAX_BYTES, scheduleProblem,
 } from '@/timeDiscounts/items'
 import type { TimeDiscountItem } from '@/timeDiscounts/config'
 
@@ -98,5 +98,28 @@ describe('function config size', () => {
 
   it('rejects a discount that would exceed the guard, with a clear message', () => {
     expect(() => assertItemsFitFunctionConfig(rows(70))).toThrow('too many products/variants')
+  })
+})
+
+describe('scheduleProblem', () => {
+  it('is fine for an ordinary schedule and while a date is still empty', () => {
+    expect(scheduleProblem('2026-07-01T12:00', '2026-07-02T12:00')).toBeNull()
+    expect(scheduleProblem('', '')).toBeNull()
+    expect(scheduleProblem('2026-07-01T12:00', '')).toBeNull()
+  })
+
+  it('says when the end is not after the start', () => {
+    expect(scheduleProblem('2026-07-02T12:00', '2026-07-01T12:00')).toBe('End must be after start.')
+    expect(scheduleProblem('2026-07-01T12:00', '2026-07-01T12:00')).toBe('End must be after start.')
+  })
+
+  it.each([['1999-12-31T00:00', '2026-01-02T00:00'], ['2026-01-01T00:00', '2101-01-01T00:00'], ['0202-01-01T00:00', '2026-01-02T00:00']])(
+    'rejects %s / %s as an implausible year', (startsAt, endsAt) => {
+      expect(scheduleProblem(startsAt, endsAt)).toBe('Enter a year between 2000 and 2100.')
+    },
+  )
+
+  it('accepts the boundary years 2000 and 2100', () => {
+    expect(scheduleProblem('2000-01-01T00:00', '2100-12-31T00:00')).toBeNull()
   })
 })

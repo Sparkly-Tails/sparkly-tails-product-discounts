@@ -1,58 +1,197 @@
 'use client'
 
-import { useState } from 'react'
-import { createTimeDiscount } from '@/timeDiscounts/actions'
+import { useActionState, useEffect, useState } from 'react'
+import { createTimeDiscount, type SaveResult } from '@/timeDiscounts/actions'
+import { itemKey, productAdminUrl, scheduleProblem } from '@/timeDiscounts/items'
+import AddItemPicker, { type PickedItem } from '@/timeDiscounts/components/AddItemPicker'
+import type { DisplayRow } from '@/timeDiscounts/components/ItemRow'
+import ItemsTable from '@/timeDiscounts/components/ItemsTable'
 
 const inputClass =
   'w-full border border-line rounded px-3 py-2 text-sm transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:border-accent'
 
-/** Title and schedule only — the discount is created empty and opens on its own page, where products are added. */
-export default function NewTimeDiscountForm({ shopTimezone }: { shopTimezone: string }) {
+/** What a save resolves to when the call itself is rejected (network drop, or a stale action after a deploy). */
+const UNREACHABLE: SaveResult = { ok: false, error: "Couldn't reach the server — reload the page and try again" }
+
+/** A redirect after a successful create reaches us as a thrown error; it must go on to navigate, not be shown as a failure. */
+function isRedirect(err: unknown): boolean {
+  return typeof err === 'object' && err !== null && String((err as { digest?: unknown }).digest ?? '').startsWith('NEXT_REDIRECT')
+}
+
+async function submit(previous: SaveResult | null, formData: FormData): Promise<SaveResult> {
+  try {
+    return await createTimeDiscount(previous, formData)
+  } catch (err) {
+    if (isRedirect(err)) throw err
+    return UNREACHABLE
+  }
+}
+
+/** Drops rows that were added but never kept — except the one being edited. */
+function withoutUnsavedRows(list: DisplayRow[], keep?: string) {
+  return list.filter((row) => !row.isNew || itemKey(row) === keep)
+}
+
+/**
+ * Title, schedule and products on one page. Nothing exists in Shopify until
+ * Save is pressed on a complete form: the whole discount is created in one
+ * request, so a long fill-in can't run past the end time of a half-built
+ * discount that is already live.
+ */
+export default function NewTimeDiscountForm({
+  shopTimezone, adminProductBaseUrl,
+}: {
+  shopTimezone: string
+  /** Ends with `/admin/products/` — used to link added rows. */
+  adminProductBaseUrl: string
+}) {
+  const [state, formAction, pending] = useActionState(submit, null)
+
   const [title, setTitle] = useState('')
   const [startsAt, setStartsAt] = useState('')
   const [endsAt, setEndsAt] = useState('')
+  const [rows, setRows] = useState<DisplayRow[]>([])
+  const [editingKey, setEditingKey] = useState<string | null>(null)
 
-  const hasValidSchedule = startsAt !== '' && endsAt !== '' && endsAt > startsAt
-  const canSubmit = title.trim() !== '' && hasValidSchedule
+  const keptRows = rows.filter((row) => !row.isNew)
+  const problem = scheduleProblem(startsAt, endsAt)
+
+  // Why Save is off, most basic reason first.
+  const missing =
+    title.trim() === '' ? 'Add a title to save.'
+    : startsAt === '' || endsAt === '' ? 'Set a start and an end time to save.'
+    : problem ? 'Fix the schedule to save.'
+    : editingKey !== null ? "Save or cancel the row you're editing."
+    : keptRows.length === 0 ? 'Add at least one product to save.'
+    : null
+
+  // The draft lives only in this page, so closing or reloading it would lose it.
+  const hasWork = title !== '' || startsAt !== '' || endsAt !== '' || rows.length > 0
+  useEffect(() => {
+    if (!hasWork || pending) return
+    const warn = (event: BeforeUnloadEvent) => {
+      event.preventDefault()
+      event.returnValue = ''
+    }
+    window.addEventListener('beforeunload', warn)
+    return () => window.removeEventListener('beforeunload', warn)
+  }, [hasWork, pending])
+
+  function addRow(item: PickedItem) {
+    const row: DisplayRow = {
+      productId: item.productId,
+      variantId: item.variantId,
+      title: item.title,
+      adminUrl: productAdminUrl(adminProductBaseUrl, item.productId),
+      regularPrice: item.price,
+      pricingMode: 'percent',
+      amount: 0,
+      isNew: true,
+    }
+    setRows((current) => [...withoutUnsavedRows(current), row])
+    setEditingKey(itemKey(row))
+  }
+
+  function startEdit(row: DisplayRow) {
+    setRows((current) => withoutUnsavedRows(current, itemKey(row)))
+    setEditingKey(itemKey(row))
+  }
+
+  function cancelEdit() {
+    setRows((current) => withoutUnsavedRows(current))
+    setEditingKey(null)
+  }
+
+  function keepRow(row: DisplayRow, rule: { pricingMode: 'percent' | 'fixed'; amount: number }) {
+    const key = itemKey(row)
+    setRows((current) => current.map((r) => (itemKey(r) === key ? { ...r, ...rule, isNew: false } : r)))
+    setEditingKey((current) => (current === key ? null : current))
+  }
+
+  function deleteRow(row: DisplayRow) {
+    if (!window.confirm(`Remove ${row.title} from this discount?`)) return
+    if (row.isNew) {
+      cancelEdit()
+      return
+    }
+    const key = itemKey(row)
+    setRows((current) => current.filter((r) => itemKey(r) !== key))
+    setEditingKey((current) => (current === key ? null : current))
+  }
+
+  const itemsJson = JSON.stringify(
+    keptRows.map((row) => ({
+      productId: row.productId,
+      ...(row.variantId ? { variantId: row.variantId } : {}),
+      pricingMode: row.pricingMode,
+      amount: row.amount,
+    })),
+  )
 
   return (
-    <main className="p-8 max-w-xl mx-auto">
+    <main className="p-8 max-w-3xl mx-auto">
       <h1 className="text-2xl font-semibold mb-6">Add time-based discount</h1>
 
-      <form action={createTimeDiscount} className="space-y-6">
-        <div>
+      <form
+        action={formAction}
+        // Enter in a text box (the title, the product search) must not save the whole discount.
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && (e.target as HTMLElement).tagName === 'INPUT') e.preventDefault()
+        }}
+      >
+        <input type="hidden" name="items" value={itemsJson} />
+
+        <section className="mb-8">
           <label htmlFor="title" className="block text-sm font-medium mb-2">Title</label>
           <input
-            id="title" name="title" type="text" required placeholder="e.g. Spring Flash Sale"
+            id="title" name="title" type="text" placeholder="e.g. Spring Flash Sale"
             value={title} onChange={(e) => setTitle(e.target.value)}
             className={inputClass}
           />
           <p className="text-xs text-muted mt-2">Shown to customers in the countdown widget.</p>
-        </div>
+        </section>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label htmlFor="startsAt" className="block text-sm font-medium mb-2">Starts ({shopTimezone})</label>
-            <input id="startsAt" name="startsAt" type="datetime-local" required value={startsAt} onChange={(e) => setStartsAt(e.target.value)} className={inputClass} />
+        <section className="mb-8">
+          <h2 className="font-medium mb-2">Schedule</h2>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="startsAt" className="block text-sm font-medium mb-2">Starts ({shopTimezone})</label>
+              <input id="startsAt" name="startsAt" type="datetime-local" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} className={inputClass} />
+            </div>
+            <div>
+              <label htmlFor="endsAt" className="block text-sm font-medium mb-2">Ends ({shopTimezone})</label>
+              <input id="endsAt" name="endsAt" type="datetime-local" value={endsAt} onChange={(e) => setEndsAt(e.target.value)} className={inputClass} />
+            </div>
           </div>
-          <div>
-            <label htmlFor="endsAt" className="block text-sm font-medium mb-2">Ends ({shopTimezone})</label>
-            <input id="endsAt" name="endsAt" type="datetime-local" required value={endsAt} onChange={(e) => setEndsAt(e.target.value)} className={inputClass} />
-          </div>
-        </div>
-        {startsAt !== '' && endsAt !== '' && endsAt <= startsAt && (
-          <p className="text-xs text-danger -mt-4">End must be after start.</p>
-        )}
+          {problem && <p role="alert" className="text-xs text-danger mt-2">{problem}</p>}
+        </section>
 
-        <div>
+        <section className="mb-8">
+          <h2 className="font-medium mb-2">Products</h2>
+          <ItemsTable
+            rows={rows}
+            editingKey={editingKey}
+            busy={pending}
+            rowErrors={{}}
+            onEdit={startEdit}
+            onCancel={cancelEdit}
+            onSave={keepRow}
+            onDelete={deleteRow}
+          />
+          <AddItemPicker existingKeys={rows.map(itemKey)} onSelect={addRow} />
+        </section>
+
+        <section>
           <button
-            type="submit" disabled={!canSubmit}
+            type="submit" disabled={missing !== null || pending}
+            aria-describedby={missing ? 'save-hint' : undefined}
             className="bg-accent hover:bg-accent-hover text-white px-4 py-3 rounded transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-accent"
           >
-            Create discount
+            {pending ? 'Saving…' : 'Save discount'}
           </button>
-          <p className="text-xs text-muted mt-2">You&apos;ll add products on the next screen.</p>
-        </div>
+          {missing && <p id="save-hint" className="text-xs text-muted mt-2">{missing}</p>}
+          {state && !state.ok && <p role="alert" className="text-sm text-danger mt-3">{state.error}</p>}
+        </section>
       </form>
     </main>
   )

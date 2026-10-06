@@ -205,22 +205,106 @@ async function assertAvailable(key: ProductKey, discountId: string): Promise<voi
   }
 }
 
-export async function createTimeDiscount(formData: FormData): Promise<void> {
+const UNREADABLE_ROWS = 'The products could not be read — reload the page and try again'
+
+/** The rows the form sends, as plain data. Anything that is not a well-formed row is rejected rather than guessed at. */
+function parseItemsFromForm(raw: string): SaveItemInput[] {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  } catch {
+    throw new Error(UNREADABLE_ROWS)
+  }
+  if (!Array.isArray(parsed)) throw new Error(UNREADABLE_ROWS)
+  return parsed.map((entry) => {
+    if (typeof entry !== 'object' || entry === null) throw new Error(UNREADABLE_ROWS)
+    const { productId, variantId, pricingMode, amount } = entry as Record<string, unknown>
+    if (typeof productId !== 'string' || productId === '') throw new Error(UNREADABLE_ROWS)
+    if (variantId != null && typeof variantId !== 'string') throw new Error(UNREADABLE_ROWS)
+    return {
+      productId,
+      ...(variantId ? { variantId } : {}),
+      pricingMode: pricingMode === 'fixed' ? 'fixed' : 'percent',
+      amount: Math.round(Number(amount) * 100) / 100,
+    }
+  })
+}
+
+/**
+ * Checks every row of a discount that does not exist yet, against Shopify's
+ * current prices and every other discount, and returns the rows to store.
+ * A row that fails is reported with its product's name.
+ */
+async function buildItemsForNewDiscount(raw: string): Promise<TimeDiscountItem[]> {
+  const inputs = parseItemsFromForm(raw)
+  if (inputs.length === 0) throw new Error('Add at least one product before saving')
+
+  const keys: ProductKey[] = inputs.map(({ productId, variantId }) => ({ productId, ...(variantId ? { variantId } : {}) }))
+  const info = new Map((await getMemberInfo(keys)).map((member) => [itemKey(member), member]))
+  const { productConfig, timeConfig } = await fetchAvailabilityConfigs()
+
+  const items: TimeDiscountItem[] = inputs.map((input, index) => {
+    const key = keys[index]
+    const found = info.get(itemKey(key))
+    const label = found?.title ?? `Product ${key.productId.split('/').pop()}`
+    try {
+      if (!found) throw new Error('This product could not be found in Shopify')
+      const ruleError = validateRule(input, input.pricingMode === 'fixed' ? found.price : null)
+      if (ruleError) throw new Error(ruleError)
+      if (!isAvailableEverywhere(productConfig, timeConfig, key.productId, key.variantId)) {
+        throw new Error(`This ${key.variantId ? 'variant' : 'product'} already belongs to another discount`)
+      }
+    } catch (err) {
+      throw new Error(`${label}: ${err instanceof Error ? err.message : 'could not be checked'}`)
+    }
+    return { ...key, pricingMode: input.pricingMode, amount: input.amount }
+  })
+
+  const structureError = validateItemsStructure(items)
+  if (structureError) throw new Error(structureError)
+  assertItemsFitFunctionConfig(items)
+  return items
+}
+
+/**
+ * Creates a discount with all of its rows in one request — nothing exists in
+ * Shopify until the merchant presses Save on a complete form. Every problem
+ * comes back as a result to show next to the Save button; success opens the
+ * new discount's page (the redirect does not return).
+ */
+export async function createTimeDiscount(_previous: SaveResult | null, formData: FormData): Promise<SaveResult> {
+  let discountId: string
+  try {
+    discountId = await createDiscountFromForm(formData)
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : 'Something went wrong — please try again' }
+  }
+  await redirectWithToken(`/time-discounts/${encodeURIComponent(discountId)}`)
+  return { ok: true }
+}
+
+async function createDiscountFromForm(formData: FormData): Promise<string> {
   const title = String(formData.get('title') ?? '').trim()
   if (!title) throw new Error('A title is required')
 
   const { startsAt, endsAt } = parseSchedule(String(formData.get('startsAt') ?? ''), String(formData.get('endsAt') ?? ''))
 
   const timezone = await getShopTimezone()
+  const endsAtUtc = zonedTimeToUtc(endsAt, timezone)
+  // Filling in the form can take a while: refuse an end time that has slipped into the past.
+  if (Date.parse(endsAtUtc) <= Date.now()) throw new Error('The end time has already passed. Choose a later end time.')
+
+  const items = await buildItemsForNewDiscount(String(formData.get('items') ?? '[]'))
+
   const shopifyDiscountId = await createShopifyDiscountRecord({
     title,
     startsAtUtc: zonedTimeToUtc(startsAt, timezone),
-    endsAtUtc: zonedTimeToUtc(endsAt, timezone),
-    items: [],
+    endsAtUtc,
+    items,
   })
 
   const discountId = `time_disc_${crypto.randomUUID()}`
-  const newDiscount: TimeDiscount = { discountId, shopifyDiscountId, name: title, title, startsAt, endsAt, items: [] }
+  const newDiscount: TimeDiscount = { discountId, shopifyDiscountId, name: title, title, startsAt, endsAt, items }
 
   try {
     const config = await getTimeDiscountsConfig()
@@ -245,7 +329,8 @@ export async function createTimeDiscount(formData: FormData): Promise<void> {
     throw err
   }
 
-  await redirectWithToken(`/time-discounts/${encodeURIComponent(discountId)}`)
+  await syncBestEffort('createTimeDiscount', newDiscount, timezone)
+  return discountId
 }
 
 export async function saveTimeDiscountTitle(discountId: string, rawTitle: string): Promise<SaveResult> {
