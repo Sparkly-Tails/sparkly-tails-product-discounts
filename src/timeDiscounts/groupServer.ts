@@ -5,7 +5,7 @@ import type { DiscountMember, GroupSpec, GroupSelection, TimeDiscount, TimeDisco
 import { clearTimeDiscountMetafields, syncTimeDiscountMetafields } from '@/timeDiscounts/metafieldSync'
 import { FUNCTION_CONFIG_MAX_BYTES, functionConfigBytes, itemKey, validateItemsStructure, validateRule } from '@/timeDiscounts/items'
 import {
-  EMPTY_SELECTION_MESSAGE, GROUP_RESOLVE_LIMIT, coveredRows, expandGroup, groupSizeMessage, summariseFailures,
+  EMPTY_SELECTION_MESSAGE, GROUP_RESOLVE_LIMIT, coveredRows, expandGroup, groupSizeMessage, isSelectionEmpty, summariseFailures,
   type CoveredRow, type Failure, type PriceInfo,
 } from '@/timeDiscounts/group'
 
@@ -54,12 +54,14 @@ export async function resolveGroup(
   const ruleError = validateRule(group, null)
   if (ruleError) throw new Error(ruleError)
 
+  // Only a selection with nothing picked may be empty (an existing group whose picks were all removed);
+  // picks that resolve to no products (an empty collection) are always a failure.
+  if (options.allowEmpty && isSelectionEmpty(group.selection)) return { items: [], covered: [] }
+
   const members = await membersOf(group.selection)
-  if (members.length === 0) {
-    if (options.allowEmpty) return { items: [], covered: [] }
-    throw new Error(EMPTY_SELECTION_MESSAGE)
-  }
-  if (members.length > GROUP_RESOLVE_LIMIT) throw new Error(groupSizeMessage(members.length, true))
+  if (members.length === 0) throw new Error(EMPTY_SELECTION_MESSAGE)
+  // Collections are cut short at the limit + 1, so their count is not exact; explicit picks are.
+  if (members.length > GROUP_RESOLVE_LIMIT) throw new Error(groupSizeMessage(members.length, group.selection.mode === 'collections'))
 
   const items = expandGroup(group, members)
   const structureError = validateItemsStructure(items)

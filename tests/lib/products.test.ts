@@ -163,6 +163,15 @@ describe('getLowestVariantPrices', () => {
     expect(spy).not.toHaveBeenCalled()
   })
 
+  it('skips an id that is not a product (Shopify answers with an empty object)', async () => {
+    vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({
+      nodes: [{}, { id: 'gid://shopify/Product/2', title: 'Toy', variants: { edges: [{ node: { price: '5.00' } }] } }],
+    })
+    expect(await getLowestVariantPrices(['gid://shopify/Collection/1', 'gid://shopify/Product/2'])).toEqual([
+      { productId: 'gid://shopify/Product/2', title: 'Toy', price: 5 },
+    ])
+  })
+
   it('asks for each product once, in chunks of at most 250', async () => {
     const spy = vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({ nodes: [] })
     const ids = Array.from({ length: 300 }, (_, i) => `gid://shopify/Product/${i}`)

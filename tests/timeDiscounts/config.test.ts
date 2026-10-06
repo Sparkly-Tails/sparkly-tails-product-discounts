@@ -32,6 +32,13 @@ describe('getTimeDiscountsConfig', () => {
     expect(discounts[0].kind).toBe('perProduct')
   })
 
+  it('reads a discount stored before per-row pricing (no items) as having no rows', async () => {
+    mockStoredConfig({ discounts: [{ discountId: 'd1', shopifyDiscountId: 'g1', name: 'A', title: 'A', startsAt: '2026-01-01T00:00', endsAt: '2026-01-02T00:00' }] })
+    const { discounts } = await getTimeDiscountsConfig()
+    expect(discounts[0].items).toEqual([])
+    expect(discounts[0].kind).toBe('perProduct')
+  })
+
   it('keeps the kind and the group of a stored group discount', async () => {
     const group = { pricingMode: 'percent', amount: 20, selection: { mode: 'collections', collections: [{ id: 'gid://shopify/Collection/1', title: 'Summer' }] } }
     mockStoredConfig({ discounts: [{ discountId: 'd1', shopifyDiscountId: 'g1', name: 'A', title: 'A', startsAt: '2026-01-01T00:00', endsAt: '2026-01-02T00:00', kind: 'group', group, items: [] }] })

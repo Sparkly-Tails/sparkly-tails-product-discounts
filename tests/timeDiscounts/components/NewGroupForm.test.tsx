@@ -179,4 +179,25 @@ describe('NewGroupForm', () => {
     await user.type(screen.getByLabelText('Title'), 'Summer')
     expect(unload().defaultPrevented).toBe(true)
   })
+
+  it('does not warn while the discount is being saved', async () => {
+    const unload = () => {
+      const event = new Event('beforeunload', { cancelable: true })
+      window.dispatchEvent(event)
+      return event
+    }
+    const user = setup()
+    create.mockReturnValue(new Promise(() => {}))
+    await fillBasics(user)
+    await pickToy(user)
+    await waitFor(() => expect(saveButton()).toBeEnabled())
+    await user.click(saveButton())
+    await screen.findByRole('button', { name: 'Saving…' })
+    expect(unload().defaultPrevented).toBe(false)
+  })
+
+  it('leaves the validation to its own checks, not the browser\'s (an amount like 12.345 is rounded, not refused)', () => {
+    setup()
+    expect(screen.getByLabelText('Title').closest('form')).toHaveAttribute('novalidate')
+  })
 })

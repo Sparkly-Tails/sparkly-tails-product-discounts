@@ -8,12 +8,15 @@ import type { DiscountMember, GroupCollection, GroupMember, GroupSelection, Grou
 
 /** Collections are resolved up to this many products (+1, to tell "too many" from "exactly the limit"); anything over this cannot fit one discount anyway. */
 export const GROUP_RESOLVE_LIMIT = 200
+/** A group can name at most this many collections (each one is a separate Shopify query when it is resolved). */
+export const GROUP_MAX_COLLECTIONS = 50
 /** How long the Group page waits after the amount stops changing before it saves. */
 export const RULE_SAVE_DELAY_MS = 600
 
 export const EMPTY_SELECTION_MESSAGE = 'This selection covers no products.'
 export const NOT_A_GROUP_MESSAGE = 'This is not a group discount.'
 export const GROUP_DISCOUNT_MESSAGE = 'This is a group discount: change its shared price or its picks instead.'
+const TOO_MANY_PICKS = `A group can have at most ${GROUP_MAX_COLLECTIONS} collections or ${GROUP_RESOLVE_LIMIT} products.`
 const UNREADABLE = 'The group could not be read — reload the page and try again'
 
 export type CoveredRow = {
@@ -98,6 +101,7 @@ export function cleanSelection(raw: unknown): GroupSelection {
   if (!isRecord(raw)) throw new Error(UNREADABLE)
   if (raw.mode === 'products') {
     if (!Array.isArray(raw.members)) throw new Error(UNREADABLE)
+    if (raw.members.length > GROUP_RESOLVE_LIMIT) throw new Error(TOO_MANY_PICKS)
     const members: GroupMember[] = raw.members.map((entry: unknown) => {
       if (!isRecord(entry) || !nonEmptyString(entry.productId) || typeof entry.title !== 'string') throw new Error(UNREADABLE)
       if (entry.variantId != null && typeof entry.variantId !== 'string') throw new Error(UNREADABLE)
@@ -107,6 +111,7 @@ export function cleanSelection(raw: unknown): GroupSelection {
   }
   if (raw.mode === 'collections') {
     if (!Array.isArray(raw.collections)) throw new Error(UNREADABLE)
+    if (raw.collections.length > GROUP_MAX_COLLECTIONS) throw new Error(TOO_MANY_PICKS)
     const collections: GroupCollection[] = raw.collections.map((entry: unknown) => {
       if (!isRecord(entry) || !nonEmptyString(entry.id) || typeof entry.title !== 'string') throw new Error(UNREADABLE)
       return { id: entry.id, title: entry.title }

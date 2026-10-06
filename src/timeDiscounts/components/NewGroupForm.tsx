@@ -57,6 +57,8 @@ export default function NewGroupForm({ shopTimezone }: { shopTimezone: string })
   return (
     <form
       action={formAction}
+      // Our own checks are authoritative: the browser must not block a Save the form has enabled (12.345 is rounded to 12.35, not refused).
+      noValidate
       // The end time may have passed since Save last looked enabled: check the clock again right before submitting.
       onSubmit={(e) => {
         if (endTimeHasPassed(endsAt, shopTimezone, new Date())) {

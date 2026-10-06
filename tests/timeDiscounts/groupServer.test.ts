@@ -51,6 +51,19 @@ describe('resolveGroup — products mode', () => {
     expect(getMemberInfo).toHaveBeenCalledWith([{ productId: P2, variantId: V10 }])
     expect(getLowest).toHaveBeenCalledWith([P1])
   })
+
+  it('refuses a whole-product pick and a variant pick of the same product, before any price lookup', async () => {
+    const both = group(products({ productId: P1, title: 'Cat Toy' }, { productId: P1, variantId: V10, title: 'Cat Toy – Red' }))
+    await expect(resolveGroup(both, undefined, BASE)).rejects.toThrow('A product cannot have both a whole-product row and variant rows')
+    expect(getLowest).not.toHaveBeenCalled()
+    expect(getMemberInfo).not.toHaveBeenCalled()
+  })
+
+  it('shows the real count when explicit picks are over the limit', async () => {
+    const many = products(...Array.from({ length: 201 }, (_, i) => ({ productId: `gid://shopify/Product/${i}`, title: `P${i}` })))
+    await expect(resolveGroup(group(many), undefined, BASE)).rejects.toThrow('This selection covers 201 products.')
+    expect(getLowest).not.toHaveBeenCalled()
+  })
 })
 
 describe('resolveGroup — collections mode', () => {
@@ -91,6 +104,12 @@ describe('resolveGroup — empty picks', () => {
     const empty = group(products())
     await expect(resolveGroup(empty, undefined, BASE)).rejects.toThrow(EMPTY_SELECTION_MESSAGE)
     expect(await resolveGroup(empty, undefined, BASE, { allowEmpty: true })).toEqual({ items: [], covered: [] })
+  })
+
+  it('still refuses a collection that resolves to no products when empty is allowed', async () => {
+    resolveCollection.mockResolvedValue([])
+    const emptyCollection = group({ mode: 'collections', collections: [{ id: C1, title: 'Summer' }] })
+    await expect(resolveGroup(emptyCollection, undefined, BASE, { allowEmpty: true })).rejects.toThrow(EMPTY_SELECTION_MESSAGE)
   })
 
   it('still checks the rule when empty is allowed', async () => {

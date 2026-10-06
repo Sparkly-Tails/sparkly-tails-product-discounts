@@ -182,7 +182,12 @@ export async function getLowestVariantPrices(productIds: string[]): Promise<Lowe
   const responses = await Promise.all(
     chunk(unique, NODES_QUERY_CHUNK_SIZE).map((ids) =>
       shopifyQuery<{
-        nodes: ({ id: string; title: string; variants: { edges: { node: { price: string } }[] } } | null)[]
+        // `nodes` answers null for an unknown id and `{}` for an id that is not a Product.
+        nodes: (
+          | { id: string; title: string; variants: { edges: { node: { price: string } }[] } }
+          | { id?: undefined; title?: undefined; variants?: undefined }
+          | null
+        )[]
       }>(
         `query getLowestVariantPrices($ids: [ID!]!) {
           nodes(ids: $ids) {
@@ -201,7 +206,7 @@ export async function getLowestVariantPrices(productIds: string[]): Promise<Lowe
   return responses
     .flatMap((response) => response.nodes)
     .flatMap((node) =>
-      node && node.variants.edges.length > 0
+      node?.variants?.edges?.length
         ? [{ productId: node.id, title: node.title, price: Math.min(...node.variants.edges.map((e) => parseFloat(e.node.price))) }]
         : [],
     )

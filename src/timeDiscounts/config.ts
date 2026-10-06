@@ -58,9 +58,12 @@ export interface TimeDiscount {
   group?: GroupSpec
 }
 
-/** A discount stored before `kind` existed (or without it) is a per-product discount. */
-export function withDefaultKind(stored: Omit<TimeDiscount, 'kind'> & { kind?: TimeDiscount['kind'] }): TimeDiscount {
-  return { ...stored, kind: stored.kind ?? 'perProduct' }
+/** A discount as it may sit in the stored config: `kind` and `items` can be missing in older data. */
+export type StoredTimeDiscount = Omit<TimeDiscount, 'kind' | 'items'> & { kind?: TimeDiscount['kind']; items?: TimeDiscount['items'] }
+
+/** A discount stored before `kind` existed (or without it) is a per-product discount; one stored before per-row pricing has no rows. */
+export function withDefaultKind(stored: StoredTimeDiscount): TimeDiscount {
+  return { ...stored, kind: stored.kind ?? 'perProduct', items: stored.items ?? [] }
 }
 
 export interface TimeDiscountsConfig {
@@ -88,7 +91,7 @@ export async function getTimeDiscountsConfig(): Promise<TimeDiscountsConfig> {
 
   if (!data.shop.metafield) return { discounts: [] }
 
-  const parsed = JSON.parse(data.shop.metafield.value) as { discounts?: (Omit<TimeDiscount, 'kind'> & { kind?: TimeDiscount['kind'] })[] }
+  const parsed = JSON.parse(data.shop.metafield.value) as { discounts?: StoredTimeDiscount[] }
   return { discounts: Array.isArray(parsed.discounts) ? parsed.discounts.map(withDefaultKind) : [] }
 }
 

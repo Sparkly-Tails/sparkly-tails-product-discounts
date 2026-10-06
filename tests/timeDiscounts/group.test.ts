@@ -3,7 +3,7 @@ import {
   expandGroup, summariseFailures, groupSizeMessage, coveredRows, cleanRule, cleanSelection, parseGroupSpec, parseRuleInput,
   ruleSaveDelay, isSelectionEmpty, selectionCount, memberKeys, addMember, removeMember, switchMode, previewKey, groupSaveBlocker,
   collectionsNotPicked, withCollection, withoutCollection, sameRule, visibleRuleProblem,
-  EMPTY_SELECTION_MESSAGE, type GroupFormState,
+  EMPTY_SELECTION_MESSAGE, GROUP_MAX_COLLECTIONS, GROUP_RESOLVE_LIMIT, type GroupFormState,
 } from '@/timeDiscounts/group'
 import type { GroupSelection } from '@/timeDiscounts/config'
 
@@ -89,6 +89,18 @@ describe('cleanSelection', () => {
     [{ mode: 'collections', collections: [{ id: '', title: 't' }] }],
   ])('rejects %j', (raw) => {
     expect(() => cleanSelection(raw)).toThrow('could not be read')
+  })
+
+  const manyMembers = (count: number) => ({ mode: 'products', members: Array.from({ length: count }, (_, i) => ({ productId: `gid://shopify/Product/${i}`, title: `P${i}` })) })
+  const manyCollections = (count: number) => ({ mode: 'collections', collections: Array.from({ length: count }, (_, i) => ({ id: `gid://shopify/Collection/${i}`, title: `C${i}` })) })
+
+  it('accepts as many members as one group can hold, and rejects one more', () => {
+    expect(cleanSelection(manyMembers(GROUP_RESOLVE_LIMIT))).toMatchObject({ mode: 'products' })
+    expect(() => cleanSelection(manyMembers(GROUP_RESOLVE_LIMIT + 1))).toThrow('A group can have at most 50 collections or 200 products.')
+  })
+  it('accepts 50 collections, and rejects one more', () => {
+    expect(cleanSelection(manyCollections(GROUP_MAX_COLLECTIONS))).toMatchObject({ mode: 'collections' })
+    expect(() => cleanSelection(manyCollections(GROUP_MAX_COLLECTIONS + 1))).toThrow('A group can have at most 50 collections or 200 products.')
   })
 })
 
