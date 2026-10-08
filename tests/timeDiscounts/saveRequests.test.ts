@@ -1,6 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { requestTitleSave, requestScheduleSave, requestRowSave, requestRowRemoval, UNREACHABLE } from '@/timeDiscounts/saveRequests'
+import {
+  requestTitleSave, requestScheduleSave, requestRowSave, requestRowRemoval, requestGroupRuleSave, requestGroupSelectionSave, UNREACHABLE,
+} from '@/timeDiscounts/saveRequests'
 import * as actions from '@/timeDiscounts/actions'
+import * as groupActions from '@/timeDiscounts/groupActions'
 
 vi.mock('@/timeDiscounts/actions', () => ({
   saveTimeDiscountTitle: vi.fn(),
@@ -8,6 +11,8 @@ vi.mock('@/timeDiscounts/actions', () => ({
   saveTimeDiscountItem: vi.fn(),
   removeTimeDiscountItem: vi.fn(),
 }))
+
+vi.mock('@/timeDiscounts/groupActions', () => ({ saveGroupRule: vi.fn(), saveGroupSelection: vi.fn() }))
 
 const mocked = vi.mocked(actions)
 /** A queue that runs each task straight away, and records how many were queued. */
@@ -68,5 +73,30 @@ describe('requestRowRemoval', () => {
   it('turns a rejected call into the reload message', async () => {
     mocked.removeTimeDiscountItem.mockRejectedValue(new Error('network'))
     expect(await requestRowRemoval(makeEnqueue(), 'time_disc_1', { productId: 'p' })).toEqual(UNREACHABLE)
+  })
+})
+
+describe('requestGroupRuleSave', () => {
+  it('queues the new rule for that discount and returns the result', async () => {
+    vi.mocked(groupActions.saveGroupRule).mockResolvedValue({ ok: true, covered: [] })
+    expect(await requestGroupRuleSave(makeEnqueue(), 'time_disc_1', { pricingMode: 'fixed', amount: 7.5 })).toEqual({ ok: true, covered: [] })
+    expect(groupActions.saveGroupRule).toHaveBeenCalledWith('time_disc_1', { pricingMode: 'fixed', amount: 7.5 })
+  })
+  it('turns a rejected call into the reload message', async () => {
+    vi.mocked(groupActions.saveGroupRule).mockRejectedValue(new Error('network'))
+    expect(await requestGroupRuleSave(makeEnqueue(), 'time_disc_1', { pricingMode: 'percent', amount: 5 })).toEqual(UNREACHABLE)
+  })
+})
+
+describe('requestGroupSelectionSave', () => {
+  const selection = { mode: 'products' as const, members: [{ productId: 'gid://shopify/Product/1', title: 'Cat Toy' }] }
+  it('queues the new picks for that discount and returns the result', async () => {
+    vi.mocked(groupActions.saveGroupSelection).mockResolvedValue({ ok: false, error: 'No' })
+    expect(await requestGroupSelectionSave(makeEnqueue(), 'time_disc_1', selection)).toEqual({ ok: false, error: 'No' })
+    expect(groupActions.saveGroupSelection).toHaveBeenCalledWith('time_disc_1', selection)
+  })
+  it('turns a rejected call into the reload message', async () => {
+    vi.mocked(groupActions.saveGroupSelection).mockRejectedValue(new Error('stale action'))
+    expect(await requestGroupSelectionSave(makeEnqueue(), 'time_disc_1', selection)).toEqual(UNREACHABLE)
   })
 })

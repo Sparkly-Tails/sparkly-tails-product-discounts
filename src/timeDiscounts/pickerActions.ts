@@ -1,6 +1,7 @@
 'use server'
 
 import { searchProducts, getProductVariantOptions, type ProductSearchResult, type ProductVariantOption } from '@/lib/products'
+import { searchCollections, type CollectionSearchResult } from '@/lib/collections'
 import { isAvailableEverywhere, fetchAvailabilityConfigs } from '@/lib/discount-availability'
 
 /**
@@ -58,4 +59,14 @@ export async function validateTimeDiscountMemberAction(
     }
   }
   return { ok: true }
+}
+
+/** Backs the collection picker's search box. */
+export async function searchTimeDiscountCollectionsAction(query: string): Promise<CollectionSearchResult[]> {
+  try {
+    return await searchCollections(query)
+  } catch (err) {
+    console.error('[searchTimeDiscountCollectionsAction] search failed:', err)
+    return []
+  }
 }

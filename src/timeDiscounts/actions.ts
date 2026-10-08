@@ -2,19 +2,20 @@
 
 import {
   getTimeDiscountsConfig, saveTimeDiscountsConfig,
-  type TimeDiscount, type TimeDiscountItem, type TimeDiscountsConfig,
+  type TimeDiscount, type TimeDiscountItem, type GroupSpec,
 } from '@/timeDiscounts/config'
 import { isAvailableEverywhere, fetchAvailabilityConfigs } from '@/lib/discount-availability'
 import { getMemberInfo } from '@/lib/products'
 import { syncTimeDiscountMetafields, clearTimeDiscountMetafields } from '@/timeDiscounts/metafieldSync'
 import { getShopTimezone, zonedTimeToUtc } from '@/lib/shop'
-import { shopifyQuery } from '@/lib/shopify-client'
 import { redirectWithToken } from '@/lib/auth-redirect'
-import { itemKey, validateRule, validateItemsStructure, assertItemsFitFunctionConfig, functionConfigBytes, FUNCTION_CONFIG_MAX_BYTES, END_PASSED_MESSAGE } from '@/timeDiscounts/items'
-
-const METAFIELD_NAMESPACE = 'sparkly_time_discounts'
-/** Must match the `handle` in extensions/time-based-discount/shopify.extension.toml. */
-const FUNCTION_HANDLE = 'time-based-discount'
+import { itemKey, validateRule, validateItemsStructure, assertItemsFitFunctionConfig, END_PASSED_MESSAGE } from '@/timeDiscounts/items'
+import {
+  createShopifyDiscountRecord, updateShopifyDiscountRecord, deleteShopifyDiscountRecord,
+  parseSchedule, findDiscountOrThrow, syncBestEffort, errorMessage, adminProductBaseUrl,
+} from '@/timeDiscounts/shopifyRecord'
+import { resolveGroup } from '@/timeDiscounts/groupServer'
+import { GROUP_DISCOUNT_MESSAGE, parseGroupSpec } from '@/timeDiscounts/group'
 
 /** What the autosaving page shows: success, or the reason to display inline. */
 export type SaveResult = { ok: true } | { ok: false; error: string }
@@ -28,167 +29,13 @@ export type SaveItemInput = {
 
 type ProductKey = { productId: string; variantId?: string }
 
-interface FunctionConfigMetafield {
-  namespace: string
-  key: string
-  type: string
-  value: string
-}
-
-/** The Function's own per-discount config, written atomically as part of the DiscountAutomaticAppInput on create/update. */
-function buildFunctionConfigMetafield(items: TimeDiscountItem[]): FunctionConfigMetafield {
-  assertItemsFitFunctionConfig(items)
-  return { namespace: METAFIELD_NAMESPACE, key: 'function_config', type: 'json', value: JSON.stringify({ items }) }
-}
-
-async function createShopifyDiscountRecord(input: {
-  title: string
-  startsAtUtc: string
-  endsAtUtc: string
-  items: TimeDiscountItem[]
-}): Promise<string> {
-  const data = await shopifyQuery<{
-    discountAutomaticAppCreate: {
-      automaticAppDiscount: { discountId: string } | null
-      userErrors: { field: string[]; message: string }[]
-    }
-  }>(
-    `mutation createTimeDiscountRecord($automaticAppDiscount: DiscountAutomaticAppInput!) {
-      discountAutomaticAppCreate(automaticAppDiscount: $automaticAppDiscount) {
-        automaticAppDiscount { discountId }
-        userErrors { field message }
-      }
-    }`,
-    {
-      automaticAppDiscount: {
-        title: input.title,
-        functionHandle: FUNCTION_HANDLE,
-        discountClasses: ['PRODUCT'],
-        startsAt: input.startsAtUtc,
-        endsAt: input.endsAtUtc,
-        metafields: [buildFunctionConfigMetafield(input.items)],
-      },
-    },
-  )
-
-  if (data.discountAutomaticAppCreate.userErrors.length > 0) {
-    throw new Error(data.discountAutomaticAppCreate.userErrors.map((e) => e.message).join('; '))
-  }
-  if (!data.discountAutomaticAppCreate.automaticAppDiscount) {
-    throw new Error('Shopify did not return the created discount')
-  }
-  return data.discountAutomaticAppCreate.automaticAppDiscount.discountId
-}
-
-interface ShopifyDiscountRecordUpdate {
-  title?: string
-  startsAtUtc?: string
-  endsAtUtc?: string
-  items?: TimeDiscountItem[]
-}
-
-/** Partial update — only the fields present in `update` are sent, matching Shopify's own documented partial-update behavior for this mutation. */
-async function updateShopifyDiscountRecord(shopifyDiscountId: string, update: ShopifyDiscountRecordUpdate): Promise<void> {
-  const automaticAppDiscount: Record<string, unknown> = {}
-  if (update.title !== undefined) automaticAppDiscount.title = update.title
-  if (update.startsAtUtc !== undefined) automaticAppDiscount.startsAt = update.startsAtUtc
-  if (update.endsAtUtc !== undefined) automaticAppDiscount.endsAt = update.endsAtUtc
-  if (update.items !== undefined) automaticAppDiscount.metafields = [buildFunctionConfigMetafield(update.items)]
-
-  const data = await shopifyQuery<{
-    discountAutomaticAppUpdate: { userErrors: { field: string[]; message: string }[] }
-  }>(
-    `mutation updateTimeDiscountRecord($id: ID!, $automaticAppDiscount: DiscountAutomaticAppInput!) {
-      discountAutomaticAppUpdate(id: $id, automaticAppDiscount: $automaticAppDiscount) {
-        userErrors { field message }
-      }
-    }`,
-    { id: shopifyDiscountId, automaticAppDiscount },
-  )
-
-  if (data.discountAutomaticAppUpdate.userErrors.length > 0) {
-    throw new Error(data.discountAutomaticAppUpdate.userErrors.map((e) => e.message).join('; '))
-  }
-}
-
-/**
- * Uses the generic discountAutomaticDelete mutation — there is no
- * discount-type-specific delete mutation. A "not found"/"does not
- * exist"-shaped userError is treated as a successful no-op rather than an
- * error: it means Shopify's side of a previous delete already succeeded
- * (e.g. this delete is a retry after saveTimeDiscountsConfig failed on a
- * prior attempt), so retrying must not get permanently stuck.
- */
-async function deleteShopifyDiscountRecord(shopifyDiscountId: string): Promise<void> {
-  const data = await shopifyQuery<{
-    discountAutomaticDelete: { userErrors: { field: string[]; message: string }[] }
-  }>(
-    `mutation deleteTimeDiscountRecord($id: ID!) {
-      discountAutomaticDelete(id: $id) {
-        userErrors { field message }
-      }
-    }`,
-    { id: shopifyDiscountId },
-  )
-
-  const realErrors = data.discountAutomaticDelete.userErrors.filter(
-    (e) => !/not found|does not exist/i.test(e.message),
-  )
-  if (realErrors.length > 0) {
-    throw new Error(realErrors.map((e) => e.message).join('; '))
-  }
-}
-
-function parseSchedule(startsAtRaw: string, endsAtRaw: string): { startsAt: string; endsAt: string } {
-  const startsAt = startsAtRaw.trim()
-  const endsAt = endsAtRaw.trim()
-  if (!startsAt || !endsAt) throw new Error('Start and end date/time are required')
-  // A half-typed year (e.g. 0202) still forms a valid pair; never let one reach Shopify.
-  for (const value of [startsAt, endsAt]) {
-    const year = Number(value.slice(0, 4))
-    if (!(year >= 2000 && year <= 2100)) throw new Error('Enter dates between the years 2000 and 2100')
-  }
-  if (new Date(endsAt).getTime() <= new Date(startsAt).getTime()) throw new Error('End must be after start')
-  return { startsAt, endsAt }
-}
-
-function findDiscountOrThrow(config: TimeDiscountsConfig, discountId: string): TimeDiscount {
-  const discount = config.discounts.find((d) => d.discountId === discountId)
-  if (!discount) throw new Error(`Time discount ${discountId} not found`)
-  return discount
-}
-
-/**
- * A discount converted from before per-row pricing can already be over the
- * Function config size cap, so the usual "split it into two discounts" advice
- * cannot be followed from its page. If the rows this change leaves do not fit
- * AND the current rows did not fit either, say so; a change that brings it
- * under the cap passes, and one that takes a fitting discount over the cap
- * keeps the generic message from assertItemsFitFunctionConfig.
- */
-function assertNotStuckOverCap(currentItems: TimeDiscountItem[], nextItems: TimeDiscountItem[]): void {
-  if (functionConfigBytes(nextItems) <= FUNCTION_CONFIG_MAX_BYTES) return
-  if (functionConfigBytes(currentItems) > FUNCTION_CONFIG_MAX_BYTES) {
-    throw new Error('This discount was created before per-row pricing and has too many products to edit row by row. Delete it and recreate it as smaller discounts.')
-  }
-}
-
 /** Runs a save and turns a thrown error into the result the page shows inline. */
 async function guarded(save: () => Promise<void>): Promise<SaveResult> {
   try {
     await save()
     return { ok: true }
   } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : 'Something went wrong — please try again' }
-  }
-}
-
-/** The storefront sync runs after the discount is already saved and live, so a failure is logged, not surfaced as a failed save. */
-async function syncBestEffort(label: string, discount: TimeDiscount, timezone: string, onlyProductIds?: string[]): Promise<void> {
-  try {
-    await syncTimeDiscountMetafields(discount, timezone, onlyProductIds)
-  } catch (err) {
-    console.error(`[${label}] storefront metafield sync failed (discount is saved and live; the storefront may be stale for some products):`, err)
+    return { ok: false, error: errorMessage(err) }
   }
 }
 
@@ -266,6 +113,13 @@ async function buildItemsForNewDiscount(raw: string): Promise<TimeDiscountItem[]
   return items
 }
 
+/** A new group: its picks are resolved now, and its rows come from them. */
+async function buildGroupForNewDiscount(raw: string): Promise<{ items: TimeDiscountItem[]; group: GroupSpec }> {
+  const group = parseGroupSpec(raw)
+  const { items } = await resolveGroup(group, undefined, adminProductBaseUrl())
+  return { items, group }
+}
+
 /**
  * Creates a discount with all of its rows in one request — nothing exists in
  * Shopify until the merchant presses Save on a complete form. Every problem
@@ -277,7 +131,7 @@ export async function createTimeDiscount(_previous: SaveResult | null, formData:
   try {
     discountId = await createDiscountFromForm(formData)
   } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : 'Something went wrong — please try again' }
+    return { ok: false, error: errorMessage(err) }
   }
   await redirectWithToken(`/time-discounts/${encodeURIComponent(discountId)}`)
   return { ok: true }
@@ -294,17 +148,24 @@ async function createDiscountFromForm(formData: FormData): Promise<string> {
   // Filling in the form can take a while: refuse an end time that has slipped into the past.
   if (Date.parse(endsAtUtc) <= Date.now()) throw new Error(END_PASSED_MESSAGE)
 
-  const items = await buildItemsForNewDiscount(String(formData.get('items') ?? '[]'))
+  const kind = formData.get('kind') === 'group' ? 'group' : 'perProduct'
+  const content: { items: TimeDiscountItem[]; group?: GroupSpec } =
+    kind === 'group'
+      ? await buildGroupForNewDiscount(String(formData.get('group') ?? ''))
+      : { items: await buildItemsForNewDiscount(String(formData.get('items') ?? '[]')) }
 
   const shopifyDiscountId = await createShopifyDiscountRecord({
     title,
     startsAtUtc: zonedTimeToUtc(startsAt, timezone),
     endsAtUtc,
-    items,
+    items: content.items,
   })
 
   const discountId = `time_disc_${crypto.randomUUID()}`
-  const newDiscount: TimeDiscount = { discountId, shopifyDiscountId, name: title, title, startsAt, endsAt, items }
+  const newDiscount: TimeDiscount = {
+    discountId, shopifyDiscountId, name: title, title, kind, startsAt, endsAt, items: content.items,
+    ...(content.group ? { group: content.group } : {}),
+  }
 
   try {
     const config = await getTimeDiscountsConfig()
@@ -382,6 +243,7 @@ export async function saveTimeDiscountItem(discountId: string, input: SaveItemIn
 
     const config = await getTimeDiscountsConfig()
     const discount = findDiscountOrThrow(config, discountId)
+    if (discount.kind === 'group') throw new Error(GROUP_DISCOUNT_MESSAGE)
 
     const regularPrice = pricingMode === 'fixed' ? await regularPriceOf(key) : null
     const ruleError = validateRule({ pricingMode, amount }, regularPrice)
@@ -395,7 +257,6 @@ export async function saveTimeDiscountItem(discountId: string, input: SaveItemIn
 
     const structureError = validateItemsStructure(nextItems)
     if (structureError) throw new Error(structureError)
-    assertNotStuckOverCap(discount.items, nextItems)
     if (!exists) await assertAvailable(key, discountId)
 
     const timezone = await getShopTimezone()
@@ -411,10 +272,10 @@ export async function removeTimeDiscountItem(discountId: string, key: ProductKey
   return guarded(async () => {
     const config = await getTimeDiscountsConfig()
     const discount = findDiscountOrThrow(config, discountId)
+    if (discount.kind === 'group') throw new Error(GROUP_DISCOUNT_MESSAGE)
 
     const nextItems = discount.items.filter((existing) => itemKey(existing) !== itemKey(key))
     if (nextItems.length === discount.items.length) return // already gone — removing twice is a no-op
-    assertNotStuckOverCap(discount.items, nextItems)
 
     const timezone = await getShopTimezone()
     await updateShopifyDiscountRecord(discount.shopifyDiscountId, { items: nextItems })

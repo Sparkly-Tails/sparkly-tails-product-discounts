@@ -10,8 +10,8 @@ import * as metafieldSync from '@/timeDiscounts/metafieldSync'
 import * as authRedirect from '@/lib/auth-redirect'
 import * as shopLib from '@/lib/shop'
 import * as shopifyClient from '@/lib/shopify-client'
+import * as groupServer from '@/timeDiscounts/groupServer'
 import type { TimeDiscount, TimeDiscountItem } from '@/timeDiscounts/config'
-import { functionConfigBytes, FUNCTION_CONFIG_MAX_BYTES } from '@/timeDiscounts/items'
 
 const P1 = 'gid://shopify/Product/1'
 const P2 = 'gid://shopify/Product/2'
@@ -27,7 +27,7 @@ function formData(entries: [string, string][]): FormData {
 function discountWith(items: TimeDiscountItem[], overrides: Partial<TimeDiscount> = {}): TimeDiscount {
   return {
     discountId: 'time_disc_1', shopifyDiscountId: 'gid://shopify/DiscountAutomaticApp/1', name: 'Flash', title: 'Flash Sale',
-    startsAt: '2026-01-01T00:00', endsAt: '2026-01-02T00:00', items,
+    kind: 'perProduct', startsAt: '2026-01-01T00:00', endsAt: '2026-01-02T00:00', items,
     ...overrides,
   }
 }
@@ -216,6 +216,67 @@ describe('createTimeDiscount', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
     expect(await createTimeDiscount(null, form())).toEqual({ ok: true })
     expect(redirectSpy).toHaveBeenCalled()
+  })
+})
+
+describe('createTimeDiscount — group', () => {
+  const rule = { pricingMode: 'percent', amount: 20 }
+  const selection = { mode: 'collections', collections: [{ id: 'gid://shopify/Collection/1', title: 'Summer' }] }
+  const rows = [{ productId: P1, pricingMode: 'percent' as const, amount: 20 }, { productId: P2, pricingMode: 'percent' as const, amount: 20 }]
+  const form = (over: Record<string, string> = {}) =>
+    formData(Object.entries({
+      title: 'Summer Sale', startsAt: '2026-07-01T12:00', endsAt: '2026-07-02T12:00', kind: 'group',
+      group: JSON.stringify({ ...rule, selection }), ...over,
+    }))
+  const created = () => shopifyQuerySpy.mockResolvedValueOnce({
+    discountAutomaticAppCreate: { automaticAppDiscount: { discountId: 'gid://shopify/DiscountAutomaticApp/99' }, userErrors: [] },
+  })
+  let resolveSpy: MockInstance<typeof groupServer.resolveGroup>
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-06-01T00:00:00Z'))
+    resolveSpy = vi.spyOn(groupServer, 'resolveGroup').mockResolvedValue({ items: rows, covered: [] })
+  })
+  afterEach(() => vi.useRealTimers())
+
+  it('creates the discount with the rows the group expands to, and stores the group beside them', async () => {
+    created()
+    expect(await createTimeDiscount(null, form())).toEqual({ ok: true })
+
+    expect(resolveSpy).toHaveBeenCalledWith({ ...rule, selection }, undefined, expect.stringContaining('/admin/products/'))
+    expect(functionConfigSent().parsed).toEqual({ items: rows })
+    const [saved] = saveSpy.mock.calls[0][0].discounts as TimeDiscount[]
+    expect(saved).toMatchObject({ kind: 'group', title: 'Summer Sale', items: rows, group: { ...rule, selection } })
+    expect(metafieldSync.syncTimeDiscountMetafields).toHaveBeenCalledWith(expect.objectContaining({ kind: 'group' }), 'Europe/London', undefined)
+    expect(redirectSpy).toHaveBeenCalledWith(`/time-discounts/${encodeURIComponent(saved.discountId)}`)
+  })
+
+  it('creates nothing and shows the reason when the group cannot be resolved', async () => {
+    resolveSpy.mockRejectedValue(new Error('Cat Toy: This product already belongs to another discount'))
+    expect(await createTimeDiscount(null, form())).toEqual({ ok: false, error: 'Cat Toy: This product already belongs to another discount' })
+    expect(shopifyQuerySpy).not.toHaveBeenCalled()
+    expect(saveSpy).not.toHaveBeenCalled()
+  })
+
+  it('creates nothing when the group cannot be read', async () => {
+    expect(await createTimeDiscount(null, form({ group: 'not json' }))).toEqual({ ok: false, error: expect.stringContaining('could not be read') })
+    expect(resolveSpy).not.toHaveBeenCalled()
+    expect(shopifyQuerySpy).not.toHaveBeenCalled()
+  })
+
+  it('still refuses an end time that has already passed', async () => {
+    vi.setSystemTime(new Date('2026-07-02T12:00:00Z'))
+    expect(await createTimeDiscount(null, form())).toEqual({ ok: false, error: 'The end time has already passed. Choose a later end time.' })
+    expect(resolveSpy).not.toHaveBeenCalled()
+  })
+
+  it('rolls back the Shopify record when saving the app config fails', async () => {
+    created()
+    shopifyQuerySpy.mockResolvedValueOnce({ discountAutomaticDelete: { userErrors: [] } })
+    saveSpy.mockRejectedValueOnce(new Error('metafield write failed'))
+    expect(await createTimeDiscount(null, form())).toEqual({ ok: false, error: 'metafield write failed' })
+    expect(shopifyQuerySpy).toHaveBeenLastCalledWith(expect.stringContaining('discountAutomaticDelete'), { id: 'gid://shopify/DiscountAutomaticApp/99' })
   })
 })
 
@@ -483,47 +544,21 @@ describe('schedule years', () => {
   })
 })
 
-describe('discounts converted from before per-row pricing that are over the size cap', () => {
-  const legacyRow = (i: number): TimeDiscountItem => ({
-    productId: `gid://shopify/Product/${10_000_000_000_000 + i}`,
-    variantId: `gid://shopify/ProductVariant/${50_000_000_000_000 + i}`,
-    pricingMode: 'percent', amount: 20.5,
-  })
-  const rowsOf = (n: number) => Array.from({ length: n }, (_, i) => legacyRow(i))
-  // The smallest row count that no longer fits, found with the same measure the guard uses.
-  let over = 1
-  while (functionConfigBytes(rowsOf(over)) <= FUNCTION_CONFIG_MAX_BYTES) over++
+describe('per-product actions and a group discount', () => {
+  const group = (): TimeDiscount => discountWith([pct(P1, 10)], { kind: 'group', group: { pricingMode: 'percent', amount: 10, selection: { mode: 'products', members: [{ productId: P1, title: 'X' }] } } })
 
-  const TOO_BIG = 'This discount was created before per-row pricing and has too many products to edit row by row. Delete it and recreate it as smaller discounts.'
-
-  it('refuses to add or replace a row, with a message that can be acted on, and writes nothing', async () => {
-    storedDiscounts([discountWith(rowsOf(over + 10))])
-    expect(await saveTimeDiscountItem('time_disc_1', { productId: P1, pricingMode: 'percent', amount: 20 })).toEqual({ ok: false, error: TOO_BIG })
-    expect(await saveTimeDiscountItem('time_disc_1', { ...legacyRow(0), amount: 30 })).toEqual({ ok: false, error: TOO_BIG })
+  it('refuse to add, change or remove a single row of a group', async () => {
+    storedDiscounts([group()])
+    const message = 'This is a group discount: change its shared price or its picks instead.'
+    expect(await saveTimeDiscountItem('time_disc_1', { productId: P2, pricingMode: 'percent', amount: 20 })).toEqual({ ok: false, error: message })
+    expect(await removeTimeDiscountItem('time_disc_1', { productId: P1 })).toEqual({ ok: false, error: message })
     expect(shopifyQuerySpy).not.toHaveBeenCalled()
     expect(saveSpy).not.toHaveBeenCalled()
   })
 
-  it('refuses to remove a row when what is left is still too big, and writes nothing', async () => {
-    storedDiscounts([discountWith(rowsOf(over + 10))])
-    expect(await removeTimeDiscountItem('time_disc_1', legacyRow(0))).toEqual({ ok: false, error: TOO_BIG })
-    expect(shopifyQuerySpy).not.toHaveBeenCalled()
-    expect(saveSpy).not.toHaveBeenCalled()
-  })
-
-  it('lets a removal through when it brings the discount under the cap', async () => {
-    storedDiscounts([discountWith(rowsOf(over))])
-    expect(functionConfigBytes(rowsOf(over - 1))).toBeLessThanOrEqual(FUNCTION_CONFIG_MAX_BYTES)
-    expect(await removeTimeDiscountItem('time_disc_1', legacyRow(0))).toEqual({ ok: true })
-    expect(saveSpy.mock.calls[0][0].discounts[0].items).toHaveLength(over - 1)
-  })
-
-  it('keeps the generic message for a discount that was under the cap and goes over it', async () => {
-    storedDiscounts([discountWith(rowsOf(over - 1))])
-    const result = await saveTimeDiscountItem('time_disc_1', { ...legacyRow(over + 500), pricingMode: 'percent', amount: 20.5 })
-    expect(result.ok).toBe(false)
-    expect(result.ok === false && result.error).toContain('too many products/variants')
-    expect(shopifyQuerySpy).not.toHaveBeenCalled()
-    expect(saveSpy).not.toHaveBeenCalled()
+  it('still lets a group be retitled and rescheduled', async () => {
+    storedDiscounts([group()])
+    expect(await saveTimeDiscountTitle('time_disc_1', 'New title')).toEqual({ ok: true })
+    expect(await saveTimeDiscountSchedule('time_disc_1', '2026-07-01T12:00', '2026-07-02T12:00')).toEqual({ ok: true })
   })
 })

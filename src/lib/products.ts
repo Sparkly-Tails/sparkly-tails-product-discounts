@@ -161,3 +161,53 @@ export async function getMemberInfo(
   }
   return results
 }
+
+export interface LowestPrice {
+  productId: string
+  title: string
+  price: number
+}
+
+/**
+ * Each product's title and its LOWEST variant price, in one batched lookup
+ * (chunks of 250, Shopify's list-argument cap). A whole-product discount row
+ * applies to every variant, so a fixed price has to be judged against the
+ * cheapest one; `getMemberInfo` cannot do that, it returns the first variant's
+ * price. A product that no longer resolves, or has no variants, is left out.
+ */
+export async function getLowestVariantPrices(productIds: string[]): Promise<LowestPrice[]> {
+  const unique = [...new Set(productIds)]
+  if (unique.length === 0) return []
+
+  const responses = await Promise.all(
+    chunk(unique, NODES_QUERY_CHUNK_SIZE).map((ids) =>
+      shopifyQuery<{
+        // `nodes` answers null for an unknown id and `{}` for an id that is not a Product.
+        nodes: (
+          | { id: string; title: string; variants: { edges: { node: { price: string } }[] } }
+          | { id?: undefined; title?: undefined; variants?: undefined }
+          | null
+        )[]
+      }>(
+        `query getLowestVariantPrices($ids: [ID!]!) {
+          nodes(ids: $ids) {
+            ... on Product {
+              id
+              title
+              variants(first: 250) { edges { node { price } } }
+            }
+          }
+        }`,
+        { ids },
+      ),
+    ),
+  )
+
+  return responses
+    .flatMap((response) => response.nodes)
+    .flatMap((node) =>
+      node?.variants?.edges?.length
+        ? [{ productId: node.id, title: node.title, price: Math.min(...node.variants.edges.map((e) => parseFloat(e.node.price))) }]
+        : [],
+    )
+}
