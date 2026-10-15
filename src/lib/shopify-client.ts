@@ -1,3 +1,5 @@
+import { getAccessToken } from '@/lib/getAccessToken'
+
 const SHOPIFY_API_VERSION = '2025-10'
 
 function apiUrl(): string {
@@ -6,21 +8,17 @@ function apiUrl(): string {
   return `https://${shop}/admin/api/${SHOPIFY_API_VERSION}/graphql.json`
 }
 
-function accessToken(): string {
-  const token = process.env.SHOPIFY_ACCESS_TOKEN
-  if (!token) throw new Error('SHOPIFY_ACCESS_TOKEN is not set')
-  return token
-}
-
 export async function shopifyQuery<T>(
   query: string,
   variables?: Record<string, unknown>,
 ): Promise<T> {
-  const res = await fetch(apiUrl(), {
+  const url = apiUrl()
+  const token = await getAccessToken()
+  const res = await fetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'X-Shopify-Access-Token': accessToken(),
+      'X-Shopify-Access-Token': token,
     },
     body: JSON.stringify({ query, variables }),
   })
