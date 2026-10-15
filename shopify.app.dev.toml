@@ -3,12 +3,17 @@
 # deploys the `dev` branch). This is NOT the production app; production is
 # shopify.app.toml.
 #
-# Always pass --config explicitly so the right app is targeted:
-#   shopify app deploy --config shopify.app.dev.toml    # dev app only
-#   shopify app deploy --config shopify.app.toml        # production app
+# Shopify managed installation: scopes live here and Shopify installs the app
+# itself, with no redirect through this app. The admin logs in with an App Bridge
+# ID token exchanged for an access token (see docs/superpowers/specs/2026-10-15-dev-managed-install-auth-design.md).
 #
-# Only public values live here. The dev app's client secret and the dev store's
-# access token are Vercel environment variables on the dev project, never in git.
+# Always pass --config explicitly so the right app is targeted:
+#   SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk \
+#     shopify app deploy --config shopify.app.dev.toml    # dev app only
+#   shopify app deploy --config shopify.app.toml          # production app
+#
+# Only public values live here. The dev app's client secret, the database URLs and
+# every token are environment variables on the dev Vercel project, never in git.
 
 client_id = "f707124c97ab92f1fc7dd99b1a01c8e1"
 name = "demo"
@@ -17,13 +22,25 @@ embedded = true
 
 [access_scopes]
 scopes = "read_discounts,read_products,write_discounts,write_products"
-use_legacy_install_flow = true
 
 [auth]
-redirect_urls = [ "https://sparkly-tails-product-discounts-nyq.vercel.app/api/auth/callback" ]
+redirect_urls = [ "https://sparkly-tails-product-discounts-nyq.vercel.app/api/auth" ]
 
 [webhooks]
-api_version = "2027-01"
+api_version = "2026-10"
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/app/uninstalled"
+  topics = [ "app/uninstalled" ]
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/app/scopes_update"
+  topics = [ "app/scopes_update" ]
+
+  # Mandatory compliance topics. Handled by src/app/webhooks/compliance/route.ts.
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/compliance"
+  compliance_topics = [ "customers/data_request", "customers/redact", "shop/redact" ]
 
 [build]
 automatically_update_urls_on_dev = false
