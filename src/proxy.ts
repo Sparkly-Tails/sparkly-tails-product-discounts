@@ -1,91 +1,46 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import {
-  verifyShopifyHmac,
-  makeSessionToken,
-  verifyUrlToken,
-} from '@/lib/shopify-auth'
+import { bouncePage, decideProxy, forwardHeaders } from '@/lib/proxyDecision'
 
-// No cookie anywhere in this file, deliberately.
-
-async function nextWithFreshToken(req: NextRequest, shop: string, secret: string): Promise<NextResponse> {
-  const freshToken = await makeSessionToken(shop, secret)
-  const requestHeaders = new Headers(req.headers)
-  requestHeaders.set('x-auth-token', freshToken)
-  const res = NextResponse.next({ request: { headers: requestHeaders } })
-  res.headers.set('x-auth-token', freshToken)
-  return res
+function accessRestricted(shop: string | undefined, message: string): string {
+  const link = shop ? `<p><a href="https://${shop}/admin/apps">Go to Shopify admin &rarr;</a></p>` : ''
+  return `<!DOCTYPE html><html><head><title>Access restricted</title></head><body style="font-family:sans-serif;padding:40px;text-align:center"><h2>${message}</h2>${link}</body></html>`
 }
 
 export async function proxy(req: NextRequest) {
-  const { pathname, searchParams } = req.nextUrl
-
-  if (pathname.startsWith('/_next/') || pathname === '/favicon.ico') {
-    return NextResponse.next()
+  const env = {
+    secret: process.env.SHOPIFY_API_SECRET_KEY,
+    apiKey: process.env.NEXT_PUBLIC_SHOPIFY_API_KEY,
+    shop: process.env.SHOPIFY_SHOP,
   }
 
-  if (pathname.startsWith('/api/auth/')) {
-    return NextResponse.next()
+  const decision = await decideProxy({
+    pathname: req.nextUrl.pathname,
+    searchParams: req.nextUrl.searchParams,
+    headers: {
+      authorization: req.headers.get('authorization'),
+      secFetchDest: req.headers.get('sec-fetch-dest'),
+      accept: req.headers.get('accept'),
+      rsc: req.headers.get('rsc'),
+    },
+    env,
+    now: Math.floor(Date.now() / 1000),
+    isDevelopment: process.env.NODE_ENV === 'development',
+  })
+
+  if (decision.kind === 'bounce') {
+    return new NextResponse(bouncePage(env.apiKey ?? ''), { status: 200, headers: { 'Content-Type': 'text/html' } })
   }
 
-  if (process.env.NODE_ENV === 'development') {
-    return NextResponse.next()
+  if (decision.kind === 'deny') {
+    const isHtml = (req.headers.get('accept') ?? '').includes('text/html')
+    if (decision.status === 503) return NextResponse.json({ error: decision.message }, { status: 503 })
+    return isHtml
+      ? new NextResponse(accessRestricted(env.shop, decision.message), { status: decision.status, headers: { 'Content-Type': 'text/html' } })
+      : NextResponse.json({ error: decision.message }, { status: decision.status })
   }
 
-  const secret = process.env.SHOPIFY_API_SECRET_KEY
-  const apiKey = process.env.NEXT_PUBLIC_SHOPIFY_API_KEY
-  const shop = process.env.SHOPIFY_SHOP
-
-  if (!secret || !apiKey || !shop) {
-    return NextResponse.json(
-      { error: 'App misconfigured: missing env vars' },
-      { status: 503 },
-    )
-  }
-
-  if (searchParams.has('hmac') && searchParams.has('shop')) {
-    const valid = await verifyShopifyHmac(searchParams, secret)
-    if (!valid) {
-      return new NextResponse('HMAC verification failed', { status: 403 })
-    }
-
-    if (process.env.SHOPIFY_ACCESS_TOKEN) {
-      return nextWithFreshToken(req, shop, secret)
-    }
-
-    const startUrl = new URL('/api/auth/start', req.url)
-    searchParams.forEach((v, k) => startUrl.searchParams.set(k, v))
-    return NextResponse.redirect(startUrl)
-  }
-
-  const urlToken = searchParams.get('stt')
-  if (urlToken) {
-    const valid = await verifyUrlToken(urlToken, secret)
-    if (valid) {
-      return nextWithFreshToken(req, shop, secret)
-    }
-    const parts = urlToken.split('|')
-    console.log('[proxy] stt present but failed verification', {
-      pathname,
-      method: req.method,
-      partsCount: parts.length,
-      ageMs: parts[1] && Number.isFinite(parseInt(parts[1])) ? Date.now() - parseInt(parts[1]) : 'unparseable',
-    })
-  } else {
-    console.log('[proxy] no stt param on request', {
-      pathname,
-      method: req.method,
-      search: searchParams.toString(),
-    })
-  }
-
-  return new NextResponse(
-    `<!DOCTYPE html><html><head><title>Access restricted</title></head><body style="font-family:sans-serif;padding:40px;text-align:center">
-      <h2>Open this app from your Shopify admin</h2>
-      <p><a href="https://${shop}/admin/apps">Go to Shopify admin &rarr;</a></p>
-    </body></html>`,
-    { status: 403, headers: { 'Content-Type': 'text/html' } },
-  )
+  return NextResponse.next({ request: { headers: forwardHeaders(req.headers, decision) } })
 }
 
 export const config = {

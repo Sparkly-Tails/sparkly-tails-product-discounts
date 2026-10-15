@@ -133,9 +133,5 @@ export function isProductAvailable(
   })
 }
 
-/** True when every price in the list is equal, within floating-point rounding. */
-export function pricesUniform(prices: number[]): boolean {
-  if (prices.length <= 1) return true
-  const [first, ...rest] = prices
-  return rest.every((p) => Math.abs(p - first) <= 0.001)
-}
+// Lives in its own client-safe module; re-exported so server code and tests keep importing it from here.
+export { pricesUniform } from '@/lib/pricesUniform'

@@ -1,4 +1,5 @@
-import { fixedPriceNotLowerError, type TimeDiscountItem } from '@/timeDiscounts/config'
+import type { TimeDiscountItem } from '@/timeDiscounts/config'
+import { fixedPriceNotLowerError } from '@/timeDiscounts/fixedPrice'
 
 /**
  * Shopify never hands a Function a metafield value over 10,000 bytes — it
