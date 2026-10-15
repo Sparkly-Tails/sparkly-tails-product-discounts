@@ -9,3 +9,6 @@ extensions/*/target/
 # Local-only architecture reference — not for the remote repo yet
 /README.md
 tsconfig.tsbuildinfo
+
+# Local environment (database URLs, secrets)
+.env
