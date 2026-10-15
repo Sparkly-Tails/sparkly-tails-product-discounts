@@ -1,0 +1,29 @@
+# Dev copy of the app: the "demo" app in the Dev Dashboard, paired with the dev
+# Vercel project (https://sparkly-tails-product-discounts-nyq.vercel.app, which
+# deploys the `dev` branch). This is NOT the production app; production is
+# shopify.app.toml.
+#
+# Always pass --config explicitly so the right app is targeted:
+#   shopify app deploy --config shopify.app.dev.toml    # dev app only
+#   shopify app deploy --config shopify.app.toml        # production app
+#
+# Only public values live here. The dev app's client secret and the dev store's
+# access token are Vercel environment variables on the dev project, never in git.
+
+client_id = "f707124c97ab92f1fc7dd99b1a01c8e1"
+name = "demo"
+application_url = "https://sparkly-tails-product-discounts-nyq.vercel.app"
+embedded = true
+
+[access_scopes]
+scopes = "read_discounts,read_products,write_discounts,write_products"
+use_legacy_install_flow = true
+
+[auth]
+redirect_urls = [ "https://sparkly-tails-product-discounts-nyq.vercel.app/api/auth/callback" ]
+
+[webhooks]
+api_version = "2027-01"
+
+[build]
+automatically_update_urls_on_dev = false
