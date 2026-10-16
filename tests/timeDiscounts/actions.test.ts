@@ -7,11 +7,13 @@ import * as timeConfigLib from '@/timeDiscounts/config'
 import * as configLib from '@/lib/config'
 import * as productsLib from '@/lib/products'
 import * as metafieldSync from '@/timeDiscounts/metafieldSync'
-import * as authRedirect from '@/lib/auth-redirect'
+import { redirect } from 'next/navigation'
 import * as shopLib from '@/lib/shop'
 import * as shopifyClient from '@/lib/shopify-client'
 import * as groupServer from '@/timeDiscounts/groupServer'
 import type { TimeDiscount, TimeDiscountItem } from '@/timeDiscounts/config'
+
+vi.mock('next/navigation', () => ({ redirect: vi.fn() }))
 
 const P1 = 'gid://shopify/Product/1'
 const P2 = 'gid://shopify/Product/2'
@@ -36,7 +38,7 @@ const pct = (productId: string, amount: number, variantId?: string): TimeDiscoun
 
 let saveSpy: MockInstance<typeof timeConfigLib.saveTimeDiscountsConfig>
 let shopifyQuerySpy: MockInstance<typeof shopifyClient.shopifyQuery>
-let redirectSpy: MockInstance<typeof authRedirect.redirectWithToken>
+let redirectSpy: MockInstance<typeof redirect>
 
 /** Sets up the stored config and a Shopify that accepts every mutation. */
 function storedDiscounts(discounts: TimeDiscount[]) {
@@ -46,7 +48,8 @@ function storedDiscounts(discounts: TimeDiscount[]) {
 beforeEach(() => {
   vi.restoreAllMocks()
   vi.spyOn(configLib, 'getConfig').mockResolvedValue({ discounts: [] })
-  redirectSpy = vi.spyOn(authRedirect, 'redirectWithToken').mockResolvedValue(undefined as never)
+  redirectSpy = vi.mocked(redirect)
+  redirectSpy.mockClear()
   vi.spyOn(productsLib, 'getMemberInfo').mockResolvedValue([{ productId: P1, title: 'X', price: 10, handle: 'x', imageUrl: null }])
   vi.spyOn(shopLib, 'getShopTimezone').mockResolvedValue('Europe/London')
   vi.spyOn(metafieldSync, 'syncTimeDiscountMetafields').mockResolvedValue(undefined)

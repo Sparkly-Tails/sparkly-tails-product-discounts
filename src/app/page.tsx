@@ -1,12 +1,10 @@
-import { headers } from 'next/headers'
 import { getConfig } from '@/lib/config'
 import { getMemberInfo } from '@/lib/products'
-import AuthLink from '@/components/AuthLink'
+import Link from 'next/link'
 import { getTimeDiscountsConfig, computeTimeDiscountStatusLabel } from '@/timeDiscounts/config'
 import { getShopTimezone } from '@/lib/shop'
 
 export default async function Home() {
-  const token = (await headers()).get('x-auth-token') ?? ''
   const config = await getConfig()
 
   const rows = await Promise.all(
@@ -26,13 +24,12 @@ export default async function Home() {
     <main className="p-8 max-w-3xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-semibold">Discounts</h1>
-        <AuthLink
+        <Link
           href="/discounts/new"
-          token={token}
           className="bg-accent hover:bg-accent-hover text-white px-4 py-3 rounded transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
         >
           Add discount
-        </AuthLink>
+        </Link>
       </div>
 
       {rows.length === 0 ? (
@@ -41,13 +38,12 @@ export default async function Home() {
         <ul className="divide-y divide-line">
           {rows.map((row) => (
             <li key={row.discountId} className="py-4">
-              <AuthLink
+              <Link
                 href={`/discounts/${encodeURIComponent(row.discountId)}`}
-                token={token}
                 className="font-medium hover:underline transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded"
               >
                 {row.name}
-              </AuthLink>
+              </Link>
               <p className="text-sm text-muted">
                 {row.status} · {row.pricingMode === 'fixed' ? 'Fixed price' : 'Percentage'} · {row.memberTitles.join(', ') || 'no members resolved'} · {row.tiers.length} tier{row.tiers.length === 1 ? '' : 's'}
               </p>
@@ -58,13 +54,12 @@ export default async function Home() {
 
       <div className="flex items-center justify-between mb-6 mt-10">
         <h2 className="text-xl font-semibold">Time-based discounts</h2>
-        <AuthLink
+        <Link
           href="/time-discounts/new"
-          token={token}
           className="bg-accent hover:bg-accent-hover text-white px-4 py-3 rounded transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
         >
           Add time-based discount
-        </AuthLink>
+        </Link>
       </div>
 
       {timeConfig.discounts.length === 0 ? (
@@ -73,13 +68,12 @@ export default async function Home() {
         <ul className="divide-y divide-line">
           {timeConfig.discounts.map((row) => (
             <li key={row.discountId} className="py-4">
-              <AuthLink
+              <Link
                 href={`/time-discounts/${encodeURIComponent(row.discountId)}`}
-                token={token}
                 className="font-medium hover:underline transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded"
               >
                 {row.title}
-              </AuthLink>
+              </Link>
               <p className="text-sm text-muted">
                 {row.kind === 'group' ? 'Group' : 'Per product'} · {scheduleLabel(row.startsAt, row.endsAt)} · {row.startsAt} → {row.endsAt} · {row.items.length} product{row.items.length === 1 ? '' : 's'}
               </p>

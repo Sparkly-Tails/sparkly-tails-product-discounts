@@ -1,4 +1,3 @@
-import { headers } from 'next/headers'
 import { notFound } from 'next/navigation'
 import { getConfig, pricesUniform } from '@/lib/config'
 import { getMemberInfo } from '@/lib/products'
@@ -8,7 +7,7 @@ import MemberPicker from '@/components/MemberPicker'
 import TierFields from '@/components/TierFields'
 import FixedPriceTierFields from '@/components/FixedPriceTierFields'
 import ConfirmForm from '@/components/ConfirmForm'
-import AuthLink from '@/components/AuthLink'
+import Link from 'next/link'
 
 export default async function DiscountPage({
   params,
@@ -17,7 +16,6 @@ export default async function DiscountPage({
 }) {
   const { discountId: encodedDiscountId } = await params
   const discountId = decodeURIComponent(encodedDiscountId)
-  const token = (await headers()).get('x-auth-token') ?? ''
 
   const config = await getConfig()
   const discount = config.discounts.find((d) => d.discountId === discountId)
@@ -35,13 +33,12 @@ export default async function DiscountPage({
 
   return (
     <main className="p-8 max-w-2xl mx-auto">
-      <AuthLink
+      <Link
         href="/"
-        token={token}
         className="text-sm text-accent hover:underline transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded inline-block mb-4"
       >
         ← Back to discounts
-      </AuthLink>
+      </Link>
 
       <h1 className="text-2xl font-semibold mb-2">{discount.name}</h1>
       <p className="text-sm text-muted mb-6">

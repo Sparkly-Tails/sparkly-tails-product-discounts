@@ -1,7 +1,7 @@
 'use server'
 
 import { getConfig, saveConfig, isProductAvailable, pricesUniform, type Tier, type Discount, type DiscountMember } from '@/lib/config'
-import { redirectWithToken } from '@/lib/auth-redirect'
+import { redirect } from 'next/navigation'
 import { syncDiscountMetafields, clearDiscountMetafields } from '@/lib/product-tiers'
 import { getMemberInfo } from '@/lib/products'
 
@@ -99,7 +99,7 @@ export async function createDiscount(formData: FormData): Promise<void> {
   const newDiscount: Discount = { discountId, name, title, status: 'draft', pricingMode, members, tiers }
   await saveConfig({ discounts: [...config.discounts, newDiscount] })
 
-  await redirectWithToken(`/discounts/${encodeURIComponent(discountId)}`)
+  redirect(`/discounts/${encodeURIComponent(discountId)}`)
 }
 
 function findDiscountOrThrow(config: { discounts: Discount[] }, discountId: string): Discount {
@@ -133,7 +133,7 @@ export async function updateDiscountMembers(discountId: string, formData: FormDa
     await syncDiscountMetafields(discount)
   }
 
-  await redirectWithToken(`/discounts/${encodeURIComponent(discountId)}`)
+  redirect(`/discounts/${encodeURIComponent(discountId)}`)
 }
 
 export async function updateDiscountTiers(discountId: string, formData: FormData): Promise<void> {
@@ -152,7 +152,7 @@ export async function updateDiscountTiers(discountId: string, formData: FormData
     await syncDiscountMetafields(discount)
   }
 
-  await redirectWithToken(`/discounts/${encodeURIComponent(discountId)}`)
+  redirect(`/discounts/${encodeURIComponent(discountId)}`)
 }
 
 export async function updateDiscountTitle(discountId: string, formData: FormData): Promise<void> {
@@ -169,7 +169,7 @@ export async function updateDiscountTitle(discountId: string, formData: FormData
     await syncDiscountMetafields(discount)
   }
 
-  await redirectWithToken(`/discounts/${encodeURIComponent(discountId)}`)
+  redirect(`/discounts/${encodeURIComponent(discountId)}`)
 }
 
 export async function setDiscountStatus(discountId: string, status: 'draft' | 'live'): Promise<void> {
@@ -185,7 +185,7 @@ export async function setDiscountStatus(discountId: string, status: 'draft' | 'l
     await clearDiscountMetafields(discount.members)
   }
 
-  await redirectWithToken(`/discounts/${encodeURIComponent(discountId)}`)
+  redirect(`/discounts/${encodeURIComponent(discountId)}`)
 }
 
 export async function deleteDiscount(discountId: string): Promise<void> {
@@ -197,5 +197,5 @@ export async function deleteDiscount(discountId: string): Promise<void> {
 
   await clearDiscountMetafields(discount.members)
 
-  await redirectWithToken('/')
+  redirect('/')
 }

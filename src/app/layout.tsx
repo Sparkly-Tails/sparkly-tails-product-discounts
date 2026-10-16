@@ -1,20 +1,19 @@
 import type { Metadata } from "next";
-import { headers } from "next/headers";
-import AuthTokenInit from "@/components/AuthTokenInit";
 import { SavedToastProvider } from "@/components/SavedToast";
 import packageJson from "../../package.json";
 import "./globals.css";
+
+// Every page shows live shop data behind the ID-token login: render per request, never at build time.
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Sparkly Tails — Product Discounts",
   description: "Per-product volume pricing admin",
 };
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  const authToken = (await headers()).get("x-auth-token") ?? "";
-
   return (
     <html lang="en">
       <head>
@@ -25,7 +24,6 @@ export default async function RootLayout({
         <script src="https://cdn.shopify.com/shopifycloud/app-bridge.js"></script>
       </head>
       <body>
-        <AuthTokenInit initialToken={authToken} />
         <div className="text-xs text-subtle text-right px-4 pt-1">
           v{packageJson.version}
         </div>
