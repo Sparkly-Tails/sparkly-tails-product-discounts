@@ -1,20 +1,20 @@
 import { getAccessToken } from '@/lib/getAccessToken'
+import { deleteShopSessions } from '@/lib/sessions'
 
 const SHOPIFY_API_VERSION = '2025-10'
 
-function apiUrl(): string {
+function requireShop(): string {
   const shop = process.env.SHOPIFY_SHOP
   if (!shop) throw new Error('SHOPIFY_SHOP is not set')
+  return shop
+}
+
+function apiUrl(shop: string): string {
   return `https://${shop}/admin/api/${SHOPIFY_API_VERSION}/graphql.json`
 }
 
-export async function shopifyQuery<T>(
-  query: string,
-  variables?: Record<string, unknown>,
-): Promise<T> {
-  const url = apiUrl()
-  const token = await getAccessToken()
-  const res = await fetch(url, {
+function postQuery(url: string, token: string, query: string, variables?: Record<string, unknown>): Promise<Response> {
+  return fetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -22,6 +22,22 @@ export async function shopifyQuery<T>(
     },
     body: JSON.stringify({ query, variables }),
   })
+}
+
+export async function shopifyQuery<T>(
+  query: string,
+  variables?: Record<string, unknown>,
+): Promise<T> {
+  const shop = requireShop()
+  const url = apiUrl(shop)
+  let res = await postQuery(url, await getAccessToken(), query, variables)
+
+  // Shopify refused the stored token (revoked, for example after a late uninstall webhook): drop it so the
+  // next token comes from the request's ID token, and retry once.
+  if (res.status === 401) {
+    await deleteShopSessions(shop)
+    res = await postQuery(url, await getAccessToken(), query, variables)
+  }
 
   let json: { data?: T; errors?: unknown }
   try {

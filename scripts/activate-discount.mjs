@@ -1,4 +1,6 @@
 // Run once, manually, after the function is deployed and its ID is known.
+// Production (legacy token) app only: it needs a copied SHOPIFY_ACCESS_TOKEN, which the dev app
+// (managed install, no copyable token) never has.
 // Usage: node scripts/activate-discount.mjs <functionId>
 const functionId = process.argv[2]
 if (!functionId) {
