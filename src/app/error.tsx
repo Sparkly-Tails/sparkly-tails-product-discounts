@@ -1,6 +1,6 @@
 'use client'
 
-import { getAuthToken, appendToken } from '@/lib/auth-token'
+import Link from 'next/link'
 
 export default function ErrorBoundary({
   error,
@@ -20,12 +20,12 @@ export default function ErrorBoundary({
         >
           Try again
         </button>
-        <a
-          href={appendToken('/', getAuthToken())}
+        <Link
+          href="/"
           className="bg-surface border border-line hover:bg-line px-4 py-3 rounded text-sm transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
         >
           Back to discounts
-        </a>
+        </Link>
       </div>
     </main>
   )

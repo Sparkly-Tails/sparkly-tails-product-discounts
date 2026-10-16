@@ -3,12 +3,12 @@ import {
   createDiscount, updateDiscountMembers, updateDiscountTiers, updateDiscountTitle, setDiscountStatus, deleteDiscount,
 } from '@/actions/discountActions'
 import * as configLib from '@/lib/config'
-import * as authRedirect from '@/lib/auth-redirect'
+import { redirect } from 'next/navigation'
 import * as productTiers from '@/lib/product-tiers'
 import * as products from '@/lib/products'
 import type { Config, Discount } from '@/lib/config'
 
-vi.mock('@/lib/auth-redirect', () => ({ redirectWithToken: vi.fn() }))
+vi.mock('next/navigation', () => ({ redirect: vi.fn() }))
 
 function memberFormData(members: { productId: string; variantId?: string }[], extra: Record<string, string> = {}) {
   const fd = new FormData()
@@ -21,7 +21,10 @@ function memberFormData(members: { productId: string; variantId?: string }[], ex
 }
 
 describe('createDiscount', () => {
-  beforeEach(() => vi.restoreAllMocks())
+  beforeEach(() => {
+    vi.mocked(redirect).mockClear()
+    vi.restoreAllMocks()
+  })
 
   it('creates a single-member discount with parsed tiers', async () => {
     vi.spyOn(configLib, 'getConfig').mockResolvedValue({ discounts: [] })
@@ -45,7 +48,7 @@ describe('createDiscount', () => {
         tiers: [{ minQty: 5, percentOff: 10 }],
       }],
     })
-    expect(authRedirect.redirectWithToken).toHaveBeenCalledWith(expect.stringMatching(/^\/discounts\/disc_/))
+    expect(redirect).toHaveBeenCalledWith(expect.stringMatching(/^\/discounts\/disc_/))
   })
 
   it('creates a multi-member discount mixing a whole product and a specific variant', async () => {
@@ -142,7 +145,10 @@ describe('createDiscount', () => {
 })
 
 describe('updateDiscountMembers', () => {
-  beforeEach(() => vi.restoreAllMocks())
+  beforeEach(() => {
+    vi.mocked(redirect).mockClear()
+    vi.restoreAllMocks()
+  })
 
   it('rejects a member set with different prices when the stored discount is fixed-price', async () => {
     const discount: Discount = {
@@ -257,7 +263,10 @@ describe('updateDiscountMembers', () => {
 })
 
 describe('updateDiscountTiers', () => {
-  beforeEach(() => vi.restoreAllMocks())
+  beforeEach(() => {
+    vi.mocked(redirect).mockClear()
+    vi.restoreAllMocks()
+  })
 
   it('rejects a submitted fixedPrice tier when the stored members have different prices', async () => {
     const discount: Discount = {
@@ -324,7 +333,10 @@ describe('updateDiscountTiers', () => {
 })
 
 describe('updateDiscountTitle', () => {
-  beforeEach(() => vi.restoreAllMocks())
+  beforeEach(() => {
+    vi.mocked(redirect).mockClear()
+    vi.restoreAllMocks()
+  })
 
   it('updates the title and re-syncs metafields when the discount is live', async () => {
     const discount: Discount = {
@@ -378,7 +390,10 @@ describe('updateDiscountTitle', () => {
 })
 
 describe('setDiscountStatus', () => {
-  beforeEach(() => vi.restoreAllMocks())
+  beforeEach(() => {
+    vi.mocked(redirect).mockClear()
+    vi.restoreAllMocks()
+  })
 
   it('syncs metafields when going live', async () => {
     const discount: Discount = {
@@ -410,7 +425,10 @@ describe('setDiscountStatus', () => {
 })
 
 describe('deleteDiscount', () => {
-  beforeEach(() => vi.restoreAllMocks())
+  beforeEach(() => {
+    vi.mocked(redirect).mockClear()
+    vi.restoreAllMocks()
+  })
 
   it('removes the discount and clears its metafields', async () => {
     const discount: Discount = {

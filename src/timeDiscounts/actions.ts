@@ -8,7 +8,7 @@ import { isAvailableEverywhere, fetchAvailabilityConfigs } from '@/lib/discount-
 import { getMemberInfo } from '@/lib/products'
 import { syncTimeDiscountMetafields, clearTimeDiscountMetafields } from '@/timeDiscounts/metafieldSync'
 import { getShopTimezone, zonedTimeToUtc } from '@/lib/shop'
-import { redirectWithToken } from '@/lib/auth-redirect'
+import { redirect } from 'next/navigation'
 import { itemKey, validateRule, validateItemsStructure, assertItemsFitFunctionConfig, END_PASSED_MESSAGE } from '@/timeDiscounts/items'
 import {
   createShopifyDiscountRecord, updateShopifyDiscountRecord, deleteShopifyDiscountRecord,
@@ -133,7 +133,7 @@ export async function createTimeDiscount(_previous: SaveResult | null, formData:
   } catch (err) {
     return { ok: false, error: errorMessage(err) }
   }
-  await redirectWithToken(`/time-discounts/${encodeURIComponent(discountId)}`)
+  redirect(`/time-discounts/${encodeURIComponent(discountId)}`)
   return { ok: true }
 }
 
@@ -315,5 +315,5 @@ export async function deleteTimeDiscount(discountId: string): Promise<void> {
     console.error('[deleteTimeDiscount] storefront metafield clear failed (discount is deleted and no longer live; the storefront may be stale for some products until the next successful save):', err)
   }
 
-  await redirectWithToken('/')
+  redirect('/')
 }

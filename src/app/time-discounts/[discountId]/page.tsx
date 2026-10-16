@@ -1,5 +1,4 @@
 import { notFound } from 'next/navigation'
-import { headers } from 'next/headers'
 import { getTimeDiscountsConfig } from '@/timeDiscounts/config'
 import { deleteTimeDiscount } from '@/timeDiscounts/actions'
 import { getShopTimezone } from '@/lib/shop'
@@ -9,7 +8,7 @@ import { loadCovered } from '@/timeDiscounts/groupServer'
 import GroupDiscountEditor from '@/timeDiscounts/components/GroupDiscountEditor'
 import TimeDiscountEditor from '@/timeDiscounts/components/TimeDiscountEditor'
 import type { DisplayRow } from '@/timeDiscounts/components/ItemRow'
-import AuthLink from '@/components/AuthLink'
+import Link from 'next/link'
 
 export default async function TimeDiscountPage({
   params,
@@ -18,7 +17,6 @@ export default async function TimeDiscountPage({
 }) {
   const { discountId: encodedDiscountId } = await params
   const discountId = decodeURIComponent(encodedDiscountId)
-  const token = (await headers()).get('x-auth-token') ?? ''
 
   const config = await getTimeDiscountsConfig()
   const discount = config.discounts.find((d) => d.discountId === discountId)
@@ -31,13 +29,12 @@ export default async function TimeDiscountPage({
     const covered = await loadCovered(discount.items, adminProductBaseUrl)
     return (
       <main className="p-8 max-w-3xl mx-auto">
-        <AuthLink
+        <Link
           href="/"
-          token={token}
           className="text-sm text-accent hover:underline transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded inline-block mb-4"
         >
           ← Back to discounts
-        </AuthLink>
+        </Link>
 
         <GroupDiscountEditor
           discountId={discountId}
@@ -72,13 +69,12 @@ export default async function TimeDiscountPage({
 
   return (
     <main className="p-8 max-w-3xl mx-auto">
-      <AuthLink
+      <Link
         href="/"
-        token={token}
         className="text-sm text-accent hover:underline transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded inline-block mb-4"
       >
         ← Back to discounts
-      </AuthLink>
+      </Link>
 
       <TimeDiscountEditor
         discountId={discountId}
