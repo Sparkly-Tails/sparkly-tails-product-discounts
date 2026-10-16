@@ -11,17 +11,24 @@ export interface ProxyInput {
   isDevelopment: boolean
 }
 
+/**
+ * Why a request was bounced or refused: a short code that is safe to log (it never
+ * holds a token): `no-token`, `token-<reason from verifyIdToken>` or `missing-env`.
+ */
 export type ProxyDecision =
   | { kind: 'next' }
   | { kind: 'next-with-token'; idToken: string; shop: string }
-  | { kind: 'bounce' }
-  | { kind: 'deny'; status: 401 | 403 | 503; message: string }
+  | { kind: 'bounce'; reason: string }
+  | { kind: 'deny'; status: 401 | 403 | 503; message: string; reason: string }
 
 const EXEMPT_PREFIXES = ['/_next/', '/webhooks/']
 
+/** A page load: a navigation, or the iframe/frame the Shopify admin embeds the app in (browsers label that `iframe`). */
+const PAGE_DESTINATIONS = ['document', 'iframe', 'frame']
+
 export function isDocumentRequest(headers: { secFetchDest: string | null; accept: string | null; rsc: string | null }): boolean {
   if (headers.rsc === '1') return false
-  if (headers.secFetchDest) return headers.secFetchDest === 'document'
+  if (headers.secFetchDest) return PAGE_DESTINATIONS.includes(headers.secFetchDest)
   return !!headers.accept?.includes('text/html')
 }
 
@@ -32,22 +39,24 @@ export async function decideProxy(input: ProxyInput): Promise<ProxyDecision> {
   if (input.isDevelopment) return { kind: 'next' }
 
   if (!env.secret || !env.apiKey || !env.shop) {
-    return { kind: 'deny', status: 503, message: 'App misconfigured: missing env vars' }
+    return { kind: 'deny', status: 503, message: 'App misconfigured: missing env vars', reason: 'missing-env' }
   }
 
   const isDocument = isDocumentRequest(headers)
   const canBounce = isDocument && searchParams.has('shop') && searchParams.has('host') && searchParams.get('shopify-bounced') !== '1'
   const idToken = pickIdToken({ authorization: headers.authorization, idTokenParam: searchParams.get('id_token') })
 
+  let reason = 'no-token'
   if (idToken) {
     const result = await verifyIdToken(idToken, { secret: env.secret, apiKey: env.apiKey, shop: env.shop, now })
     if (result.ok) return { kind: 'next-with-token', idToken, shop: result.shop }
-    if (result.reason === 'shop') return { kind: 'deny', status: 403, message: 'This app is not set up for this store.' }
+    reason = `token-${result.reason}`
+    if (result.reason === 'shop') return { kind: 'deny', status: 403, message: 'This app is not set up for this store.', reason }
   }
 
-  if (canBounce) return { kind: 'bounce' }
-  if (isDocument) return { kind: 'deny', status: 403, message: 'Open this app from your Shopify admin.' }
-  return { kind: 'deny', status: 401, message: 'Unauthorized' }
+  if (canBounce) return { kind: 'bounce', reason }
+  if (isDocument) return { kind: 'deny', status: 403, message: 'Open this app from your Shopify admin.', reason }
+  return { kind: 'deny', status: 401, message: 'Unauthorized', reason }
 }
 
 /** The request headers to pass on: any client-sent token headers are dropped, then the verified ones are set. */

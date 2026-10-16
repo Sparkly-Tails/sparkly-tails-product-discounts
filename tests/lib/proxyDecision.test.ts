@@ -57,11 +57,11 @@ describe('decideProxy', () => {
 
   it('bounces a page load whose token has expired, when shop and host are present', async () => {
     const t = token({ exp: NOW - 60 })
-    expect(await decideProxy(input({ searchParams: new URLSearchParams({ id_token: t, shop: SHOP, host: 'h' }) }))).toEqual({ kind: 'bounce' })
+    expect(await decideProxy(input({ searchParams: new URLSearchParams({ id_token: t, shop: SHOP, host: 'h' }) }))).toMatchObject({ kind: 'bounce' })
   })
 
   it('bounces a page load with no token when shop and host are present', async () => {
-    expect(await decideProxy(input({ searchParams: new URLSearchParams({ shop: SHOP, host: 'h' }) }))).toEqual({ kind: 'bounce' })
+    expect(await decideProxy(input({ searchParams: new URLSearchParams({ shop: SHOP, host: 'h' }) }))).toMatchObject({ kind: 'bounce' })
   })
 
   it('never bounces twice: a still-invalid token after a bounce is a 403', async () => {
@@ -83,6 +83,48 @@ describe('decideProxy', () => {
     const t = token({}, 'other-secret')
     expect(await decideProxy(input({ headers: { ...fetchHeaders, authorization: `Bearer ${t}` } }))).toMatchObject({ kind: 'deny', status: 401 })
   })
+
+  // The Shopify admin opens the app inside an iframe, so the browser labels the request
+  // Sec-Fetch-Dest: iframe (not document). It must be handled like a page load.
+  it('treats the admin iframe load like a page load: an expired token bounces instead of a 401', async () => {
+    const t = token({ exp: NOW - 60 })
+    const params = new URLSearchParams({ id_token: t, shop: SHOP, host: 'h', embedded: '1' })
+    const iframeHeaders = { ...documentHeaders, secFetchDest: 'iframe' }
+    expect(await decideProxy(input({ headers: iframeHeaders, searchParams: params }))).toMatchObject({ kind: 'bounce' })
+  })
+
+  it('accepts a valid token on the admin iframe load', async () => {
+    const t = token()
+    const params = new URLSearchParams({ id_token: t, shop: SHOP, host: 'h', embedded: '1' })
+    expect(await decideProxy(input({ headers: { ...documentHeaders, secFetchDest: 'iframe' }, searchParams: params }))).toEqual({ kind: 'next-with-token', idToken: t, shop: SHOP })
+  })
+
+  it('says why a request was refused, without any token in the reason', async () => {
+    const noToken = await decideProxy(input({ headers: fetchHeaders }))
+    expect(noToken).toMatchObject({ kind: 'deny', reason: 'no-token' })
+
+    const wrongSecret = await decideProxy(input({ headers: { ...fetchHeaders, authorization: `Bearer ${token({}, 'other-secret')}` } }))
+    expect(wrongSecret).toMatchObject({ kind: 'deny', reason: 'token-signature' })
+
+    const otherShop = await decideProxy(input({ headers: { ...fetchHeaders, authorization: `Bearer ${token({ dest: 'https://other.myshopify.com' })}` } }))
+    expect(otherShop).toMatchObject({ kind: 'deny', status: 403, reason: 'token-shop' })
+
+    const wrongAudience = await decideProxy(input({ headers: { ...fetchHeaders, authorization: `Bearer ${token({ aud: 'someone-else' })}` } }))
+    expect(wrongAudience).toMatchObject({ kind: 'deny', reason: 'token-audience' })
+
+    const misconfigured = await decideProxy(input({ env: { secret: undefined, apiKey: API_KEY, shop: SHOP } }))
+    expect(misconfigured).toMatchObject({ kind: 'deny', status: 503, reason: 'missing-env' })
+
+    for (const decision of [noToken, wrongSecret, otherShop, wrongAudience, misconfigured]) {
+      expect(JSON.stringify(decision)).not.toContain('eyJ')
+    }
+  })
+
+  it('says why a page load bounced', async () => {
+    expect(await decideProxy(input({ searchParams: new URLSearchParams({ shop: SHOP, host: 'h' }) }))).toEqual({ kind: 'bounce', reason: 'no-token' })
+    const expired = token({ exp: NOW - 60 })
+    expect(await decideProxy(input({ searchParams: new URLSearchParams({ id_token: expired, shop: SHOP, host: 'h' }) }))).toEqual({ kind: 'bounce', reason: 'token-expired' })
+  })
 })
 
 describe('isDocumentRequest', () => {
@@ -91,6 +133,16 @@ describe('isDocumentRequest', () => {
     expect(isDocumentRequest({ secFetchDest: null, accept: 'text/html,application/xhtml+xml', rsc: null })).toBe(true)
     expect(isDocumentRequest({ secFetchDest: 'empty', accept: '*/*', rsc: null })).toBe(false)
     expect(isDocumentRequest({ secFetchDest: null, accept: 'text/x-component', rsc: '1' })).toBe(false)
+  })
+
+  it('is true for a page loaded in an iframe or frame (how the Shopify admin embeds the app)', () => {
+    expect(isDocumentRequest({ secFetchDest: 'iframe', accept: 'text/html', rsc: null })).toBe(true)
+    expect(isDocumentRequest({ secFetchDest: 'frame', accept: 'text/html', rsc: null })).toBe(true)
+  })
+
+  it('is false for other destinations such as scripts and images', () => {
+    expect(isDocumentRequest({ secFetchDest: 'script', accept: '*/*', rsc: null })).toBe(false)
+    expect(isDocumentRequest({ secFetchDest: 'image', accept: 'image/*', rsc: null })).toBe(false)
   })
 })
 
