@@ -28,6 +28,19 @@ export async function proxy(req: NextRequest) {
     isDevelopment: process.env.NODE_ENV === 'development',
   })
 
+  // Runtime logs show console output only. Log why a request was bounced or refused,
+  // never a token, a secret or a query string.
+  if (decision.kind === 'bounce' || decision.kind === 'deny') {
+    const status = decision.kind === 'deny' ? ` status=${decision.status}` : ''
+    console.log(
+      `[proxy] ${decision.kind}${status} reason=${decision.reason} path=${req.nextUrl.pathname}` +
+        ` dest=${req.headers.get('sec-fetch-dest') ?? '-'}` +
+        ` idTokenParam=${req.nextUrl.searchParams.has('id_token')} authHeader=${req.headers.has('authorization')}` +
+        ` shopParam=${req.nextUrl.searchParams.has('shop')} hostParam=${req.nextUrl.searchParams.has('host')}` +
+        ` bounced=${req.nextUrl.searchParams.get('shopify-bounced') === '1'}`,
+    )
+  }
+
   if (decision.kind === 'bounce') {
     return new NextResponse(bouncePage(env.apiKey ?? ''), { status: 200, headers: { 'Content-Type': 'text/html' } })
   }
