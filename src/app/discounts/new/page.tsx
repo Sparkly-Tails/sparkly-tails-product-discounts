@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { createDiscount } from '@/actions/discountActions'
-import { pricesUniform } from '@/lib/config'
+import { pricesUniform } from '@/lib/pricesUniform'
 import MemberPicker, { type SelectedMember } from '@/components/MemberPicker'
 import PricingModeTierFields from '@/components/PricingModeTierFields'
 

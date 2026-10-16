@@ -1,0 +1,46 @@
+# Dev copy of the app: the "demo" app in the Dev Dashboard, paired with the dev
+# Vercel project (https://sparkly-tails-product-discounts-nyq.vercel.app, which
+# deploys the `dev` branch). This is NOT the production app; production is
+# shopify.app.toml.
+#
+# Shopify managed installation: scopes live here and Shopify installs the app
+# itself, with no redirect through this app. The admin logs in with an App Bridge
+# ID token exchanged for an access token (see docs/superpowers/specs/2026-10-15-dev-managed-install-auth-design.md).
+#
+# Always pass --config explicitly so the right app is targeted:
+#   SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk \
+#     shopify app deploy --config shopify.app.dev.toml    # dev app only
+#   shopify app deploy --config shopify.app.toml          # production app
+#
+# Only public values live here. The dev app's client secret, the database URLs and
+# every token are environment variables on the dev Vercel project, never in git.
+
+client_id = "f707124c97ab92f1fc7dd99b1a01c8e1"
+name = "demo"
+application_url = "https://sparkly-tails-product-discounts-nyq.vercel.app"
+embedded = true
+
+[access_scopes]
+scopes = "read_discounts,read_products,write_discounts,write_products"
+
+[auth]
+redirect_urls = [ "https://sparkly-tails-product-discounts-nyq.vercel.app/api/auth" ]
+
+[webhooks]
+api_version = "2026-10"
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/app/uninstalled"
+  topics = [ "app/uninstalled" ]
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/app/scopes_update"
+  topics = [ "app/scopes_update" ]
+
+  # Mandatory compliance topics. Handled by src/app/webhooks/compliance/route.ts.
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/compliance"
+  compliance_topics = [ "customers/data_request", "customers/redact", "shop/redact" ]
+
+[build]
+automatically_update_urls_on_dev = false

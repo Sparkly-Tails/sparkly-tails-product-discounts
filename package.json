@@ -1,6 +1,6 @@
 {
   "name": "sparkly-tails-product-discounts",
-  "version": "0.21.13",
+  "version": "0.23.5",
   "private": true,
   "engines": {
     "node": ">=20.9.0"
@@ -11,9 +11,13 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "postinstall": "prisma generate"
   },
   "dependencies": {
+    "@prisma/client": "6.19.3",
+    "@shopify/shopify-api": "15.0.1",
+    "@shopify/shopify-app-session-storage-prisma": "11.0.1",
     "next": "16.2.10",
     "react": "19.2.4",
     "react-dom": "19.2.4"
@@ -29,6 +33,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.10",
     "jsdom": "^29.1.1",
+    "prisma": "6.19.3",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^3"
