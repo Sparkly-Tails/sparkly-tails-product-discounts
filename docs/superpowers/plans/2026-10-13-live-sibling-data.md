@@ -1031,7 +1031,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 
 ## After the tasks (controller, not a task)
 
-Run the full verification once more (`npx tsc --noEmit`, `npx vitest run`, extension tests, `npx next build --webpack`), then check the PR state before pushing (`gh pr view feat/live-sibling-data --json state`; none exists yet) and open the PR. The PR description must state the rollout order from the spec (merge → user runs `shopify app deploy --config shopify.app.toml` → re-save each live tier discount, only after the deploy → live check → later cleanup PR), the 50-sibling listing limit, and that the fallback block is marked `TEMPORARY FALLBACK` in `tier-pricing.liquid`. The user merges and deploys.
+Run the full verification once more (`npx tsc --noEmit`, `npx vitest run`, extension tests, `npx next build --webpack`), then check the PR state before pushing (`gh pr view feat/live-sibling-data --json state`; none exists yet) and open the PR. The PR description must state the rollout order from the spec (user runs `shopify app deploy --config <the app's toml>` FIRST → merge → re-save each live tier discount → live check → later cleanup PR; the final review showed that merging first lets an ordinary admin save write the new shape before the new Liquid is live), the 50-sibling listing limit, and that the fallback block is marked `TEMPORARY FALLBACK` in `tier-pricing.liquid`. The user merges and deploys.
 
 **Live check list (user, after deploy and re-save):**
 1. A tier product page: the mix & match list shows the right titles and thumbnails.

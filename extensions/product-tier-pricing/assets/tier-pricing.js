@@ -345,9 +345,9 @@ function buildMixMatchRows(products, cartItems) {
   return products.map((product) => {
     const member = { productId: extractNumericId(product.productId), variantId: product.variantId ? extractNumericId(product.variantId) : undefined }
     const qty = sumMemberQuantityInCart(cartItems || [], [member])
-    const href = member.variantId ? '/products/' + product.handle + '?variant=' + member.variantId : '/products/' + product.handle
     return {
-      href,
+      // The theme (Liquid) builds the link from the live product, including any ?variant= query.
+      href: product.url,
       title: product.title,
       imageUrl: product.imageUrl || null,
       qtyLabel: qty === 1 ? '1 in cart' : qty + ' in cart',
@@ -372,10 +372,17 @@ function buildDisplayMixMatchItems(config) {
     productId: config.productId,
     variantId: opt.variantId,
     title: opt.title,
-    handle: config.productHandle,
+    url: opt.url,
     imageUrl: null,
   }))
   return ownRows.concat(config.mixMatchListItems)
+}
+
+// Siblings that still resolve in the store. A sibling whose product was deleted
+// or unpublished stays in `siblings` (its units still count toward the combined
+// quantity) but is not shown in the list.
+function listedMixMatchItems(siblings) {
+  return (siblings || []).filter((sibling) => sibling.listed)
 }
 
 // Rows of a time-based discount for ONE product: [{ variantId: string|null,
@@ -456,6 +463,7 @@ if (typeof module !== 'undefined' && module.exports) {
     computeWidgetViewModel,
     buildMixMatchRows,
     buildDisplayMixMatchItems,
+    listedMixMatchItems,
   }
 }
 
@@ -636,6 +644,7 @@ if (typeof document !== 'undefined') {
     const ownVariantOptions = (discount.ownVariantOptions || []).map((o) => ({
       variantId: extractNumericId(o.variantId),
       title: o.title,
+      url: o.url,
     }))
     const siblingMembers = (discount.siblings || []).map((s) => ({
       productId: extractNumericId(s.productId),
@@ -659,7 +668,7 @@ if (typeof document !== 'undefined') {
         ? extractNumericId(discount.selfVariantId)
         : container.dataset.selectedVariantId || null,
       allMembers,
-      mixMatchListItems: discount.siblings || [],
+      mixMatchListItems: listedMixMatchItems(discount.siblings),
       isGroup: allMembers.length > 1,
     }
   }

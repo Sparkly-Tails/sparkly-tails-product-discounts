@@ -10,23 +10,75 @@
 {%- assign selected_variant_id = product.selected_or_first_available_variant.id | prepend: 'gid://shopify/ProductVariant/' -%}
 {%- assign discount_json = '{"tiers":[]}' -%}
 {%- if discount_metafield != blank -%}
+  {%- assign sibling_product_refs = product.metafields.sparkly_product_discounts.sibling_products.value -%}
+  {%- assign sibling_variant_refs = product.metafields.sparkly_product_discounts.sibling_variants.value -%}
   {%- capture siblings_json -%}
     [
     {%- for sibling in discount_metafield.value.siblings -%}
+      {%- assign sib_listed = false -%}
+      {%- assign sib_title = nil -%}
+      {%- assign sib_url = nil -%}
+      {%- assign sib_image = nil -%}
+      {%- if sibling.variantId != blank -%}
+        {%- for ref in sibling_variant_refs -%}
+          {%- assign ref_gid = ref.id | prepend: 'gid://shopify/ProductVariant/' -%}
+          {%- if ref_gid == sibling.variantId -%}
+            {%- assign sib_listed = true -%}
+            {%- capture sib_title -%}{{ ref.product.title }} – {{ ref.title }}{%- endcapture -%}
+            {%- capture sib_url -%}{{ ref.product.url }}?variant={{ ref.id }}{%- endcapture -%}
+            {%- assign sib_image_source = ref.featured_image | default: ref.product.featured_image -%}
+            {%- if sib_image_source != blank -%}
+              {%- assign sib_image = sib_image_source | image_url: width: 160 -%}
+            {%- endif -%}
+          {%- endif -%}
+        {%- endfor -%}
+      {%- else -%}
+        {%- for ref in sibling_product_refs -%}
+          {%- assign ref_gid = ref.id | prepend: 'gid://shopify/Product/' -%}
+          {%- if ref_gid == sibling.productId -%}
+            {%- assign sib_listed = true -%}
+            {%- assign sib_title = ref.title -%}
+            {%- assign sib_url = ref.url -%}
+            {%- if ref.featured_image != blank -%}
+              {%- assign sib_image = ref.featured_image | image_url: width: 160 -%}
+            {%- endif -%}
+          {%- endif -%}
+        {%- endfor -%}
+      {%- endif -%}
+      {%- comment -%}
+        TEMPORARY FALLBACK (remove in the cleanup PR once every live tier discount has been re-saved):
+        a discount saved before sibling data became live still carries copied title / handle /
+        imageUrl on each sibling. Use them only when the live reference did not resolve.
+      {%- endcomment -%}
+      {%- if sib_listed == false and sibling.title != blank -%}
+        {%- assign sib_listed = true -%}
+        {%- assign sib_title = sibling.title -%}
+        {%- capture sib_url -%}/products/{{ sibling.handle }}{%- if sibling.variantId != blank -%}?variant={{ sibling.variantId | split: '/' | last }}{%- endif -%}{%- endcapture -%}
+        {%- assign sib_image = sibling.imageUrl -%}
+      {%- endif -%}
       {
         "productId": {{ sibling.productId | json }},
-        "title": {{ sibling.title | json }},
-        "handle": {{ sibling.handle | json }},
         "variantId": {{ sibling.variantId | default: null | json }},
-        "imageUrl": {{ sibling.imageUrl | default: null | json }}
+        "title": {{ sib_title | default: null | json }},
+        "url": {{ sib_url | default: null | json }},
+        "imageUrl": {{ sib_image | default: null | json }},
+        "listed": {{ sib_listed }}
       }{%- unless forloop.last -%},{%- endunless -%}
     {%- endfor -%}
     ]
   {%- endcapture -%}
   {%- capture own_variant_options_json -%}
     [
-    {%- for opt in discount_metafield.value.ownVariantOptions -%}
-      { "variantId": {{ opt.variantId | json }}, "title": {{ opt.title | json }} }{%- unless forloop.last -%},{%- endunless -%}
+    {%- assign own_first = true -%}
+    {%- for own_id in discount_metafield.value.ownVariantIds -%}
+      {%- for own_variant in product.variants -%}
+        {%- assign own_variant_gid = own_variant.id | prepend: 'gid://shopify/ProductVariant/' -%}
+        {%- if own_variant_gid == own_id -%}
+          {%- unless own_first -%},{%- endunless -%}
+          {%- assign own_first = false -%}
+          { "variantId": {{ own_id | json }}, "title": {{ own_variant.title | json }}, "url": {{ product.url | append: '?variant=' | append: own_variant.id | json }} }
+        {%- endif -%}
+      {%- endfor -%}
     {%- endfor -%}
     ]
   {%- endcapture -%}
