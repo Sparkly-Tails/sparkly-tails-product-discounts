@@ -97,22 +97,27 @@ copied titles or images.
 
 ## Rollout (all steps are the user's actions)
 
-1. Merge the PR so Vercel deploys the admin (it writes the new shape on the next
-   save).
-2. Run `shopify app deploy --config shopify.app.toml` (the new Liquid, with
-   the fallback).
-3. Re-save each live tier discount in the admin. Its products' metafields are
-   rewritten in the new shape.
+1. Deploy the extension first: `shopify app deploy --config <the app's toml>`
+   (dev app: `shopify.app.dev.toml`; production: `shopify.app.toml`). The new
+   Liquid reads both the new shape and the old copied shape (the fallback), so
+   deploying it ahead of the admin is always safe.
+2. Merge the PR so Vercel deploys the admin. From this point ANY save in the
+   admin (a tier edit, a title change, the live/draft toggle, not only a
+   deliberate re-save) writes the new shape for that discount's products.
+3. Re-save each live tier discount in the admin, so every product's metafields
+   are rewritten in the new shape.
 4. Check a product page: rename a sibling product (or change its image), reload,
    and the mix & match list updates with no re-save. Also check a product that is
    a variant sibling, and a sibling that is unpublished (it must disappear from
    the list).
 5. Later, the cleanup PR removes the fallback.
 
-Either order of steps 1 and 2 is safe: new Liquid reads the old shape through the
-fallback, and old Liquid keeps reading a product until it is re-saved (re-saving
-before step 2 would give old Liquid entries with no titles, so re-save only after
-step 2).
+Deploy before merging. The old Liquid cannot read the new shape (siblings would
+show with blank titles and links to `/products/null`, and a product's own-variant
+rows would vanish), and the new shape reaches a product on any admin save after
+the merge, so the new Liquid must already be live when the admin is. (An earlier
+version of this section said either order was safe; a final review showed it is
+not.)
 
 ## Assumptions to prove in the first plan step
 
