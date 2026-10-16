@@ -166,3 +166,17 @@ description states the rollout order.
 | List length limit below a discount's member count | Writes fail on large discounts | Assumption 3, proved first; cap or split |
 | Re-save before the Liquid deploy | Old Liquid shows rows without titles | Rollout says re-save only after the deploy |
 | Resolved URL differs from the old `/products/<handle>` | None expected (it is the storefront's own URL) | Check in rollout step 4 |
+
+## Gate results (2026-10-16)
+
+Run on the dev store `demo-nlmhyat3` (theme `test-data`, Admin API 2025-10) with a Custom Liquid block on the product page and probe metafields in the `sparkly_product_discounts` namespace on a product. Everything below was read from the printed output or the API answer, nothing was assumed.
+
+1. References resolve without a definition: **yes**. The store has no metafield definition for `sparkly_product_discounts.sibling_*` (checked: it has only two unrelated `test_data.*` definitions), and both a `list.product_reference` and a `list.variant_reference` metafield printed `id`, `title`, `url` and, for products, `featured_image | image_url`. Plan Step 5 (definitions script) is not needed.
+2. Variant reference gives `variant.title`, `variant.product.title` and an image: **yes, with a caveat**. `variant.title`, `variant.product.title`, `variant.product.url` and `variant.product.featured_image | image_url` all printed. `variant.featured_image | image_url` raised `Liquid error: invalid url input` for both variants tested (neither has an image of its own), so the Liquid must use the variant image only when it exists and otherwise the product image, and never pass a nil image to `image_url`.
+3. Maximum list size: write limit **128** (a list of 129 was refused with "Value has more than 128 elements."); the Liquid loop returned **50** of 55 distinct variant references. `SIBLING_REFERENCE_LIMIT` stays **50**. Not tested: a product-reference list longer than 50 (the dev store has 17 products, too few distinct visible ones); the cap is assumed to be the same for product lists. Also observed: 51 copies of the same product read back as 1 item, so identical references collapse and a writer cannot rely on duplicates.
+4. Draft/unpublished product disappears from the resolved list: **yes**. With The Complete Snowboard set to Draft, its line vanished from the product list and its "Ice" variant line vanished from the variant list. Likewise, the 55 variants of a throwaway product that was not yet available on the Online Store read as 0 items, and after the product was published they resolved (up to the cap of 50).
+5. `metafieldsDelete` on a missing key gives no userErrors: **yes** (`deletedMetafields: [null]`, `userErrors: []`).
+
+Also checked: renaming a referenced product showed the new title on the next page load in both the product list and the variant list (the point of the design).
+
+Consequences for the plan: Step 5 is skipped; Task 2 uses `SIBLING_REFERENCE_LIMIT = 50` for both lists; Task 4's Liquid must keep the variant-to-product image fallback and guard against a nil image; siblings that are draft or not on the Online Store silently drop out of the widget (expected, document it in the rollout notes).
