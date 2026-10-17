@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { createHmac } from 'node:crypto'
-import { handleWebhook, parseScopesPayload, complianceAction } from '@/lib/webhookHandler'
+import { handleWebhook, parseScopesPayload, complianceAction, bodyKeyNames } from '@/lib/webhookHandler'
 
 const SECRET = 'client-secret'
 const sign = (raw: string, secret = SECRET) => createHmac('sha256', secret).update(raw, 'utf8').digest('base64')
@@ -76,5 +76,27 @@ describe('complianceAction', () => {
     expect(complianceAction('SHOP_REDACT')).toBe('delete-sessions')
     expect(complianceAction('CUSTOMERS_DATA_REQUEST')).toBe('acknowledge')
     expect(complianceAction('orders/create')).toBe('ignore')
+  })
+})
+
+describe('bodyKeyNames (temporary: shows which field carries the shop, never a value)', () => {
+  it('lists the top-level key names of a JSON object body', () => {
+    expect(bodyKeyNames('{"id":1,"shop_domain":"a.myshopify.com","nested":{"x":1}}')).toBe('id,shop_domain,nested')
+  })
+
+  it('says so when the body is not JSON or not an object', () => {
+    expect(bodyKeyNames('not json')).toBe('not-json')
+    expect(bodyKeyNames('[1,2]')).toBe('not-an-object')
+  })
+
+  it('handleWebhook logs the key names but never a value', async () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {})
+    const body = '{"shop_domain":"secret-store.myshopify.com","email":"customer@example.com"}'
+    await handleWebhook(webhookRequest(body), { secret: SECRET, onVerified: async () => {} })
+    const logged = log.mock.calls.map((call) => call.join(' ')).join('\n')
+    log.mockRestore()
+    expect(logged).toContain('shop_domain,email')
+    expect(logged).not.toContain('secret-store.myshopify.com')
+    expect(logged).not.toContain('customer@example.com')
   })
 })
