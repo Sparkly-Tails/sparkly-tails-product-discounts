@@ -1,7 +1,7 @@
 # Multi-store dev app (any store can install it) — design
 
 **Date:** 2026-10-17
-**Status:** awaiting review (the design was played back to and approved by the user in conversation; this is the written version)
+**Status:** awaiting the owner's review of the written spec (the design was played back to and approved in conversation; a fresh reviewer read this document and its questions are answered below)
 **App:** the dev app `demo` (`shopify.app.dev.toml`). Production (`st-product-discounts`, `shopify.app.toml`) is out of scope.
 **Branch workflow:** a milestone branch, see "Branches and commits".
 
@@ -43,6 +43,7 @@ The app will eventually be published in the Shopify App Store. It must therefore
 - The milestone PR into `dev` is squash-merged (the repo's pattern so far), so reverting the milestone is one `git revert`.
 - Webhooks take the shop from the signed body when Shopify provides it (see 5.2).
 - `scripts/activate-discount.mjs` is deleted (its job moves into the app).
+- Webhook rules in 5.2, the existing-discount policy and mechanism in 5.3, and leaving the product-card snippet out of new-store behaviour are my calls from the builder check.
 - The milestone is live-tested on the dev app by deploying the milestone branch to the dev Vercel project through the Vercel connector, with the owner's yes for each deploy.
 
 ## Current state (verified on `origin/dev` at 0.23.12)
@@ -64,7 +65,7 @@ The app will eventually be published in the Shopify App Store. It must therefore
 
 ### 5.1 The shop comes from the token
 
-- `verifyIdToken` no longer takes a `shop` to match. It validates `dest` as a Shopify shop host (`^[a-z0-9][a-z0-9-]*\.myshopify\.com$`, https only), requires the `iss` host to equal the `dest` host, keeps the audience, signature and time checks, and returns the shop.
+- `verifyIdToken` no longer takes a `shop` to match. It validates `dest` as a Shopify shop host (`^[a-z0-9][a-z0-9-]*\.myshopify\.com$`, https only), requires the host of `iss` (normally `https://<shop>/admin`) to equal the host of `dest` (compare hosts only), keeps the audience, signature and time checks, and returns the shop.
 - `decideProxy` / `src/proxy.ts` no longer need `SHOPIFY_SHOP`; the 503 "misconfigured" case covers only the secret and the API key. The forwarded `x-shopify-shop` is the verified `dest` host.
 - One server helper returns the request's shop from `x-shopify-shop` (never from the environment) and throws outside a request unless a shop is passed. `getAccessToken(shop?)` and `shopifyQuery` use it; sessions are looked up by `offline_<shop>`; the 401 recovery deletes only that shop's session.
 - The three admin product-link builders use the request's shop.
@@ -73,13 +74,17 @@ The app will eventually be published in the Shopify App Store. It must therefore
 
 ### 5.2 Webhooks: the shop comes from the signed body
 
-Today the shop is taken from the header `x-shopify-shop-domain`, which the signature does not cover; a captured valid body replayed with another store's header could delete another store's sessions. Use the shop from the signed body wherever Shopify provides it (the compliance payloads carry `shop_domain`; check what `app/uninstalled` and `app/scopes_update` carry), and reject a delivery whose header and body disagree. Which payload field each topic has is verified from a real delivery in the proof step.
+Today the shop is taken from the header `x-shopify-shop-domain`, which the signature does not cover; a captured valid body replayed with another store's header could delete another store's sessions. Rules (my calls):
+
+- `shop/redact` and `app/uninstalled` are destructive, so the shop must come from the signed body (the compliance payloads carry `shop_domain`; the docs show the uninstall payload as a shop resource with `myshopify_domain`), and a delivery whose header and body disagree is rejected. The exact field per topic is verified from a real delivery in the proof step. If the real uninstall body carries no shop domain, the plan must propose how to bind the body to a store (for example keeping the shop's numeric ID with the session) and bring it back to the user before building it.
+- `app/scopes_update`: the docs show the body identifies the shop by `shop_id`, not by domain, so the shop can only come from the header. It must not apply unsigned-header-selected data from the body: the handler ignores the body's scope list and re-reads that shop's granted scopes from Shopify with that shop's own token (a replay then only triggers a harmless refresh for that shop).
 
 ### 5.3 Ensure the tier checkout discount exists
 
-- A function `ensureTierDiscount(shop)` creates the automatic app discount for `functionHandle: 'product-discount'` (title and `combinesWith` as in `scripts/activate-discount.mjs`) if the store does not have one. It is safe to repeat and must never create a second discount for a store, even with two tabs opening the app at once.
+- A function `ensureTierDiscount(shop)` creates the automatic app discount if the store does not have one. Its input is exactly what `scripts/activate-discount.mjs` sends, with the Function referenced by handle: `title: "Product tier discounts"`, `functionHandle: 'product-discount'`, `startsAt` now, `discountClasses: [PRODUCT]`, and no `combinesWith` (the script and the time-based creation in `src/timeDiscounts/shopifyRecord.ts` set none, so Shopify's default stays). It uses the Admin API version the client already uses. It is safe to repeat and must never create a second discount for a store, even with two tabs opening the app at once.
+- Existing-discount policy (my call): the lookup is by this Function, not by title. If a discount for the Function already exists in any state (active, scheduled, expired, paused) it is left alone and never modified; one is created only when none exists. If the merchant deletes it, the next app open recreates it. If creation fails (the Function is not deployed, a scope is missing) the app keeps working: the error is logged and shown when the merchant saves a discount; the home page is never blocked.
 - It runs when the app's home page loads and before the first discount is saved.
-- Recommended mechanism (a call, to be proven): remember the created discount's ID in an app-data metafield on the app installation (hidden from merchants; goes away with the installation) and verify it still exists before trusting it; otherwise look up the store's existing app discounts for this Function before creating.
+- Mechanism (my call, to be proven): the guarantee should come from Shopify alone. `MetafieldsSetInput` has a `compareDigest` field (confirmed in the schema; its create-only-if-absent behaviour is proven in the proof step), so the first caller claims an app-data metafield on the app installation (hidden from merchants; goes away with the installation) and only the winner creates the discount, then records its ID there; a stale claim expires after a short time. Fallback if that does not work: a Postgres advisory lock keyed by the shop, which stores no table or data, so the rule "the database holds only sessions" still holds. Either way the concurrency test must pass.
 - The time-based Function needs nothing new.
 
 ### 5.4 The namespace move
@@ -100,6 +105,7 @@ All keys live in `$app:smooth_discount`:
 - The Liquid, the two Functions' input queries and, if needed, `shopify.app.dev.toml` definitions are updated together. Whether a sub-namespace can be declared and read in Liquid is proven first; the fallback is the bare `$app` namespace with keys `smooth_discount_<key>` (the names live in the one module, so nothing else changes).
 - The sibling reference lists are `list.product_reference` / `list.variant_reference` metafields; whether app-owned reference lists resolve in Liquid (they resolved in a merchant namespace with no definition) is part of the proof step.
 - No migration script, no old-name fallback, no copying: the dev store's discounts are re-saved after the move. The `sparkly_tiers.tiers` leftover is not touched.
+- `snippets/product-card-with-discount.liquid` is referenced nowhere in the repo (an app-extension snippet cannot be rendered from a merchant's theme unless it is copied by hand, which I have not verified against the docs), so only its namespace read is renamed, to keep the drift test true. Making it usable is out of scope.
 - Also removed: the `TEMPORARY FALLBACK` block in `tier-pricing.liquid`, the unused `productHandle` field in `tier-pricing.js` and `data-product-handle`, and `scripts/activate-discount.mjs`.
 
 ### 5.5 Uninstall
@@ -111,7 +117,7 @@ All keys live in `$app:smooth_discount`:
 
 ### 5.6 Isolation tests (two dev stores)
 
-Needs a second dev store in the same organization as the dev app. Automated where possible:
+Needs a second dev store in the same organization as the dev app, created by the owner, with the dev app installed on it (a dependency of the isolation PR; the unit tests below do not wait for it). The scripted check reads each store's token through the app's client credentials: the builder runs it locally, taking the client secret from `shopify app env show --config shopify.app.dev.toml` inside the script, never printing it. Automated where possible:
 
 - Unit tests: `verifyIdToken` accepts a valid token for any well-formed `*.myshopify.com` shop and rejects a bad host, a non-https `dest`, and `iss` not matching `dest`; a forged `x-shopify-shop` is dropped; `getAccessToken` and `shopifyQuery` use the header shop and never the environment; two interleaved requests for shops A and B each read and refresh their own session; the 401 recovery deletes only the requesting shop's session; a webhook for shop A (valid body) never deletes B's sessions, and a header/body mismatch is rejected.
 - A scripted two-store check (client-credentials tokens for both stores, run by the builder): a discount configuration written on A is not visible on B; `ensureTierDiscount` called twice (and concurrently) on A leaves exactly one discount on A and none on B.
@@ -138,6 +144,7 @@ Throwaway tests on the dev app and two dev stores; the results are written into 
 ## Rollout (all steps are the user's actions)
 
 1. Deploy the extension from the milestone branch first (`shopify app deploy --config shopify.app.dev.toml`; the Mac SDK note in that file's header applies). The new Liquid and Functions read the new names; the new admin writes them.
+   Between steps 1 and 3 the widget and checkout discounts on the dev stores read nothing, because the new names are empty until the admin writes them; this is accepted dev behaviour (no fallbacks, per the user).
 2. Deploy the admin from the milestone branch to the dev Vercel project (through the Vercel connector, with the owner's yes) to live-test before merging.
 3. Re-save every dev discount; check the widget, a checkout, and the time-based discounts on the first dev store; repeat the install and the isolation checks on the second dev store.
 4. Merge the milestone PR into `dev` (squash). Remove `SHOPIFY_SHOP` from the dev Vercel project.
