@@ -44,7 +44,7 @@ The app will eventually be published in the Shopify App Store. It must therefore
 - Webhooks take the shop from the signed body when Shopify provides it (see 5.2).
 - `scripts/activate-discount.mjs` is deleted (its job moves into the app).
 - Webhook rules in 5.2, the existing-discount policy and mechanism in 5.3, and leaving the product-card snippet out of new-store behaviour are my calls from the builder check.
-- The milestone is live-tested on the dev app by deploying the milestone branch to the dev Vercel project through the Vercel connector, with the owner's yes for each deploy.
+- I never deploy anything (no Vercel deployments, no `shopify app deploy`): I only commit and open PRs. The owner deploys, either by merging to the branch the dev Vercel project builds or by pointing that project at the milestone branch for a live test; I may only read deployments and logs.
 
 ## Current state (verified on `origin/dev` at 0.23.12)
 
@@ -145,7 +145,7 @@ Throwaway tests on the dev app and two dev stores; the results are written into 
 
 1. Deploy the extension from the milestone branch first (`shopify app deploy --config shopify.app.dev.toml`; the Mac SDK note in that file's header applies). The new Liquid and Functions read the new names; the new admin writes them.
    Between steps 1 and 3 the widget and checkout discounts on the dev stores read nothing, because the new names are empty until the admin writes them; this is accepted dev behaviour (no fallbacks, per the user).
-2. Deploy the admin from the milestone branch to the dev Vercel project (through the Vercel connector, with the owner's yes) to live-test before merging.
+2. The owner deploys the admin from the milestone branch to the dev Vercel project (for example by pointing that project at the milestone branch for the test; I do not deploy) to live-test before merging.
 3. Re-save every dev discount; check the widget, a checkout, and the time-based discounts on the first dev store; repeat the install and the isolation checks on the second dev store.
 4. Merge the milestone PR into `dev` (squash). Remove `SHOPIFY_SHOP` from the dev Vercel project.
 5. Do not merge `dev` into `main` before the production login migration (unchanged rule).
