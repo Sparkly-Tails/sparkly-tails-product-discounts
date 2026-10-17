@@ -21,6 +21,9 @@ export async function handleWebhook(
   const topic = request.headers.get('x-shopify-topic')
   if (!shop || !topic) return new Response('Missing headers', { status: 400 })
 
+  // Temporary: shows which body field names the shop. Key names only, never a value; revert after the multi-store proof.
+  console.log(`Webhook ${topic} body keys: ${bodyKeyNames(body)}`)
+
   try {
     await options.onVerified({ shop, topic, body })
   } catch (error) {
@@ -28,6 +31,17 @@ export async function handleWebhook(
     return new Response('Webhook failed', { status: 500 })
   }
   return new Response(null, { status: 200 })
+}
+
+/** Temporary: the top-level key names of a webhook body (never the values), or why there are none. */
+export function bodyKeyNames(body: string): string {
+  try {
+    const parsed: unknown = JSON.parse(body)
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return 'not-an-object'
+    return Object.keys(parsed).join(',')
+  } catch {
+    return 'not-json'
+  }
 }
 
 /** The `current` scopes of an app/scopes_update payload, or null when the payload does not have them. */
