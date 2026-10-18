@@ -20,7 +20,7 @@ query Input {
     }
   }
   shop {
-    metafield(namespace: "sparkly_product_discounts", key: "config") {
+    metafield(namespace: "$app:smooth_discount", key: "tier_config") {
       jsonValue
     }
   }

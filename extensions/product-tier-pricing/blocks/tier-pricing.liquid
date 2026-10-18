@@ -2,11 +2,11 @@
   This block replaces the theme's native Buy Buttons price line (its
   "Show price" setting must be turned off in the theme editor). It always
   renders a price — a live-updating tiered price when
-  product.metafields.sparkly_product_discounts.discount is present AND the
+  product.metafields['$app:smooth_discount'].tier_discount is present AND the
   currently-selected variant is one of its members, or a plain price
   otherwise.
 {% endcomment %}
-{%- assign discount_metafield = product.metafields.sparkly_product_discounts.discount -%}
+{%- assign discount_metafield = product.metafields['$app:smooth_discount'].tier_discount -%}
 {%- assign selected_variant_id = product.selected_or_first_available_variant.id | prepend: 'gid://shopify/ProductVariant/' -%}
 {%- assign discount_json = '{"tiers":[]}' -%}
 {%- if discount_metafield != blank -%}
@@ -94,7 +94,7 @@
   {%- endcapture -%}
   {%- assign discount_json = discount_json_raw | strip | escape -%}
 {%- endif -%}
-{%- assign time_discount_metafield = product.metafields.sparkly_product_discounts.time_based_discount -%}
+{%- assign time_discount_metafield = product.metafields['$app:smooth_discount'].time_discount -%}
 {%- assign time_discount_json = '{}' -%}
 {%- if time_discount_metafield != blank -%}
   {%- capture time_discount_data -%}

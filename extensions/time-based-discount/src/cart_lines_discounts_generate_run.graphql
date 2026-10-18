@@ -21,7 +21,7 @@ query Input {
   }
   discount {
     discountClasses
-    metafield(namespace: "sparkly_time_discounts", key: "function_config") {
+    metafield(namespace: "$app:smooth_discount", key: "time_function_config") {
       jsonValue
     }
   }

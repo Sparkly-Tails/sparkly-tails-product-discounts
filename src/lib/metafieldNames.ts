@@ -5,20 +5,20 @@
  */
 export const METAFIELD_NAMESPACE = '$app:smooth_discount' as const
 
-/** Each key notes its owner and the `namespace.key` it replaces. */
+/** Each key notes the resource that owns it. The old names are in the spec (section 5.4). */
 export const METAFIELD_KEYS = {
-  /** Shop; was `sparkly_product_discounts.config`. */
+  /** Shop. */
   tierConfig: 'tier_config',
-  /** Product; was `sparkly_product_discounts.discount`. */
+  /** Product. */
   tierDiscount: 'tier_discount',
-  /** Product; was `sparkly_product_discounts.sibling_products`. */
+  /** Product. */
   tierSiblingProducts: 'tier_sibling_products',
-  /** Product; was `sparkly_product_discounts.sibling_variants`. */
+  /** Product. */
   tierSiblingVariants: 'tier_sibling_variants',
-  /** Product; was `sparkly_product_discounts.time_based_discount`. */
+  /** Product. */
   timeDiscount: 'time_discount',
-  /** Shop; was `sparkly_time_discounts.config`. */
+  /** Shop. */
   timeConfig: 'time_config',
-  /** Discount; was `sparkly_time_discounts.function_config`. */
+  /** Discount. */
   timeFunctionConfig: 'time_function_config',
 } as const
