@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { bouncePage, decideProxy, forwardHeaders } from '@/lib/proxyDecision'
+import { isShopHost } from '@/lib/idToken'
 
-function accessRestricted(shop: string | undefined, message: string): string {
-  const link = shop ? `<p><a href="https://${shop}/admin/apps">Go to Shopify admin &rarr;</a></p>` : ''
+/** `shop` comes from the URL, so it only becomes a link when it is a real shop host. */
+function accessRestricted(shop: string | null, message: string): string {
+  const link = shop && isShopHost(shop) ? `<p><a href="https://${shop}/admin/apps">Go to Shopify admin &rarr;</a></p>` : ''
   return `<!DOCTYPE html><html><head><title>Access restricted</title></head><body style="font-family:sans-serif;padding:40px;text-align:center"><h2>${message}</h2>${link}</body></html>`
 }
 
@@ -11,7 +13,6 @@ export async function proxy(req: NextRequest) {
   const env = {
     secret: process.env.SHOPIFY_API_SECRET_KEY,
     apiKey: process.env.NEXT_PUBLIC_SHOPIFY_API_KEY,
-    shop: process.env.SHOPIFY_SHOP,
   }
 
   const decision = await decideProxy({
@@ -49,7 +50,7 @@ export async function proxy(req: NextRequest) {
     const isHtml = (req.headers.get('accept') ?? '').includes('text/html')
     if (decision.status === 503) return NextResponse.json({ error: decision.message }, { status: 503 })
     return isHtml
-      ? new NextResponse(accessRestricted(env.shop, decision.message), { status: decision.status, headers: { 'Content-Type': 'text/html' } })
+      ? new NextResponse(accessRestricted(req.nextUrl.searchParams.get('shop'), decision.message), { status: decision.status, headers: { 'Content-Type': 'text/html' } })
       : NextResponse.json({ error: decision.message }, { status: decision.status })
   }
 
