@@ -1,4 +1,42 @@
 import { verifyWebhookHmac } from '@/lib/webhookHmac'
+import { isShopHost } from '@/lib/idToken'
+
+/**
+ * The body field that names the shop, per destructive topic (real `app/uninstalled` delivery: the
+ * shop resource; `shop/redact` per Shopify's docs). The signature covers the body but not the
+ * `x-shopify-shop-domain` header, so these topics trust only the body, and the header must agree.
+ */
+const BODY_SHOP_FIELD: Record<string, string> = {
+  APP_UNINSTALLED: 'myshopify_domain',
+  SHOP_REDACT: 'shop_domain',
+}
+
+const normalizeTopic = (topic: string): string => topic.toUpperCase().replace(/\//g, '_')
+
+function bodyShop(body: string, field: string): string | null {
+  try {
+    const value = (JSON.parse(body) as Record<string, unknown> | null)?.[field]
+    return typeof value === 'string' && isShopHost(value) ? value : null
+  } catch {
+    return null
+  }
+}
+
+export type ShopFromBody = { ok: true; shop: string } | { ok: false; reason: 'no-shop' | 'mismatch' }
+
+/**
+ * The shop a verified webhook is about. For app/uninstalled and shop/redact it is the shop in the
+ * signed body, and a header that names another shop is refused. Other topics do nothing destructive
+ * with the body, so they take the header shop once it is a real shop host.
+ */
+export function shopFromBody(topic: string, body: string, headerShop: string): ShopFromBody {
+  if (!isShopHost(headerShop)) return { ok: false, reason: 'no-shop' }
+  const field = BODY_SHOP_FIELD[normalizeTopic(topic)]
+  if (!field) return { ok: true, shop: headerShop }
+  const shop = bodyShop(body, field)
+  if (!shop) return { ok: false, reason: 'no-shop' }
+  return shop === headerShop ? { ok: true, shop } : { ok: false, reason: 'mismatch' }
+}
 
 export interface VerifiedWebhook {
   shop: string
@@ -17,9 +55,16 @@ export async function handleWebhook(
   const valid = await verifyWebhookHmac(body, request.headers.get('x-shopify-hmac-sha256'), options.secret)
   if (!valid) return new Response('Unauthorized', { status: 401 })
 
-  const shop = request.headers.get('x-shopify-shop-domain')
+  const headerShop = request.headers.get('x-shopify-shop-domain')
   const topic = request.headers.get('x-shopify-topic')
-  if (!shop || !topic) return new Response('Missing headers', { status: 400 })
+  if (!headerShop || !topic) return new Response('Missing headers', { status: 400 })
+
+  const resolved = shopFromBody(topic, body, headerShop)
+  if (!resolved.ok) {
+    console.log(`Webhook ${topic} refused: ${resolved.reason}`)
+    return new Response('Shop not confirmed', { status: 400 })
+  }
+  const shop = resolved.shop
 
   try {
     await options.onVerified({ shop, topic, body })
@@ -28,17 +73,6 @@ export async function handleWebhook(
     return new Response('Webhook failed', { status: 500 })
   }
   return new Response(null, { status: 200 })
-}
-
-/** The `current` scopes of an app/scopes_update payload, or null when the payload does not have them. */
-export function parseScopesPayload(body: string): string[] | null {
-  try {
-    const parsed: unknown = JSON.parse(body)
-    const current = (parsed as { current?: unknown } | null)?.current
-    return Array.isArray(current) && current.every((scope) => typeof scope === 'string') ? (current as string[]) : null
-  } catch {
-    return null
-  }
 }
 
 /** This app stores no customer data, so only shop/redact has work to do. Topic casing differs between API styles. */
