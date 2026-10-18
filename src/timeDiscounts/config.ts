@@ -1,5 +1,6 @@
 import { shopifyQuery } from '@/lib/shopify-client'
 import { zonedTimeToUtc } from '@/lib/shop'
+import { METAFIELD_NAMESPACE, METAFIELD_KEYS } from '@/lib/metafieldNames'
 
 /** A product, or one variant of it, picked for a discount. Omitting `variantId` means the whole product. */
 export interface DiscountMember {
@@ -70,8 +71,6 @@ export interface TimeDiscountsConfig {
   discounts: TimeDiscount[]
 }
 
-const NAMESPACE = 'sparkly_time_discounts'
-
 async function getShopId(): Promise<string> {
   const data = await shopifyQuery<{ shop: { id: string } }>(`query { shop { id } }`)
   return data.shop.id
@@ -86,7 +85,7 @@ export async function getTimeDiscountsConfig(): Promise<TimeDiscountsConfig> {
         metafield(namespace: $namespace, key: $key) { value }
       }
     }`,
-    { namespace: NAMESPACE, key: 'config' },
+    { namespace: METAFIELD_NAMESPACE, key: METAFIELD_KEYS.timeConfig },
   )
 
   if (!data.shop.metafield) return { discounts: [] }
@@ -108,7 +107,7 @@ export async function saveTimeDiscountsConfig(config: TimeDiscountsConfig): Prom
     }`,
     {
       metafields: [
-        { ownerId: shopId, namespace: NAMESPACE, key: 'config', type: 'json', value: JSON.stringify(config) },
+        { ownerId: shopId, namespace: METAFIELD_NAMESPACE, key: METAFIELD_KEYS.timeConfig, type: 'json', value: JSON.stringify(config) },
       ],
     },
   )

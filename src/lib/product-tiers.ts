@@ -1,10 +1,9 @@
 import { shopifyQuery } from '@/lib/shopify-client'
 import type { Discount } from '@/lib/config'
+import { METAFIELD_NAMESPACE, METAFIELD_KEYS } from '@/lib/metafieldNames'
 
-const NAMESPACE = 'sparkly_product_discounts'
-
-export const SIBLING_PRODUCTS_KEY = 'sibling_products'
-export const SIBLING_VARIANTS_KEY = 'sibling_variants'
+export const SIBLING_PRODUCTS_KEY = METAFIELD_KEYS.tierSiblingProducts
+export const SIBLING_VARIANTS_KEY = METAFIELD_KEYS.tierSiblingVariants
 
 /**
  * Liquid loops over a reference list return only the first 50 items, so a longer
@@ -98,12 +97,12 @@ export function metafieldWrites(productId: string, built: ProductMetafields): { 
   ]
   return {
     toSet: [
-      { ownerId: productId, namespace: NAMESPACE, key: 'discount', type: 'json', value: JSON.stringify(built.value) },
+      { ownerId: productId, namespace: METAFIELD_NAMESPACE, key: METAFIELD_KEYS.tierDiscount, type: 'json', value: JSON.stringify(built.value) },
       ...lists
         .filter((l) => l.ids.length > 0)
-        .map((l) => ({ ownerId: productId, namespace: NAMESPACE, key: l.key, type: l.type, value: JSON.stringify(l.ids) })),
+        .map((l) => ({ ownerId: productId, namespace: METAFIELD_NAMESPACE, key: l.key, type: l.type, value: JSON.stringify(l.ids) })),
     ],
-    toDelete: lists.filter((l) => l.ids.length === 0).map((l) => ({ ownerId: productId, namespace: NAMESPACE, key: l.key })),
+    toDelete: lists.filter((l) => l.ids.length === 0).map((l) => ({ ownerId: productId, namespace: METAFIELD_NAMESPACE, key: l.key })),
   }
 }
 
@@ -201,7 +200,7 @@ export async function clearDiscountMetafields(members: { productId: string }[]):
   const results = await Promise.allSettled(
     uniqueProductIds.map((productId) =>
       deleteMetafields(
-        ['discount', SIBLING_PRODUCTS_KEY, SIBLING_VARIANTS_KEY].map((key) => ({ ownerId: productId, namespace: NAMESPACE, key })),
+        [METAFIELD_KEYS.tierDiscount, SIBLING_PRODUCTS_KEY, SIBLING_VARIANTS_KEY].map((key) => ({ ownerId: productId, namespace: METAFIELD_NAMESPACE, key })),
       ),
     ),
   )

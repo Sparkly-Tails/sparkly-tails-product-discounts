@@ -10,8 +10,8 @@
 {%- assign selected_variant_id = product.selected_or_first_available_variant.id | prepend: 'gid://shopify/ProductVariant/' -%}
 {%- assign discount_json = '{"tiers":[]}' -%}
 {%- if discount_metafield != blank -%}
-  {%- assign sibling_product_refs = product.metafields.sparkly_product_discounts.sibling_products.value -%}
-  {%- assign sibling_variant_refs = product.metafields.sparkly_product_discounts.sibling_variants.value -%}
+  {%- assign sibling_product_refs = product.metafields['$app:smooth_discount'].tier_sibling_products.value -%}
+  {%- assign sibling_variant_refs = product.metafields['$app:smooth_discount'].tier_sibling_variants.value -%}
   {%- capture siblings_json -%}
     [
     {%- for sibling in discount_metafield.value.siblings -%}

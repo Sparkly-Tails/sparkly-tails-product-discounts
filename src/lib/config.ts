@@ -1,4 +1,5 @@
 import { shopifyQuery } from '@/lib/shopify-client'
+import { METAFIELD_NAMESPACE, METAFIELD_KEYS } from '@/lib/metafieldNames'
 
 export interface Tier {
   minQty: number
@@ -49,8 +50,6 @@ export interface Config {
   discounts: Discount[]
 }
 
-const NAMESPACE = 'sparkly_product_discounts'
-
 async function getShopId(): Promise<string> {
   const data = await shopifyQuery<{ shop: { id: string } }>(
     `query { shop { id } }`,
@@ -67,7 +66,7 @@ export async function getConfig(): Promise<Config> {
         metafield(namespace: $namespace, key: $key) { value }
       }
     }`,
-    { namespace: NAMESPACE, key: 'config' },
+    { namespace: METAFIELD_NAMESPACE, key: METAFIELD_KEYS.tierConfig },
   )
 
   if (!data.shop.metafield) {
@@ -93,8 +92,8 @@ export async function saveConfig(config: Config): Promise<void> {
       metafields: [
         {
           ownerId: shopId,
-          namespace: NAMESPACE,
-          key: 'config',
+          namespace: METAFIELD_NAMESPACE,
+          key: METAFIELD_KEYS.tierConfig,
           type: 'json',
           value: JSON.stringify(config),
         },

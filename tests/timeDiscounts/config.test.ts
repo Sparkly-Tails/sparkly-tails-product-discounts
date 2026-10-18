@@ -4,6 +4,7 @@ import {
   computeTimeDiscountStatusLabel, type TimeDiscountsConfig,
 } from '@/timeDiscounts/config'
 import * as shopifyClient from '@/lib/shopify-client'
+import { METAFIELD_NAMESPACE, METAFIELD_KEYS } from '@/lib/metafieldNames'
 
 describe('getTimeDiscountsConfig', () => {
   beforeEach(() => vi.restoreAllMocks())
@@ -24,6 +25,13 @@ describe('getTimeDiscountsConfig', () => {
 
     const config = await getTimeDiscountsConfig()
     expect(config).toEqual(stored)
+  })
+
+  it('reads time_config in the app namespace', async () => {
+    const spy = vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({ shop: { metafield: null } })
+
+    await getTimeDiscountsConfig()
+    expect(spy).toHaveBeenCalledWith(expect.any(String), { namespace: METAFIELD_NAMESPACE, key: METAFIELD_KEYS.timeConfig })
   })
 
   it('reads a discount stored without a kind as a per-product discount', async () => {
@@ -75,8 +83,8 @@ describe('saveTimeDiscountsConfig', () => {
         metafields: [
           expect.objectContaining({
             ownerId: 'gid://shopify/Shop/1',
-            namespace: 'sparkly_time_discounts',
-            key: 'config',
+            namespace: METAFIELD_NAMESPACE,
+            key: METAFIELD_KEYS.timeConfig,
             type: 'json',
             value: JSON.stringify(config),
           }),

@@ -1,8 +1,7 @@
 import { shopifyQuery } from '@/lib/shopify-client'
 import { zonedTimeToUtc } from '@/lib/shop'
 import type { TimeDiscount } from '@/timeDiscounts/config'
-
-const NAMESPACE = 'sparkly_product_discounts'
+import { METAFIELD_NAMESPACE, METAFIELD_KEYS } from '@/lib/metafieldNames'
 
 interface TimeDiscountMetafieldItem {
   /** Variant GID, or null for the whole (single-variant) product. */
@@ -22,7 +21,7 @@ interface TimeDiscountMetafieldValue {
 }
 
 /**
- * Writes the `time_based_discount` metafield to every unique product in the
+ * Writes the `time_discount` metafield to every unique product in the
  * discount's rows — the storefront scripts read this, keyed per product.
  * `onlyProductIds` limits the writes to those products (a single-row change
  * need not rewrite every product).
@@ -74,7 +73,7 @@ async function setTimeDiscountMetafield(productId: string, value: TimeDiscountMe
     }`,
     {
       metafields: [
-        { ownerId: productId, namespace: NAMESPACE, key: 'time_based_discount', type: 'json', value: JSON.stringify(value) },
+        { ownerId: productId, namespace: METAFIELD_NAMESPACE, key: METAFIELD_KEYS.timeDiscount, type: 'json', value: JSON.stringify(value) },
       ],
     },
   )
@@ -84,7 +83,7 @@ async function setTimeDiscountMetafield(productId: string, value: TimeDiscountMe
   }
 }
 
-/** Deletes the `time_based_discount` metafield from every unique product in the list. */
+/** Deletes the `time_discount` metafield from every unique product in the list. */
 export async function clearTimeDiscountMetafields(members: { productId: string }[]): Promise<void> {
   const uniqueProductIds = [...new Set(members.map((m) => m.productId))]
 
@@ -98,7 +97,7 @@ export async function clearTimeDiscountMetafields(members: { productId: string }
             userErrors { field message }
           }
         }`,
-        { metafields: [{ ownerId: productId, namespace: NAMESPACE, key: 'time_based_discount' }] },
+        { metafields: [{ ownerId: productId, namespace: METAFIELD_NAMESPACE, key: METAFIELD_KEYS.timeDiscount }] },
       )
 
       if (data.metafieldsDelete.userErrors.length > 0) {

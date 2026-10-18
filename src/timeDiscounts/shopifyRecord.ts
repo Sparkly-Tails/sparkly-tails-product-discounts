@@ -1,9 +1,9 @@
 import { syncTimeDiscountMetafields } from '@/timeDiscounts/metafieldSync'
 import { shopifyQuery } from '@/lib/shopify-client'
+import { METAFIELD_NAMESPACE, METAFIELD_KEYS } from '@/lib/metafieldNames'
 import { assertItemsFitFunctionConfig } from '@/timeDiscounts/items'
 import type { TimeDiscount, TimeDiscountItem, TimeDiscountsConfig } from '@/timeDiscounts/config'
 
-const METAFIELD_NAMESPACE = 'sparkly_time_discounts'
 /** Must match the `handle` in extensions/time-based-discount/shopify.extension.toml. */
 const FUNCTION_HANDLE = 'time-based-discount'
 
@@ -17,7 +17,7 @@ interface FunctionConfigMetafield {
 /** The Function's own per-discount config, written atomically as part of the DiscountAutomaticAppInput on create/update. */
 export function buildFunctionConfigMetafield(items: TimeDiscountItem[]): FunctionConfigMetafield {
   assertItemsFitFunctionConfig(items)
-  return { namespace: METAFIELD_NAMESPACE, key: 'function_config', type: 'json', value: JSON.stringify({ items }) }
+  return { namespace: METAFIELD_NAMESPACE, key: METAFIELD_KEYS.timeFunctionConfig, type: 'json', value: JSON.stringify({ items }) }
 }
 
 export async function createShopifyDiscountRecord(input: {
