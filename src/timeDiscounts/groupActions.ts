@@ -2,6 +2,7 @@
 
 import { getTimeDiscountsConfig, saveTimeDiscountsConfig, type GroupSpec } from '@/timeDiscounts/config'
 import { getShopTimezone } from '@/lib/shop'
+import { getRequestShop } from '@/lib/requestShop'
 import { adminProductBaseUrl, errorMessage, findDiscountOrThrow, updateShopifyDiscountRecord } from '@/timeDiscounts/shopifyRecord'
 import { resolveGroup, syncGroupMetafields } from '@/timeDiscounts/groupServer'
 import {
@@ -17,7 +18,7 @@ import {
 export async function previewGroup(rule: unknown, selection: unknown, excludeDiscountId?: string): Promise<PreviewResult> {
   try {
     const group = { ...cleanRule(rule), selection: cleanSelection(selection) }
-    const { covered } = await resolveGroup(group, excludeDiscountId, adminProductBaseUrl())
+    const { covered } = await resolveGroup(group, excludeDiscountId, adminProductBaseUrl(await getRequestShop()))
     return { ok: true, covered }
   } catch (err) {
     return { ok: false, error: errorMessage(err) }
@@ -37,7 +38,7 @@ async function saveGroup(discountId: string, change: (group: GroupSpec) => Group
     if (discount.kind !== 'group' || !discount.group) throw new Error(NOT_A_GROUP_MESSAGE)
 
     const group = change(discount.group)
-    const { items, covered } = await resolveGroup(group, discountId, adminProductBaseUrl(), { allowEmpty: true })
+    const { items, covered } = await resolveGroup(group, discountId, adminProductBaseUrl(await getRequestShop()), { allowEmpty: true })
     const timezone = await getShopTimezone()
 
     await updateShopifyDiscountRecord(discount.shopifyDiscountId, { items })

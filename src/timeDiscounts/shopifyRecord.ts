@@ -152,6 +152,6 @@ export function errorMessage(err: unknown): string {
 }
 
 /** Link base for a product's Shopify admin page; ends with `/admin/products/`. */
-export function adminProductBaseUrl(): string {
-  return `https://${process.env.SHOPIFY_SHOP}/admin/products/`
+export function adminProductBaseUrl(shop: string): string {
+  return `https://${shop}/admin/products/`
 }
