@@ -8,6 +8,8 @@ import * as shopifyClient from '@/lib/shopify-client'
 import { NOT_A_GROUP_MESSAGE } from '@/timeDiscounts/group'
 import type { TimeDiscount } from '@/timeDiscounts/config'
 
+vi.mock('@/lib/requestShop', () => ({ getRequestShop: async () => 'test.myshopify.com' }))
+
 const P1 = 'gid://shopify/Product/1'
 const P2 = 'gid://shopify/Product/2'
 const covered = [{ productId: P1, title: 'Cat Toy', adminUrl: 'https://x/admin/products/1', regularPrice: 10, discountedPrice: 8 }]
@@ -22,7 +24,7 @@ describe('previewGroup', () => {
     expect(resolve).toHaveBeenCalledWith(
       { pricingMode: 'percent', amount: 20, selection },
       'time_disc_1',
-      expect.stringContaining('/admin/products/'),
+      'https://test.myshopify.com/admin/products/',
     )
   })
 

@@ -19,13 +19,15 @@ const stored = (over: Record<string, unknown> = {}) => ({
   id: `offline_${SHOP}`, shop: SHOP, accessToken: 'stored-token', expires: later(3_600_000), refreshToken: 'stored-refresh', refreshTokenExpires: later(86_400_000), ...over,
 })
 
-function requestWithIdToken(idToken: string | null): void {
-  vi.mocked(headers).mockResolvedValue(new Headers(idToken ? { 'x-shopify-id-token': idToken } : {}) as never)
+function requestWithIdToken(idToken: string | null, shop: string | null = SHOP): void {
+  const verified: Record<string, string> = {}
+  if (idToken) verified['x-shopify-id-token'] = idToken
+  if (shop) verified['x-shopify-shop'] = shop
+  vi.mocked(headers).mockResolvedValue(new Headers(verified) as never)
 }
 
 describe('getAccessToken', () => {
   beforeEach(() => {
-    process.env.SHOPIFY_SHOP = SHOP
     for (const fn of [tokenExchange, refreshToken, loadSession, storeSession]) fn.mockReset()
     vi.mocked(getShopify).mockReturnValue({
       auth: { tokenExchange, refreshToken },
@@ -35,7 +37,7 @@ describe('getAccessToken', () => {
     requestWithIdToken('id-jwt')
   })
 
-  it('looks the session up by the offline id of the configured shop and uses an unexpired token as it is', async () => {
+  it('looks the session up by the offline id of the request shop and uses an unexpired token as it is', async () => {
     loadSession.mockResolvedValue(stored())
 
     expect(await getAccessToken()).toBe('stored-token')
@@ -45,7 +47,7 @@ describe('getAccessToken', () => {
     expect(refreshToken).not.toHaveBeenCalled()
   })
 
-  it('exchanges the verified ID token for an expiring offline token and stores the session', async () => {
+  it('exchanges with the request shop and the ID token for an expiring offline token and stores the session', async () => {
     const exchanged = stored({ accessToken: 'exchanged-token' })
     loadSession.mockResolvedValue(undefined)
     tokenExchange.mockResolvedValue({ session: exchanged })
@@ -95,17 +97,26 @@ describe('getAccessToken', () => {
     await expect(getAccessToken()).rejects.toThrow(NOT_AUTHENTICATED_MESSAGE)
   })
 
-  it('works outside a request (a script): no ID token, so only a stored token can be used', async () => {
+  it('works outside a request (a script) when the shop is given: no ID token, so only a stored token can be used', async () => {
     vi.mocked(headers).mockRejectedValue(new Error('headers() was called outside a request scope'))
     loadSession.mockResolvedValue(stored())
 
-    expect(await getAccessToken()).toBe('stored-token')
+    expect(await getAccessToken(SHOP)).toBe('stored-token')
   })
 
-  it('throws when SHOPIFY_SHOP is not set', async () => {
-    delete process.env.SHOPIFY_SHOP
+  it('throws when the request has no verified shop, and touches no session', async () => {
+    requestWithIdToken('id-jwt', null)
 
-    await expect(getAccessToken()).rejects.toThrow('SHOPIFY_SHOP is not set')
+    await expect(getAccessToken()).rejects.toThrow('No shop for this request')
     expect(loadSession).not.toHaveBeenCalled()
+    expect(tokenExchange).not.toHaveBeenCalled()
+  })
+
+  it('uses the shop it is given, not the header shop', async () => {
+    loadSession.mockResolvedValue(stored({ id: 'offline_other.myshopify.com', shop: 'other.myshopify.com' }))
+
+    await getAccessToken('other.myshopify.com')
+
+    expect(loadSession).toHaveBeenCalledWith('offline_other.myshopify.com')
   })
 })

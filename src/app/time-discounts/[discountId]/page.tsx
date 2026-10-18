@@ -2,6 +2,8 @@ import { notFound } from 'next/navigation'
 import { getTimeDiscountsConfig } from '@/timeDiscounts/config'
 import { deleteTimeDiscount } from '@/timeDiscounts/actions'
 import { getShopTimezone } from '@/lib/shop'
+import { getRequestShop } from '@/lib/requestShop'
+import { adminProductBaseUrl as buildAdminProductBaseUrl } from '@/timeDiscounts/shopifyRecord'
 import { getMemberInfo } from '@/lib/products'
 import { itemKey, productAdminUrl } from '@/timeDiscounts/items'
 import { loadCovered } from '@/timeDiscounts/groupServer'
@@ -23,7 +25,7 @@ export default async function TimeDiscountPage({
   if (!discount) notFound()
 
   const shopTimezone = await getShopTimezone()
-  const adminProductBaseUrl = `https://${process.env.SHOPIFY_SHOP}/admin/products/`
+  const adminProductBaseUrl = buildAdminProductBaseUrl(await getRequestShop())
 
   if (discount.kind === 'group' && discount.group) {
     const covered = await loadCovered(discount.items, adminProductBaseUrl)
