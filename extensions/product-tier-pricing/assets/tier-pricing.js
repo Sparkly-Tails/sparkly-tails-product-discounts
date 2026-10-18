@@ -632,7 +632,6 @@ if (typeof document !== 'undefined') {
   function parseWidgetConfig(container) {
     const discount = JSON.parse(container.dataset.discount)
     const moneyFormat = JSON.parse(container.dataset.moneyFormat)
-    const productHandle = JSON.parse(container.dataset.productHandle)
     const productId = JSON.parse(container.dataset.productId)
     const tiers = withUnitAnchor(discount.tiers)
 
@@ -654,7 +653,6 @@ if (typeof document !== 'undefined') {
 
     return {
       moneyFormat,
-      productHandle,
       productId: selfProductId,
       tiers,
       title: discount.title,

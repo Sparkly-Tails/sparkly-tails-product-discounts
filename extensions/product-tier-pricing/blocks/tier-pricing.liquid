@@ -45,17 +45,6 @@
           {%- endif -%}
         {%- endfor -%}
       {%- endif -%}
-      {%- comment -%}
-        TEMPORARY FALLBACK (remove in the cleanup PR once every live tier discount has been re-saved):
-        a discount saved before sibling data became live still carries copied title / handle /
-        imageUrl on each sibling. Use them only when the live reference did not resolve.
-      {%- endcomment -%}
-      {%- if sib_listed == false and sibling.title != blank -%}
-        {%- assign sib_listed = true -%}
-        {%- assign sib_title = sibling.title -%}
-        {%- capture sib_url -%}/products/{{ sibling.handle }}{%- if sibling.variantId != blank -%}?variant={{ sibling.variantId | split: '/' | last }}{%- endif -%}{%- endcapture -%}
-        {%- assign sib_image = sibling.imageUrl -%}
-      {%- endif -%}
       {
         "productId": {{ sibling.productId | json }},
         "variantId": {{ sibling.variantId | default: null | json }},
@@ -117,7 +106,6 @@
   data-discount='{{ discount_json }}'
   data-time-discount='{{ time_discount_json }}'
   data-selected-variant-id="{{ product.selected_or_first_available_variant.id }}"
-  data-product-handle='{{ product.handle | json | escape }}'
   data-product-id='{{ product.id | prepend: "gid://shopify/Product/" | json }}'
   data-base-price="{{ product.selected_or_first_available_variant.price | divided_by: 100.0 | json }}"
   data-compare-at-price="{{ product.selected_or_first_available_variant.compare_at_price | default: 0 | divided_by: 100.0 | json }}"

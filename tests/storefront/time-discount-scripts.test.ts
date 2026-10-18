@@ -29,7 +29,7 @@ function mount(discount: Record<string, unknown>, opts: { selectedVariantId?: nu
     <input name="quantity" value="1">
     <div id="sparkly-tier-pricing-b1" class="sparkly-tier-pricing" data-sparkly-tier-pricing
       data-discount='{"tiers":[]}' data-time-discount='${timeDiscount}'
-      data-product-handle='"bed"' data-product-id='"gid://shopify/Product/9"'
+      data-product-id='"gid://shopify/Product/9"'
       data-selected-variant-id="${selectedVariantId}"
       data-base-price="${basePrice}" data-compare-at-price="0" data-money-format='"£{{amount}}"'>
       <div class="sparkly-tier-pricing__price-row">
