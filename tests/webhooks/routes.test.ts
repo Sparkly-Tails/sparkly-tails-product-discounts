@@ -5,9 +5,11 @@ import { POST as scopesUpdate } from '@/app/webhooks/app/scopes_update/route'
 import { POST as compliance } from '@/app/webhooks/compliance/route'
 import { deleteShopSessions } from '@/lib/sessions'
 import { refreshStoredScopes } from '@/lib/storedScopes'
+import { probeStoredToken } from '@/lib/uninstallTokenProbe'
 
 vi.mock('@/lib/sessions', () => ({ deleteShopSessions: vi.fn(async () => {}), updateStoredScope: vi.fn(async () => {}) }))
 vi.mock('@/lib/storedScopes', () => ({ refreshStoredScopes: vi.fn(async () => {}) }))
+vi.mock('@/lib/uninstallTokenProbe', () => ({ probeStoredToken: vi.fn(async () => {}) }))
 
 const SECRET = 'client-secret'
 const A = 'demo.myshopify.com'
@@ -25,12 +27,38 @@ beforeEach(() => {
   process.env.SHOPIFY_API_SECRET_KEY = SECRET
   vi.mocked(deleteShopSessions).mockClear()
   vi.mocked(refreshStoredScopes).mockClear()
+  vi.mocked(probeStoredToken).mockReset()
+  vi.mocked(probeStoredToken).mockResolvedValue(undefined)
 })
 
 describe('app/uninstalled', () => {
   it('deletes the sessions of the shop in the signed body', async () => {
     expect((await uninstalled(post(uninstalledBody(A), 'app/uninstalled'))).status).toBe(200)
     expect(deleteShopSessions).toHaveBeenCalledExactlyOnceWith(A)
+  })
+
+  it('probes the stored token before the sessions are deleted (temporary experiment)', async () => {
+    const order: string[] = []
+    vi.mocked(probeStoredToken).mockImplementation(async () => { order.push('probe') })
+    vi.mocked(deleteShopSessions).mockImplementation(async () => { order.push('delete') })
+
+    expect((await uninstalled(post(uninstalledBody(A), 'app/uninstalled'))).status).toBe(200)
+
+    expect(probeStoredToken).toHaveBeenCalledExactlyOnceWith(A)
+    expect(order).toEqual(['probe', 'delete'])
+  })
+
+  it('still deletes the sessions when the probe fails', async () => {
+    vi.mocked(probeStoredToken).mockRejectedValue(new Error('boom'))
+
+    expect((await uninstalled(post(uninstalledBody(A), 'app/uninstalled'))).status).toBe(200)
+
+    expect(deleteShopSessions).toHaveBeenCalledExactlyOnceWith(A)
+  })
+
+  it('does not probe a delivery that is refused', async () => {
+    expect((await uninstalled(post(uninstalledBody(A), 'app/uninstalled', undefined, B))).status).toBe(400)
+    expect(probeStoredToken).not.toHaveBeenCalled()
   })
 
   it('uninstalled for A with a header for B deletes nothing and answers 400', async () => {
