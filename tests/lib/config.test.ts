@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { getConfig, saveConfig, isProductAvailable, pricesUniform, type Config } from '@/lib/config'
 import * as shopifyClient from '@/lib/shopify-client'
+import { METAFIELD_NAMESPACE, METAFIELD_KEYS } from '@/lib/metafieldNames'
 
 describe('getConfig', () => {
   beforeEach(() => vi.restoreAllMocks())
@@ -25,6 +26,13 @@ describe('getConfig', () => {
 
     const config = await getConfig()
     expect(config).toEqual(stored)
+  })
+
+  it('reads tier_config in the app namespace', async () => {
+    const spy = vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({ shop: { metafield: null } })
+
+    await getConfig()
+    expect(spy).toHaveBeenCalledWith(expect.any(String), { namespace: METAFIELD_NAMESPACE, key: METAFIELD_KEYS.tierConfig })
   })
 
   it('returns an empty discount list when no metafield exists yet', async () => {
@@ -70,8 +78,8 @@ describe('saveConfig', () => {
         metafields: [
           expect.objectContaining({
             ownerId: 'gid://shopify/Shop/1',
-            namespace: 'sparkly_product_discounts',
-            key: 'config',
+            namespace: METAFIELD_NAMESPACE,
+            key: METAFIELD_KEYS.tierConfig,
             type: 'json',
             value: JSON.stringify(config),
           }),

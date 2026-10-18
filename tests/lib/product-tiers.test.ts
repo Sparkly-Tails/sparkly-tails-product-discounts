@@ -10,6 +10,7 @@ import {
   SIBLING_VARIANTS_KEY,
 } from '@/lib/product-tiers'
 import * as shopifyClient from '@/lib/shopify-client'
+import { METAFIELD_NAMESPACE, METAFIELD_KEYS } from '@/lib/metafieldNames'
 import * as products from '@/lib/products'
 import type { Discount } from '@/lib/config'
 
@@ -103,18 +104,18 @@ describe('metafieldWrites', () => {
   it('sets the discount and each non-empty list, and deletes each empty list', () => {
     const built = buildProductMetafields(mix, P1, SIBLING_REFERENCE_LIMIT)
     const { toSet, toDelete } = metafieldWrites(P1, built)
-    expect(toSet.map((m) => m.key)).toEqual(['discount', SIBLING_VARIANTS_KEY])
+    expect(toSet.map((m) => m.key)).toEqual([METAFIELD_KEYS.tierDiscount, METAFIELD_KEYS.tierSiblingVariants])
     expect(toSet[1]).toEqual({
-      ownerId: P1, namespace: 'sparkly_product_discounts', key: SIBLING_VARIANTS_KEY,
+      ownerId: P1, namespace: METAFIELD_NAMESPACE, key: METAFIELD_KEYS.tierSiblingVariants,
       type: 'list.variant_reference', value: JSON.stringify([V20, V21]),
     })
-    expect(toDelete).toEqual([{ ownerId: P1, namespace: 'sparkly_product_discounts', key: SIBLING_PRODUCTS_KEY }])
+    expect(toDelete).toEqual([{ ownerId: P1, namespace: METAFIELD_NAMESPACE, key: METAFIELD_KEYS.tierSiblingProducts }])
   })
 
   it('a product with no siblings sets only the discount and deletes both lists', () => {
     const discount: Discount = { ...mix, members: [{ productId: P1 }] }
     const { toSet, toDelete } = metafieldWrites(P1, buildProductMetafields(discount, P1, SIBLING_REFERENCE_LIMIT))
-    expect(toSet.map((m) => m.key)).toEqual(['discount'])
+    expect(toSet.map((m) => m.key)).toEqual([METAFIELD_KEYS.tierDiscount])
     expect(toDelete.map((m) => m.key)).toEqual([SIBLING_PRODUCTS_KEY, SIBLING_VARIANTS_KEY])
   })
 })
@@ -194,7 +195,7 @@ describe('syncDiscountMetafields', () => {
     expect(JSON.parse(written[0].value).siblings).toEqual([{ productId: P3 }, { productId: gone }])
     expect(written[1]).toMatchObject({ key: SIBLING_PRODUCTS_KEY, value: JSON.stringify([P3]) })
     for (const call of callsOf(querySpy, 'metafieldsSet')) {
-      const lists = (call[1] as { metafields: { key: string; value: string }[] }).metafields.filter((m) => m.key !== 'discount')
+      const lists = (call[1] as { metafields: { key: string; value: string }[] }).metafields.filter((m) => m.key !== METAFIELD_KEYS.tierDiscount)
       expect(lists.some((m) => m.value.includes(gone))).toBe(false)
     }
   })
@@ -236,7 +237,7 @@ describe('clearDiscountMetafields', () => {
 
     expect(querySpy).toHaveBeenCalledTimes(2)
     const keys = (querySpy.mock.calls[0][1] as { metafields: { key: string }[] }).metafields.map((m) => m.key)
-    expect(keys).toEqual(['discount', SIBLING_PRODUCTS_KEY, SIBLING_VARIANTS_KEY])
+    expect(keys).toEqual([METAFIELD_KEYS.tierDiscount, METAFIELD_KEYS.tierSiblingProducts, METAFIELD_KEYS.tierSiblingVariants])
   })
 
   it('throws when metafieldsDelete reports userErrors', async () => {

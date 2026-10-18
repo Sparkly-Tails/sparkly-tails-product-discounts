@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { syncTimeDiscountMetafields, clearTimeDiscountMetafields } from '@/timeDiscounts/metafieldSync'
 import * as shopifyClient from '@/lib/shopify-client'
 import { zonedTimeToUtc } from '@/lib/shop'
+import { METAFIELD_NAMESPACE, METAFIELD_KEYS } from '@/lib/metafieldNames'
 import type { TimeDiscount } from '@/timeDiscounts/config'
 
 const TIME_ZONE = 'Europe/London'
@@ -30,8 +31,8 @@ describe('syncTimeDiscountMetafields', () => {
 
     expect(spy).toHaveBeenCalledTimes(2)
     const written = writtenMetafields(spy).find((m) => m.ownerId === 'gid://shopify/Product/1')!
-    expect(written.namespace).toBe('sparkly_product_discounts')
-    expect(written.key).toBe('time_based_discount')
+    expect(written.namespace).toBe(METAFIELD_NAMESPACE)
+    expect(written.key).toBe(METAFIELD_KEYS.timeDiscount)
     expect(written.type).toBe('json')
     expect(JSON.parse(written.value)).toEqual({
       discountId: 'time_disc_1', title: 'Flash Sale',
@@ -101,7 +102,7 @@ describe('clearTimeDiscountMetafields', () => {
     await clearTimeDiscountMetafields([{ productId: 'gid://shopify/Product/1' }, { productId: 'gid://shopify/Product/1' }])
     expect(spy).toHaveBeenCalledTimes(1)
     expect((spy.mock.calls[0][1] as { metafields: unknown[] }).metafields).toEqual([
-      { ownerId: 'gid://shopify/Product/1', namespace: 'sparkly_product_discounts', key: 'time_based_discount' },
+      { ownerId: 'gid://shopify/Product/1', namespace: METAFIELD_NAMESPACE, key: METAFIELD_KEYS.timeDiscount },
     ])
   })
 })
