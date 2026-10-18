@@ -6,6 +6,7 @@ import { deleteShopSessions } from '@/lib/sessions'
 export async function POST(request: Request) {
   return handleWebhook(request, {
     secret: process.env.SHOPIFY_API_SECRET_KEY,
+    topics: ['customers/data_request', 'customers/redact', 'shop/redact'],
     onVerified: async ({ shop, topic }) => {
       const action = complianceAction(topic)
       console.log(`Received ${topic} for ${shop}: ${action}`)
