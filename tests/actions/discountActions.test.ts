@@ -6,9 +6,11 @@ import * as configLib from '@/lib/config'
 import { redirect } from 'next/navigation'
 import * as productTiers from '@/lib/product-tiers'
 import * as products from '@/lib/products'
+import { ensureTierDiscount } from '@/lib/tierDiscount'
 import type { Config, Discount } from '@/lib/config'
 
 vi.mock('next/navigation', () => ({ redirect: vi.fn() }))
+vi.mock('@/lib/tierDiscount', () => ({ ensureTierDiscount: vi.fn() }))
 
 function memberFormData(members: { productId: string; variantId?: string }[], extra: Record<string, string> = {}) {
   const fd = new FormData()
@@ -24,6 +26,24 @@ describe('createDiscount', () => {
   beforeEach(() => {
     vi.mocked(redirect).mockClear()
     vi.restoreAllMocks()
+    vi.mocked(ensureTierDiscount).mockReset()
+    vi.mocked(ensureTierDiscount).mockResolvedValue('exists')
+  })
+
+  it('awaits ensureTierDiscount before saving and surfaces its error, saving nothing', async () => {
+    vi.spyOn(configLib, 'getConfig').mockResolvedValue({ discounts: [] })
+    const saveSpy = vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
+    vi.spyOn(products, 'getMemberInfo').mockResolvedValue([
+      { productId: 'gid://shopify/Product/1', variantId: undefined, title: 'Tuna Soup', price: 1.49, handle: 'tuna-soup', imageUrl: null },
+    ])
+    vi.mocked(ensureTierDiscount).mockRejectedValue(new Error('The tier discount Function is not deployed'))
+    const formData = memberFormData([{ productId: 'gid://shopify/Product/1' }], { name: 'Tuna Soup', title: 'Tuna Soup', 'tier-0-minQty': '5', 'tier-0-percentOff': '10' })
+
+    await expect(createDiscount(formData)).rejects.toThrow('The tier discount Function is not deployed')
+
+    expect(ensureTierDiscount).toHaveBeenCalledTimes(1)
+    expect(saveSpy).not.toHaveBeenCalled()
+    expect(redirect).not.toHaveBeenCalled()
   })
 
   it('creates a single-member discount with parsed tiers', async () => {
