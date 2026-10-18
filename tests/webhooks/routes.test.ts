@@ -71,6 +71,20 @@ describe('app/uninstalled', () => {
     expect(deleteShopSessions).not.toHaveBeenCalled()
   })
 
+  // The topic header is not signed either: a replay must not be able to turn off the body check by changing it.
+  it.each(['app/scopes_update', 'app/uninstalled ', 'APP_UNINSTALLED_X', 'shop/redact', 'customers/redact', 'orders/create'])(
+    'a signed body for A with the topic header changed to "%s" and a header for B deletes nothing and answers 400',
+    async (topic) => {
+      expect((await uninstalled(post(uninstalledBody(A), topic, undefined, B))).status).toBe(400)
+      expect(deleteShopSessions).not.toHaveBeenCalled()
+    },
+  )
+
+  it('accepts the topic in the uppercase style the GraphQL API uses', async () => {
+    expect((await uninstalled(post(uninstalledBody(A), 'APP_UNINSTALLED'))).status).toBe(200)
+    expect(deleteShopSessions).toHaveBeenCalledExactlyOnceWith(A)
+  })
+
   it('does nothing for a bad signature', async () => {
     expect((await uninstalled(post(uninstalledBody(A), 'app/uninstalled', 'AAAA'))).status).toBe(401)
     expect(deleteShopSessions).not.toHaveBeenCalled()
@@ -86,6 +100,11 @@ describe('app/scopes_update', () => {
 
   it('answers 400 and refreshes nothing when the header is not a real shop host', async () => {
     expect((await scopesUpdate(post('{}', 'app/scopes_update', undefined, 'evil.example.com'))).status).toBe(400)
+    expect(refreshStoredScopes).not.toHaveBeenCalled()
+  })
+
+  it('answers 400 and refreshes nothing for any other topic', async () => {
+    expect((await scopesUpdate(post(uninstalledBody(A), 'app/uninstalled'))).status).toBe(400)
     expect(refreshStoredScopes).not.toHaveBeenCalled()
   })
 
@@ -111,6 +130,14 @@ describe('compliance', () => {
     expect((await compliance(post(redactBody(A), 'shop/redact', undefined, B))).status).toBe(400)
     expect(deleteShopSessions).not.toHaveBeenCalled()
   })
+
+  it.each(['app/uninstalled', 'app/scopes_update', 'orders/create', 'shop/redact '])(
+    'a body for A sent with the topic header "%s" deletes nothing and answers 400',
+    async (topic) => {
+      expect((await compliance(post(redactBody(A), topic, undefined, B))).status).toBe(400)
+      expect(deleteShopSessions).not.toHaveBeenCalled()
+    },
+  )
 
   it('rejects a bad signature without touching the database', async () => {
     expect((await compliance(post(redactBody(A), 'shop/redact', 'AAAA'))).status).toBe(401)

@@ -3,6 +3,7 @@ import { createHmac } from 'node:crypto'
 import { handleWebhook, shopFromBody, complianceAction } from '@/lib/webhookHandler'
 
 const SECRET = 'client-secret'
+const TOPICS = ['app/uninstalled']
 const UNINSTALLED_BODY = '{"id":1,"myshopify_domain":"demo.myshopify.com"}'
 const sign = (raw: string, secret = SECRET) => createHmac('sha256', secret).update(raw, 'utf8').digest('base64')
 
@@ -17,35 +18,51 @@ function webhookRequest(body: string, headers: Record<string, string> = {}, sign
 describe('handleWebhook', () => {
   it('runs the handler with the body shop for a correctly signed webhook and answers 200', async () => {
     const onVerified = vi.fn(async () => {})
-    const res = await handleWebhook(webhookRequest(UNINSTALLED_BODY), { secret: SECRET, onVerified })
+    const res = await handleWebhook(webhookRequest(UNINSTALLED_BODY), { secret: SECRET, topics: TOPICS, onVerified })
     expect(res.status).toBe(200)
     expect(onVerified).toHaveBeenCalledWith({ shop: 'demo.myshopify.com', topic: 'app/uninstalled', body: UNINSTALLED_BODY })
   })
 
+  it('answers 400 and does nothing when the topic is not one this endpoint handles, whatever the body says', async () => {
+    const onVerified = vi.fn(async () => {})
+    for (const topic of ['app/scopes_update', 'app/uninstalled ', 'shop/redact', 'orders/create']) {
+      const res = await handleWebhook(webhookRequest(UNINSTALLED_BODY, { 'x-shopify-topic': topic, 'x-shopify-shop-domain': 'other.myshopify.com' }), { secret: SECRET, topics: TOPICS, onVerified })
+      expect(res.status, topic).toBe(400)
+    }
+    expect(onVerified).not.toHaveBeenCalled()
+  })
+
+  it('accepts the topic in either style and with any letter case', async () => {
+    const onVerified = vi.fn(async () => {})
+    for (const topic of ['app/uninstalled', 'APP_UNINSTALLED', 'App/Uninstalled']) {
+      expect((await handleWebhook(webhookRequest(UNINSTALLED_BODY, { 'x-shopify-topic': topic }), { secret: SECRET, topics: TOPICS, onVerified })).status, topic).toBe(200)
+    }
+  })
+
   it('answers 400 and does nothing when the header names another shop than the signed body', async () => {
     const onVerified = vi.fn(async () => {})
-    const res = await handleWebhook(webhookRequest(UNINSTALLED_BODY, { 'x-shopify-shop-domain': 'other.myshopify.com' }), { secret: SECRET, onVerified })
+    const res = await handleWebhook(webhookRequest(UNINSTALLED_BODY, { 'x-shopify-shop-domain': 'other.myshopify.com' }), { secret: SECRET, topics: TOPICS, onVerified })
     expect(res.status).toBe(400)
     expect(onVerified).not.toHaveBeenCalled()
   })
 
   it('answers 400 and does nothing when a destructive topic body has no shop', async () => {
     const onVerified = vi.fn(async () => {})
-    const res = await handleWebhook(webhookRequest('{"a":1}'), { secret: SECRET, onVerified })
+    const res = await handleWebhook(webhookRequest('{"a":1}'), { secret: SECRET, topics: TOPICS, onVerified })
     expect(res.status).toBe(400)
     expect(onVerified).not.toHaveBeenCalled()
   })
 
   it('does not log the body when it refuses a delivery', async () => {
     const log = vi.spyOn(console, 'log').mockImplementation(() => {})
-    await handleWebhook(webhookRequest('{"email":"customer@example.com"}'), { secret: SECRET, onVerified: async () => {} })
+    await handleWebhook(webhookRequest('{"email":"customer@example.com"}'), { secret: SECRET, topics: TOPICS, onVerified: async () => {} })
     expect(log.mock.calls.flat().join(' ')).not.toContain('customer@example.com')
     log.mockRestore()
   })
 
   it('answers 401 and does nothing for a tampered body', async () => {
     const onVerified = vi.fn(async () => {})
-    const res = await handleWebhook(webhookRequest('{"a":2}', {}, sign('{"a":1}')), { secret: SECRET, onVerified })
+    const res = await handleWebhook(webhookRequest('{"a":2}', {}, sign('{"a":1}')), { secret: SECRET, topics: TOPICS, onVerified })
     expect(res.status).toBe(401)
     expect(onVerified).not.toHaveBeenCalled()
   })
@@ -53,26 +70,26 @@ describe('handleWebhook', () => {
   it('answers 401 when the signature header is missing', async () => {
     const onVerified = vi.fn(async () => {})
     const req = new Request('https://app.test/webhooks/x', { method: 'POST', body: '{}', headers: { 'x-shopify-shop-domain': 'd.myshopify.com', 'x-shopify-topic': 't' } })
-    expect((await handleWebhook(req, { secret: SECRET, onVerified })).status).toBe(401)
+    expect((await handleWebhook(req, { secret: SECRET, topics: TOPICS, onVerified })).status).toBe(401)
     expect(onVerified).not.toHaveBeenCalled()
   })
 
   it('answers 503 and does nothing when the client secret is not set', async () => {
     const onVerified = vi.fn(async () => {})
-    expect((await handleWebhook(webhookRequest('{}'), { secret: undefined, onVerified })).status).toBe(503)
-    expect((await handleWebhook(webhookRequest('{}'), { secret: '', onVerified })).status).toBe(503)
+    expect((await handleWebhook(webhookRequest('{}'), { secret: undefined, topics: TOPICS, onVerified })).status).toBe(503)
+    expect((await handleWebhook(webhookRequest('{}'), { secret: '', topics: TOPICS, onVerified })).status).toBe(503)
     expect(onVerified).not.toHaveBeenCalled()
   })
 
   it('answers 400 when the shop or topic header is missing on a correctly signed request', async () => {
     const onVerified = vi.fn(async () => {})
     const req = new Request('https://app.test/webhooks/x', { method: 'POST', body: '{}', headers: { 'x-shopify-hmac-sha256': sign('{}') } })
-    expect((await handleWebhook(req, { secret: SECRET, onVerified })).status).toBe(400)
+    expect((await handleWebhook(req, { secret: SECRET, topics: TOPICS, onVerified })).status).toBe(400)
     expect(onVerified).not.toHaveBeenCalled()
   })
 
   it('answers 500 when the handler fails, so Shopify retries', async () => {
-    const res = await handleWebhook(webhookRequest(UNINSTALLED_BODY), { secret: SECRET, onVerified: async () => { throw new Error('db down') } })
+    const res = await handleWebhook(webhookRequest(UNINSTALLED_BODY), { secret: SECRET, topics: TOPICS, onVerified: async () => { throw new Error('db down') } })
     expect(res.status).toBe(500)
   })
 })
