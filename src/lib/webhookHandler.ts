@@ -45,9 +45,14 @@ export interface VerifiedWebhook {
   body: string
 }
 
+/**
+ * `topics` are the topics the endpoint handles. The topic header is not signed any more than the shop
+ * header is, so each endpoint states its own topics: a delivery that arrives with another topic is
+ * refused instead of being allowed to switch off the body check that goes with the endpoint's topic.
+ */
 export async function handleWebhook(
   request: Request,
-  options: { secret: string | undefined; onVerified: (webhook: VerifiedWebhook) => Promise<void> },
+  options: { secret: string | undefined; topics: string[]; onVerified: (webhook: VerifiedWebhook) => Promise<void> },
 ): Promise<Response> {
   if (!options.secret) return new Response('App misconfigured', { status: 503 })
 
@@ -58,6 +63,11 @@ export async function handleWebhook(
   const headerShop = request.headers.get('x-shopify-shop-domain')
   const topic = request.headers.get('x-shopify-topic')
   if (!headerShop || !topic) return new Response('Missing headers', { status: 400 })
+
+  if (!options.topics.some((expected) => normalizeTopic(expected) === normalizeTopic(topic))) {
+    console.log('Webhook refused: unexpected topic for this endpoint')
+    return new Response('Unexpected topic', { status: 400 })
+  }
 
   const resolved = shopFromBody(topic, body, headerShop)
   if (!resolved.ok) {
