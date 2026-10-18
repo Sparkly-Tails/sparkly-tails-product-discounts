@@ -20,7 +20,14 @@ describe('tier-pricing.liquid reads what the writer writes', () => {
     expect(liquid).toContain('"listed"')
   })
 
-  it('keeps the temporary fallback in one clearly marked block', () => {
-    expect(liquid).toContain('TEMPORARY FALLBACK')
+  it('has no fallback to copied sibling fields', () => {
+    expect(liquid).not.toContain('TEMPORARY FALLBACK')
+    expect(liquid).not.toContain('sibling.handle')
+    expect(liquid).not.toContain('sibling.title')
+    expect(liquid).not.toContain('sibling.imageUrl')
+  })
+
+  it('does not hand the product handle to the widget script', () => {
+    expect(liquid).not.toContain('data-product-handle')
   })
 })
