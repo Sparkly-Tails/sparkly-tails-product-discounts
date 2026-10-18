@@ -3,8 +3,11 @@ import { getMemberInfo } from '@/lib/products'
 import Link from 'next/link'
 import { getTimeDiscountsConfig, computeTimeDiscountStatusLabel } from '@/timeDiscounts/config'
 import { getShopTimezone } from '@/lib/shop'
+import { ensureTierDiscountSafely } from '@/lib/tierDiscount'
 
 export default async function Home() {
+  // First, so the store has its tier checkout discount; it never throws, so the page always loads.
+  await ensureTierDiscountSafely()
   const config = await getConfig()
 
   const rows = await Promise.all(
