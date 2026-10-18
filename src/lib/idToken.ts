@@ -14,17 +14,17 @@ export interface IdTokenClaims {
 
 export type IdTokenResult =
   | { ok: true; claims: IdTokenClaims; shop: string }
-  | { ok: false; reason: 'malformed' | 'signature' | 'expired' | 'not-yet-valid' | 'audience' | 'shop' }
+  | { ok: false; reason: 'malformed' | 'signature' | 'expired' | 'not-yet-valid' | 'audience' | 'shop' | 'issuer' }
 
 export interface IdTokenOptions {
   secret: string
   apiKey: string
-  shop: string
   /** Unix time in seconds. */
   now: number
 }
 
 const CLOCK_SKEW_SECONDS = 10
+const SHOP_HOST = /^[a-z0-9][a-z0-9-]*\.myshopify\.com$/
 const MALFORMED = { ok: false, reason: 'malformed' } as const
 
 function base64UrlToBytes(value: string): Uint8Array<ArrayBuffer> | null {
@@ -51,6 +51,22 @@ function decodeJson(part: string): Record<string, unknown> | null {
   }
 }
 
+/** A store's `*.myshopify.com` host: no port, no path, no look-alike suffix. */
+export function isShopHost(host: string): boolean {
+  return SHOP_HOST.test(host)
+}
+
+/** The host of an https URL, or null when `value` is not a string, not a URL or not https. */
+function httpsHost(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  try {
+    const url = new URL(value)
+    return url.protocol === 'https:' ? url.host : null
+  } catch {
+    return null
+  }
+}
+
 export async function verifyIdToken(token: string, options: IdTokenOptions): Promise<IdTokenResult> {
   const parts = token.split('.')
   if (parts.length !== 3) return MALFORMED
@@ -72,13 +88,18 @@ export async function verifyIdToken(token: string, options: IdTokenOptions): Pro
   if (payload.nbf - CLOCK_SKEW_SECONDS > options.now) return { ok: false, reason: 'not-yet-valid' }
   if (payload.aud !== options.apiKey) return { ok: false, reason: 'audience' }
 
-  let destHost: string
+  // `dest` names the store the merchant is in; it must be a real shop host reached over https.
+  let destUrl: URL
   try {
-    destHost = new URL(String(payload.dest)).host
+    destUrl = new URL(String(payload.dest))
   } catch {
     return MALFORMED
   }
-  if (destHost !== options.shop) return { ok: false, reason: 'shop' }
+  if (destUrl.protocol !== 'https:' || !isShopHost(destUrl.host)) return { ok: false, reason: 'shop' }
+  const destHost = destUrl.host
+
+  // `iss` is https://<shop>/admin: its host must be the same store.
+  if (httpsHost(payload.iss) !== destHost) return { ok: false, reason: 'issuer' }
 
   return { ok: true, claims: payload as unknown as IdTokenClaims, shop: destHost }
 }

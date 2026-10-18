@@ -20,7 +20,7 @@ const fetchHeaders = { authorization: null, secFetchDest: 'empty', accept: '*/*'
 function input(over: Partial<ProxyInput> = {}): ProxyInput {
   return {
     pathname: '/', searchParams: new URLSearchParams(), headers: documentHeaders,
-    env: { secret: SECRET, apiKey: API_KEY, shop: SHOP }, now: NOW, isDevelopment: false, ...over,
+    env: { secret: SECRET, apiKey: API_KEY }, now: NOW, isDevelopment: false, ...over,
   }
 }
 
@@ -35,9 +35,17 @@ describe('decideProxy', () => {
     expect(await decideProxy(input({ isDevelopment: true }))).toEqual({ kind: 'next' })
   })
 
-  it('answers 503 when the app is not configured', async () => {
-    expect(await decideProxy(input({ env: { secret: undefined, apiKey: API_KEY, shop: SHOP } }))).toMatchObject({ kind: 'deny', status: 503 })
-    expect(await decideProxy(input({ env: { secret: SECRET, apiKey: API_KEY, shop: '' } }))).toMatchObject({ kind: 'deny', status: 503 })
+  it('answers 503 only when the secret or API key is missing', async () => {
+    expect(await decideProxy(input({ env: { secret: undefined, apiKey: API_KEY } }))).toMatchObject({ kind: 'deny', status: 503 })
+    expect(await decideProxy(input({ env: { secret: SECRET, apiKey: '' } }))).toMatchObject({ kind: 'deny', status: 503 })
+    expect(await decideProxy(input({ searchParams: new URLSearchParams({ shop: SHOP, host: 'h' }) }))).toMatchObject({ kind: 'bounce' })
+  })
+
+  it('passes a token for a store that is not in any environment variable', async () => {
+    const other = 'brand-new-store.myshopify.com'
+    const t = token({ iss: `https://${other}/admin`, dest: `https://${other}` })
+    const params = new URLSearchParams({ id_token: t, shop: other, host: 'h' })
+    expect(await decideProxy(input({ searchParams: params }))).toEqual({ kind: 'next-with-token', idToken: t, shop: other })
   })
 
   it('accepts a valid ID token in the id_token query parameter on a page load', async () => {
@@ -50,8 +58,8 @@ describe('decideProxy', () => {
     expect(await decideProxy(input({ headers: { ...fetchHeaders, authorization: `Bearer ${t}` } }))).toEqual({ kind: 'next-with-token', idToken: t, shop: SHOP })
   })
 
-  it('refuses a correctly signed token for another shop with 403', async () => {
-    const t = token({ dest: 'https://other.myshopify.com' })
+  it('refuses a correctly signed token whose dest is not a real shop host with 403', async () => {
+    const t = token({ dest: 'https://evil.myshopify.com.attacker.com', iss: 'https://evil.myshopify.com.attacker.com/admin' })
     expect(await decideProxy(input({ searchParams: new URLSearchParams({ id_token: t, shop: SHOP, host: 'h' }) }))).toMatchObject({ kind: 'deny', status: 403 })
   })
 
@@ -106,13 +114,13 @@ describe('decideProxy', () => {
     const wrongSecret = await decideProxy(input({ headers: { ...fetchHeaders, authorization: `Bearer ${token({}, 'other-secret')}` } }))
     expect(wrongSecret).toMatchObject({ kind: 'deny', reason: 'token-signature' })
 
-    const otherShop = await decideProxy(input({ headers: { ...fetchHeaders, authorization: `Bearer ${token({ dest: 'https://other.myshopify.com' })}` } }))
+    const otherShop = await decideProxy(input({ headers: { ...fetchHeaders, authorization: `Bearer ${token({ dest: 'https://myshopify.com' })}` } }))
     expect(otherShop).toMatchObject({ kind: 'deny', status: 403, reason: 'token-shop' })
 
     const wrongAudience = await decideProxy(input({ headers: { ...fetchHeaders, authorization: `Bearer ${token({ aud: 'someone-else' })}` } }))
     expect(wrongAudience).toMatchObject({ kind: 'deny', reason: 'token-audience' })
 
-    const misconfigured = await decideProxy(input({ env: { secret: undefined, apiKey: API_KEY, shop: SHOP } }))
+    const misconfigured = await decideProxy(input({ env: { secret: undefined, apiKey: API_KEY } }))
     expect(misconfigured).toMatchObject({ kind: 'deny', status: 503, reason: 'missing-env' })
 
     for (const decision of [noToken, wrongSecret, otherShop, wrongAudience, misconfigured]) {
@@ -153,6 +161,12 @@ describe('forwardHeaders', () => {
     expect(out.get('x-shopify-id-token')).toBe('real')
     expect(out.get('x-shopify-shop')).toBe(SHOP)
     expect(out.get('accept')).toBe('text/html')
+  })
+
+  it('a forged x-shopify-shop is dropped and replaced by the verified one', () => {
+    const inbound = new Headers({ 'x-shopify-shop': 'evil.myshopify.com' })
+    const out = forwardHeaders(inbound, { kind: 'next-with-token', idToken: 'real', shop: 'verified.myshopify.com' })
+    expect(out.get('x-shopify-shop')).toBe('verified.myshopify.com')
   })
 
   it('removes client-sent token headers when the request passes without a token', () => {
