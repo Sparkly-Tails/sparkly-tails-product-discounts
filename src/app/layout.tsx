@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { SavedToastProvider } from "@/components/SavedToast";
+import { ensureFreshInstall } from "@/lib/freshInstall";
 import packageJson from "../../package.json";
 import "./globals.css";
 
@@ -11,9 +12,12 @@ export const metadata: Metadata = {
   description: "Per-product volume pricing admin",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  // A new installation must be clean before any page renders, so nothing can be saved over data Shopify kept
+  // from an earlier install. If this fails the page does not render and the next load tries again.
+  await ensureFreshInstall();
   return (
     <html lang="en">
       <head>
@@ -21,6 +25,7 @@ export default function RootLayout({
         {/* Plain <script>, not next/script — Shopify requires App Bridge to be
             the literal first <script> tag with no async/defer/type=module.
             next/script's beforeInteractive strategy doesn't guarantee that. */}
+        {/* eslint-disable-next-line @next/next/no-sync-scripts -- App Bridge must be a plain synchronous script, as explained above. */}
         <script src="https://cdn.shopify.com/shopifycloud/app-bridge.js"></script>
       </head>
       <body>
