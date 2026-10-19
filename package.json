@@ -1,6 +1,6 @@
 {
   "name": "sparkly-tails-product-discounts",
-  "version": "0.23.14",
+  "version": "0.23.27",
   "private": true,
   "engines": {
     "node": ">=20.9.0"
@@ -12,6 +12,7 @@
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",
+    "check:isolation": "node scripts/check-store-isolation.mjs",
     "postinstall": "prisma generate"
   },
   "dependencies": {

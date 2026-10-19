@@ -8,6 +8,7 @@ import { isAvailableEverywhere, fetchAvailabilityConfigs } from '@/lib/discount-
 import { getMemberInfo } from '@/lib/products'
 import { syncTimeDiscountMetafields, clearTimeDiscountMetafields } from '@/timeDiscounts/metafieldSync'
 import { getShopTimezone, zonedTimeToUtc } from '@/lib/shop'
+import { getRequestShop } from '@/lib/requestShop'
 import { redirect } from 'next/navigation'
 import { itemKey, validateRule, validateItemsStructure, assertItemsFitFunctionConfig, END_PASSED_MESSAGE } from '@/timeDiscounts/items'
 import {
@@ -116,7 +117,7 @@ async function buildItemsForNewDiscount(raw: string): Promise<TimeDiscountItem[]
 /** A new group: its picks are resolved now, and its rows come from them. */
 async function buildGroupForNewDiscount(raw: string): Promise<{ items: TimeDiscountItem[]; group: GroupSpec }> {
   const group = parseGroupSpec(raw)
-  const { items } = await resolveGroup(group, undefined, adminProductBaseUrl())
+  const { items } = await resolveGroup(group, undefined, adminProductBaseUrl(await getRequestShop()))
   return { items, group }
 }
 

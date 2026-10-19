@@ -9,7 +9,7 @@
   below, using the live variant price, so it follows variant changes.
 {% endcomment %}
 
-{%- assign discount_metafield = product.metafields.sparkly_product_discounts.time_based_discount -%}
+{%- assign discount_metafield = product.metafields['$app:smooth_discount'].time_discount -%}
 {%- assign discount_data = '{}' -%}
 
 {%- if discount_metafield != blank -%}

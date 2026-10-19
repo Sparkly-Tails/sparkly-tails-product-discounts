@@ -1,6 +1,7 @@
 import { headers } from 'next/headers'
 import { RequestedTokenType, type Session } from '@shopify/shopify-api'
 import { resolveAccessToken } from '@/lib/accessToken'
+import { getRequestShop } from '@/lib/requestShop'
 import { getSessionStorage, getShopify } from '@/lib/shopifyApp'
 
 /** The library types `accessToken` as optional; a session without one is no use here. */
@@ -25,10 +26,9 @@ async function currentIdToken(): Promise<string | null> {
   }
 }
 
-/** Server only. The access token for `SHOPIFY_SHOP`, from the stored session, a refresh or a token exchange. */
-export async function getAccessToken(): Promise<string> {
-  const shop = process.env.SHOPIFY_SHOP
-  if (!shop) throw new Error('SHOPIFY_SHOP is not set')
+/** Server only. The access token for the request's shop (or `explicitShop`), from the stored session, a refresh or a token exchange. */
+export async function getAccessToken(explicitShop?: string): Promise<string> {
+  const shop = await getRequestShop(explicitShop)
 
   const shopify = getShopify()
   const storage = getSessionStorage()

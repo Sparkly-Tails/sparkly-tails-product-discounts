@@ -14,6 +14,7 @@ import * as groupServer from '@/timeDiscounts/groupServer'
 import type { TimeDiscount, TimeDiscountItem } from '@/timeDiscounts/config'
 
 vi.mock('next/navigation', () => ({ redirect: vi.fn() }))
+vi.mock('@/lib/requestShop', () => ({ getRequestShop: async () => 'test.myshopify.com' }))
 
 const P1 = 'gid://shopify/Product/1'
 const P2 = 'gid://shopify/Product/2'

@@ -4,6 +4,7 @@ import { getConfig, saveConfig, isProductAvailable, pricesUniform, type Tier, ty
 import { redirect } from 'next/navigation'
 import { syncDiscountMetafields, clearDiscountMetafields } from '@/lib/product-tiers'
 import { getMemberInfo } from '@/lib/products'
+import { ensureTierDiscount } from '@/lib/tierDiscount'
 
 function parseTiersFromForm(formData: FormData, pricingMode: 'percent' | 'fixed'): Tier[] {
   const tiers: Tier[] = []
@@ -93,6 +94,9 @@ export async function createDiscount(formData: FormData): Promise<void> {
 
   await assertMembersAvailable(members)
   await assertPricingAllowed(members, pricingMode, tiers)
+
+  // The checkout discount must exist for this discount to apply; if it cannot be created, say so now.
+  await ensureTierDiscount()
 
   const config = await getConfig()
   const discountId = `disc_${crypto.randomUUID()}`

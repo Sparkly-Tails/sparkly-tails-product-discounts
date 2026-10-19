@@ -23,7 +23,7 @@ describe('proxy', () => {
   let log: ReturnType<typeof vi.spyOn>
 
   beforeEach(() => {
-    process.env.SHOPIFY_SHOP = SHOP
+    delete process.env.SHOPIFY_SHOP
     process.env.NEXT_PUBLIC_SHOPIFY_API_KEY = API_KEY
     process.env.SHOPIFY_API_SECRET_KEY = 'secret'
     vi.mocked(decideProxy).mockReset()
@@ -58,13 +58,32 @@ describe('proxy', () => {
   it('answers a refused page load with an HTML page that links back to the Shopify admin', async () => {
     decide({ kind: 'deny', status: 403, message: 'Open this app from your Shopify admin.', reason: 'no-token' })
 
-    const res = await proxy(request('https://app.test/', { accept: 'text/html' }))
+    const res = await proxy(request(`https://app.test/?shop=${SHOP}`, { accept: 'text/html' }))
 
     expect(res.status).toBe(403)
     expect(res.headers.get('content-type')).toBe('text/html')
     const html = await res.text()
     expect(html).toContain('Open this app from your Shopify admin.')
     expect(html).toContain(`https://${SHOP}/admin/apps`)
+  })
+
+  it('links nowhere when the shop in the URL is not a real shop host', async () => {
+    decide({ kind: 'deny', status: 403, message: 'Open this app from your Shopify admin.', reason: 'no-token' })
+
+    const res = await proxy(request('https://app.test/?shop=evil.example.com%22%3E%3Cscript%3E', { accept: 'text/html' }))
+
+    const html = await res.text()
+    expect(html).toContain('Open this app from your Shopify admin.')
+    expect(html).not.toContain('evil.example.com')
+    expect(html).not.toContain('<a ')
+  })
+
+  it('does not need SHOPIFY_SHOP to decide', async () => {
+    decide({ kind: 'next' })
+
+    await proxy(request('https://app.test/'))
+
+    expect(vi.mocked(decideProxy).mock.calls[0][0].env).toEqual({ secret: 'secret', apiKey: API_KEY })
   })
 
   it('answers a refused fetch with JSON', async () => {

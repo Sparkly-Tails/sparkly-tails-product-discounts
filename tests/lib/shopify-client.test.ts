@@ -1,14 +1,17 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { shopifyQuery } from '@/lib/shopify-client'
 import { getAccessToken } from '@/lib/getAccessToken'
+import { getRequestShop } from '@/lib/requestShop'
 import { deleteShopSessions } from '@/lib/sessions'
 
 vi.mock('@/lib/getAccessToken', () => ({ getAccessToken: vi.fn() }))
 vi.mock('@/lib/sessions', () => ({ deleteShopSessions: vi.fn() }))
+vi.mock('@/lib/requestShop', () => ({ getRequestShop: vi.fn() }))
 
 describe('shopifyQuery', () => {
   beforeEach(() => {
-    process.env.SHOPIFY_SHOP = 'test.myshopify.com'
+    vi.mocked(getRequestShop).mockReset()
+    vi.mocked(getRequestShop).mockImplementation(async (explicit?: string) => explicit ?? 'test.myshopify.com')
     vi.mocked(getAccessToken).mockReset()
     vi.mocked(getAccessToken).mockResolvedValue('test-token')
     vi.mocked(deleteShopSessions).mockReset()
@@ -30,7 +33,7 @@ describe('shopifyQuery', () => {
     expect(result).toEqual({ shop: { id: 'gid://shopify/Shop/1' } })
   })
 
-  it('sends the token from getAccessToken to the configured shop', async () => {
+  it('calls the request shop admin url with the token from getAccessToken', async () => {
     vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({ data: {} }) } as Response)
 
     await shopifyQuery('query { shop { id } }')
@@ -60,9 +63,27 @@ describe('shopifyQuery', () => {
     await expect(shopifyQuery('query { shop { id } }')).rejects.toThrow(/HTTP 502/)
   })
 
-  it('throws when SHOPIFY_SHOP is not set', async () => {
-    delete process.env.SHOPIFY_SHOP
-    await expect(shopifyQuery('query { shop { id } }')).rejects.toThrow('SHOPIFY_SHOP is not set')
+  it('throws when the request has no verified shop, and calls nothing', async () => {
+    vi.mocked(getRequestShop).mockRejectedValue(new Error('No shop for this request'))
+
+    await expect(shopifyQuery('query { shop { id } }')).rejects.toThrow('No shop for this request')
+    expect(fetch).not.toHaveBeenCalled()
+    expect(getAccessToken).not.toHaveBeenCalled()
+  })
+
+  it('two concurrent calls for shops A and B use their own url and token', async () => {
+    vi.mocked(getAccessToken).mockImplementation(async (shop?: string) => `token-of-${shop}`)
+    vi.mocked(fetch).mockImplementation(async () => ({ ok: true, json: async () => ({ data: {} }) }) as Response)
+
+    await Promise.all([
+      shopifyQuery('query { shop { id } }', undefined, 'a.myshopify.com'),
+      shopifyQuery('query { shop { id } }', undefined, 'b.myshopify.com'),
+    ])
+
+    const calls = vi.mocked(fetch).mock.calls.map(([url, init]) => ({ url: String(url), token: ((init as RequestInit).headers as Record<string, string>)['X-Shopify-Access-Token'] }))
+    expect(calls).toContainEqual({ url: expect.stringContaining('https://a.myshopify.com/admin/api/'), token: 'token-of-a.myshopify.com' })
+    expect(calls).toContainEqual({ url: expect.stringContaining('https://b.myshopify.com/admin/api/'), token: 'token-of-b.myshopify.com' })
+    expect(calls).toHaveLength(2)
   })
 
   it('passes along the error when no access token can be obtained', async () => {
@@ -83,6 +104,7 @@ describe('shopifyQuery', () => {
 
       expect(result).toEqual({ shop: { id: 'gid://shopify/Shop/1' } })
       expect(deleteShopSessions).toHaveBeenCalledExactlyOnceWith('test.myshopify.com')
+      expect(getAccessToken).toHaveBeenCalledWith('test.myshopify.com')
       expect(fetch).toHaveBeenCalledTimes(2)
       expect((vi.mocked(fetch).mock.calls[0][1] as RequestInit).headers).toMatchObject({ 'X-Shopify-Access-Token': 'revoked-token' })
       expect((vi.mocked(fetch).mock.calls[1][1] as RequestInit).headers).toMatchObject({ 'X-Shopify-Access-Token': 'fresh-token' })

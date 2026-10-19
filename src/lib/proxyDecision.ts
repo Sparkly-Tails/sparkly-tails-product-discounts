@@ -5,7 +5,7 @@ export interface ProxyInput {
   pathname: string
   searchParams: URLSearchParams
   headers: { authorization: string | null; secFetchDest: string | null; accept: string | null; rsc: string | null }
-  env: { secret: string | undefined; apiKey: string | undefined; shop: string | undefined }
+  env: { secret: string | undefined; apiKey: string | undefined }
   /** Unix time in seconds. */
   now: number
   isDevelopment: boolean
@@ -38,7 +38,7 @@ export async function decideProxy(input: ProxyInput): Promise<ProxyDecision> {
   if (EXEMPT_PREFIXES.some((prefix) => pathname.startsWith(prefix)) || pathname === '/favicon.ico') return { kind: 'next' }
   if (input.isDevelopment) return { kind: 'next' }
 
-  if (!env.secret || !env.apiKey || !env.shop) {
+  if (!env.secret || !env.apiKey) {
     return { kind: 'deny', status: 503, message: 'App misconfigured: missing env vars', reason: 'missing-env' }
   }
 
@@ -48,7 +48,7 @@ export async function decideProxy(input: ProxyInput): Promise<ProxyDecision> {
 
   let reason = 'no-token'
   if (idToken) {
-    const result = await verifyIdToken(idToken, { secret: env.secret, apiKey: env.apiKey, shop: env.shop, now })
+    const result = await verifyIdToken(idToken, { secret: env.secret, apiKey: env.apiKey, now })
     if (result.ok) return { kind: 'next-with-token', idToken, shop: result.shop }
     reason = `token-${result.reason}`
     if (result.reason === 'shop') return { kind: 'deny', status: 403, message: 'This app is not set up for this store.', reason }

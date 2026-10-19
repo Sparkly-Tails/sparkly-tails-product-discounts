@@ -3,46 +3,86 @@ import { createHmac } from 'node:crypto'
 import { POST as uninstalled } from '@/app/webhooks/app/uninstalled/route'
 import { POST as scopesUpdate } from '@/app/webhooks/app/scopes_update/route'
 import { POST as compliance } from '@/app/webhooks/compliance/route'
-import { deleteShopSessions, updateStoredScope } from '@/lib/sessions'
+import { deleteShopSessions } from '@/lib/sessions'
+import { refreshStoredScopes } from '@/lib/storedScopes'
 
 vi.mock('@/lib/sessions', () => ({ deleteShopSessions: vi.fn(async () => {}), updateStoredScope: vi.fn(async () => {}) }))
+vi.mock('@/lib/storedScopes', () => ({ refreshStoredScopes: vi.fn(async () => {}) }))
 
 const SECRET = 'client-secret'
+const A = 'demo.myshopify.com'
+const B = 'other.myshopify.com'
 const sign = (raw: string) => createHmac('sha256', SECRET).update(raw, 'utf8').digest('base64')
-const post = (body: string, topic: string, signature = sign(body)) =>
+const post = (body: string, topic: string, signature = sign(body), shopHeader = A) =>
   new Request('https://app.test/webhooks', {
     method: 'POST', body,
-    headers: { 'x-shopify-hmac-sha256': signature, 'x-shopify-shop-domain': 'demo.myshopify.com', 'x-shopify-topic': topic },
+    headers: { 'x-shopify-hmac-sha256': signature, 'x-shopify-shop-domain': shopHeader, 'x-shopify-topic': topic },
   })
+const uninstalledBody = (shop: string) => JSON.stringify({ id: 1, myshopify_domain: shop })
+const redactBody = (shop: string) => JSON.stringify({ shop_id: 1, shop_domain: shop })
 
 beforeEach(() => {
   process.env.SHOPIFY_API_SECRET_KEY = SECRET
   vi.mocked(deleteShopSessions).mockClear()
-  vi.mocked(updateStoredScope).mockClear()
+  vi.mocked(refreshStoredScopes).mockClear()
 })
 
 describe('app/uninstalled', () => {
-  it('deletes the shop sessions', async () => {
-    expect((await uninstalled(post('{}', 'app/uninstalled'))).status).toBe(200)
-    expect(deleteShopSessions).toHaveBeenCalledWith('demo.myshopify.com')
+  it('deletes the sessions of the shop in the signed body', async () => {
+    expect((await uninstalled(post(uninstalledBody(A), 'app/uninstalled'))).status).toBe(200)
+    expect(deleteShopSessions).toHaveBeenCalledExactlyOnceWith(A)
+  })
+
+  it('uninstalled for A with a header for B deletes nothing and answers 400', async () => {
+    expect((await uninstalled(post(uninstalledBody(A), 'app/uninstalled', undefined, B))).status).toBe(400)
+    expect(deleteShopSessions).not.toHaveBeenCalled()
+  })
+
+  it('answers 400 and deletes nothing when the body has no shop', async () => {
+    expect((await uninstalled(post('{}', 'app/uninstalled'))).status).toBe(400)
+    expect(deleteShopSessions).not.toHaveBeenCalled()
+  })
+
+  // The topic header is not signed either: a replay must not be able to turn off the body check by changing it.
+  it.each(['app/scopes_update', 'app/uninstalled ', 'APP_UNINSTALLED_X', 'shop/redact', 'customers/redact', 'orders/create'])(
+    'a signed body for A with the topic header changed to "%s" and a header for B deletes nothing and answers 400',
+    async (topic) => {
+      expect((await uninstalled(post(uninstalledBody(A), topic, undefined, B))).status).toBe(400)
+      expect(deleteShopSessions).not.toHaveBeenCalled()
+    },
+  )
+
+  it('accepts the topic in the uppercase style the GraphQL API uses', async () => {
+    expect((await uninstalled(post(uninstalledBody(A), 'APP_UNINSTALLED'))).status).toBe(200)
+    expect(deleteShopSessions).toHaveBeenCalledExactlyOnceWith(A)
   })
 
   it('does nothing for a bad signature', async () => {
-    expect((await uninstalled(post('{}', 'app/uninstalled', 'AAAA'))).status).toBe(401)
+    expect((await uninstalled(post(uninstalledBody(A), 'app/uninstalled', 'AAAA'))).status).toBe(401)
     expect(deleteShopSessions).not.toHaveBeenCalled()
   })
 })
 
 describe('app/scopes_update', () => {
-  it('stores the current scopes', async () => {
-    const body = '{"current":["read_products","write_products"]}'
+  it('ignores the body scope list and refreshes from Shopify for the header shop', async () => {
+    const body = '{"shop_id":1,"current":["read_products","write_everything"]}'
     expect((await scopesUpdate(post(body, 'app/scopes_update'))).status).toBe(200)
-    expect(updateStoredScope).toHaveBeenCalledWith('demo.myshopify.com', ['read_products', 'write_products'])
+    expect(refreshStoredScopes).toHaveBeenCalledExactlyOnceWith(A)
   })
 
-  it('answers 200 without writing when the payload has no scopes', async () => {
-    expect((await scopesUpdate(post('{}', 'app/scopes_update'))).status).toBe(200)
-    expect(updateStoredScope).not.toHaveBeenCalled()
+  it('answers 400 and refreshes nothing when the header is not a real shop host', async () => {
+    expect((await scopesUpdate(post('{}', 'app/scopes_update', undefined, 'evil.example.com'))).status).toBe(400)
+    expect(refreshStoredScopes).not.toHaveBeenCalled()
+  })
+
+  it('answers 400 and refreshes nothing for any other topic', async () => {
+    expect((await scopesUpdate(post(uninstalledBody(A), 'app/uninstalled'))).status).toBe(400)
+    expect(refreshStoredScopes).not.toHaveBeenCalled()
+  })
+
+  it('answers 500 so Shopify retries when the refresh fails', async () => {
+    vi.mocked(refreshStoredScopes).mockRejectedValueOnce(new Error('open the app from Shopify admin'))
+    expect((await scopesUpdate(post('{}', 'app/scopes_update'))).status).toBe(500)
   })
 })
 
@@ -53,13 +93,26 @@ describe('compliance', () => {
     expect(deleteShopSessions).not.toHaveBeenCalled()
   })
 
-  it('deletes the shop sessions for shop/redact', async () => {
-    expect((await compliance(post('{}', 'shop/redact'))).status).toBe(200)
-    expect(deleteShopSessions).toHaveBeenCalledWith('demo.myshopify.com')
+  it('shop/redact deletes only the body shop', async () => {
+    expect((await compliance(post(redactBody(A), 'shop/redact'))).status).toBe(200)
+    expect(deleteShopSessions).toHaveBeenCalledExactlyOnceWith(A)
   })
 
+  it('shop/redact for A with a header for B deletes nothing and answers 400', async () => {
+    expect((await compliance(post(redactBody(A), 'shop/redact', undefined, B))).status).toBe(400)
+    expect(deleteShopSessions).not.toHaveBeenCalled()
+  })
+
+  it.each(['app/uninstalled', 'app/scopes_update', 'orders/create', 'shop/redact '])(
+    'a body for A sent with the topic header "%s" deletes nothing and answers 400',
+    async (topic) => {
+      expect((await compliance(post(redactBody(A), topic, undefined, B))).status).toBe(400)
+      expect(deleteShopSessions).not.toHaveBeenCalled()
+    },
+  )
+
   it('rejects a bad signature without touching the database', async () => {
-    expect((await compliance(post('{}', 'shop/redact', 'AAAA'))).status).toBe(401)
+    expect((await compliance(post(redactBody(A), 'shop/redact', 'AAAA'))).status).toBe(401)
     expect(deleteShopSessions).not.toHaveBeenCalled()
   })
 })

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { createHmac } from 'node:crypto'
-import { verifyIdToken } from '@/lib/idToken'
+import { verifyIdToken, isShopHost } from '@/lib/idToken'
 
 const SECRET = 'client-secret'
 const API_KEY = 'client-id'
@@ -21,13 +21,50 @@ function signToken(payload: Record<string, unknown>, secret = SECRET, header: Re
 const claims = (over: Record<string, unknown> = {}) => ({
   iss: `https://${SHOP}/admin`, dest: `https://${SHOP}`, aud: API_KEY, sub: '1', exp: NOW + 60, nbf: NOW - 5, iat: NOW - 5, jti: 'j', sid: 's', ...over,
 })
-const opts = { secret: SECRET, apiKey: API_KEY, shop: SHOP, now: NOW }
+const opts = { secret: SECRET, apiKey: API_KEY, now: NOW }
 
 describe('verifyIdToken', () => {
-  it('accepts a correctly signed token for this app and shop', async () => {
+  it('accepts a correctly signed token for this app and returns the shop', async () => {
     const result = await verifyIdToken(signToken(claims()), opts)
     expect(result.ok).toBe(true)
     if (result.ok) expect(result.shop).toBe(SHOP)
+  })
+
+  it('accepts a valid token for any well-formed myshopify.com shop and returns that shop', async () => {
+    for (const shop of ['demo.myshopify.com', 'demo2-vohii5ln.myshopify.com', 'a.myshopify.com']) {
+      const result = await verifyIdToken(signToken(claims({ iss: `https://${shop}/admin`, dest: `https://${shop}` })), opts)
+      expect(result.ok, shop).toBe(true)
+      if (result.ok) expect(result.shop).toBe(shop)
+    }
+  })
+
+  it('refuses these dest values with reason shop', async () => {
+    const dests = [
+      'https://myshopify.com',
+      'https://evil.myshopify.com.attacker.com',
+      'https://shop.myshopify.com:8080',
+      'http://shop.myshopify.com',
+      'https://-bad.myshopify.com',
+    ]
+    for (const dest of dests) {
+      const result = await verifyIdToken(signToken(claims({ dest, iss: `${dest}/admin` })), opts)
+      expect(result, dest).toEqual({ ok: false, reason: 'shop' })
+    }
+  })
+
+  it('refuses an iss whose host differs from dest', async () => {
+    const token = signToken(claims({ iss: 'https://other.myshopify.com/admin' }))
+    expect(await verifyIdToken(token, opts)).toEqual({ ok: false, reason: 'issuer' })
+  })
+
+  it('refuses an iss that is not https or not a URL', async () => {
+    expect(await verifyIdToken(signToken(claims({ iss: `http://${SHOP}/admin` })), opts)).toEqual({ ok: false, reason: 'issuer' })
+    expect(await verifyIdToken(signToken(claims({ iss: 'not a url' })), opts)).toEqual({ ok: false, reason: 'issuer' })
+    expect(await verifyIdToken(signToken(claims({ iss: undefined })), opts)).toEqual({ ok: false, reason: 'issuer' })
+  })
+
+  it('accepts iss https://<shop>/admin', async () => {
+    expect((await verifyIdToken(signToken(claims({ iss: `https://${SHOP}/admin` })), opts)).ok).toBe(true)
   })
 
   it('rejects a token signed with a different secret', async () => {
@@ -60,15 +97,24 @@ describe('verifyIdToken', () => {
     expect(await verifyIdToken(signToken(claims({ aud: 'someone-else' })), opts)).toEqual({ ok: false, reason: 'audience' })
   })
 
-  it('rejects a token for another shop, even when it is correctly signed', async () => {
-    expect(await verifyIdToken(signToken(claims({ dest: 'https://other.myshopify.com' })), opts)).toEqual({ ok: false, reason: 'shop' })
-  })
-
   it('never accepts a token when the secret is empty', async () => {
     expect(await verifyIdToken(signToken(claims(), ''), { ...opts, secret: '' })).toEqual({ ok: false, reason: 'signature' })
   })
 
   it('rejects claims whose exp or nbf are not numbers', async () => {
     expect(await verifyIdToken(signToken(claims({ exp: 'soon' })), opts)).toEqual({ ok: false, reason: 'malformed' })
+  })
+})
+
+describe('isShopHost', () => {
+  it('accepts well-formed myshopify.com hosts', () => {
+    expect(isShopHost('demo.myshopify.com')).toBe(true)
+    expect(isShopHost('demo-2.myshopify.com')).toBe(true)
+  })
+
+  it('refuses look-alikes, ports, paths and anything else', () => {
+    for (const host of ['myshopify.com', '.myshopify.com', '-a.myshopify.com', 'evil.myshopify.com.attacker.com', 'shop.myshopify.com:8080', 'shop.myshopify.com/', 'a.b.myshopify.com', 'Shop.myshopify.com', 'shop.myshopify.com.', '', ' shop.myshopify.com']) {
+      expect(isShopHost(host), host).toBe(false)
+    }
   })
 })

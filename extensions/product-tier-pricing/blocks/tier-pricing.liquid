@@ -2,16 +2,16 @@
   This block replaces the theme's native Buy Buttons price line (its
   "Show price" setting must be turned off in the theme editor). It always
   renders a price — a live-updating tiered price when
-  product.metafields.sparkly_product_discounts.discount is present AND the
+  product.metafields['$app:smooth_discount'].tier_discount is present AND the
   currently-selected variant is one of its members, or a plain price
   otherwise.
 {% endcomment %}
-{%- assign discount_metafield = product.metafields.sparkly_product_discounts.discount -%}
+{%- assign discount_metafield = product.metafields['$app:smooth_discount'].tier_discount -%}
 {%- assign selected_variant_id = product.selected_or_first_available_variant.id | prepend: 'gid://shopify/ProductVariant/' -%}
 {%- assign discount_json = '{"tiers":[]}' -%}
 {%- if discount_metafield != blank -%}
-  {%- assign sibling_product_refs = product.metafields.sparkly_product_discounts.sibling_products.value -%}
-  {%- assign sibling_variant_refs = product.metafields.sparkly_product_discounts.sibling_variants.value -%}
+  {%- assign sibling_product_refs = product.metafields['$app:smooth_discount'].tier_sibling_products.value -%}
+  {%- assign sibling_variant_refs = product.metafields['$app:smooth_discount'].tier_sibling_variants.value -%}
   {%- capture siblings_json -%}
     [
     {%- for sibling in discount_metafield.value.siblings -%}
@@ -44,17 +44,6 @@
             {%- endif -%}
           {%- endif -%}
         {%- endfor -%}
-      {%- endif -%}
-      {%- comment -%}
-        TEMPORARY FALLBACK (remove in the cleanup PR once every live tier discount has been re-saved):
-        a discount saved before sibling data became live still carries copied title / handle /
-        imageUrl on each sibling. Use them only when the live reference did not resolve.
-      {%- endcomment -%}
-      {%- if sib_listed == false and sibling.title != blank -%}
-        {%- assign sib_listed = true -%}
-        {%- assign sib_title = sibling.title -%}
-        {%- capture sib_url -%}/products/{{ sibling.handle }}{%- if sibling.variantId != blank -%}?variant={{ sibling.variantId | split: '/' | last }}{%- endif -%}{%- endcapture -%}
-        {%- assign sib_image = sibling.imageUrl -%}
       {%- endif -%}
       {
         "productId": {{ sibling.productId | json }},
@@ -94,7 +83,7 @@
   {%- endcapture -%}
   {%- assign discount_json = discount_json_raw | strip | escape -%}
 {%- endif -%}
-{%- assign time_discount_metafield = product.metafields.sparkly_product_discounts.time_based_discount -%}
+{%- assign time_discount_metafield = product.metafields['$app:smooth_discount'].time_discount -%}
 {%- assign time_discount_json = '{}' -%}
 {%- if time_discount_metafield != blank -%}
   {%- capture time_discount_data -%}
@@ -117,7 +106,6 @@
   data-discount='{{ discount_json }}'
   data-time-discount='{{ time_discount_json }}'
   data-selected-variant-id="{{ product.selected_or_first_available_variant.id }}"
-  data-product-handle='{{ product.handle | json | escape }}'
   data-product-id='{{ product.id | prepend: "gid://shopify/Product/" | json }}'
   data-base-price="{{ product.selected_or_first_available_variant.price | divided_by: 100.0 | json }}"
   data-compare-at-price="{{ product.selected_or_first_available_variant.compare_at_price | default: 0 | divided_by: 100.0 | json }}"
