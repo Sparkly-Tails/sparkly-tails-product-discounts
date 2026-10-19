@@ -218,9 +218,9 @@ describe('tier widget painting (redesign)', () => {
         <p data-tier-pricing-promo></p>
         <div data-tier-pricing-card hidden>
           <div><span data-tier-pricing-status></span><span data-tier-pricing-aside></span></div>
-          <div><div><div data-tier-pricing-fill></div></div><div data-tier-pricing-markers></div><span data-tier-pricing-dot></span></div>
+          <div data-tier-pricing-bar role="progressbar"><div><div data-tier-pricing-fill></div></div><div data-tier-pricing-markers></div><span data-tier-pricing-dot></span></div>
           <div data-tier-pricing-tiers></div>
-          <div><button data-tier-pricing-toggle>mix &amp; match products ▼</button><span data-tier-pricing-chosen hidden></span></div>
+          <div><button data-tier-pricing-toggle aria-expanded="false"><span data-tier-pricing-toggle-label>mix &amp; match products</span><span data-tier-pricing-toggle-arrow aria-hidden="true">▼</span></button><span data-tier-pricing-chosen hidden></span></div>
           <div data-tier-pricing-list hidden></div>
           <p data-tier-pricing-list-message hidden></p>
         </div>
@@ -417,5 +417,53 @@ describe('tier widget painting (redesign)', () => {
     nextCartError = null
     await click('[data-cart-delta="1"]', 1)
     expect(message.hidden).toBe(true) // the message clears on the next attempt
+  })
+
+  describe('accessibility', () => {
+    it('the bar is a progressbar with the quantity, its range and a spoken summary', async () => {
+      await mountTiers(10)
+      const bar = document.querySelector('[data-tier-pricing-bar]') as HTMLElement
+      expect(bar.getAttribute('role')).toBe('progressbar')
+      expect(bar.getAttribute('aria-valuenow')).toBe('10')
+      expect(bar.getAttribute('aria-valuemin')).toBe('1')
+      expect(bar.getAttribute('aria-valuemax')).toBe('16')
+      expect(bar.getAttribute('aria-valuetext')).toBe('10 of 16 units. Offer unlocked, highest discount at 16.')
+    })
+
+    it('a discounted price reads as "Discounted price" then "Original price", never as two bare numbers', async () => {
+      await mountTiers(10)
+      const price = document.querySelector('[data-tier-pricing-price]') as HTMLElement
+      expect(price.textContent!.replace(/\s+/g, ' ').trim()).toBe('Discounted price: £1.63 Original price: £1.69')
+      expect(price.querySelectorAll('.sparkly-tier-pricing__sr-only')).toHaveLength(2)
+    })
+
+    it('the pill that matches the quantity is pressed, the others are not', async () => {
+      await mountTiers(8)
+      const pressed = [...document.querySelectorAll('[data-tier-pricing-tiers] button')].map((b) => b.getAttribute('aria-pressed'))
+      expect(pressed).toEqual(['false', 'true', 'false'])
+    })
+
+    it('the list toggle tells assistive technology whether the list is open', async () => {
+      await openList()
+      const toggle = document.querySelector('[data-tier-pricing-toggle]') as HTMLElement
+      expect(toggle.getAttribute('aria-expanded')).toBe('true')
+      ;(toggle as HTMLElement).click()
+      expect(toggle.getAttribute('aria-expanded')).toBe('false')
+    })
+
+    it('live text is only rewritten when it changed, so the once-a-second refresh does not re-announce it', async () => {
+      await mountTiers(5)
+      const status = document.querySelector('[data-tier-pricing-status]') as HTMLElement
+      const promo = document.querySelector('[data-tier-pricing-promo]') as HTMLElement
+      const writes: string[] = []
+      const observer = new MutationObserver((records) => records.forEach((r) => writes.push((r.target as HTMLElement).tagName)))
+      observer.observe(status, { childList: true, characterData: true, subtree: true })
+      observer.observe(promo, { childList: true, characterData: true, subtree: true })
+      await vi.advanceTimersByTimeAsync(3500) // three polling renders, nothing changed
+      expect(writes).toHaveLength(0)
+      await setQuantity(10)
+      expect(writes.length).toBeGreaterThan(0) // a real change is still written
+      observer.disconnect()
+    })
   })
 })

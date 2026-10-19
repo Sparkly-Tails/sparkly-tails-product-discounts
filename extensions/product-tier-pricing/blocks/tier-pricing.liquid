@@ -153,15 +153,15 @@
 
   {%- if discount_metafield != blank -%}
     {%- comment -%} Empty mount point — JS (buildPromoText) owns the wording. {%- endcomment -%}
-    <p class="sparkly-tier-pricing__promo" data-tier-pricing-promo></p>
+    <p class="sparkly-tier-pricing__promo" data-tier-pricing-promo aria-live="polite" aria-atomic="true"></p>
   {%- endif -%}
 
   <div class="sparkly-tier-pricing__card" data-tier-pricing-card hidden>
-    <div class="sparkly-tier-pricing__status-row">
+    <div class="sparkly-tier-pricing__status-row" aria-live="polite" aria-atomic="true">
       <span class="sparkly-tier-pricing__status" data-tier-pricing-status></span>
       <span class="sparkly-tier-pricing__aside" data-tier-pricing-aside></span>
     </div>
-    <div class="sparkly-tier-pricing__bar-wrap">
+    <div class="sparkly-tier-pricing__bar-wrap" data-tier-pricing-bar role="progressbar" aria-label="Discount progress">
       <div class="sparkly-tier-pricing__track">
         <div class="sparkly-tier-pricing__fill" data-tier-pricing-fill></div>
       </div>
@@ -171,10 +171,10 @@
     <div class="sparkly-tier-pricing__tiers" data-tier-pricing-tiers></div>
     {%- if discount_metafield != blank -%}
       <div class="sparkly-tier-pricing__list-head">
-        <button type="button" class="sparkly-tier-pricing__toggle" data-tier-pricing-toggle>mix &amp; match products ▼</button>
+        <button type="button" class="sparkly-tier-pricing__toggle" data-tier-pricing-toggle aria-expanded="false" aria-controls="sparkly-tier-list-{{ block.id }}"><span>mix &amp; match products</span> <span data-tier-pricing-toggle-arrow aria-hidden="true">▼</span></button>
         <span class="sparkly-tier-pricing__chosen" data-tier-pricing-chosen hidden></span>
       </div>
-      <div class="sparkly-tier-pricing__list" data-tier-pricing-list hidden></div>
+      <div class="sparkly-tier-pricing__list" id="sparkly-tier-list-{{ block.id }}" data-tier-pricing-list hidden></div>
       <p class="sparkly-tier-pricing__list-message" data-tier-pricing-list-message role="status" aria-live="polite" hidden></p>
     {%- endif -%}
   </div>
@@ -193,7 +193,7 @@
   .sparkly-tier-pricing__original-price[data-strike="true"] {
     font-weight: 400;
     font-size: calc(var(--sparkly-tier-price-font-size, 2.5rem) * 0.75);
-    opacity: 0.6;
+    color: var(--color-secondary-text-main, #5b5c4e);
     text-decoration: line-through;
   }
 

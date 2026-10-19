@@ -175,7 +175,7 @@ function computeProgressState(tiers, otherQty, addingQty) {
     ? { afterIndex: reachedTierIndex, tier: sorted[reachedTierIndex] }
     : null
 
-  return { combinedQty, topThreshold, maxed, tierState, tierButtons, tempBox }
+  return { combinedQty, startThreshold: sorted[0].minQty, topThreshold, maxed, tierState, tierButtons, tempBox }
 }
 
 function computeTierButtonsSignature(state, basePrice, addingQty) {
@@ -309,6 +309,27 @@ function buildStatusCopy({ progressState, tiers, basePrice, formatMoney: formatM
   }
 }
 
+// role="progressbar" values and the text a screen reader speaks for the bar.
+// The value is clamped to the range; the text keeps the real quantity.
+function buildProgressSemantics(progressState) {
+  const qty = progressState.combinedQty
+  const min = progressState.startThreshold
+  const max = progressState.topThreshold
+  const state = classifyOfferState(progressState)
+  const head = qty > max ? pluralizeUnits(qty) : qty + ' of ' + max + ' units'
+  let tail = ''
+  if (state === 'highest') {
+    tail = 'Highest discount unlocked'
+  } else if (state === 'offer') {
+    tail = 'Offer unlocked, highest discount at ' + max
+  } else {
+    const ts = progressState.tierState
+    const next = ts.nextTier || (ts.remainingTiers && ts.remainingTiers[0])
+    if (next) tail = 'Next offer at ' + next.minQty
+  }
+  return { valueNow: clamp(qty, min, max), valueMin: min, valueMax: max, valueText: head + '. ' + (tail ? tail + '.' : '') }
+}
+
 // View-model assembly: decides WHAT the widget shows. The DOM layer below
 // only paints whatever this returns.
 
@@ -332,6 +353,7 @@ function computeWidgetViewModel({ tiers, basePrice, compareAtPrice, otherQty, ad
       dot: null,
       promoLine: '',
       status: null,
+      semantics: null,
     }
   }
 
@@ -364,6 +386,7 @@ function computeWidgetViewModel({ tiers, basePrice, compareAtPrice, otherQty, ad
     dot: computeProgressDot(sortedTiers, progressState.combinedQty),
     promoLine: buildPromoLine(tiers, basePrice, formatMoneyFn, isGroup),
     status: buildStatusCopy({ progressState, tiers, basePrice, formatMoney: formatMoneyFn }),
+    semantics: buildProgressSemantics(progressState),
   }
 }
 
@@ -533,6 +556,7 @@ if (typeof module !== 'undefined' && module.exports) {
     computeWidgetViewModel,
     buildMixMatchRows,
     buildCartChange,
+    buildProgressSemantics,
     cartErrorMessage,
     formatItemsChosen,
     buildDisplayMixMatchItems,
@@ -547,11 +571,20 @@ if (typeof document !== 'undefined') {
     return (amount) => formatMoney(amount, moneyFormat)
   }
 
+  // Rewrites text only when it changed: live regions re-announce on every
+  // write, and the widget repaints once a second.
+  function setText(el, text) {
+    if (el && el.textContent !== text) el.textContent = text
+  }
+
   function paintPriceRow(elements, viewModel) {
     if (viewModel.discountedPrice) {
-      elements.priceEl.innerHTML = viewModel.discountedPrice + ' <s>' + viewModel.plainPrice + '</s>'
+      // Screen readers would otherwise read the two prices as bare numbers.
+      const html = '<span class="sparkly-tier-pricing__sr-only">Discounted price: </span>' + viewModel.discountedPrice +
+        ' <s><span class="sparkly-tier-pricing__sr-only">Original price: </span>' + viewModel.plainPrice + '</s>'
+      if (elements.priceEl.innerHTML !== html) elements.priceEl.innerHTML = html
     } else {
-      elements.priceEl.textContent = viewModel.plainPrice
+      setText(elements.priceEl, viewModel.plainPrice)
     }
     // "each" only makes sense once there's a per-unit/bulk-pricing story to
     // explain — showCard already means "this product has a discount
@@ -563,7 +596,7 @@ if (typeof document !== 'undefined') {
     if (!elements.promoEl) return
     // Once an offer applies the headline replaces the "buy more" line.
     const headline = viewModel.status && viewModel.status.headlineText
-    elements.promoEl.textContent = headline || viewModel.promoLine
+    setText(elements.promoEl, headline || viewModel.promoLine)
   }
 
   function paintCard(elements, viewModel) {
@@ -575,16 +608,16 @@ if (typeof document !== 'undefined') {
   function paintStatus(elements, viewModel) {
     const status = viewModel.status
     if (!status) return
-    if (elements.statusEl) elements.statusEl.textContent = status.statusText
+    setText(elements.statusEl, status.statusText)
     if (elements.asideEl) {
-      elements.asideEl.textContent = status.badgeText || status.hintText || ''
+      setText(elements.asideEl, status.badgeText || status.hintText || '')
       elements.asideEl.classList.toggle('sparkly-tier-pricing__aside--badge', !!status.badgeText)
     }
   }
 
   // Bar: fill up to the dot, a marker per tier number, and the dot showing the
   // current quantity. A marker the dot sits on is hidden under it.
-  function paintProgressBar(elements, dot) {
+  function paintProgressBar(elements, dot, semantics) {
     elements.fillEl.style.width = dot.dotPct + '%'
     elements.markersEl.innerHTML = ''
     dot.markers.forEach((marker) => {
@@ -598,6 +631,12 @@ if (typeof document !== 'undefined') {
     })
     elements.dotEl.style.left = dot.dotPct + '%'
     elements.dotEl.textContent = String(dot.dotValue)
+    if (elements.barEl && semantics) {
+      elements.barEl.setAttribute('aria-valuenow', String(semantics.valueNow))
+      elements.barEl.setAttribute('aria-valuemin', String(semantics.valueMin))
+      elements.barEl.setAttribute('aria-valuemax', String(semantics.valueMax))
+      elements.barEl.setAttribute('aria-valuetext', semantics.valueText)
+    }
   }
 
   // One pill per tier ("8 × £1.63"); the exact-match pill carries a tick and
@@ -612,6 +651,7 @@ if (typeof document !== 'undefined') {
         (btn.active ? ' sparkly-tier-pricing__tier-btn--active' : '') +
         (btn.dimmed ? ' sparkly-tier-pricing__tier-btn--dimmed' : '')
       el.textContent = btn.label
+      el.setAttribute('aria-pressed', btn.active ? 'true' : 'false')
       if (btn.active) {
         const tick = document.createElement('span')
         tick.className = 'sparkly-tier-pricing__tier-tick'
@@ -638,7 +678,7 @@ if (typeof document !== 'undefined') {
     if (!viewModel.showCard || !viewModel.progressState) return
     const state = viewModel.progressState
 
-    paintProgressBar(elements, viewModel.dot)
+    paintProgressBar(elements, viewModel.dot, viewModel.semantics)
 
     const signature = computeTierButtonsSignature(state, basePrice, addingQty)
     if (tierButtonsSignatureRef.value === signature) return
@@ -858,10 +898,12 @@ if (typeof document !== 'undefined') {
       statusEl: container.querySelector('[data-tier-pricing-status]'),
       asideEl: container.querySelector('[data-tier-pricing-aside]'),
       fillEl: container.querySelector('[data-tier-pricing-fill]'),
+      barEl: container.querySelector('[data-tier-pricing-bar]'),
       markersEl: container.querySelector('[data-tier-pricing-markers]'),
       dotEl: container.querySelector('[data-tier-pricing-dot]'),
       tiersEl: container.querySelector('[data-tier-pricing-tiers]'),
       toggleEl: container.querySelector('[data-tier-pricing-toggle]'),
+      toggleArrowEl: container.querySelector('[data-tier-pricing-toggle-arrow]'),
       listEl: container.querySelector('[data-tier-pricing-list]'),
       chosenEl: container.querySelector('[data-tier-pricing-chosen]'),
       messageEl: container.querySelector('[data-tier-pricing-list-message]'),
@@ -924,7 +966,7 @@ if (typeof document !== 'undefined') {
 
       if (config.isGroup && elements.listEl && !elements.listEl.hidden) {
         renderMixMatchList(elements.listEl, buildDisplayMixMatchItems(config), lastCartItems, lastPricing)
-        if (elements.chosenEl && lastPricing) elements.chosenEl.textContent = formatItemsChosen(lastPricing.combinedQty)
+        if (lastPricing) setText(elements.chosenEl, formatItemsChosen(lastPricing.combinedQty))
       }
     }
 
@@ -941,10 +983,11 @@ if (typeof document !== 'undefined') {
         open = !open
         elements.listEl.hidden = !open
         if (elements.chosenEl) elements.chosenEl.hidden = !open
-        elements.toggleEl.textContent = 'mix & match products ' + (open ? '▲' : '▼')
+        elements.toggleEl.setAttribute('aria-expanded', open ? 'true' : 'false')
+        if (elements.toggleArrowEl) elements.toggleArrowEl.textContent = open ? '▲' : '▼'
         if (open) {
           renderMixMatchList(elements.listEl, buildDisplayMixMatchItems(config), lastCartItems, lastPricing)
-          if (elements.chosenEl && lastPricing) elements.chosenEl.textContent = formatItemsChosen(lastPricing.combinedQty)
+          if (lastPricing) setText(elements.chosenEl, formatItemsChosen(lastPricing.combinedQty))
         }
       })
     }

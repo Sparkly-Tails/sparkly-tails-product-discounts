@@ -1,6 +1,6 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
-const { isTimeDiscountWindowActive, tierTimeDiscountItems, tierTimeDiscountItemFor, timeDiscountSalePrice, computeTierState, perUnitPrice, extractNumericId, sumMemberQuantityInCart, resolveEligibility, unitPriceAtTier, computeProgressState, formatTempBoxLabel, joinNaturally, computeOrderSummary, computeTierButtonsSignature, withUnitAnchor, cartBaselineOtherQty, clamp, sortTiersByMinQty, normalizeTierPricing, formatMoney, computeWidgetViewModel, buildMixMatchRows, buildCartChange, cartErrorMessage, formatItemsChosen, buildDisplayMixMatchItems, listedMixMatchItems, computeProgressDot, classifyOfferState, buildPromoLine, buildStatusCopy } = require('../product-tier-pricing/assets/tier-pricing.js')
+const { isTimeDiscountWindowActive, tierTimeDiscountItems, tierTimeDiscountItemFor, timeDiscountSalePrice, computeTierState, perUnitPrice, extractNumericId, sumMemberQuantityInCart, resolveEligibility, unitPriceAtTier, computeProgressState, formatTempBoxLabel, joinNaturally, computeOrderSummary, computeTierButtonsSignature, withUnitAnchor, cartBaselineOtherQty, clamp, sortTiersByMinQty, normalizeTierPricing, formatMoney, computeWidgetViewModel, buildMixMatchRows, buildCartChange, cartErrorMessage, buildProgressSemantics, formatItemsChosen, buildDisplayMixMatchItems, listedMixMatchItems, computeProgressDot, classifyOfferState, buildPromoLine, buildStatusCopy } = require('../product-tier-pricing/assets/tier-pricing.js')
 
 test('below every tier: no discount, lists every tier as a delta from current quantity', () => {
   const tiers = [{ minQty: 7, percentOff: 5 }, { minQty: 14, percentOff: 10 }]
@@ -587,6 +587,7 @@ test('computeWidgetViewModel: no tiers configured at all — plain price, card h
     dot: null,
     promoLine: '',
     status: null,
+    semantics: null,
   })
 })
 
@@ -1006,4 +1007,26 @@ test('cartErrorMessage: uses Shopify\'s own description, then its message, then 
   assert.equal(cartErrorMessage({ message: 'Cannot find variant' }), 'Cannot find variant')
   assert.equal(cartErrorMessage({}), 'Could not update the cart. Please try again.')
   assert.equal(cartErrorMessage(null), 'Could not update the cart. Please try again.')
+})
+
+// Progress bar semantics (WCAG 4.1.2 / 4.1.3): role="progressbar" values and the spoken text.
+
+test('buildProgressSemantics: below the first offer — value, range and where the next offer starts', () => {
+  const state = computeProgressState(REDESIGN_TIERS_FIXED, 0, 5)
+  assert.deepEqual(buildProgressSemantics(state), { valueNow: 5, valueMin: 1, valueMax: 16, valueText: '5 of 16 units. Next offer at 8.' })
+})
+
+test('buildProgressSemantics: a middle tier says the offer is unlocked and where the highest discount is', () => {
+  const state = computeProgressState(REDESIGN_TIERS_FIXED, 0, 10)
+  assert.equal(buildProgressSemantics(state).valueText, '10 of 16 units. Offer unlocked, highest discount at 16.')
+})
+
+test('buildProgressSemantics: the highest tier, and beyond it the value is clamped while the text keeps the real quantity', () => {
+  assert.deepEqual(buildProgressSemantics(computeProgressState(REDESIGN_TIERS_FIXED, 0, 16)), { valueNow: 16, valueMin: 1, valueMax: 16, valueText: '16 of 16 units. Highest discount unlocked.' })
+  assert.deepEqual(buildProgressSemantics(computeProgressState(REDESIGN_TIERS_FIXED, 0, 20)), { valueNow: 16, valueMin: 1, valueMax: 16, valueText: '20 units. Highest discount unlocked.' })
+})
+
+test('computeWidgetViewModel: carries the progress bar semantics', () => {
+  const vm = computeWidgetViewModel({ tiers: REDESIGN_TIERS_FIXED, basePrice: REDESIGN_BASE, otherQty: 0, addingQty: 10, isGroup: true, formatMoney: fmt })
+  assert.equal(vm.semantics.valueNow, 10)
 })
