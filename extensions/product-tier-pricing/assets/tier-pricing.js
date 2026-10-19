@@ -279,6 +279,105 @@ function buildPromoText(tiers, basePrice, formatMoneyFn, isGroup, title) {
   return hasTitle ? 'Buy ' + title + ' and get ' + tail : 'Buy more and get ' + tail
 }
 
+// Redesign (Stitch design) view-model pieces: pure, unused by the DOM until the
+// layout PRs paint them.
+
+// Progress bar with a dot on the current quantity. Markers sit at each tier's
+// own minQty (the synthetic minQty:1 anchor is the start), evenly spaced
+// whatever the value gaps, like computeProgressTrack's segments. The dot is
+// interpolated inside the segment it falls in; past the last tier it stays at
+// the end but keeps showing the real quantity. A marker the dot sits exactly
+// on is `covered` so the DOM can hide its label under the dot.
+function computeProgressDot(sortedTiers, combinedQty) {
+  const values = sortedTiers.map((t) => t.minQty)
+  const n = values.length
+  const step = n > 1 ? 100 / (n - 1) : 0
+  let dotPct = 100
+  if (combinedQty <= values[0]) {
+    dotPct = 0
+  } else {
+    for (let i = 0; i < n - 1; i++) {
+      if (combinedQty <= values[i + 1]) {
+        const span = values[i + 1] - values[i]
+        dotPct = Math.round(clamp(i * step + ((combinedQty - values[i]) / span) * step, 0, 100))
+        break
+      }
+    }
+  }
+  const markers = values.map((value, i) => {
+    const pct = Math.round(i * step)
+    return { value, pct, reached: combinedQty >= value, covered: pct === dotPct }
+  })
+  return { dotValue: combinedQty, dotPct, markers }
+}
+
+// 'progress': no discount applied yet. 'offer': a middle tier applies.
+// 'highest': the top tier applies (or is passed). Discounted means the same as
+// computeWidgetViewModel's price row: a fixed price or a percent off.
+function classifyOfferState(progressState) {
+  const ts = progressState.tierState
+  const discounted = ts.fixedPrice != null || ts.percentOff > 0
+  if (!discounted) return 'progress'
+  return progressState.maxed ? 'highest' : 'offer'
+}
+
+function pluralizeUnits(qty) {
+  return qty + (qty === 1 ? ' unit' : ' units')
+}
+
+// The line under the price before any offer applies: "Mix and match 8+ for
+// £1.63 or 16+ for £1.55" (group) / "Buy 8+ for …" (standalone).
+function buildPromoLine(tiers, basePrice, formatMoneyFn, isGroup) {
+  const clauses = sortTiersByMinQty(tiers).slice(1).map((t) => t.minQty + '+ for ' + formatMoneyFn(unitPriceAtTier(basePrice, t)))
+  if (clauses.length === 0) return ''
+  return (isGroup ? 'Mix and match ' : 'Buy ') + joinNaturally(clauses)
+}
+
+// Status row + headline copy per state. `hintText`/`badgeText` go in the
+// status row's right-hand slot; `headlineText` replaces the promo line under
+// the price once an offer applies. No "Tier N" wording: middle tiers read
+// "Offer unlocked", the top one "Highest discount unlocked".
+function buildStatusCopy({ progressState, tiers, basePrice, formatMoney: formatMoneyFn }) {
+  const state = classifyOfferState(progressState)
+  const sorted = sortTiersByMinQty(tiers)
+  const qty = progressState.combinedQty
+  const ts = progressState.tierState
+  const unit = perUnitPrice(basePrice, qty, ts)
+  const savings = computeOrderSummary(basePrice, qty, unit).savings
+  const nextRaw = ts.nextTier || (ts.remainingTiers && ts.remainingTiers[0])
+  // The state's nextTier only carries minQty/percentOff/fixedPrice; price the
+  // configured tier itself so an anchor tier is priced right.
+  const next = nextRaw ? sorted.find((t) => t.minQty === nextRaw.minQty) : null
+  const nextPrice = next ? formatMoneyFn(unitPriceAtTier(basePrice, next)) : null
+
+  if (state === 'progress') {
+    return {
+      state,
+      statusText: 'You have ' + pluralizeUnits(qty),
+      hintText: next ? 'Add ' + nextRaw.delta + ' for ' + nextPrice + '/ea' : null,
+      badgeText: null,
+      headlineText: null,
+    }
+  }
+  if (state === 'offer') {
+    const nextIsHighest = next && next.minQty === progressState.topThreshold
+    return {
+      state,
+      statusText: pluralizeUnits(qty) + ' × ' + formatMoneyFn(unit) + ' (Offer unlocked)',
+      hintText: null,
+      badgeText: 'Save ' + formatMoneyFn(savings),
+      headlineText: 'Offer unlocked! Add ' + nextRaw.delta + ' more to unlock ' + (nextIsHighest ? 'the highest discount' : 'the next offer') + ' for ' + nextPrice,
+    }
+  }
+  return {
+    state,
+    statusText: 'You have ' + pluralizeUnits(qty),
+    hintText: '✓ Highest discount (' + formatMoneyFn(unit) + '/ea)',
+    badgeText: null,
+    headlineText: 'Highest discount unlocked: ' + formatMoneyFn(unit) + '/each applied! (Save ' + formatMoneyFn(savings) + ')',
+  }
+}
+
 // View-model assembly: decides WHAT the widget shows. The DOM layer below
 // only paints whatever this returns.
 
@@ -300,6 +399,10 @@ function computeWidgetViewModel({ tiers, basePrice, compareAtPrice, otherQty, ad
       tempBoxLabel: null,
       tempBoxAfterIndex: null,
       breakdownText: null, // null = leave it alone, distinct from '' = clear it
+      offerState: null,
+      dot: null,
+      promoLine: '',
+      status: null,
     }
   }
 
@@ -336,6 +439,10 @@ function computeWidgetViewModel({ tiers, basePrice, compareAtPrice, otherQty, ad
     tempBoxLabel: progressState.tempBox ? formatTempBoxLabel(progressState, basePrice, formatMoneyFn) : null,
     tempBoxAfterIndex: progressState.tempBox ? progressState.tempBox.afterIndex : null,
     breakdownText,
+    offerState: classifyOfferState(progressState),
+    dot: computeProgressDot(sortedTiers, progressState.combinedQty),
+    promoLine: buildPromoLine(tiers, basePrice, formatMoneyFn, isGroup),
+    status: buildStatusCopy({ progressState, tiers, basePrice, formatMoney: formatMoneyFn }),
   }
 }
 
@@ -460,6 +567,10 @@ if (typeof module !== 'undefined' && module.exports) {
     computeTierButtonsSignature,
     withUnitAnchor,
     cartBaselineOtherQty,
+    computeProgressDot,
+    classifyOfferState,
+    buildPromoLine,
+    buildStatusCopy,
     computeWidgetViewModel,
     buildMixMatchRows,
     buildDisplayMixMatchItems,
