@@ -1,6 +1,6 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
-const { isTimeDiscountWindowActive, tierTimeDiscountItems, tierTimeDiscountItemFor, timeDiscountSalePrice, computeTierState, perUnitPrice, extractNumericId, sumMemberQuantityInCart, resolveEligibility, unitPriceAtTier, totalAtTier, computeProgressState, computeProgressTrack, pluralizeTitle, formatAddMoreText, formatTempBoxLabel, joinNaturally, buildPromoText, computeOrderSummary, computeTierButtonsSignature, withUnitAnchor, cartBaselineOtherQty, clamp, sortTiersByMinQty, normalizeTierPricing, formatMoney, computeWidgetViewModel, buildMixMatchRows, buildDisplayMixMatchItems, listedMixMatchItems } = require('../product-tier-pricing/assets/tier-pricing.js')
+const { isTimeDiscountWindowActive, tierTimeDiscountItems, tierTimeDiscountItemFor, timeDiscountSalePrice, computeTierState, perUnitPrice, extractNumericId, sumMemberQuantityInCart, resolveEligibility, unitPriceAtTier, totalAtTier, computeProgressState, computeProgressTrack, pluralizeTitle, formatAddMoreText, formatTempBoxLabel, joinNaturally, buildPromoText, computeOrderSummary, computeTierButtonsSignature, withUnitAnchor, cartBaselineOtherQty, clamp, sortTiersByMinQty, normalizeTierPricing, formatMoney, computeWidgetViewModel, buildMixMatchRows, buildDisplayMixMatchItems, listedMixMatchItems, computeProgressDot, classifyOfferState, buildPromoLine, buildStatusCopy } = require('../product-tier-pricing/assets/tier-pricing.js')
 
 test('below every tier: no discount, lists every tier as a delta from current quantity', () => {
   const tiers = [{ minQty: 7, percentOff: 5 }, { minQty: 14, percentOff: 10 }]
@@ -758,6 +758,10 @@ test('computeWidgetViewModel: no tiers configured at all — plain price, card h
     tempBoxLabel: null,
     tempBoxAfterIndex: null,
     breakdownText: null,
+    offerState: null,
+    dot: null,
+    promoLine: '',
+    status: null,
   })
 })
 
@@ -939,4 +943,130 @@ test('isTimeDiscountWindowActive: never active without both dates, with unparsea
   assert.equal(isTimeDiscountWindowActive({ startsAt: '2026-06-01T00:00:00.000Z' }, now), false)
   assert.equal(isTimeDiscountWindowActive({ startsAt: 'nope', endsAt: 'nope' }, now), false)
   assert.equal(isTimeDiscountWindowActive(null, now), false)
+})
+
+// Redesign view-model pieces (Stitch design). Tiers below always carry the
+// synthetic minQty:1 anchor, as withUnitAnchor gives them in the widget.
+
+const REDESIGN_TIERS = [{ minQty: 1, percentOff: 0 }, { minQty: 8, percentOff: 3.5503 }, { minQty: 16, percentOff: 8.2840 }]
+// base £1.69: 8+ -> £1.63, 16+ -> £1.55 (the design's worked example)
+const REDESIGN_BASE = 1.69
+const REDESIGN_TIERS_FIXED = [{ minQty: 1, percentOff: 0 }, { minQty: 8, fixedPrice: 1.63 }, { minQty: 16, fixedPrice: 1.55 }]
+
+test('computeProgressDot: the dot sits on the current quantity, evenly spaced markers start at the first tier and end at the last', () => {
+  const dot = computeProgressDot(REDESIGN_TIERS, 5)
+  assert.equal(dot.dotValue, 5)
+  assert.equal(dot.dotPct, 29) // 4/7 of the first half = round(28.57)
+  assert.deepEqual(dot.markers.map((m) => [m.value, m.pct, m.reached, m.covered]), [
+    [1, 0, true, false],
+    [8, 50, false, false],
+    [16, 100, false, false],
+  ])
+})
+
+test('computeProgressDot: a quantity exactly on a marker covers that marker', () => {
+  const atStart = computeProgressDot(REDESIGN_TIERS, 1)
+  assert.equal(atStart.dotPct, 0)
+  assert.equal(atStart.markers[0].covered, true)
+  const atTier = computeProgressDot(REDESIGN_TIERS, 8)
+  assert.equal(atTier.dotPct, 50)
+  assert.deepEqual(atTier.markers.map((m) => m.covered), [false, true, false])
+  assert.deepEqual(atTier.markers.map((m) => m.reached), [true, true, false])
+})
+
+test('computeProgressDot: past the last tier the dot stays at the end but still shows the real quantity', () => {
+  const dot = computeProgressDot(REDESIGN_TIERS, 20)
+  assert.equal(dot.dotValue, 20)
+  assert.equal(dot.dotPct, 100)
+  assert.deepEqual(dot.markers.map((m) => m.reached), [true, true, true])
+  assert.equal(dot.markers[2].covered, true)
+})
+
+test('computeProgressDot: segments are even-width whatever the value gaps; below the start the dot sits at 0', () => {
+  const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 8, percentOff: 3 }, { minQty: 16, percentOff: 6 }, { minQty: 32, percentOff: 10 }]
+  assert.equal(computeProgressDot(tiers, 12).dotPct, 50) // halfway through the 8..16 segment = 33.33 + 16.67
+  assert.equal(computeProgressDot(tiers, 0).dotPct, 0)
+})
+
+test('classifyOfferState: below the first discount is progress, a middle tier is offer, the highest tier (and beyond) is highest', () => {
+  const state = (qty) => classifyOfferState(computeProgressState(REDESIGN_TIERS, 0, qty), REDESIGN_BASE)
+  assert.equal(state(1), 'progress')
+  assert.equal(state(5), 'progress')
+  assert.equal(state(8), 'offer')
+  assert.equal(state(10), 'offer')
+  assert.equal(state(16), 'highest')
+  assert.equal(state(20), 'highest')
+})
+
+test('classifyOfferState: with one real tier, reaching it is the highest discount (there is no middle tier)', () => {
+  const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 8, percentOff: 5 }]
+  assert.equal(classifyOfferState(computeProgressState(tiers, 0, 8), 1.69), 'highest')
+})
+
+test('buildPromoLine: lists each real tier threshold with its unit price, no title', () => {
+  assert.equal(buildPromoLine(REDESIGN_TIERS_FIXED, REDESIGN_BASE, fmt, true), 'Mix and match 8+ for £1.63 or 16+ for £1.55')
+  assert.equal(buildPromoLine(REDESIGN_TIERS_FIXED, REDESIGN_BASE, fmt, false), 'Buy 8+ for £1.63 or 16+ for £1.55')
+})
+
+test('buildPromoLine: three real tiers read as a spoken list; no real tier gives an empty line', () => {
+  const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 8, fixedPrice: 1.63 }, { minQty: 16, fixedPrice: 1.55 }, { minQty: 32, fixedPrice: 1.45 }]
+  assert.equal(buildPromoLine(tiers, REDESIGN_BASE, fmt, true), 'Mix and match 8+ for £1.63, 16+ for £1.55, or 32+ for £1.45')
+  assert.equal(buildPromoLine([{ minQty: 1, percentOff: 0 }], REDESIGN_BASE, fmt, true), '')
+})
+
+test('buildStatusCopy: below the first offer — units owned, hint to the next price, no badge', () => {
+  const status = buildStatusCopy({ progressState: computeProgressState(REDESIGN_TIERS_FIXED, 4, 1), tiers: REDESIGN_TIERS_FIXED, basePrice: REDESIGN_BASE, formatMoney: fmt })
+  assert.deepEqual(status, { state: 'progress', statusText: 'You have 5 units', hintText: 'Add 3 for £1.63/ea', badgeText: null, headlineText: null })
+})
+
+test('buildStatusCopy: singular wording at one unit', () => {
+  const status = buildStatusCopy({ progressState: computeProgressState(REDESIGN_TIERS_FIXED, 0, 1), tiers: REDESIGN_TIERS_FIXED, basePrice: REDESIGN_BASE, formatMoney: fmt })
+  assert.equal(status.statusText, 'You have 1 unit')
+  assert.equal(status.hintText, 'Add 7 for £1.63/ea')
+})
+
+test('buildStatusCopy: middle tier — "Offer unlocked", saving on the combined quantity, nudge to the highest discount', () => {
+  const status = buildStatusCopy({ progressState: computeProgressState(REDESIGN_TIERS_FIXED, 0, 10), tiers: REDESIGN_TIERS_FIXED, basePrice: REDESIGN_BASE, formatMoney: fmt })
+  assert.deepEqual(status, {
+    state: 'offer',
+    statusText: '10 units × £1.63 (Offer unlocked)',
+    hintText: null,
+    badgeText: 'Save £0.60',
+    headlineText: 'Offer unlocked! Add 6 more to unlock the highest discount for £1.55',
+  })
+})
+
+test('buildStatusCopy: a middle tier followed by another middle tier nudges to "the next offer"', () => {
+  const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 8, fixedPrice: 1.63 }, { minQty: 16, fixedPrice: 1.55 }, { minQty: 32, fixedPrice: 1.45 }]
+  const status = buildStatusCopy({ progressState: computeProgressState(tiers, 0, 10), tiers, basePrice: REDESIGN_BASE, formatMoney: fmt })
+  assert.equal(status.headlineText, 'Offer unlocked! Add 6 more to unlock the next offer for £1.55')
+})
+
+test('buildStatusCopy: highest tier — "Highest discount unlocked" with the total saving, no "Tier" wording, no emoji', () => {
+  const status = buildStatusCopy({ progressState: computeProgressState(REDESIGN_TIERS_FIXED, 0, 16), tiers: REDESIGN_TIERS_FIXED, basePrice: REDESIGN_BASE, formatMoney: fmt })
+  assert.deepEqual(status, {
+    state: 'highest',
+    statusText: 'You have 16 units',
+    hintText: '✓ Highest discount (£1.55/ea)',
+    badgeText: null,
+    headlineText: 'Highest discount unlocked: £1.55/each applied! (Save £2.24)',
+  })
+  assert.doesNotMatch(JSON.stringify(status), /Tier|🎉/)
+})
+
+test('buildStatusCopy: uses the real next tier (anchor pricing), not just its percent', () => {
+  const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 4, anchorPrice: 5, percentOff: 0 }]
+  const status = buildStatusCopy({ progressState: computeProgressState(tiers, 0, 1), tiers, basePrice: 2, formatMoney: fmt })
+  assert.equal(status.hintText, 'Add 3 for £1.25/ea') // 5 / 4 units
+})
+
+test('computeWidgetViewModel: carries the redesign fields next to the existing ones', () => {
+  const vm = computeWidgetViewModel({ tiers: REDESIGN_TIERS_FIXED, basePrice: REDESIGN_BASE, otherQty: 4, addingQty: 1, title: 'Tins', isGroup: true, formatMoney: fmt })
+  assert.equal(vm.offerState, 'progress')
+  assert.equal(vm.dot.dotValue, 5)
+  assert.equal(vm.promoLine, 'Mix and match 8+ for £1.63 or 16+ for £1.55')
+  assert.equal(vm.status.hintText, 'Add 3 for £1.63/ea')
+  // existing fields untouched
+  assert.equal(vm.showCard, true)
+  assert.equal(vm.breakdownText, 'You have 5 Tins, add 3 to get them for £1.63')
 })
