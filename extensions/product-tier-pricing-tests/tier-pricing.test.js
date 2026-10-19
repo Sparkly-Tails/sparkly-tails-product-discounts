@@ -1,6 +1,6 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
-const { isTimeDiscountWindowActive, tierTimeDiscountItems, tierTimeDiscountItemFor, timeDiscountSalePrice, computeTierState, perUnitPrice, extractNumericId, sumMemberQuantityInCart, resolveEligibility, unitPriceAtTier, totalAtTier, computeProgressState, computeProgressTrack, pluralizeTitle, formatAddMoreText, formatTempBoxLabel, joinNaturally, buildPromoText, computeOrderSummary, computeTierButtonsSignature, withUnitAnchor, cartBaselineOtherQty, clamp, sortTiersByMinQty, normalizeTierPricing, formatMoney, computeWidgetViewModel, buildMixMatchRows, buildDisplayMixMatchItems, listedMixMatchItems, computeProgressDot, classifyOfferState, buildPromoLine, buildStatusCopy } = require('../product-tier-pricing/assets/tier-pricing.js')
+const { isTimeDiscountWindowActive, tierTimeDiscountItems, tierTimeDiscountItemFor, timeDiscountSalePrice, computeTierState, perUnitPrice, extractNumericId, sumMemberQuantityInCart, resolveEligibility, unitPriceAtTier, computeProgressState, formatTempBoxLabel, joinNaturally, computeOrderSummary, computeTierButtonsSignature, withUnitAnchor, cartBaselineOtherQty, clamp, sortTiersByMinQty, normalizeTierPricing, formatMoney, computeWidgetViewModel, buildMixMatchRows, buildCartChange, cartErrorMessage, buildProgressSemantics, formatItemsChosen, buildDisplayMixMatchItems, listedMixMatchItems, computeProgressDot, classifyOfferState, buildPromoLine, buildStatusCopy } = require('../product-tier-pricing/assets/tier-pricing.js')
 
 test('below every tier: no discount, lists every tier as a delta from current quantity', () => {
   const tiers = [{ minQty: 7, percentOff: 5 }, { minQty: 14, percentOff: 10 }]
@@ -223,31 +223,13 @@ test('unitPriceAtTier: fixed price above base price clamps to base price, never 
   assert.equal(unitPriceAtTier(1.49, tier), 1.49)
 })
 
-test('totalAtTier: fixed tier multiplies clamped unit price by minQty, rounded to whole pence', () => {
-  const tier = { minQty: 3, fixedPrice: 1.5 }
-  assert.equal(totalAtTier(1.99, tier), 4.5)
-})
-
-test('totalAtTier: anchor tier returns exactly the anchorPrice (minQty units, no extra accrual)', () => {
-  const tier = { minQty: 7, percentOff: 5, anchorPrice: 10.0 }
-  assert.equal(totalAtTier(1.49, tier), 10.0)
-})
-
-test('computeProgressState: below the lowest tier, small fill, not maxed', () => {
+test('computeProgressState: below the lowest tier, not maxed', () => {
   const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 7, percentOff: 5 }, { minQty: 20, percentOff: 10 }]
   const state = computeProgressState(tiers, 0, 1)
 
   assert.equal(state.combinedQty, 1)
   assert.equal(state.topThreshold, 20)
   assert.equal(state.maxed, false)
-  // 3 stops (0, 7, 20) -> 2 equal 50%-wide segments. combinedQty 1 is
-  // 1/7 of the way through the first segment: round(1/7 * 50) = 7.
-  assert.equal(state.fillPct, 7)
-  assert.deepEqual(state.stops, [
-    { value: 0, active: true },
-    { value: 7, active: false },
-    { value: 20, active: false },
-  ])
 })
 
 test('computeProgressState: reaching the top tier reports maxed and a 0 tierRemaining', () => {
@@ -257,43 +239,15 @@ test('computeProgressState: reaching the top tier reports maxed and a 0 tierRema
   assert.equal(state.combinedQty, 20)
   assert.equal(state.maxed, true)
   assert.equal(state.tierState.nextTier, null)
-  assert.equal(state.fillPct, 100)
 })
 
-test('computeProgressState: combinedQty beyond every tier — fill maxes out at 100, every stop reads active', () => {
+test('computeProgressState: combinedQty beyond every tier is still maxed', () => {
   const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 20, percentOff: 10 }]
   const state = computeProgressState(tiers, 25, 3)
 
   assert.equal(state.combinedQty, 28)
   assert.equal(state.maxed, true)
-  assert.equal(state.fillPct, 100)
-  assert.deepEqual(state.stops, [
-    { value: 0, active: true },
-    { value: 20, active: true },
-  ])
 })
-
-test('computeProgressTrack: stops start at 0 and are evenly spaced regardless of the value gap between tiers', () => {
-  const sorted = [{ minQty: 1, percentOff: 0 }, { minQty: 16, percentOff: 3 }, { minQty: 24, percentOff: 6 }, { minQty: 32, percentOff: 10 }]
-  const track = computeProgressTrack(sorted, 5)
-  assert.deepEqual(track.stops.map((s) => s.value), [0, 16, 24, 32])
-})
-
-test('computeProgressTrack: fill position is interpolated within the current even-width segment, not linear across the whole range', () => {
-  const sorted = [{ minQty: 1, percentOff: 0 }, { minQty: 16, percentOff: 3 }, { minQty: 24, percentOff: 6 }, { minQty: 32, percentOff: 10 }]
-  // 4 stops -> 3 equal segments of 33.33% each. combinedQty 8 is halfway
-  // through the first segment (0..16) despite that segment covering a much
-  // larger value range than the other two — even spacing, not proportional.
-  const track = computeProgressTrack(sorted, 8)
-  assert.equal(track.fillPct, 17) // round(0 + 0.5 * 33.33)
-})
-
-// Buttons and the temp box are driven entirely by combinedQty (otherQty +
-// addingQty) — the true cart total — never by addingQty alone. A button
-// highlights only when combinedQty lands exactly on its minQty; any other
-// combinedQty shows a dashed box with the true total, positioned after
-// whichever tier is currently applied (which can be the last tier's own
-// slot, putting the box to the right of every button).
 
 test('computeProgressState: tierButtons reflect combinedQty, not addingQty — an addingQty that happens to equal a tier\'s minQty is not enough on its own', () => {
   const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 7, percentOff: 5 }, { minQty: 20, percentOff: 10 }]
@@ -410,61 +364,6 @@ function fmt(n) {
   return '£' + n.toFixed(2)
 }
 
-test('pluralizeTitle: appends "s" for a singular title when quantity is more than one', () => {
-  assert.equal(pluralizeTitle('Canagan Cat Soup', 5), 'Canagan Cat Soups')
-})
-
-test('pluralizeTitle: leaves an already-plural title untouched — real configured titles mix conventions', () => {
-  assert.equal(pluralizeTitle('Canagan Wet Cat Tins', 5), 'Canagan Wet Cat Tins')
-})
-
-test('pluralizeTitle: a quantity of exactly one keeps the title as configured, even if it reads plural', () => {
-  assert.equal(pluralizeTitle('Canagan Cat Soup', 1), 'Canagan Cat Soup')
-  assert.equal(pluralizeTitle('Canagan Wet Cat Tins', 1), 'Canagan Wet Cat Tins')
-})
-
-test('formatAddMoreText: with a title, states how many are already in the cart and how many more to add', () => {
-  const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 7, percentOff: 4 }]
-  const state = computeProgressState(tiers, 4, 1) // 5 combined, matches the "5 in cart" worked example
-  const text = formatAddMoreText(state, tiers, 1.49, fmt, 'Canagan Cat Soups')
-  assert.equal(text, 'You have 5 Canagan Cat Soups, add 2 to get them for £1.43')
-})
-
-test('formatAddMoreText: a singular configured title pluralizes for a combined quantity above one', () => {
-  const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 7, percentOff: 4 }]
-  const state = computeProgressState(tiers, 4, 1)
-  const text = formatAddMoreText(state, tiers, 1.49, fmt, 'Canagan Cat Soup')
-  assert.equal(text, 'You have 5 Canagan Cat Soups, add 2 to get them for £1.43')
-})
-
-test('formatAddMoreText: combined quantity of exactly one keeps the title singular', () => {
-  const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 7, percentOff: 4 }]
-  const state = computeProgressState(tiers, 0, 1) // 1 combined
-  const text = formatAddMoreText(state, tiers, 1.49, fmt, 'Canagan Cat Soup')
-  assert.equal(text, 'You have 1 Canagan Cat Soup, add 6 to get them for £1.43')
-})
-
-test('formatAddMoreText: no title configured — falls back to the generic instruction, no "You have"', () => {
-  const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 7, percentOff: 4 }]
-  const state = computeProgressState(tiers, 4, 1)
-  const text = formatAddMoreText(state, tiers, 1.49, fmt, undefined)
-  assert.equal(text, 'Add 2 more to get them for £1.43')
-})
-
-test('formatAddMoreText: next tier is a fixed price above base price, clamps to base price (never a markup)', () => {
-  const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 7, fixedPrice: 5.0 }, { minQty: 20, percentOff: 10 }]
-  const state = computeProgressState(tiers, 2, 1) // 3 combined
-  const text = formatAddMoreText(state, tiers, 1.49, fmt, undefined)
-  assert.equal(text, 'Add 4 more to get them for £1.49')
-})
-
-test('formatAddMoreText: below every tier (no tier with minQty 1), falls back to remainingTiers instead of throwing on a null nextTier', () => {
-  const tiers = [{ minQty: 7, percentOff: 5 }, { minQty: 20, percentOff: 10 }]
-  const state = computeProgressState(tiers, 0, 1)
-  const text = formatAddMoreText(state, tiers, 1.49, fmt, undefined)
-  assert.equal(text, 'Add 6 more to get them for £1.42')
-})
-
 test('computeProgressState: below every tier (no tier with minQty 1) does not throw, and documents that nextTier is null while remainingTiers is populated', () => {
   const tiers = [{ minQty: 7, percentOff: 5 }, { minQty: 20, percentOff: 10 }]
   const state = computeProgressState(tiers, 0, 1)
@@ -478,13 +377,13 @@ test('computeProgressState: below every tier (no tier with minQty 1) does not th
   ])
 })
 
-test('formatTempBoxLabel: quantity, "x", the running total at the already-active (lower) tier\'s rate — no "=" sign', () => {
+test('formatTempBoxLabel: quantity, "×", the unit price at the already-active (lower) tier\'s rate', () => {
   const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 7, percentOff: 5 }, { minQty: 20, percentOff: 10 }]
   const state = computeProgressState(tiers, 0, 5)
   const label = formatTempBoxLabel(state, 1.49, fmt)
   // 5 sits between the qty:1 anchor (0% off) and the 7-tier — no discount
-  // is active yet, so the preview is 5 units at plain base price: 5 * 1.49 = 7.45
-  assert.equal(label, '5x £7.45')
+  // is active yet, so the preview is 5 units at the plain base price
+  assert.equal(label, '5 × £1.49')
 })
 
 test('formatTempBoxLabel: between two real tiers, previews at the lower tier\'s already-unlocked rate', () => {
@@ -492,19 +391,19 @@ test('formatTempBoxLabel: between two real tiers, previews at the lower tier\'s 
   const state = computeProgressState(tiers, 0, 10)
   const label = formatTempBoxLabel(state, 1.49, fmt)
   // 10 sits between the 7-tier (5% off, already active) and the 20-tier —
-  // preview uses the 7-tier's unlocked rate: unit 1.4155, 10 * 1.4155 = 14.155 -> 14.16
-  assert.equal(label, '10x £14.16')
+  // preview uses the 7-tier's unlocked rate: unit 1.4155 -> £1.42
+  assert.equal(label, '10 × £1.42')
 })
 
-test('formatTempBoxLabel: uses the true combined quantity, not addingQty alone — 6 already in cart on page load shows "6x", not "1x"', () => {
+test('formatTempBoxLabel: uses the true combined quantity, not addingQty alone — 6 already in cart on page load shows "6 ×", not "1 ×"', () => {
   const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 7, percentOff: 4 }]
   const otherQty = cartBaselineOtherQty(6) // 5 -- page just loaded, stepper at its floor of 1
   const state = computeProgressState(tiers, otherQty, 1)
   assert.equal(state.combinedQty, 6)
   const label = formatTempBoxLabel(state, 1.49, fmt)
   // 6 sits between the qty:1 anchor and the 7-tier -- no discount active
-  // yet, so 6 units at plain base price: 6 * 1.49 = 8.94
-  assert.equal(label, '6x £8.94')
+  // yet, so 6 units at the plain base price
+  assert.equal(label, '6 × £1.49')
 })
 
 test('withUnitAnchor: prepends a { minQty: 1, percentOff: 0 } tier when none is configured', () => {
@@ -567,36 +466,6 @@ test('joinNaturally: reads like a spoken list rather than a mechanical dump', ()
   assert.equal(joinNaturally(['A', 'B', 'C']), 'A, B, or C')
 })
 
-test('buildPromoText: group mode with a title, single tier — matches the "Canagan Cat Soup" worked example', () => {
-  const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 7, percentOff: 4, anchorPrice: 10 }]
-  const text = buildPromoText(tiers, 1.49, fmt, true, 'Canagan Cat Soup')
-  assert.equal(text, 'Mix and match any Canagan Cat Soup and get 7 or more for £1.43')
-})
-
-test('buildPromoText: group mode with a title, several tiers — lists each threshold naturally', () => {
-  const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 7, percentOff: 5 }, { minQty: 20, percentOff: 10 }]
-  const text = buildPromoText(tiers, 1.49, fmt, true, 'Canagan treat')
-  assert.equal(text, 'Mix and match any Canagan treat and get 7 or more for £1.42 or 20 or more for £1.34')
-})
-
-test('buildPromoText: group mode with no title falls back to generic copy', () => {
-  const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 7, percentOff: 5 }]
-  const text = buildPromoText(tiers, 1.49, fmt, true, undefined)
-  assert.equal(text, 'Mix and match and get 7 or more for £1.42')
-})
-
-test('buildPromoText: standalone mode with a title', () => {
-  const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 7, percentOff: 5 }]
-  const text = buildPromoText(tiers, 1.49, fmt, false, 'Canagan Tuna Soup')
-  assert.equal(text, 'Buy Canagan Tuna Soup and get 7 or more for £1.42')
-})
-
-test('buildPromoText: standalone mode with no title falls back to generic copy', () => {
-  const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 7, percentOff: 5 }]
-  const text = buildPromoText(tiers, 1.49, fmt, false, '')
-  assert.equal(text, 'Buy more and get 7 or more for £1.42')
-})
-
 test('computeOrderSummary: no discount, no savings line', () => {
   const summary = computeOrderSummary(1.49, 3, 1.49)
   assert.equal(summary.total, 4.47)
@@ -646,75 +515,33 @@ test('formatMoney: fills the {{amount}} placeholder with 2 decimal places', () =
   assert.equal(formatMoney(9.999, '£{{ amount }}'), '£10.00')
 })
 
-test('buildMixMatchRows: builds one row per product with its live cart quantity and the link Liquid provided', () => {
-  const products = [
-    { title: 'Canagan Tuna Soup for Cats', url: '/products/canagan-tuna-soup-for-cats', productId: 'gid://shopify/Product/1', imageUrl: 'https://example.com/tuna.png' },
-    { title: 'Canagan Chicken Soup for Cats', url: '/products/canagan-chicken-soup-for-cats', productId: 'gid://shopify/Product/2', imageUrl: null },
-  ]
-  const cartItems = [
-    { product_id: 1, variant_id: 10, quantity: 5 },
-    { product_id: 3, variant_id: 30, quantity: 2 },
-  ]
-  assert.deepEqual(buildMixMatchRows(products, cartItems), [
-    { href: '/products/canagan-tuna-soup-for-cats', title: 'Canagan Tuna Soup for Cats', imageUrl: 'https://example.com/tuna.png', qtyLabel: '5 in cart' },
-    { href: '/products/canagan-chicken-soup-for-cats', title: 'Canagan Chicken Soup for Cats', imageUrl: null, qtyLabel: '0 in cart' },
-  ])
-})
-
-test('buildMixMatchRows: singular "1 in cart" label', () => {
-  const rows = buildMixMatchRows(
-    [{ title: 'X', url: '/products/x', productId: 'gid://shopify/Product/9', imageUrl: null }],
-    [{ product_id: 9, variant_id: 90, quantity: 1 }],
-  )
-  assert.equal(rows[0].qtyLabel, '1 in cart')
-})
-
-test('buildMixMatchRows: a variant-scoped member matches only that exact variant\'s cart quantity', () => {
-  const rows = buildMixMatchRows(
-    [{ title: 'X', url: '/products/x?variant=90', productId: 'gid://shopify/Product/9', variantId: 'gid://shopify/ProductVariant/90', imageUrl: null }],
-    [
-      { product_id: 9, variant_id: 90, quantity: 3 },
-      { product_id: 9, variant_id: 91, quantity: 4 },
-    ],
-  )
-  assert.equal(rows[0].qtyLabel, '3 in cart')
-})
-
-test('buildMixMatchRows: the link is exactly the url Liquid provided, including a ?variant= query', () => {
-  const rows = buildMixMatchRows(
-    [{ title: 'Salmon', url: '/products/wet-cat-food?variant=90', productId: 'gid://shopify/Product/9', variantId: 'gid://shopify/ProductVariant/90', imageUrl: null }],
-    [],
-  )
-  assert.equal(rows[0].href, '/products/wet-cat-food?variant=90')
-})
-
 test('buildDisplayMixMatchItems: includes every one of this product\'s own other member-variants, INCLUDING the currently-displayed one', () => {
   const config = {
     productId: '2',
     ownVariantOptions: [
-      { variantId: '20', title: 'Chicken', url: '/products/wet-cat-food?variant=20' },
-      { variantId: '21', title: 'Salmon', url: '/products/wet-cat-food?variant=21' },
-      { variantId: '22', title: 'Duck', url: '/products/wet-cat-food?variant=22' },
+      { variantId: '20', title: 'Chicken', url: '/products/wet-cat-food?variant=20', imageUrl: null, price: 169, available: true, cartVariantId: '20' },
+      { variantId: '21', title: 'Salmon', url: '/products/wet-cat-food?variant=21', imageUrl: null, price: 169, available: true, cartVariantId: '21' },
+      { variantId: '22', title: 'Duck', url: '/products/wet-cat-food?variant=22', imageUrl: null, price: 169, available: true, cartVariantId: '22' },
     ],
     mixMatchListItems: [],
   }
   const items = buildDisplayMixMatchItems(config) // viewing Salmon, but it still gets a row — a customer's own already-in-cart quantity for the variant they're on must stay visible
   assert.deepEqual(items, [
-    { productId: '2', variantId: '20', title: 'Chicken', url: '/products/wet-cat-food?variant=20', imageUrl: null },
-    { productId: '2', variantId: '21', title: 'Salmon', url: '/products/wet-cat-food?variant=21', imageUrl: null },
-    { productId: '2', variantId: '22', title: 'Duck', url: '/products/wet-cat-food?variant=22', imageUrl: null },
+    { productId: '2', variantId: '20', title: 'Chicken', url: '/products/wet-cat-food?variant=20', imageUrl: null, price: 169, available: true, cartVariantId: '20' },
+    { productId: '2', variantId: '21', title: 'Salmon', url: '/products/wet-cat-food?variant=21', imageUrl: null, price: 169, available: true, cartVariantId: '21' },
+    { productId: '2', variantId: '22', title: 'Duck', url: '/products/wet-cat-food?variant=22', imageUrl: null, price: 169, available: true, cartVariantId: '22' },
   ])
 })
 
 test('buildDisplayMixMatchItems: cross-product siblings are appended after this product\'s own-variant rows', () => {
   const config = {
     productId: '2',
-    ownVariantOptions: [{ variantId: '20', title: 'Chicken', url: '/products/wet-cat-food?variant=20' }],
+    ownVariantOptions: [{ variantId: '20', title: 'Chicken', url: '/products/wet-cat-food?variant=20', imageUrl: null, price: 169, available: true, cartVariantId: '20' }],
     mixMatchListItems: [{ productId: 'gid://shopify/Product/1', title: 'Tuna Soup', url: '/products/tuna-soup', imageUrl: null }],
   }
   const items = buildDisplayMixMatchItems(config)
   assert.deepEqual(items, [
-    { productId: '2', variantId: '20', title: 'Chicken', url: '/products/wet-cat-food?variant=20', imageUrl: null },
+    { productId: '2', variantId: '20', title: 'Chicken', url: '/products/wet-cat-food?variant=20', imageUrl: null, price: 169, available: true, cartVariantId: '20' },
     { productId: 'gid://shopify/Product/1', title: 'Tuna Soup', url: '/products/tuna-soup', imageUrl: null },
   ])
 })
@@ -746,22 +573,21 @@ test('listedMixMatchItems: no siblings at all gives an empty list', () => {
   assert.deepEqual(listedMixMatchItems([]), [])
 })
 
-test('computeWidgetViewModel: no tiers configured at all — plain price, card hidden, breakdown left untouched', () => {
-  const vm = computeWidgetViewModel({ tiers: [], basePrice: 1.49, otherQty: 0, addingQty: 1, title: undefined, isGroup: false, formatMoney: fmt })
+test('computeWidgetViewModel: no tiers configured at all — plain price, card hidden, no redesign copy', () => {
+  const vm = computeWidgetViewModel({ tiers: [], basePrice: 1.49, otherQty: 0, addingQty: 1, isGroup: false, formatMoney: fmt })
   assert.deepEqual(vm, {
     showCard: false,
     discountedPrice: null,
     plainPrice: '£1.49',
-    promoText: '',
     progressState: null,
     tierButtons: [],
     tempBoxLabel: null,
     tempBoxAfterIndex: null,
-    breakdownText: null,
     offerState: null,
     dot: null,
     promoLine: '',
     status: null,
+    semantics: null,
   })
 })
 
@@ -782,7 +608,7 @@ test('computeWidgetViewModel: no tiers, compare-at price equal to or below the s
   assert.equal(vmZero.plainPrice, '£1.49')
 })
 
-test('computeWidgetViewModel: fresh page load, qty 1, below the discount tier — no strike-through, low progress fill', () => {
+test('computeWidgetViewModel: fresh page load, qty 1, below the discount tier — no strike-through, dot on the start', () => {
   // Mirrors a real group-mode load: otherQty from cartBaselineOtherQty(0) = 0.
   const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 7, percentOff: 4 }]
   const vm = computeWidgetViewModel({ tiers, basePrice: 1.49, otherQty: 0, addingQty: 1, title: undefined, isGroup: true, formatMoney: fmt })
@@ -790,27 +616,26 @@ test('computeWidgetViewModel: fresh page load, qty 1, below the discount tier �
   assert.equal(vm.showCard, true)
   assert.equal(vm.discountedPrice, null) // 0% off at qty 1 — not actually discounted yet
   assert.equal(vm.plainPrice, '£1.49')
-  assert.equal(vm.promoText, 'Mix and match and get 7 or more for £1.43')
-  assert.deepEqual(vm.progressState.stops, [
-    { value: 0, active: true },
-    { value: 7, active: false },
+  assert.equal(vm.promoLine, 'Mix and match 7+ for £1.43')
+  assert.deepEqual(vm.dot.markers, [
+    { value: 1, pct: 0, reached: true, covered: true },
+    { value: 7, pct: 100, reached: false, covered: false },
   ])
   assert.deepEqual(vm.tierButtons, [
-    { minQty: 1, active: true, label: '1 x £1.49' },
-    { minQty: 7, active: false, label: '7 x £10.01' },
+    { minQty: 1, active: true, dimmed: false, label: '1 × £1.49' },
+    { minQty: 7, active: false, dimmed: false, label: '7 × £1.43' },
   ])
   assert.equal(vm.tempBoxLabel, null) // addingQty sits exactly at the qty:1 anchor, not strictly between two tiers
-  // Below the top tier, the breakdown line becomes the "add more" instruction
-  // instead of the addingQty × price line — no title configured here, so it
-  // reads cleanly without a product name.
-  assert.equal(vm.breakdownText, 'Add 6 more to get them for £1.43')
+  assert.equal(vm.status.statusText, 'You have 1 unit')
+  assert.equal(vm.status.hintText, 'Add 6 for £1.43/ea')
 })
 
-test('computeWidgetViewModel: discount title flows through to the breakdown line — "5 in cart" worked example', () => {
+test('computeWidgetViewModel: the status row counts the combined quantity — "5 in cart" worked example', () => {
   const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 7, percentOff: 4 }]
-  const vm = computeWidgetViewModel({ tiers, basePrice: 1.49, otherQty: 4, addingQty: 1, title: 'Canagan Cat Soups', isGroup: true, formatMoney: fmt })
+  const vm = computeWidgetViewModel({ tiers, basePrice: 1.49, otherQty: 4, addingQty: 1, isGroup: true, formatMoney: fmt })
 
-  assert.equal(vm.breakdownText, 'You have 5 Canagan Cat Soups, add 2 to get them for £1.43')
+  assert.equal(vm.status.statusText, 'You have 5 units')
+  assert.equal(vm.status.hintText, 'Add 2 for £1.43/ea')
 })
 
 test('computeWidgetViewModel: combined quantity already past the tier threshold (cart-aware baseline + 2 clicks) — matches the live-verified "9 combined" scenario', () => {
@@ -824,18 +649,19 @@ test('computeWidgetViewModel: combined quantity already past the tier threshold 
   // (9, not addingQty's 3), positioned after the 7-tier button (the last
   // one), previewing at the already-unlocked 7-tier rate.
   assert.deepEqual(vm.tierButtons, [
-    { minQty: 1, active: false, label: '1 x £1.49' },
-    { minQty: 7, active: false, label: '7 x £10.01' },
+    { minQty: 1, active: false, dimmed: true, label: '1 × £1.49' },
+    { minQty: 7, active: false, dimmed: false, label: '7 × £1.43' },
   ])
-  assert.equal(vm.tempBoxLabel, '9x £12.87')
+  assert.equal(vm.tempBoxLabel, '9 × £1.43')
   assert.equal(vm.tempBoxAfterIndex, 1)
-  assert.equal(vm.breakdownText, '3 units × £1.43 · full price £4.47 — you save £0.18')
+  assert.equal(vm.offerState, 'highest')
+  assert.equal(vm.status.headlineText, 'Highest discount unlocked: £1.43/each applied! (Save £0.54)')
 })
 
-test('computeWidgetViewModel: standalone mode (isGroup false) uses "Buy more" promo copy', () => {
+test('computeWidgetViewModel: standalone mode (isGroup false) uses "Buy" promo copy', () => {
   const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 7, percentOff: 4 }]
-  const vm = computeWidgetViewModel({ tiers, basePrice: 1.49, otherQty: 0, addingQty: 1, title: 'Canagan Tuna Soup', isGroup: false, formatMoney: fmt })
-  assert.equal(vm.promoText, 'Buy Canagan Tuna Soup and get 7 or more for £1.43')
+  const vm = computeWidgetViewModel({ tiers, basePrice: 1.49, otherQty: 0, addingQty: 1, isGroup: false, formatMoney: fmt })
+  assert.equal(vm.promoLine, 'Buy 7+ for £1.43')
 })
 
 // Time-based discount rows and sale price (major currency unit, like basePrice)
@@ -1060,13 +886,147 @@ test('buildStatusCopy: uses the real next tier (anchor pricing), not just its pe
   assert.equal(status.hintText, 'Add 3 for £1.25/ea') // 5 / 4 units
 })
 
-test('computeWidgetViewModel: carries the redesign fields next to the existing ones', () => {
-  const vm = computeWidgetViewModel({ tiers: REDESIGN_TIERS_FIXED, basePrice: REDESIGN_BASE, otherQty: 4, addingQty: 1, title: 'Tins', isGroup: true, formatMoney: fmt })
+test('computeWidgetViewModel: carries the redesign fields', () => {
+  const vm = computeWidgetViewModel({ tiers: REDESIGN_TIERS_FIXED, basePrice: REDESIGN_BASE, otherQty: 4, addingQty: 1, isGroup: true, formatMoney: fmt })
   assert.equal(vm.offerState, 'progress')
   assert.equal(vm.dot.dotValue, 5)
   assert.equal(vm.promoLine, 'Mix and match 8+ for £1.63 or 16+ for £1.55')
   assert.equal(vm.status.hintText, 'Add 3 for £1.63/ea')
-  // existing fields untouched
   assert.equal(vm.showCard, true)
-  assert.equal(vm.breakdownText, 'You have 5 Tins, add 3 to get them for £1.63')
+})
+
+test('computeWidgetViewModel: tier buttons show the unit price at each tier and dim the tiers below the applied one', () => {
+  const vm = computeWidgetViewModel({ tiers: REDESIGN_TIERS_FIXED, basePrice: REDESIGN_BASE, otherQty: 0, addingQty: 10, isGroup: true, formatMoney: fmt })
+  assert.deepEqual(vm.tierButtons, [
+    { minQty: 1, active: false, dimmed: true, label: '1 × £1.69' },
+    { minQty: 8, active: false, dimmed: false, label: '8 × £1.63' },
+    { minQty: 16, active: false, dimmed: false, label: '16 × £1.55' },
+  ])
+  assert.equal(vm.tempBoxLabel, '10 × £1.63')
+  assert.equal(vm.tempBoxAfterIndex, 1)
+})
+
+test('computeWidgetViewModel: at the exact tier the pill is active and the lower ones are dimmed; nothing is dimmed before the first offer', () => {
+  const atTier = computeWidgetViewModel({ tiers: REDESIGN_TIERS_FIXED, basePrice: REDESIGN_BASE, otherQty: 0, addingQty: 16, isGroup: true, formatMoney: fmt })
+  assert.deepEqual(atTier.tierButtons.map((b) => [b.active, b.dimmed]), [[false, true], [false, true], [true, false]])
+  const before = computeWidgetViewModel({ tiers: REDESIGN_TIERS_FIXED, basePrice: REDESIGN_BASE, otherQty: 0, addingQty: 5, isGroup: true, formatMoney: fmt })
+  assert.deepEqual(before.tierButtons.map((b) => b.dimmed), [false, false, false])
+})
+
+test('computeTierButtonsSignature: differs when only the cart quantity changed (same stepper value), so the temporary box is repainted', () => {
+  const a = computeProgressState(REDESIGN_TIERS_FIXED, 2, 1)
+  const b = computeProgressState(REDESIGN_TIERS_FIXED, 3, 1)
+  assert.notEqual(computeTierButtonsSignature(a, 1.69, 1), computeTierButtonsSignature(b, 1.69, 1))
+})
+
+// Mix & match rows (redesign): thumbnail, name, price at the applied tier, quantity.
+
+const ROW_PRODUCTS = [
+  { title: 'Chicken & Salmon 85g', url: '/products/chicken-salmon', productId: 'gid://shopify/Product/1', imageUrl: 'https://example.com/s.png', price: 169, available: true, cartVariantId: '10' },
+  { title: 'Chicken & Herring 85g', url: '/products/chicken-herring', productId: 'gid://shopify/Product/2', imageUrl: null, price: 169, available: false, cartVariantId: '20' },
+]
+
+test('buildMixMatchRows: one row per item with its live cart quantity, the link Liquid built, and its price at the applied tier', () => {
+  const state = computeProgressState(REDESIGN_TIERS_FIXED, 0, 10)
+  const rows = buildMixMatchRows(ROW_PRODUCTS, [{ product_id: 1, variant_id: 10, quantity: 6 }, { product_id: 3, variant_id: 30, quantity: 2 }], { combinedQty: state.combinedQty, tierState: state.tierState, formatMoney: fmt })
+  assert.deepEqual(rows, [
+    { href: '/products/chicken-salmon', title: 'Chicken & Salmon 85g', imageUrl: 'https://example.com/s.png', qty: 6, priceLabel: '£1.63', available: true, cartVariantId: '10', canAdd: true, canRemove: true, needsOptions: false },
+    { href: '/products/chicken-herring', title: 'Chicken & Herring 85g', imageUrl: null, qty: 0, priceLabel: '£1.63', available: false, cartVariantId: '20', canAdd: false, canRemove: false, needsOptions: false },
+  ])
+})
+
+test('buildMixMatchRows: before any offer applies a row shows its own full price; without pricing context too', () => {
+  const state = computeProgressState(REDESIGN_TIERS_FIXED, 0, 5)
+  const before = buildMixMatchRows(ROW_PRODUCTS, [], { combinedQty: 5, tierState: state.tierState, formatMoney: fmt })
+  assert.equal(before[0].priceLabel, '£1.69')
+  const noContext = buildMixMatchRows(ROW_PRODUCTS, [], null)
+  assert.equal(noContext[0].priceLabel, '')
+})
+
+test('buildMixMatchRows: a row with no price gets an empty label; availability defaults to available', () => {
+  const rows = buildMixMatchRows([{ title: 'X', url: '/products/x', productId: 'gid://shopify/Product/9', imageUrl: null }], [], { combinedQty: 1, tierState: computeProgressState(REDESIGN_TIERS_FIXED, 0, 1).tierState, formatMoney: fmt })
+  assert.equal(rows[0].priceLabel, '')
+  assert.equal(rows[0].available, true)
+  assert.equal(rows[0].cartVariantId, null)
+  assert.deepEqual([rows[0].canAdd, rows[0].canRemove, rows[0].needsOptions], [false, false, true]) // no single variant to add: link to the product instead
+})
+
+test('buildMixMatchRows: a variant-scoped member matches only that exact variant\'s cart quantity', () => {
+  const rows = buildMixMatchRows(
+    [{ title: 'X', url: '/products/x?variant=90', productId: 'gid://shopify/Product/9', variantId: 'gid://shopify/ProductVariant/90', imageUrl: null }],
+    [{ product_id: 9, variant_id: 90, quantity: 3 }, { product_id: 9, variant_id: 91, quantity: 4 }],
+    null,
+  )
+  assert.equal(rows[0].qty, 3)
+})
+
+test('buildMixMatchRows: the link is exactly the url Liquid provided, including a ?variant= query', () => {
+  const rows = buildMixMatchRows([{ title: 'Salmon', url: '/products/wet-cat-food?variant=90', productId: 'gid://shopify/Product/9', variantId: 'gid://shopify/ProductVariant/90', imageUrl: null }], [], null)
+  assert.equal(rows[0].href, '/products/wet-cat-food?variant=90')
+})
+
+test('formatItemsChosen: singular and plural', () => {
+  assert.equal(formatItemsChosen(1), '1 item chosen')
+  assert.equal(formatItemsChosen(16), '16 items chosen')
+})
+
+// Cart changes from the list.
+
+const CART_LINES = [
+  { key: 'k10:abc', variant_id: 10, product_id: 1, quantity: 6 },
+  { key: 'k99:abc', variant_id: 99, product_id: 3, quantity: 2 },
+]
+
+test('buildCartChange: "+" adds one unit of the row\'s variant through /cart/add.js', () => {
+  const row = buildMixMatchRows([ROW_PRODUCTS[0]], CART_LINES, null)[0]
+  assert.deepEqual(buildCartChange(row, CART_LINES, 1), { url: '/cart/add.js', body: { items: [{ id: 10, quantity: 1 }] } })
+})
+
+test('buildCartChange: "−" lowers the matching cart line by one through /cart/change.js, by line key', () => {
+  const row = buildMixMatchRows([ROW_PRODUCTS[0]], CART_LINES, null)[0]
+  assert.deepEqual(buildCartChange(row, CART_LINES, -1), { url: '/cart/change.js', body: { id: 'k10:abc', quantity: 5 } })
+})
+
+test('buildCartChange: nothing to do when the row cannot add, has nothing to remove, or has no single variant', () => {
+  const [salmon, herring] = buildMixMatchRows(ROW_PRODUCTS, CART_LINES, null)
+  assert.equal(buildCartChange(herring, CART_LINES, 1), null) // sold out
+  assert.equal(buildCartChange(herring, CART_LINES, -1), null) // none in the cart
+  const noVariant = buildMixMatchRows([{ title: 'X', url: '/x', productId: 'gid://shopify/Product/9', imageUrl: null }], [], null)[0]
+  assert.equal(buildCartChange(noVariant, [], 1), null)
+  assert.notEqual(buildCartChange(salmon, CART_LINES, 1), null)
+})
+
+test('buildCartChange: with the same variant on several cart lines, the first line that still has units is lowered', () => {
+  const lines = [{ key: 'a', variant_id: 10, product_id: 1, quantity: 0 }, { key: 'b', variant_id: 10, product_id: 1, quantity: 2 }]
+  const row = buildMixMatchRows([ROW_PRODUCTS[0]], lines, null)[0]
+  assert.deepEqual(buildCartChange(row, lines, -1), { url: '/cart/change.js', body: { id: 'b', quantity: 1 } })
+})
+
+test('cartErrorMessage: uses Shopify\'s own description, then its message, then a plain fallback', () => {
+  assert.equal(cartErrorMessage({ description: 'You can only add 3 of this item to your cart.', message: 'Cannot add' }), 'You can only add 3 of this item to your cart.')
+  assert.equal(cartErrorMessage({ message: 'Cannot find variant' }), 'Cannot find variant')
+  assert.equal(cartErrorMessage({}), 'Could not update the cart. Please try again.')
+  assert.equal(cartErrorMessage(null), 'Could not update the cart. Please try again.')
+})
+
+// Progress bar semantics (WCAG 4.1.2 / 4.1.3): role="progressbar" values and the spoken text.
+
+test('buildProgressSemantics: below the first offer — value, range and where the next offer starts', () => {
+  const state = computeProgressState(REDESIGN_TIERS_FIXED, 0, 5)
+  assert.deepEqual(buildProgressSemantics(state), { valueNow: 5, valueMin: 1, valueMax: 16, valueText: '5 of 16 units. Next offer at 8.' })
+})
+
+test('buildProgressSemantics: a middle tier says the offer is unlocked and where the highest discount is', () => {
+  const state = computeProgressState(REDESIGN_TIERS_FIXED, 0, 10)
+  assert.equal(buildProgressSemantics(state).valueText, '10 of 16 units. Offer unlocked, highest discount at 16.')
+})
+
+test('buildProgressSemantics: the highest tier, and beyond it the value is clamped while the text keeps the real quantity', () => {
+  assert.deepEqual(buildProgressSemantics(computeProgressState(REDESIGN_TIERS_FIXED, 0, 16)), { valueNow: 16, valueMin: 1, valueMax: 16, valueText: '16 of 16 units. Highest discount unlocked.' })
+  assert.deepEqual(buildProgressSemantics(computeProgressState(REDESIGN_TIERS_FIXED, 0, 20)), { valueNow: 16, valueMin: 1, valueMax: 16, valueText: '20 units. Highest discount unlocked.' })
+})
+
+test('computeWidgetViewModel: carries the progress bar semantics', () => {
+  const vm = computeWidgetViewModel({ tiers: REDESIGN_TIERS_FIXED, basePrice: REDESIGN_BASE, otherQty: 0, addingQty: 10, isGroup: true, formatMoney: fmt })
+  assert.equal(vm.semantics.valueNow, 10)
 })

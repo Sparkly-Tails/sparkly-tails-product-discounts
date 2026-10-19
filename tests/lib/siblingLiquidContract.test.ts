@@ -20,6 +20,12 @@ describe('tier-pricing.liquid reads what the writer writes', () => {
     expect(liquid).toContain('"listed"')
   })
 
+  it('hands the widget each row\'s price, availability and the variant a stepper would add', () => {
+    for (const field of ['"price"', '"available"', '"cartVariantId"', '"imageUrl"']) {
+      expect(liquid).toContain(field)
+    }
+  })
+
   it('has no fallback to copied sibling fields', () => {
     expect(liquid).not.toContain('TEMPORARY FALLBACK')
     expect(liquid).not.toContain('sibling.handle')
