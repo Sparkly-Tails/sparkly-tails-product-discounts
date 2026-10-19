@@ -1,6 +1,6 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
-const { isTimeDiscountWindowActive, tierTimeDiscountItems, tierTimeDiscountItemFor, timeDiscountSalePrice, computeTierState, perUnitPrice, extractNumericId, sumMemberQuantityInCart, resolveEligibility, unitPriceAtTier, totalAtTier, computeProgressState, formatTempBoxLabel, joinNaturally, computeOrderSummary, computeTierButtonsSignature, withUnitAnchor, cartBaselineOtherQty, clamp, sortTiersByMinQty, normalizeTierPricing, formatMoney, computeWidgetViewModel, buildMixMatchRows, buildDisplayMixMatchItems, listedMixMatchItems, computeProgressDot, classifyOfferState, buildPromoLine, buildStatusCopy } = require('../product-tier-pricing/assets/tier-pricing.js')
+const { isTimeDiscountWindowActive, tierTimeDiscountItems, tierTimeDiscountItemFor, timeDiscountSalePrice, computeTierState, perUnitPrice, extractNumericId, sumMemberQuantityInCart, resolveEligibility, unitPriceAtTier, computeProgressState, formatTempBoxLabel, joinNaturally, computeOrderSummary, computeTierButtonsSignature, withUnitAnchor, cartBaselineOtherQty, clamp, sortTiersByMinQty, normalizeTierPricing, formatMoney, computeWidgetViewModel, buildMixMatchRows, buildDisplayMixMatchItems, listedMixMatchItems, computeProgressDot, classifyOfferState, buildPromoLine, buildStatusCopy } = require('../product-tier-pricing/assets/tier-pricing.js')
 
 test('below every tier: no discount, lists every tier as a delta from current quantity', () => {
   const tiers = [{ minQty: 7, percentOff: 5 }, { minQty: 14, percentOff: 10 }]
@@ -223,16 +223,6 @@ test('unitPriceAtTier: fixed price above base price clamps to base price, never 
   assert.equal(unitPriceAtTier(1.49, tier), 1.49)
 })
 
-test('totalAtTier: fixed tier multiplies clamped unit price by minQty, rounded to whole pence', () => {
-  const tier = { minQty: 3, fixedPrice: 1.5 }
-  assert.equal(totalAtTier(1.99, tier), 4.5)
-})
-
-test('totalAtTier: anchor tier returns exactly the anchorPrice (minQty units, no extra accrual)', () => {
-  const tier = { minQty: 7, percentOff: 5, anchorPrice: 10.0 }
-  assert.equal(totalAtTier(1.49, tier), 10.0)
-})
-
 test('computeProgressState: below the lowest tier, not maxed', () => {
   const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 7, percentOff: 5 }, { minQty: 20, percentOff: 10 }]
   const state = computeProgressState(tiers, 0, 1)
@@ -387,13 +377,13 @@ test('computeProgressState: below every tier (no tier with minQty 1) does not th
   ])
 })
 
-test('formatTempBoxLabel: quantity, "x", the running total at the already-active (lower) tier\'s rate — no "=" sign', () => {
+test('formatTempBoxLabel: quantity, "×", the unit price at the already-active (lower) tier\'s rate', () => {
   const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 7, percentOff: 5 }, { minQty: 20, percentOff: 10 }]
   const state = computeProgressState(tiers, 0, 5)
   const label = formatTempBoxLabel(state, 1.49, fmt)
   // 5 sits between the qty:1 anchor (0% off) and the 7-tier — no discount
-  // is active yet, so the preview is 5 units at plain base price: 5 * 1.49 = 7.45
-  assert.equal(label, '5x £7.45')
+  // is active yet, so the preview is 5 units at the plain base price
+  assert.equal(label, '5 × £1.49')
 })
 
 test('formatTempBoxLabel: between two real tiers, previews at the lower tier\'s already-unlocked rate', () => {
@@ -401,19 +391,19 @@ test('formatTempBoxLabel: between two real tiers, previews at the lower tier\'s 
   const state = computeProgressState(tiers, 0, 10)
   const label = formatTempBoxLabel(state, 1.49, fmt)
   // 10 sits between the 7-tier (5% off, already active) and the 20-tier —
-  // preview uses the 7-tier's unlocked rate: unit 1.4155, 10 * 1.4155 = 14.155 -> 14.16
-  assert.equal(label, '10x £14.16')
+  // preview uses the 7-tier's unlocked rate: unit 1.4155 -> £1.42
+  assert.equal(label, '10 × £1.42')
 })
 
-test('formatTempBoxLabel: uses the true combined quantity, not addingQty alone — 6 already in cart on page load shows "6x", not "1x"', () => {
+test('formatTempBoxLabel: uses the true combined quantity, not addingQty alone — 6 already in cart on page load shows "6 ×", not "1 ×"', () => {
   const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 7, percentOff: 4 }]
   const otherQty = cartBaselineOtherQty(6) // 5 -- page just loaded, stepper at its floor of 1
   const state = computeProgressState(tiers, otherQty, 1)
   assert.equal(state.combinedQty, 6)
   const label = formatTempBoxLabel(state, 1.49, fmt)
   // 6 sits between the qty:1 anchor and the 7-tier -- no discount active
-  // yet, so 6 units at plain base price: 6 * 1.49 = 8.94
-  assert.equal(label, '6x £8.94')
+  // yet, so 6 units at the plain base price
+  assert.equal(label, '6 × £1.49')
 })
 
 test('withUnitAnchor: prepends a { minQty: 1, percentOff: 0 } tier when none is configured', () => {
@@ -673,8 +663,8 @@ test('computeWidgetViewModel: fresh page load, qty 1, below the discount tier �
     { value: 7, pct: 100, reached: false, covered: false },
   ])
   assert.deepEqual(vm.tierButtons, [
-    { minQty: 1, active: true, label: '1 x £1.49' },
-    { minQty: 7, active: false, label: '7 x £10.01' },
+    { minQty: 1, active: true, dimmed: false, label: '1 × £1.49' },
+    { minQty: 7, active: false, dimmed: false, label: '7 × £1.43' },
   ])
   assert.equal(vm.tempBoxLabel, null) // addingQty sits exactly at the qty:1 anchor, not strictly between two tiers
   assert.equal(vm.status.statusText, 'You have 1 unit')
@@ -700,10 +690,10 @@ test('computeWidgetViewModel: combined quantity already past the tier threshold 
   // (9, not addingQty's 3), positioned after the 7-tier button (the last
   // one), previewing at the already-unlocked 7-tier rate.
   assert.deepEqual(vm.tierButtons, [
-    { minQty: 1, active: false, label: '1 x £1.49' },
-    { minQty: 7, active: false, label: '7 x £10.01' },
+    { minQty: 1, active: false, dimmed: true, label: '1 × £1.49' },
+    { minQty: 7, active: false, dimmed: false, label: '7 × £1.43' },
   ])
-  assert.equal(vm.tempBoxLabel, '9x £12.87')
+  assert.equal(vm.tempBoxLabel, '9 × £1.43')
   assert.equal(vm.tempBoxAfterIndex, 1)
   assert.equal(vm.offerState, 'highest')
   assert.equal(vm.status.headlineText, 'Highest discount unlocked: £1.43/each applied! (Save £0.54)')
@@ -944,4 +934,28 @@ test('computeWidgetViewModel: carries the redesign fields', () => {
   assert.equal(vm.promoLine, 'Mix and match 8+ for £1.63 or 16+ for £1.55')
   assert.equal(vm.status.hintText, 'Add 3 for £1.63/ea')
   assert.equal(vm.showCard, true)
+})
+
+test('computeWidgetViewModel: tier buttons show the unit price at each tier and dim the tiers below the applied one', () => {
+  const vm = computeWidgetViewModel({ tiers: REDESIGN_TIERS_FIXED, basePrice: REDESIGN_BASE, otherQty: 0, addingQty: 10, isGroup: true, formatMoney: fmt })
+  assert.deepEqual(vm.tierButtons, [
+    { minQty: 1, active: false, dimmed: true, label: '1 × £1.69' },
+    { minQty: 8, active: false, dimmed: false, label: '8 × £1.63' },
+    { minQty: 16, active: false, dimmed: false, label: '16 × £1.55' },
+  ])
+  assert.equal(vm.tempBoxLabel, '10 × £1.63')
+  assert.equal(vm.tempBoxAfterIndex, 1)
+})
+
+test('computeWidgetViewModel: at the exact tier the pill is active and the lower ones are dimmed; nothing is dimmed before the first offer', () => {
+  const atTier = computeWidgetViewModel({ tiers: REDESIGN_TIERS_FIXED, basePrice: REDESIGN_BASE, otherQty: 0, addingQty: 16, isGroup: true, formatMoney: fmt })
+  assert.deepEqual(atTier.tierButtons.map((b) => [b.active, b.dimmed]), [[false, true], [false, true], [true, false]])
+  const before = computeWidgetViewModel({ tiers: REDESIGN_TIERS_FIXED, basePrice: REDESIGN_BASE, otherQty: 0, addingQty: 5, isGroup: true, formatMoney: fmt })
+  assert.deepEqual(before.tierButtons.map((b) => b.dimmed), [false, false, false])
+})
+
+test('computeTierButtonsSignature: differs when only the cart quantity changed (same stepper value), so the temporary box is repainted', () => {
+  const a = computeProgressState(REDESIGN_TIERS_FIXED, 2, 1)
+  const b = computeProgressState(REDESIGN_TIERS_FIXED, 3, 1)
+  assert.notEqual(computeTierButtonsSignature(a, 1.69, 1), computeTierButtonsSignature(b, 1.69, 1))
 })

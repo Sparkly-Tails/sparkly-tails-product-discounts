@@ -97,10 +97,6 @@ function unitPriceAtTier(basePrice, tier) {
   return perUnitPrice(basePrice, tier.minQty, { ...normalizeTierPricing(tier), minQty: tier.minQty })
 }
 
-function totalAtTier(basePrice, tier) {
-  return Math.round(unitPriceAtTier(basePrice, tier) * tier.minQty * 100) / 100
-}
-
 // Synthetic { minQty: 1, percentOff: 0 } tier so the button row always has
 // a "1 x <base price>" anchor and the temp-box gap-detection below has two
 // entries to bracket a quantity between, even for single-tier configs.
@@ -185,7 +181,9 @@ function computeProgressState(tiers, otherQty, addingQty) {
 function computeTierButtonsSignature(state, basePrice, addingQty) {
   return JSON.stringify(state.tierButtons) + '|' +
     (state.tempBox ? state.tempBox.afterIndex + ':' + state.tempBox.tier.minQty : 'none') +
-    '|' + addingQty + '|' + basePrice
+    // combinedQty, not just the stepper: the temporary box shows the combined
+    // quantity, which also moves when the cart changes under a still stepper.
+    '|' + state.combinedQty + '|' + addingQty + '|' + basePrice
 }
 
 // Copy formatting — formatMoney is injected as an (n) => string abstraction.
@@ -193,8 +191,7 @@ function computeTierButtonsSignature(state, basePrice, addingQty) {
 function formatTempBoxLabel(progressState, basePrice, formatMoneyFn) {
   if (!progressState.tempBox) return ''
   const qty = progressState.combinedQty
-  const total = Math.round(unitPriceAtTier(basePrice, progressState.tempBox.tier) * qty * 100) / 100
-  return qty + 'x ' + formatMoneyFn(total)
+  return qty + ' × ' + formatMoneyFn(perUnitPrice(basePrice, qty, progressState.tierState))
 }
 
 function computeOrderSummary(basePrice, addingQty, unitPrice) {
@@ -345,10 +342,14 @@ function computeWidgetViewModel({ tiers, basePrice, compareAtPrice, otherQty, ad
   const isDiscounted = progressState.tierState.fixedPrice != null || progressState.tierState.percentOff > 0
 
   const sortedTiers = sortTiersByMinQty(tiers)
+  // "8 × £1.63": the unit price at each tier. Tiers below the applied one are
+  // dimmed; none are before the first offer applies.
+  const appliedMinQty = classifyOfferState(progressState) === 'progress' ? 0 : progressState.tierState.minQty
   const tierButtons = progressState.tierButtons.map((btn, i) => ({
     minQty: btn.minQty,
     active: btn.active,
-    label: btn.minQty + ' x ' + formatMoneyFn(totalAtTier(basePrice, sortedTiers[i])),
+    dimmed: btn.minQty < appliedMinQty,
+    label: btn.minQty + ' × ' + formatMoneyFn(unitPriceAtTier(basePrice, sortedTiers[i])),
   }))
 
   return {
@@ -475,7 +476,6 @@ if (typeof module !== 'undefined' && module.exports) {
     sumMemberQuantityInCart,
     resolveEligibility,
     unitPriceAtTier,
-    totalAtTier,
     computeProgressState,
     formatTempBoxLabel,
     joinNaturally,
@@ -554,13 +554,25 @@ if (typeof document !== 'undefined') {
     elements.dotEl.textContent = String(dot.dotValue)
   }
 
+  // One pill per tier ("8 × £1.63"); the exact-match pill carries a tick and
+  // tiers below the applied one are dimmed. A dashed box between two pills
+  // shows the quantity that sits between tiers.
   function paintTierButtons(elements, viewModel) {
     elements.tiersEl.innerHTML = ''
     viewModel.tierButtons.forEach((btn, i) => {
       const el = document.createElement('button')
       el.type = 'button'
-      el.className = 'sparkly-tier-pricing__tier-btn' + (btn.active ? ' sparkly-tier-pricing__tier-btn--active' : '')
+      el.className = 'sparkly-tier-pricing__tier-btn' +
+        (btn.active ? ' sparkly-tier-pricing__tier-btn--active' : '') +
+        (btn.dimmed ? ' sparkly-tier-pricing__tier-btn--dimmed' : '')
       el.textContent = btn.label
+      if (btn.active) {
+        const tick = document.createElement('span')
+        tick.className = 'sparkly-tier-pricing__tier-tick'
+        tick.setAttribute('aria-hidden', 'true')
+        tick.textContent = '✓'
+        el.appendChild(tick)
+      }
       el.addEventListener('click', () => setQuantityInput(btn.minQty))
       elements.tiersEl.appendChild(el)
 
