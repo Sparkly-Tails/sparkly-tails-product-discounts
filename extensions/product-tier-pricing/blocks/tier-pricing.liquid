@@ -101,7 +101,7 @@
 
 <div
   id="sparkly-tier-pricing-{{ block.id }}"
-  class="sparkly-tier-pricing"
+  class="sparkly-tier-pricing{% if discount_metafield != blank %} sparkly-tier-pricing--card{% endif %}"
   data-sparkly-tier-pricing
   data-discount='{{ discount_json }}'
   data-time-discount='{{ time_discount_json }}'
@@ -128,12 +128,16 @@
   {%- endif -%}
 
   <div class="sparkly-tier-pricing__card" data-tier-pricing-card hidden>
-    <div class="sparkly-tier-pricing__breakdown" data-tier-pricing-breakdown></div>
+    <div class="sparkly-tier-pricing__status-row">
+      <span class="sparkly-tier-pricing__status" data-tier-pricing-status></span>
+      <span class="sparkly-tier-pricing__aside" data-tier-pricing-aside></span>
+    </div>
     <div class="sparkly-tier-pricing__bar-wrap">
       <div class="sparkly-tier-pricing__track">
         <div class="sparkly-tier-pricing__fill" data-tier-pricing-fill></div>
       </div>
-      <div class="sparkly-tier-pricing__stops" data-tier-pricing-stops></div>
+      <div class="sparkly-tier-pricing__markers" data-tier-pricing-markers></div>
+      <span class="sparkly-tier-pricing__dot" data-tier-pricing-dot></span>
     </div>
     <div class="sparkly-tier-pricing__tiers" data-tier-pricing-tiers></div>
     {%- if discount_metafield != blank -%}
