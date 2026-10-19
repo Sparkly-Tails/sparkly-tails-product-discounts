@@ -7,7 +7,7 @@
 ## What the owner decided (2026-10-19)
 
 1. The mix & match list changes the **real cart** (`/cart/add.js`, `/cart/change.js`); the progress bar, dot, copy and tier buttons must update and stay aligned with it.
-2. Rows whose product has several purchasable variants: not decided by the owner (the owner asked what it meant). Default used: a row gets a stepper only when it resolves to exactly one purchasable variant; otherwise it keeps a "Choose options" link to the product. Revisit before PR 5.
+2. Rows and variants: in the discount admin a product with several variants must always be added as a specific variant; only a single-variant product is added whole (owner, confirmed in code: `src/lib/config.ts` documents it and `src/components/MemberPicker.tsx` enforces it by forcing a variant choice when `variantCount > 1`). So every row resolves to exactly one variant and always gets a stepper. Edge case, inferred and not verified: a whole-product member whose product later gains a second variant; that row falls back to a "Choose options" link.
 3. A row's price is the per-unit price at the current combined quantity.
 4. Copy: "Tier 1 / Tier 2" is replaced by **"Offer unlocked"** for any middle tier and **"Highest discount unlocked"** for the highest tier. No emoji.
 5. The "State 1/2/3" tags on the design are annotations and do not ship.
