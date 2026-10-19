@@ -38,8 +38,8 @@ function mount(discount: Record<string, unknown>, opts: { selectedVariantId?: nu
         <span class="sparkly-tier-pricing__each-label" data-tier-pricing-each-label>each</span>
       </div>
       <div class="sparkly-tier-pricing__card" data-tier-pricing-card hidden>
-        <div data-tier-pricing-breakdown></div>
-        <div class="sparkly-tier-pricing__bar-wrap"><div class="sparkly-tier-pricing__track"><div data-tier-pricing-fill></div></div><div data-tier-pricing-stops></div></div>
+        <div class="sparkly-tier-pricing__status-row"><span data-tier-pricing-status></span><span data-tier-pricing-aside></span></div>
+        <div class="sparkly-tier-pricing__bar-wrap"><div class="sparkly-tier-pricing__track"><div data-tier-pricing-fill></div></div><div data-tier-pricing-markers></div><span data-tier-pricing-dot></span></div>
         <div data-tier-pricing-tiers></div>
       </div>
     </div>
@@ -155,5 +155,119 @@ describe('storefront scripts share one global scope', () => {
     expect(tierNames.length).toBeGreaterThan(0)
     expect(countdownNames.length).toBeGreaterThan(0)
     expect(tierNames.filter((name) => countdownNames.includes(name))).toEqual([])
+  })
+})
+
+/**
+ * The redesigned tier widget: status row, bar with a dot on the current
+ * quantity, and the copy per state. Markup mirrors tier-pricing.liquid; the
+ * cart comes from a stubbed /cart.js.
+ */
+describe('tier widget painting (redesign)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ now: NOW })
+    vi.stubGlobal('fetch', vi.fn(async () => ({ json: async () => ({ items: [] }) })))
+  })
+  afterEach(() => { vi.clearAllTimers(); vi.useRealTimers(); vi.unstubAllGlobals(); document.body.innerHTML = '' })
+
+  const discount = {
+    title: 'Tins',
+    tiers: [{ minQty: 8, percentOff: 3.5503 }, { minQty: 16, percentOff: 8.284 }],
+    siblings: [],
+    ownVariantIds: null,
+    ownVariantOptions: [],
+    selfVariantId: V10,
+  }
+
+  async function mountTiers(quantity: number) {
+    document.body.innerHTML = `
+      <input name="quantity" value="${quantity}">
+      <div id="sparkly-tier-pricing-t1" class="sparkly-tier-pricing sparkly-tier-pricing--card" data-sparkly-tier-pricing
+        data-discount='${JSON.stringify(discount)}' data-time-discount="{}"
+        data-product-id='"gid://shopify/Product/9"' data-selected-variant-id="10"
+        data-base-price="1.69" data-compare-at-price="0" data-money-format='"£{{amount}}"'>
+        <div class="sparkly-tier-pricing__price-row">
+          <span data-tier-pricing-price data-original-price="true">£1.69</span>
+          <span data-discounted-price hidden>£1.69</span>
+          <span data-tier-pricing-each-label>each</span>
+        </div>
+        <p data-tier-pricing-promo></p>
+        <div data-tier-pricing-card hidden>
+          <div><span data-tier-pricing-status></span><span data-tier-pricing-aside></span></div>
+          <div><div><div data-tier-pricing-fill></div></div><div data-tier-pricing-markers></div><span data-tier-pricing-dot></span></div>
+          <div data-tier-pricing-tiers></div>
+        </div>
+      </div>`
+    ;(0, eval)(tierScript)
+    await vi.advanceTimersByTimeAsync(0)
+  }
+
+  async function setQuantity(value: number) {
+    const input = document.querySelector('input[name="quantity"]') as HTMLInputElement
+    input.value = String(value)
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    await vi.advanceTimersByTimeAsync(0)
+  }
+
+  function painted() {
+    const text = (selector: string) => (document.querySelector(selector) as HTMLElement).textContent
+    const dot = document.querySelector('[data-tier-pricing-dot]') as HTMLElement
+    const aside = document.querySelector('[data-tier-pricing-aside]') as HTMLElement
+    return {
+      promo: text('[data-tier-pricing-promo]'),
+      status: text('[data-tier-pricing-status]'),
+      aside: aside.textContent,
+      asideIsBadge: aside.classList.contains('sparkly-tier-pricing__aside--badge'),
+      dot: dot.textContent,
+      dotLeft: dot.style.left,
+      fill: (document.querySelector('[data-tier-pricing-fill]') as HTMLElement).style.width,
+      markers: [...document.querySelectorAll('.sparkly-tier-pricing__marker')].map((m) => ({ text: m.textContent, reached: m.classList.contains('sparkly-tier-pricing__marker--reached'), covered: m.classList.contains('sparkly-tier-pricing__marker--covered') })),
+    }
+  }
+
+  it('below the first offer: units owned, a hint to the next price, the dot on the quantity', async () => {
+    await mountTiers(5)
+    expect(painted()).toEqual({
+      promo: 'Buy 8+ for £1.63 or 16+ for £1.55',
+      status: 'You have 5 units',
+      aside: 'Add 3 for £1.63/ea',
+      asideIsBadge: false,
+      dot: '5',
+      dotLeft: '29%',
+      fill: '29%',
+      markers: [
+        { text: '1', reached: true, covered: false },
+        { text: '8', reached: false, covered: false },
+        { text: '16', reached: false, covered: false },
+      ],
+    })
+  })
+
+  it('middle tier: "Offer unlocked", a Save badge, the reached marker filled, the dot between tiers', async () => {
+    await mountTiers(5)
+    await setQuantity(10)
+    expect(painted()).toMatchObject({
+      promo: 'Offer unlocked! Add 6 more to unlock the highest discount for £1.55',
+      status: '10 units × £1.63 (Offer unlocked)',
+      aside: 'Save £0.60',
+      asideIsBadge: true,
+      dot: '10',
+      dotLeft: '63%',
+    })
+    expect(painted().markers.map((m) => m.reached)).toEqual([true, true, false])
+  })
+
+  it('highest tier: "Highest discount unlocked" and the dot on the last marker', async () => {
+    await mountTiers(5)
+    await setQuantity(16)
+    expect(painted()).toMatchObject({
+      promo: 'Highest discount unlocked: £1.55/each applied! (Save £2.24)',
+      status: 'You have 16 units',
+      aside: '✓ Highest discount (£1.55/ea)',
+      asideIsBadge: false,
+      dot: '16',
+      dotLeft: '100%',
+    })
+    expect(painted().markers.map((m) => [m.reached, m.covered])).toEqual([[true, false], [true, false], [true, true]])
   })
 })
