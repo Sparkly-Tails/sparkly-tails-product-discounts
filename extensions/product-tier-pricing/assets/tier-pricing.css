@@ -176,37 +176,65 @@
 }
 
 .sparkly-tier-pricing__tiers {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
+  gap: 6px;
+}
+
+.sparkly-tier-pricing__tier-btn,
+.sparkly-tier-pricing__temp-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 7px 8px;
+  border-radius: 999px;
+  font-family: var(--font-stack-body);
+  font-size: 12px;
+  line-height: 1.2;
+  white-space: nowrap;
 }
 
 .sparkly-tier-pricing__tier-btn {
-  padding: 10px 16px;
-  border-radius: var(--sparkly-tier-radius);
-  font-family: var(--font-stack-body);
   font-weight: 600;
-  font-size: 13px;
   cursor: pointer;
   border: 1px solid var(--sparkly-tier-border);
-  background: #fff;
-  color: var(--sparkly-tier-ink);
+  background: var(--sparkly-tier-track);
+  color: var(--sparkly-tier-text-secondary);
   transition: border-color 120ms ease, background-color 120ms ease;
 }
 
+.sparkly-tier-pricing__tier-btn:hover {
+  border-color: color-mix(in srgb, var(--sparkly-tier-accent) 50%, transparent);
+}
+
 .sparkly-tier-pricing__tier-btn--active {
-  border: 2px solid var(--sparkly-tier-moss, #434625);
-  background: var(--sparkly-tier-moss-tint);
+  border: 2px solid var(--sparkly-tier-accent);
+  background: var(--sparkly-tier-cream, #f3ecd9);
+  color: var(--sparkly-tier-ink);
+  font-weight: 700;
+}
+
+.sparkly-tier-pricing__tier-btn--dimmed {
+  opacity: 0.7;
+}
+
+.sparkly-tier-pricing__tier-tick {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--sparkly-tier-accent);
+  color: var(--sparkly-tier-track);
+  font-size: 9px;
 }
 
 .sparkly-tier-pricing__temp-btn {
-  padding: 10px 16px;
-  border-radius: var(--sparkly-tier-radius);
-  font-family: var(--font-stack-body);
-  font-weight: 600;
-  font-size: 13px;
+  font-weight: 700;
   cursor: default;
-  border: 2px dashed color-mix(in srgb, var(--sparkly-tier-moss, #434625) 80%, black);
+  border: 2px dashed var(--sparkly-tier-accent);
   background: var(--sparkly-tier-moss-tint);
   color: var(--sparkly-tier-ink);
   animation: sparklyTierFadeIn 180ms var(--sparkly-tier-ease);

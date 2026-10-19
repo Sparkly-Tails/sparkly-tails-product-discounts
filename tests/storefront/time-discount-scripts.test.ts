@@ -257,6 +257,41 @@ describe('tier widget painting (redesign)', () => {
     expect(painted().markers.map((m) => m.reached)).toEqual([true, true, false])
   })
 
+  function pills() {
+    return [...document.querySelectorAll('[data-tier-pricing-tiers] > *')].map((el) => ({
+      text: el.textContent,
+      kind: el.classList.contains('sparkly-tier-pricing__temp-btn') ? 'temp' : 'pill',
+      active: el.classList.contains('sparkly-tier-pricing__tier-btn--active'),
+      dimmed: el.classList.contains('sparkly-tier-pricing__tier-btn--dimmed'),
+    }))
+  }
+
+  it('pills show the unit price per tier; between tiers the lower ones are dimmed and a dashed box shows the quantity', async () => {
+    await mountTiers(5)
+    expect(pills()).toEqual([
+      { text: '1 × £1.69', kind: 'pill', active: false, dimmed: false },
+      { text: '5 × £1.69', kind: 'temp', active: false, dimmed: false },
+      { text: '8 × £1.63', kind: 'pill', active: false, dimmed: false },
+      { text: '16 × £1.55', kind: 'pill', active: false, dimmed: false },
+    ])
+    await setQuantity(10)
+    expect(pills()).toEqual([
+      { text: '1 × £1.69', kind: 'pill', active: false, dimmed: true },
+      { text: '8 × £1.63', kind: 'pill', active: false, dimmed: false },
+      { text: '10 × £1.63', kind: 'temp', active: false, dimmed: false },
+      { text: '16 × £1.55', kind: 'pill', active: false, dimmed: false },
+    ])
+  })
+
+  it('a quantity exactly on a tier ticks that pill and shows no dashed box', async () => {
+    await mountTiers(8)
+    expect(pills()).toEqual([
+      { text: '1 × £1.69', kind: 'pill', active: false, dimmed: true },
+      { text: '8 × £1.63✓', kind: 'pill', active: true, dimmed: false },
+      { text: '16 × £1.55', kind: 'pill', active: false, dimmed: false },
+    ])
+  })
+
   it('highest tier: "Highest discount unlocked" and the dot on the last marker', async () => {
     await mountTiers(5)
     await setQuantity(16)
