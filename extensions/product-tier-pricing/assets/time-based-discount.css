@@ -22,6 +22,43 @@
   margin: 0;
 }
 
+.sparkly-time-discount__price {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0;
+  font-family: var(--font-stack-headings);
+  color: var(--sparkly-time-discount-ink);
+}
+
+.sparkly-time-discount__price[hidden] {
+  display: none;
+}
+
+.sparkly-time-discount__sale {
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.sparkly-time-discount__regular {
+  font-size: 1rem;
+  font-weight: 400;
+  color: var(--color-secondary-text-main, #5b5c4e);
+  text-decoration: line-through;
+}
+
+.sparkly-time-discount__sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .sparkly-time-discount__boxes {
   display: flex;
   gap: 8px;

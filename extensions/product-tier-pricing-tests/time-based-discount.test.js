@@ -8,7 +8,10 @@ const {
   countdownDiscountItems,
   countdownDiscountItemFor,
   discountReducesPrice,
-  timeDiscountNumericId
+  timeDiscountNumericId,
+  computeSalePriceCents,
+  formatPriceCents,
+  buildSalePriceState
 } = require('../product-tier-pricing/assets/time-based-discount.js')
 
 test('computeCountdown: inactive before the window starts', () => {
@@ -159,4 +162,38 @@ test('paintCountdown: shows the countdown alone when there is no pricing data (o
   assert.equal(state.hidden, false)
   assert.equal(state.label, 'Sale ends in:')
   assert.equal(state.seconds, '37')
+})
+
+// The block's own sale price line (it no longer relies on the tier widget).
+
+test('computeSalePriceCents: a percent discount takes that share off the variant price (minor units)', () => {
+  assert.equal(computeSalePriceCents({ priceCents: 4999, pricingMode: 'percent', amount: 10, computeDiscountedCents: computeDiscountedPriceCents }), 4499)
+})
+
+test('computeSalePriceCents: a fixed discount is the final price', () => {
+  assert.equal(computeSalePriceCents({ priceCents: 4999, pricingMode: 'fixed', amount: 22, computeDiscountedCents: computeDiscountedPriceCents }), 2200)
+})
+
+test('computeSalePriceCents: no sale price when it would not be lower (fixed at or above the price, 0 percent)', () => {
+  assert.equal(computeSalePriceCents({ priceCents: 4999, pricingMode: 'fixed', amount: 60, computeDiscountedCents: computeDiscountedPriceCents }), null)
+  assert.equal(computeSalePriceCents({ priceCents: 4999, pricingMode: 'percent', amount: 0, computeDiscountedCents: computeDiscountedPriceCents }), null)
+})
+
+test('computeSalePriceCents: uses the discounting function it is given', () => {
+  const half = (priceCents) => Math.round(priceCents / 2)
+  assert.equal(computeSalePriceCents({ priceCents: 1000, pricingMode: 'percent', amount: 99, computeDiscountedCents: half }), 500)
+})
+
+test('formatPriceCents: puts the amount into the shop money format with two decimals', () => {
+  assert.equal(formatPriceCents({ cents: 2200, moneyFormat: '£{{amount}}' }), '£22.00')
+  assert.equal(formatPriceCents({ cents: 4499, moneyFormat: '{{ amount }} EUR' }), '44.99 EUR')
+})
+
+test('buildSalePriceState: hidden when there is no sale price', () => {
+  assert.deepEqual(buildSalePriceState({ saleCents: null, priceCents: 4999, moneyFormat: '£{{amount}}', formatCents: formatPriceCents }), { hidden: true, saleText: '', regularText: '' })
+})
+
+test('buildSalePriceState: the sale price and the regular price, formatted by the function it is given', () => {
+  const formatCents = ({ cents, moneyFormat }) => moneyFormat + ':' + cents
+  assert.deepEqual(buildSalePriceState({ saleCents: 2200, priceCents: 4999, moneyFormat: 'M', formatCents }), { hidden: false, saleText: 'M:2200', regularText: 'M:4999' })
 })

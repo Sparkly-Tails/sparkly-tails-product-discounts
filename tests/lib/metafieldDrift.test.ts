@@ -14,7 +14,7 @@ const FUNCTION_QUERIES = [
 const liquidRead = (key: string) => `product.metafields['${METAFIELD_NAMESPACE}'].${key}`
 
 const LIQUID_READERS = [
-  { path: 'extensions/product-tier-pricing/blocks/tier-pricing.liquid', keys: [METAFIELD_KEYS.tierDiscount, METAFIELD_KEYS.tierSiblingProducts, METAFIELD_KEYS.tierSiblingVariants, METAFIELD_KEYS.timeDiscount] },
+  { path: 'extensions/product-tier-pricing/blocks/tier-pricing.liquid', keys: [METAFIELD_KEYS.tierDiscount, METAFIELD_KEYS.tierSiblingProducts, METAFIELD_KEYS.tierSiblingVariants] },
   { path: 'extensions/product-tier-pricing/blocks/time-based-discount.liquid', keys: [METAFIELD_KEYS.timeDiscount] },
   { path: 'extensions/product-tier-pricing/snippets/product-card-with-discount.liquid', keys: [METAFIELD_KEYS.timeDiscount] },
 ]

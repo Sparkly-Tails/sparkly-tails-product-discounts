@@ -2,7 +2,8 @@
   Time-based discount widget: the discount title, then a countdown of red
   DAY / HRS / MINS / SECS boxes to the end of the discount (styled in
   time-based-discount.css; box colour is the "Countdown box color" setting).
-  The sale price itself is shown by the tier-pricing price block. The widget is hidden
+  The sale price (with the regular price struck beside it) is shown by this
+  block too, under the title. The widget is hidden
   outside the active window (before startsAt / after endsAt), for variants the
   discount doesn't cover, and whenever the discounted price wouldn't actually
   be lower. All of that is decided in time-based-discount.js from the data
@@ -38,10 +39,15 @@
   class="sparkly-time-discount"
   data-sparkly-time-discount
   data-discount='{{ discount_data }}'
+  data-money-format='{{ shop.money_format | json | escape }}'
   style="--sparkly-time-discount-color: {{ block.settings.countdown_color }};"
   hidden
 >
   <p class="sparkly-time-discount__label" data-time-discount-label></p>
+  <p class="sparkly-time-discount__price" data-time-discount-price hidden>
+    <span class="sparkly-time-discount__sr-only">Discounted price: </span><span class="sparkly-time-discount__sale" data-time-discount-sale></span>
+    <s class="sparkly-time-discount__regular"><span class="sparkly-time-discount__sr-only">Original price: </span><span data-time-discount-regular></span></s>
+  </p>
   <div class="sparkly-time-discount__boxes">
     <div class="sparkly-time-discount__box">
       <span class="sparkly-time-discount__value" data-time-discount-days>00</span>

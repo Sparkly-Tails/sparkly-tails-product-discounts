@@ -112,28 +112,12 @@
   {%- endcapture -%}
   {%- assign discount_json = discount_json_raw | strip | escape -%}
 {%- endif -%}
-{%- assign time_discount_metafield = product.metafields['$app:smooth_discount'].time_discount -%}
-{%- assign time_discount_json = '{}' -%}
-{%- if time_discount_metafield != blank -%}
-  {%- capture time_discount_data -%}
-    {
-      "startsAt": {{ time_discount_metafield.value.startsAt | json }},
-      "endsAt": {{ time_discount_metafield.value.endsAt | json }},
-      "pricingMode": {% if time_discount_metafield.value.pricingMode != nil %}{{ time_discount_metafield.value.pricingMode | json }}{% else %}null{% endif %},
-      "amount": {% if time_discount_metafield.value.amount != nil %}{{ time_discount_metafield.value.amount | json }}{% else %}null{% endif %},
-      "variantIds": {% if time_discount_metafield.value.variantIds != nil %}{{ time_discount_metafield.value.variantIds | json }}{% else %}null{% endif %},
-      "items": {% if time_discount_metafield.value.items != nil %}{{ time_discount_metafield.value.items | json }}{% else %}null{% endif %}
-    }
-  {%- endcapture -%}
-  {%- assign time_discount_json = time_discount_data | strip | escape -%}
-{%- endif -%}
 
 <div
   id="sparkly-tier-pricing-{{ block.id }}"
   class="sparkly-tier-pricing{% if discount_metafield != blank %} sparkly-tier-pricing--card{% endif %}"
   data-sparkly-tier-pricing
   data-discount='{{ discount_json }}'
-  data-time-discount='{{ time_discount_json }}'
   data-selected-variant-id="{{ product.selected_or_first_available_variant.id }}"
   data-product-id='{{ product.id | prepend: "gid://shopify/Product/" | json }}'
   data-base-price="{{ product.selected_or_first_available_variant.price | divided_by: 100.0 | json }}"
@@ -142,10 +126,7 @@
   style="--sparkly-tier-price-font-size: {{ block.settings.price_font_size }}px; --sparkly-tier-moss: {{ block.settings.moss_color }}; --sparkly-tier-cream: {{ block.settings.cream_color }}; --sparkly-tier-sun: {{ block.settings.sun_color }};"
 >
   <div class="sparkly-tier-pricing__price-row">
-    <span class="sparkly-tier-pricing__price sparkly-tier-pricing__original-price" data-tier-pricing-price data-original-price="true">
-      {{ product.selected_or_first_available_variant.price | money }}
-    </span>
-    <span class="sparkly-tier-pricing__price sparkly-tier-pricing__discounted-price" data-discounted-price hidden>
+    <span class="sparkly-tier-pricing__price" data-tier-pricing-price>
       {{ product.selected_or_first_available_variant.price | money }}
     </span>
     <span class="sparkly-tier-pricing__each-label" data-tier-pricing-each-label>each</span>
@@ -179,28 +160,6 @@
     {%- endif -%}
   </div>
 </div>
-
-<style>
-  .sparkly-tier-pricing__original-price {
-    transition: all 0.3s ease;
-  }
-
-  /* While a time-based discount runs, the regular price drops to the same
-     struck, smaller, muted treatment the tier discounts use (see
-     `.sparkly-tier-pricing__price s`), and the sale price — which keeps the
-     normal price styling: theme heading font, bold, theme text colour — sits
-     to its left. */
-  .sparkly-tier-pricing__original-price[data-strike="true"] {
-    font-weight: 400;
-    font-size: calc(var(--sparkly-tier-price-font-size, 2.5rem) * 0.75);
-    color: var(--color-secondary-text-main, #5b5c4e);
-    text-decoration: line-through;
-  }
-
-  .sparkly-tier-pricing__discounted-price {
-    order: -1;
-  }
-</style>
 
 {%- if block.settings.custom_css != blank -%}
   <style>

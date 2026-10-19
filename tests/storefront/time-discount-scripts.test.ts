@@ -22,19 +22,17 @@ type Item = { variantId: string | null; pricingMode: 'percent' | 'fixed'; amount
 
 function mount(discount: Record<string, unknown>, opts: { selectedVariantId?: number; basePrice?: number; variantPrices?: Record<string, number> } = {}) {
   const { selectedVariantId = 10, basePrice = 49.99, variantPrices = { '10': 4999, '11': 6000, '12': 3000 } } = opts
-  const timeDiscount = JSON.stringify({ startsAt: discount.startsAt, endsAt: discount.endsAt, items: discount.items, pricingMode: discount.pricingMode, amount: discount.amount, variantIds: discount.variantIds })
   const countdownData = JSON.stringify({ ...discount, selectedVariantId, variantPrices })
   document.body.innerHTML = `
     <product-variants></product-variants>
     <input name="quantity" value="1">
     <div id="sparkly-tier-pricing-b1" class="sparkly-tier-pricing" data-sparkly-tier-pricing
-      data-discount='{"tiers":[]}' data-time-discount='${timeDiscount}'
+      data-discount='{"tiers":[]}'
       data-product-id='"gid://shopify/Product/9"'
       data-selected-variant-id="${selectedVariantId}"
       data-base-price="${basePrice}" data-compare-at-price="0" data-money-format='"£{{amount}}"'>
       <div class="sparkly-tier-pricing__price-row">
-        <span class="sparkly-tier-pricing__price sparkly-tier-pricing__original-price" data-tier-pricing-price data-original-price="true">£${basePrice}</span>
-        <span class="sparkly-tier-pricing__price sparkly-tier-pricing__discounted-price" data-discounted-price hidden>£${basePrice}</span>
+        <span class="sparkly-tier-pricing__price" data-tier-pricing-price>£${basePrice}</span>
         <span class="sparkly-tier-pricing__each-label" data-tier-pricing-each-label>each</span>
       </div>
       <div class="sparkly-tier-pricing__card" data-tier-pricing-card hidden>
@@ -43,8 +41,12 @@ function mount(discount: Record<string, unknown>, opts: { selectedVariantId?: nu
         <div data-tier-pricing-tiers></div>
       </div>
     </div>
-    <div id="sparkly-time-discount-b1" class="sparkly-time-discount" data-sparkly-time-discount data-discount='${countdownData}' hidden>
+    <div id="sparkly-time-discount-b1" class="sparkly-time-discount" data-sparkly-time-discount data-discount='${countdownData}' data-money-format='"£{{amount}}"' hidden>
       <p class="sparkly-time-discount__label" data-time-discount-label></p>
+      <p class="sparkly-time-discount__price" data-time-discount-price hidden>
+        <span class="sparkly-time-discount__sr-only">Discounted price: </span><span data-time-discount-sale></span>
+        <s><span class="sparkly-time-discount__sr-only">Original price: </span><span data-time-discount-regular></span></s>
+      </p>
       <div class="sparkly-time-discount__boxes">
         <div class="sparkly-time-discount__box"><span class="sparkly-time-discount__value" data-time-discount-days>00</span><span class="sparkly-time-discount__unit">DAY</span></div>
         <div class="sparkly-time-discount__box"><span class="sparkly-time-discount__value" data-time-discount-hours>00</span><span class="sparkly-time-discount__unit">HRS</span></div>
@@ -59,12 +61,13 @@ function mount(discount: Record<string, unknown>, opts: { selectedVariantId?: nu
 
 function view() {
   const q = (selector: string) => document.querySelector(selector) as HTMLElement
-  const sale = q('[data-discounted-price]')
-  const regular = q('[data-original-price]')
+  const container = q('[data-sparkly-time-discount]')
+  const priceLine = q('[data-time-discount-price]')
+  const priceShown = !container.hidden && !priceLine.hidden
   return {
-    sale: sale.hidden ? null : sale.textContent!.trim(),
-    regularStruck: regular.getAttribute('data-strike') === 'true',
-    countdownVisible: !q('[data-sparkly-time-discount]').hidden,
+    sale: priceShown ? q('[data-time-discount-sale]').textContent!.trim() : null,
+    regularStruck: priceShown && q('[data-time-discount-regular]').textContent!.trim() !== '',
+    countdownVisible: !container.hidden,
     countdownLabel: q('[data-time-discount-label]').textContent,
   }
 }
@@ -139,6 +142,19 @@ describe('time-based discount storefront scripts', () => {
   it('shows the countdown alone when a metafield has no pricing data', () => {
     mount({ ...live })
     expect(view()).toMatchObject({ sale: null, regularStruck: false, countdownVisible: true })
+  })
+
+  it('shows the regular price and the sale price with their screen-reader labels', () => {
+    mount({ ...live, items: [fixed(22)] })
+    const priceLine = document.querySelector('[data-time-discount-price]') as HTMLElement
+    expect(priceLine.textContent!.replace(/\s+/g, ' ').trim()).toBe('Discounted price: £22.00 Original price: £49.99')
+  })
+
+  it('leaves the tier widget price row alone: the tier script no longer paints a time discount', () => {
+    mount({ ...live, items: [fixed(22)] })
+    const tierPrice = document.querySelector('[data-tier-pricing-price]') as HTMLElement
+    expect(tierPrice.textContent).toBe('£49.99')
+    expect(tierPrice.hasAttribute('data-strike')).toBe(false)
   })
 })
 

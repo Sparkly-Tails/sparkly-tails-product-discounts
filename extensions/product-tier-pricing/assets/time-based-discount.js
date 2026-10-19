@@ -1,34 +1,17 @@
 // extensions/product-tier-pricing/assets/time-based-discount.js
-// Independent widget, no imports from or edits to tier-pricing.js. Pure
-// math first, DOM last — mirrors that file's own structure without
-// sharing code with it.
-
-// Pure countdown math
-//
-// Theme-extension scripts share one global scope with tier-pricing.js, which
-// already declares top-level formatMoney()/extractNumericId() with different
-// semantics — every top-level name here must stay distinct from that file's.
+// Independent widget: no imports from or edits to tier-pricing.js. Pure math
+// first, DOM last. Both scripts share one global scope, so every top-level
+// name here must stay distinct from that file's (formatMoney, ...).
 
 /**
- * startsAt/endsAt arrive here as real UTC ISO instants (with the `Z`
- * suffix) — syncTimeDiscountMetafields converts them from the admin's
- * naive shop-local strings via zonedTimeToUtc before writing the product
- * metafield this widget reads. `new Date(...)` parses a `Z`-suffixed
- * string as the same absolute instant in every browser, regardless of the
- * customer's own timezone, which is what makes the countdown correct for
- * customers outside the shop's timezone. `now` is a real `new Date()` —
- * also an absolute instant, so the comparison is timezone-independent on
- * both sides. Do NOT reintroduce naive (no-offset) strings here — that was
- * a real, shipped bug (the countdown activated/deactivated at the wrong
- * real-world moment for any customer outside the shop's timezone) fixed
- * by converting at the metafield-sync boundary, not by anything in this
- * file. This is independent of checkout: the Function never evaluates a
- * time window itself (spec §5 — Shopify's native discount scheduling does,
- * server-side, using the UTC dates on the discount record), so this
- * client-side countdown and the actual activation moment can still drift
- * by ordinary network/clock-sync latency — the same class of imprecision
- * any client-side countdown has, not the timezone bug this comment warns
- * against reintroducing.
+ * startsAt/endsAt are real UTC ISO instants (with the `Z`): the metafield sync
+ * converts the admin's shop-local strings with zonedTimeToUtc before writing,
+ * so `new Date(...)` is the same absolute instant in every browser and the
+ * countdown is right for customers in any timezone. Do NOT reintroduce naive
+ * (no-offset) strings here; that was a shipped bug, fixed at the sync
+ * boundary. The Function never evaluates a time window (Shopify's native
+ * discount scheduling does), so this countdown can drift from the real
+ * activation by ordinary network/clock latency.
  */
 function computeCountdown(startsAt, endsAt, now) {
   const start = new Date(startsAt).getTime()
@@ -69,10 +52,8 @@ function computeDiscountedPriceCents(priceCents, pricingMode, amount) {
 }
 
 // Rows of a time-based discount for ONE product: [{ variantId: string|null,
-// pricingMode, amount }]. Current metafields carry `items`; metafields written
-// before per-row pricing carry one rule at the top level (pricingMode/amount)
-// plus `variantIds` (null/empty = every variant). Named with a countdown
-// prefix because this file shares one global scope with tier-pricing.js.
+// pricingMode, amount }]. Current metafields carry `items`; older ones carry
+// one rule at the top level plus `variantIds` (null/empty = every variant).
 function countdownDiscountItems(discount) {
   if (Array.isArray(discount.items)) return discount.items
   if (discount.pricingMode !== 'percent' && discount.pricingMode !== 'fixed') return []
@@ -88,15 +69,36 @@ function countdownDiscountItemFor(items, variantId) {
   return own || items.find((item) => item.variantId == null) || null
 }
 
-// Whether a sale actually applies to this variant: it must have a row AND the
-// discounted price must be genuinely lower — a fixed price at or above the
-// variant's price applies no discount at checkout (the Function clamps it), so
-// the widget must not advertise one. The sale price itself is shown by the
-// tier-pricing price block.
+// Whether a sale applies to this variant: it needs a row AND a genuinely lower
+// price (a fixed price at or above the variant's applies no discount at
+// checkout), so the widget must not advertise one.
 function discountReducesPrice({ priceCents, discount, variantId }) {
   const item = countdownDiscountItemFor(countdownDiscountItems(discount), variantId)
   if (!item) return false
   return computeDiscountedPriceCents(priceCents, item.pricingMode, item.amount) < priceCents
+}
+
+// The sale price in minor units, or null when it would not be lower than the
+// variant's price (a fixed price at or above it applies no discount).
+function computeSalePriceCents({ priceCents, pricingMode, amount, computeDiscountedCents }) {
+  const saleCents = computeDiscountedCents(priceCents, pricingMode, amount)
+  return saleCents < priceCents ? saleCents : null
+}
+
+// Puts an amount in minor units into the shop's money format ("£{{amount}}").
+function formatPriceCents({ cents, moneyFormat }) {
+  return moneyFormat.replace(/\{\{\s*amount\s*\}\}/, (cents / 100).toFixed(2))
+}
+
+// The sale price line: hidden without a sale price, otherwise the sale price
+// and the regular price as formatted text.
+function buildSalePriceState({ saleCents, priceCents, moneyFormat, formatCents }) {
+  if (saleCents == null) return { hidden: true, saleText: '', regularText: '' }
+  return {
+    hidden: false,
+    saleText: formatCents({ cents: saleCents, moneyFormat }),
+    regularText: formatCents({ cents: priceCents, moneyFormat }),
+  }
 }
 
 // `applies` is optional: null means "no pricing data" (older metafield) and
@@ -124,7 +126,10 @@ if (typeof module !== 'undefined' && module.exports) {
     countdownDiscountItems,
     countdownDiscountItemFor,
     discountReducesPrice,
-    timeDiscountNumericId
+    timeDiscountNumericId,
+    computeSalePriceCents,
+    formatPriceCents,
+    buildSalePriceState
   }
 }
 
@@ -142,9 +147,18 @@ if (typeof document !== 'undefined') {
     }
   }
 
+  function applySalePriceState({ element, saleElement, regularElement, state }) {
+    element.hidden = state.hidden
+    saleElement.textContent = state.saleText
+    regularElement.textContent = state.regularText
+  }
+
   function queryWidgetElements(container) {
     return {
       container,
+      price: container.querySelector('[data-time-discount-price]'),
+      sale: container.querySelector('[data-time-discount-sale]'),
+      regular: container.querySelector('[data-time-discount-regular]'),
       label: container.querySelector('[data-time-discount-label]'),
       days: container.querySelector('[data-time-discount-days]'),
       hours: container.querySelector('[data-time-discount-hours]'),
@@ -159,6 +173,7 @@ if (typeof document !== 'undefined') {
       if (!discount || !discount.startsAt || !discount.endsAt) return // no time discount or missing dates — leave hidden
 
       const elements = queryWidgetElements(container)
+      const moneyFormat = container.dataset.moneyFormat ? JSON.parse(container.dataset.moneyFormat) : '{{amount}}'
       let variantId = String(discount.selectedVariantId)
 
       // null = no pricing data (older metafield): countdown only.
@@ -166,6 +181,25 @@ if (typeof document !== 'undefined') {
         const priceCents = discount.variantPrices && discount.variantPrices[variantId]
         if (countdownDiscountItems(discount).length === 0 || typeof priceCents !== 'number') return null
         return discountReducesPrice({ priceCents, discount, variantId })
+      }
+
+      // The sale price of the selected variant, in minor units, or null.
+      function findSaleCents() {
+        const priceCents = discount.variantPrices && discount.variantPrices[variantId]
+        const item = countdownDiscountItemFor(countdownDiscountItems(discount), variantId)
+        if (!item || typeof priceCents !== 'number') return null
+        return computeSalePriceCents({ priceCents, pricingMode: item.pricingMode, amount: item.amount, computeDiscountedCents: computeDiscountedPriceCents })
+      }
+
+      function paintSalePrice() {
+        if (!elements.price) return
+        const state = buildSalePriceState({
+          saleCents: findSaleCents(),
+          priceCents: discount.variantPrices && discount.variantPrices[variantId],
+          moneyFormat,
+          formatCents: formatPriceCents,
+        })
+        applySalePriceState({ element: elements.price, saleElement: elements.sale, regularElement: elements.regular, state })
       }
 
       function tick() {
@@ -180,6 +214,7 @@ if (typeof document !== 'undefined') {
           applies: discountApplies()
         })
         applyCountdownState(elements, state)
+        paintSalePrice()
       }
 
       const productVariantsEl = document.querySelector('product-variants')
