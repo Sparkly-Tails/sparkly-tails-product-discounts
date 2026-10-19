@@ -164,9 +164,11 @@ describe('storefront scripts share one global scope', () => {
  * cart comes from a stubbed /cart.js.
  */
 describe('tier widget painting (redesign)', () => {
+  let cartItems: Array<{ product_id: number; variant_id: number; quantity: number }> = []
   beforeEach(() => {
+    cartItems = []
     vi.useFakeTimers({ now: NOW })
-    vi.stubGlobal('fetch', vi.fn(async () => ({ json: async () => ({ items: [] }) })))
+    vi.stubGlobal('fetch', vi.fn(async () => ({ json: async () => ({ items: cartItems }) })))
   })
   afterEach(() => { vi.clearAllTimers(); vi.useRealTimers(); vi.unstubAllGlobals(); document.body.innerHTML = '' })
 
@@ -179,11 +181,11 @@ describe('tier widget painting (redesign)', () => {
     selfVariantId: V10,
   }
 
-  async function mountTiers(quantity: number) {
+  async function mountTiers(quantity: number, extra: Record<string, unknown> = {}) {
     document.body.innerHTML = `
       <input name="quantity" value="${quantity}">
       <div id="sparkly-tier-pricing-t1" class="sparkly-tier-pricing sparkly-tier-pricing--card" data-sparkly-tier-pricing
-        data-discount='${JSON.stringify(discount)}' data-time-discount="{}"
+        data-discount='${JSON.stringify({ ...discount, ...extra })}' data-time-discount="{}"
         data-product-id='"gid://shopify/Product/9"' data-selected-variant-id="10"
         data-base-price="1.69" data-compare-at-price="0" data-money-format='"£{{amount}}"'>
         <div class="sparkly-tier-pricing__price-row">
@@ -196,6 +198,8 @@ describe('tier widget painting (redesign)', () => {
           <div><span data-tier-pricing-status></span><span data-tier-pricing-aside></span></div>
           <div><div><div data-tier-pricing-fill></div></div><div data-tier-pricing-markers></div><span data-tier-pricing-dot></span></div>
           <div data-tier-pricing-tiers></div>
+          <div><button data-tier-pricing-toggle>mix &amp; match products ▼</button><span data-tier-pricing-chosen hidden></span></div>
+          <div data-tier-pricing-list hidden></div>
         </div>
       </div>`
     ;(0, eval)(tierScript)
@@ -304,5 +308,29 @@ describe('tier widget painting (redesign)', () => {
       dotLeft: '100%',
     })
     expect(painted().markers.map((m) => [m.reached, m.covered])).toEqual([[true, false], [true, false], [true, true]])
+  })
+
+  it('opens the mix & match list: a row per member with thumbnail slot, name, price at the applied tier and its cart quantity', async () => {
+    cartItems = [{ product_id: 9, variant_id: 10, quantity: 6 }, { product_id: 20, variant_id: 200, quantity: 4 }]
+    await mountTiers(1, {
+      ownVariantOptions: [{ variantId: V10, title: 'Chicken & Salmon 85g', url: '/products/salmon', imageUrl: 'https://example.com/s.png', price: 169, available: true, cartVariantId: 10 }],
+      siblings: [{ productId: 'gid://shopify/Product/20', variantId: null, title: 'Chicken & Herring 85g', url: '/products/herring', imageUrl: null, price: 169, available: false, cartVariantId: 200, listed: true }],
+    })
+    ;(document.querySelector('[data-tier-pricing-toggle]') as HTMLElement).click()
+    await vi.advanceTimersByTimeAsync(0)
+    const rows = [...document.querySelectorAll('.sparkly-tier-pricing__list-item')].map((row) => ({
+      name: row.querySelector('.sparkly-tier-pricing__list-name')!.textContent,
+      price: row.querySelector('.sparkly-tier-pricing__list-price')!.textContent,
+      qty: row.querySelector('.sparkly-tier-pricing__list-qty')!.textContent,
+      href: row.querySelector('a')!.getAttribute('href'),
+      hasImage: !!row.querySelector('img'),
+    }))
+    expect(rows).toEqual([
+      { name: 'Chicken & Salmon 85g', price: '£1.63', qty: '6', href: '/products/salmon', hasImage: true },
+      { name: 'Chicken & Herring 85g', price: 'Sold out', qty: '4', href: '/products/herring', hasImage: false },
+    ])
+    const chosen = document.querySelector('[data-tier-pricing-chosen]') as HTMLElement
+    expect(chosen.hidden).toBe(false)
+    expect(chosen.textContent).toBe('10 items chosen')
   })
 })

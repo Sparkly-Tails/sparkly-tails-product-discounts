@@ -369,18 +369,31 @@ function computeWidgetViewModel({ tiers, basePrice, compareAtPrice, otherQty, ad
 
 // Mix & match product list — pure row-building, then a thin DOM paint.
 
-function buildMixMatchRows(products, cartItems) {
+// `pricing` ({ combinedQty, tierState, formatMoney }) prices each row at the
+// per-unit price the applied tier gives it; null leaves the price label empty.
+// Prices in `products` are Shopify's integer minor units (cents).
+function buildMixMatchRows(products, cartItems, pricing) {
   return products.map((product) => {
     const member = { productId: extractNumericId(product.productId), variantId: product.variantId ? extractNumericId(product.variantId) : undefined }
     const qty = sumMemberQuantityInCart(cartItems || [], [member])
+    const priceLabel = product.price != null && pricing
+      ? pricing.formatMoney(perUnitPrice(product.price / 100, pricing.combinedQty, pricing.tierState))
+      : ''
     return {
       // The theme (Liquid) builds the link from the live product, including any ?variant= query.
       href: product.url,
       title: product.title,
       imageUrl: product.imageUrl || null,
-      qtyLabel: qty === 1 ? '1 in cart' : qty + ' in cart',
+      qty,
+      priceLabel,
+      available: product.available !== false,
+      cartVariantId: product.cartVariantId != null ? String(product.cartVariantId) : null,
     }
   })
+}
+
+function formatItemsChosen(qty) {
+  return qty + (qty === 1 ? ' item chosen' : ' items chosen')
 }
 
 // Cross-product siblings plus every one of this product's own other
@@ -401,7 +414,10 @@ function buildDisplayMixMatchItems(config) {
     variantId: opt.variantId,
     title: opt.title,
     url: opt.url,
-    imageUrl: null,
+    imageUrl: opt.imageUrl || null,
+    price: opt.price,
+    available: opt.available,
+    cartVariantId: opt.cartVariantId,
   }))
   return ownRows.concat(config.mixMatchListItems)
 }
@@ -489,6 +505,7 @@ if (typeof module !== 'undefined' && module.exports) {
     buildStatusCopy,
     computeWidgetViewModel,
     buildMixMatchRows,
+    formatItemsChosen,
     buildDisplayMixMatchItems,
     listedMixMatchItems,
   }
@@ -608,17 +625,22 @@ if (typeof document !== 'undefined') {
     paintStatus(elements, viewModel)
   }
 
+  // One row per member: thumbnail, name and price (a link to the product), and
+  // the quantity already in the cart. Rows are read-only here.
   function paintMixMatchList(listEl, rows) {
     listEl.innerHTML = ''
     rows.forEach((row) => {
+      const item = document.createElement('div')
+      item.className = 'sparkly-tier-pricing__list-item'
+
       const link = document.createElement('a')
       link.href = row.href
-      link.className = 'sparkly-tier-pricing__list-item'
+      link.className = 'sparkly-tier-pricing__list-link'
 
       if (row.imageUrl) {
         const img = document.createElement('img')
         img.src = row.imageUrl
-        img.alt = row.title
+        img.alt = ''
         img.className = 'sparkly-tier-pricing__list-thumb'
         link.appendChild(img)
       } else {
@@ -627,22 +649,31 @@ if (typeof document !== 'undefined') {
         link.appendChild(placeholder)
       }
 
+      const text = document.createElement('span')
+      text.className = 'sparkly-tier-pricing__list-text'
       const name = document.createElement('span')
       name.className = 'sparkly-tier-pricing__list-name'
       name.textContent = row.title
-      link.appendChild(name)
+      text.appendChild(name)
+      const price = document.createElement('span')
+      price.className = 'sparkly-tier-pricing__list-price'
+      price.textContent = row.available ? row.priceLabel : 'Sold out'
+      text.appendChild(price)
+      link.appendChild(text)
+      item.appendChild(link)
 
-      const qtyLabel = document.createElement('span')
-      qtyLabel.className = 'sparkly-tier-pricing__list-qty'
-      qtyLabel.textContent = row.qtyLabel
-      link.appendChild(qtyLabel)
+      const qty = document.createElement('span')
+      qty.className = 'sparkly-tier-pricing__list-qty'
+      qty.textContent = String(row.qty)
+      qty.setAttribute('aria-label', row.qty + ' in cart')
+      item.appendChild(qty)
 
-      listEl.appendChild(link)
+      listEl.appendChild(item)
     })
   }
 
-  function renderMixMatchList(listEl, products, cartItems) {
-    paintMixMatchList(listEl, buildMixMatchRows(products, cartItems))
+  function renderMixMatchList(listEl, products, cartItems, pricing) {
+    paintMixMatchList(listEl, buildMixMatchRows(products, cartItems, pricing))
   }
 
   function setQuantityInput(value) {
@@ -698,6 +729,10 @@ if (typeof document !== 'undefined') {
       variantId: extractNumericId(o.variantId),
       title: o.title,
       url: o.url,
+      imageUrl: o.imageUrl || null,
+      price: o.price,
+      available: o.available,
+      cartVariantId: o.cartVariantId != null ? String(o.cartVariantId) : null,
     }))
     const siblingMembers = (discount.siblings || []).map((s) => ({
       productId: extractNumericId(s.productId),
@@ -739,6 +774,7 @@ if (typeof document !== 'undefined') {
       tiersEl: container.querySelector('[data-tier-pricing-tiers]'),
       toggleEl: container.querySelector('[data-tier-pricing-toggle]'),
       listEl: container.querySelector('[data-tier-pricing-list]'),
+      chosenEl: container.querySelector('[data-tier-pricing-chosen]'),
     }
   }
 
@@ -751,6 +787,7 @@ if (typeof document !== 'undefined') {
     const variantStateRef = { value: config.initialVariantId }
     const formatMoneyFn = createMoneyFormatter(config.moneyFormat)
     let lastCartItems = []
+    let lastPricing = null
 
     async function render() {
       const basePrice = Number(container.dataset.basePrice)
@@ -786,6 +823,9 @@ if (typeof document !== 'undefined') {
         formatMoney: formatMoneyFn,
       })
       paintWidget(elements, viewModel, basePrice, addingQty, tierButtonsSignatureRef)
+      lastPricing = viewModel.progressState
+        ? { combinedQty: viewModel.progressState.combinedQty, tierState: viewModel.progressState.tierState, formatMoney: formatMoneyFn }
+        : null
 
       const timeDiscountJson = container.dataset.timeDiscount
       if (timeDiscountJson) {
@@ -793,7 +833,8 @@ if (typeof document !== 'undefined') {
       }
 
       if (config.isGroup && elements.listEl && !elements.listEl.hidden) {
-        renderMixMatchList(elements.listEl, buildDisplayMixMatchItems(config), lastCartItems)
+        renderMixMatchList(elements.listEl, buildDisplayMixMatchItems(config), lastCartItems, lastPricing)
+        if (elements.chosenEl && lastPricing) elements.chosenEl.textContent = formatItemsChosen(lastPricing.combinedQty)
       }
     }
 
@@ -809,8 +850,12 @@ if (typeof document !== 'undefined') {
       elements.toggleEl.addEventListener('click', () => {
         open = !open
         elements.listEl.hidden = !open
+        if (elements.chosenEl) elements.chosenEl.hidden = !open
         elements.toggleEl.textContent = 'mix & match products ' + (open ? '▲' : '▼')
-        if (open) renderMixMatchList(elements.listEl, buildDisplayMixMatchItems(config), lastCartItems)
+        if (open) {
+          renderMixMatchList(elements.listEl, buildDisplayMixMatchItems(config), lastCartItems, lastPricing)
+          if (elements.chosenEl && lastPricing) elements.chosenEl.textContent = formatItemsChosen(lastPricing.combinedQty)
+        }
       })
     }
 

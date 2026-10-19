@@ -269,36 +269,85 @@
   display: none;
 }
 
+.sparkly-tier-pricing__list-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.sparkly-tier-pricing__chosen {
+  padding-top: 10px;
+  font-family: var(--font-stack-body);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--sparkly-tier-text-secondary);
+}
+
 .sparkly-tier-pricing__list-item {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 12px;
+}
+
+.sparkly-tier-pricing__list-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
   text-decoration: none;
   color: inherit;
 }
 
 .sparkly-tier-pricing__list-thumb {
-  width: 44px;
-  height: 44px;
+  width: 36px;
+  height: 36px;
   flex: none;
   border-radius: 8px;
+  border: 1px solid var(--sparkly-tier-border);
   object-fit: cover;
   background: var(--sparkly-tier-cream, #f3ecd9);
 }
 
+.sparkly-tier-pricing__list-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
 .sparkly-tier-pricing__list-name {
-  flex: 1;
   font-family: var(--font-stack-body);
-  font-size: 13px;
+  font-size: 12px;
+  font-weight: 600;
   color: var(--sparkly-tier-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sparkly-tier-pricing__list-price {
+  font-family: var(--font-stack-body);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--sparkly-tier-accent);
 }
 
 .sparkly-tier-pricing__list-qty {
   flex: none;
+  min-width: 28px;
+  padding: 3px 8px;
+  border: 1px solid var(--sparkly-tier-border);
+  border-radius: 999px;
+  background: var(--sparkly-tier-track);
   font-family: var(--font-stack-body);
   font-size: 12px;
-  color: var(--sparkly-tier-text-secondary);
-  white-space: nowrap;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  color: var(--sparkly-tier-accent);
 }
 
 @keyframes sparklyTierFadeIn {

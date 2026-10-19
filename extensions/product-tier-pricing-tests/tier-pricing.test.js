@@ -1,6 +1,6 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
-const { isTimeDiscountWindowActive, tierTimeDiscountItems, tierTimeDiscountItemFor, timeDiscountSalePrice, computeTierState, perUnitPrice, extractNumericId, sumMemberQuantityInCart, resolveEligibility, unitPriceAtTier, computeProgressState, formatTempBoxLabel, joinNaturally, computeOrderSummary, computeTierButtonsSignature, withUnitAnchor, cartBaselineOtherQty, clamp, sortTiersByMinQty, normalizeTierPricing, formatMoney, computeWidgetViewModel, buildMixMatchRows, buildDisplayMixMatchItems, listedMixMatchItems, computeProgressDot, classifyOfferState, buildPromoLine, buildStatusCopy } = require('../product-tier-pricing/assets/tier-pricing.js')
+const { isTimeDiscountWindowActive, tierTimeDiscountItems, tierTimeDiscountItemFor, timeDiscountSalePrice, computeTierState, perUnitPrice, extractNumericId, sumMemberQuantityInCart, resolveEligibility, unitPriceAtTier, computeProgressState, formatTempBoxLabel, joinNaturally, computeOrderSummary, computeTierButtonsSignature, withUnitAnchor, cartBaselineOtherQty, clamp, sortTiersByMinQty, normalizeTierPricing, formatMoney, computeWidgetViewModel, buildMixMatchRows, formatItemsChosen, buildDisplayMixMatchItems, listedMixMatchItems, computeProgressDot, classifyOfferState, buildPromoLine, buildStatusCopy } = require('../product-tier-pricing/assets/tier-pricing.js')
 
 test('below every tier: no discount, lists every tier as a delta from current quantity', () => {
   const tiers = [{ minQty: 7, percentOff: 5 }, { minQty: 14, percentOff: 10 }]
@@ -515,75 +515,33 @@ test('formatMoney: fills the {{amount}} placeholder with 2 decimal places', () =
   assert.equal(formatMoney(9.999, '£{{ amount }}'), '£10.00')
 })
 
-test('buildMixMatchRows: builds one row per product with its live cart quantity and the link Liquid provided', () => {
-  const products = [
-    { title: 'Canagan Tuna Soup for Cats', url: '/products/canagan-tuna-soup-for-cats', productId: 'gid://shopify/Product/1', imageUrl: 'https://example.com/tuna.png' },
-    { title: 'Canagan Chicken Soup for Cats', url: '/products/canagan-chicken-soup-for-cats', productId: 'gid://shopify/Product/2', imageUrl: null },
-  ]
-  const cartItems = [
-    { product_id: 1, variant_id: 10, quantity: 5 },
-    { product_id: 3, variant_id: 30, quantity: 2 },
-  ]
-  assert.deepEqual(buildMixMatchRows(products, cartItems), [
-    { href: '/products/canagan-tuna-soup-for-cats', title: 'Canagan Tuna Soup for Cats', imageUrl: 'https://example.com/tuna.png', qtyLabel: '5 in cart' },
-    { href: '/products/canagan-chicken-soup-for-cats', title: 'Canagan Chicken Soup for Cats', imageUrl: null, qtyLabel: '0 in cart' },
-  ])
-})
-
-test('buildMixMatchRows: singular "1 in cart" label', () => {
-  const rows = buildMixMatchRows(
-    [{ title: 'X', url: '/products/x', productId: 'gid://shopify/Product/9', imageUrl: null }],
-    [{ product_id: 9, variant_id: 90, quantity: 1 }],
-  )
-  assert.equal(rows[0].qtyLabel, '1 in cart')
-})
-
-test('buildMixMatchRows: a variant-scoped member matches only that exact variant\'s cart quantity', () => {
-  const rows = buildMixMatchRows(
-    [{ title: 'X', url: '/products/x?variant=90', productId: 'gid://shopify/Product/9', variantId: 'gid://shopify/ProductVariant/90', imageUrl: null }],
-    [
-      { product_id: 9, variant_id: 90, quantity: 3 },
-      { product_id: 9, variant_id: 91, quantity: 4 },
-    ],
-  )
-  assert.equal(rows[0].qtyLabel, '3 in cart')
-})
-
-test('buildMixMatchRows: the link is exactly the url Liquid provided, including a ?variant= query', () => {
-  const rows = buildMixMatchRows(
-    [{ title: 'Salmon', url: '/products/wet-cat-food?variant=90', productId: 'gid://shopify/Product/9', variantId: 'gid://shopify/ProductVariant/90', imageUrl: null }],
-    [],
-  )
-  assert.equal(rows[0].href, '/products/wet-cat-food?variant=90')
-})
-
 test('buildDisplayMixMatchItems: includes every one of this product\'s own other member-variants, INCLUDING the currently-displayed one', () => {
   const config = {
     productId: '2',
     ownVariantOptions: [
-      { variantId: '20', title: 'Chicken', url: '/products/wet-cat-food?variant=20' },
-      { variantId: '21', title: 'Salmon', url: '/products/wet-cat-food?variant=21' },
-      { variantId: '22', title: 'Duck', url: '/products/wet-cat-food?variant=22' },
+      { variantId: '20', title: 'Chicken', url: '/products/wet-cat-food?variant=20', imageUrl: null, price: 169, available: true, cartVariantId: '20' },
+      { variantId: '21', title: 'Salmon', url: '/products/wet-cat-food?variant=21', imageUrl: null, price: 169, available: true, cartVariantId: '21' },
+      { variantId: '22', title: 'Duck', url: '/products/wet-cat-food?variant=22', imageUrl: null, price: 169, available: true, cartVariantId: '22' },
     ],
     mixMatchListItems: [],
   }
   const items = buildDisplayMixMatchItems(config) // viewing Salmon, but it still gets a row — a customer's own already-in-cart quantity for the variant they're on must stay visible
   assert.deepEqual(items, [
-    { productId: '2', variantId: '20', title: 'Chicken', url: '/products/wet-cat-food?variant=20', imageUrl: null },
-    { productId: '2', variantId: '21', title: 'Salmon', url: '/products/wet-cat-food?variant=21', imageUrl: null },
-    { productId: '2', variantId: '22', title: 'Duck', url: '/products/wet-cat-food?variant=22', imageUrl: null },
+    { productId: '2', variantId: '20', title: 'Chicken', url: '/products/wet-cat-food?variant=20', imageUrl: null, price: 169, available: true, cartVariantId: '20' },
+    { productId: '2', variantId: '21', title: 'Salmon', url: '/products/wet-cat-food?variant=21', imageUrl: null, price: 169, available: true, cartVariantId: '21' },
+    { productId: '2', variantId: '22', title: 'Duck', url: '/products/wet-cat-food?variant=22', imageUrl: null, price: 169, available: true, cartVariantId: '22' },
   ])
 })
 
 test('buildDisplayMixMatchItems: cross-product siblings are appended after this product\'s own-variant rows', () => {
   const config = {
     productId: '2',
-    ownVariantOptions: [{ variantId: '20', title: 'Chicken', url: '/products/wet-cat-food?variant=20' }],
+    ownVariantOptions: [{ variantId: '20', title: 'Chicken', url: '/products/wet-cat-food?variant=20', imageUrl: null, price: 169, available: true, cartVariantId: '20' }],
     mixMatchListItems: [{ productId: 'gid://shopify/Product/1', title: 'Tuna Soup', url: '/products/tuna-soup', imageUrl: null }],
   }
   const items = buildDisplayMixMatchItems(config)
   assert.deepEqual(items, [
-    { productId: '2', variantId: '20', title: 'Chicken', url: '/products/wet-cat-food?variant=20', imageUrl: null },
+    { productId: '2', variantId: '20', title: 'Chicken', url: '/products/wet-cat-food?variant=20', imageUrl: null, price: 169, available: true, cartVariantId: '20' },
     { productId: 'gid://shopify/Product/1', title: 'Tuna Soup', url: '/products/tuna-soup', imageUrl: null },
   ])
 })
@@ -958,4 +916,54 @@ test('computeTierButtonsSignature: differs when only the cart quantity changed (
   const a = computeProgressState(REDESIGN_TIERS_FIXED, 2, 1)
   const b = computeProgressState(REDESIGN_TIERS_FIXED, 3, 1)
   assert.notEqual(computeTierButtonsSignature(a, 1.69, 1), computeTierButtonsSignature(b, 1.69, 1))
+})
+
+// Mix & match rows (redesign): thumbnail, name, price at the applied tier, quantity.
+
+const ROW_PRODUCTS = [
+  { title: 'Chicken & Salmon 85g', url: '/products/chicken-salmon', productId: 'gid://shopify/Product/1', imageUrl: 'https://example.com/s.png', price: 169, available: true, cartVariantId: '10' },
+  { title: 'Chicken & Herring 85g', url: '/products/chicken-herring', productId: 'gid://shopify/Product/2', imageUrl: null, price: 169, available: false, cartVariantId: '20' },
+]
+
+test('buildMixMatchRows: one row per item with its live cart quantity, the link Liquid built, and its price at the applied tier', () => {
+  const state = computeProgressState(REDESIGN_TIERS_FIXED, 0, 10)
+  const rows = buildMixMatchRows(ROW_PRODUCTS, [{ product_id: 1, variant_id: 10, quantity: 6 }, { product_id: 3, variant_id: 30, quantity: 2 }], { combinedQty: state.combinedQty, tierState: state.tierState, formatMoney: fmt })
+  assert.deepEqual(rows, [
+    { href: '/products/chicken-salmon', title: 'Chicken & Salmon 85g', imageUrl: 'https://example.com/s.png', qty: 6, priceLabel: '£1.63', available: true, cartVariantId: '10' },
+    { href: '/products/chicken-herring', title: 'Chicken & Herring 85g', imageUrl: null, qty: 0, priceLabel: '£1.63', available: false, cartVariantId: '20' },
+  ])
+})
+
+test('buildMixMatchRows: before any offer applies a row shows its own full price; without pricing context too', () => {
+  const state = computeProgressState(REDESIGN_TIERS_FIXED, 0, 5)
+  const before = buildMixMatchRows(ROW_PRODUCTS, [], { combinedQty: 5, tierState: state.tierState, formatMoney: fmt })
+  assert.equal(before[0].priceLabel, '£1.69')
+  const noContext = buildMixMatchRows(ROW_PRODUCTS, [], null)
+  assert.equal(noContext[0].priceLabel, '')
+})
+
+test('buildMixMatchRows: a row with no price gets an empty label; availability defaults to available', () => {
+  const rows = buildMixMatchRows([{ title: 'X', url: '/products/x', productId: 'gid://shopify/Product/9', imageUrl: null }], [], { combinedQty: 1, tierState: computeProgressState(REDESIGN_TIERS_FIXED, 0, 1).tierState, formatMoney: fmt })
+  assert.equal(rows[0].priceLabel, '')
+  assert.equal(rows[0].available, true)
+  assert.equal(rows[0].cartVariantId, null)
+})
+
+test('buildMixMatchRows: a variant-scoped member matches only that exact variant\'s cart quantity', () => {
+  const rows = buildMixMatchRows(
+    [{ title: 'X', url: '/products/x?variant=90', productId: 'gid://shopify/Product/9', variantId: 'gid://shopify/ProductVariant/90', imageUrl: null }],
+    [{ product_id: 9, variant_id: 90, quantity: 3 }, { product_id: 9, variant_id: 91, quantity: 4 }],
+    null,
+  )
+  assert.equal(rows[0].qty, 3)
+})
+
+test('buildMixMatchRows: the link is exactly the url Liquid provided, including a ?variant= query', () => {
+  const rows = buildMixMatchRows([{ title: 'Salmon', url: '/products/wet-cat-food?variant=90', productId: 'gid://shopify/Product/9', variantId: 'gid://shopify/ProductVariant/90', imageUrl: null }], [], null)
+  assert.equal(rows[0].href, '/products/wet-cat-food?variant=90')
+})
+
+test('formatItemsChosen: singular and plural', () => {
+  assert.equal(formatItemsChosen(1), '1 item chosen')
+  assert.equal(formatItemsChosen(16), '16 items chosen')
 })
