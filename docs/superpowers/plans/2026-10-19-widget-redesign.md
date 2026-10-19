@@ -42,3 +42,30 @@ Local testing for PRs 2–6 follows the skill `building-multistore-shopify-apps`
 - Whether development theme 189405102334 still exists, and what tier/sibling data the demo product holds.
 - How the live theme's cart drawer reacts to cart changes made by the widget (needed for PR 5).
 - The project's two "Accessibility audit" screens have not been read; they are read before PR 6 and treated as requirements.
+
+## Build results (2026-10-19)
+
+All six milestones were built test-first and checked in a live preview (`shopify theme dev` + `shopify app dev` on demo-nlmhyat3, live Dawn-family theme, at 1280px and 375px). The PRs are stacked: each targets the previous one's branch; merge in order and GitHub retargets the next (retarget by hand if the branch is kept).
+
+| PR | Branch | Version |
+|---|---|---|
+| #71 plan (this file) | `docs/widget-redesign-plan` -> milestone | none |
+| #72 view-model and copy | `feat/widget-view-model` -> milestone | 0.23.28 |
+| #73 layout | `feat/widget-layout` -> #72 | 0.23.29 |
+| #74 tier pills + dashed box | `feat/widget-tier-pills` -> #73 | 0.23.30 |
+| #75 mix & match rows | `feat/widget-mix-match-rows` -> #74 | 0.23.31 |
+| #76 cart changes from the list | `feat/widget-mix-match-cart` -> #75 | 0.23.32 |
+| #77 accessibility | `feat/widget-hardening` -> #76 | 0.23.33 |
+
+End state: extension tests 147, `npx vitest run` 761, `tsc` clean, `theme check` = the two known offenses (JS size, orphaned snippet).
+
+Decisions made while building (owner can change any):
+- Tier pills show the **unit price** ("8 × £1.63") as in the design, instead of the old total.
+- The discount title no longer appears in the copy (the design has none).
+- Adding this product's own unit from the list resets the page quantity stepper to 1, like Add to cart.
+- Rows whose product has several variants get a "Choose options" link, not a stepper (seen live on "The Complete Snowboard").
+- The theme's header cart count is refreshed and the theme's `cart-update` event is published only in Dawn-family themes (checked on the live theme only).
+
+Not verified: a real screen reader; Horizon-family themes; a time discount together with tiers; variant switching on a multi-variant product; a real stock-limit error; contrast ratios (derived from the audit's targets, not measured).
+
+Test data note: the app has no publication scope, so products it creates are not visible on the storefront (404). The preview used the tiers and siblings of `the-videographer-snowboard`, changed temporarily and restored afterwards (checked equal to the backup). `shopify app dev clean` was run and the released version is active again.
