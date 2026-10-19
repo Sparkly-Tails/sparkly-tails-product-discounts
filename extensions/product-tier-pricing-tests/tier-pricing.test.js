@@ -1,6 +1,6 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
-const { isTimeDiscountWindowActive, tierTimeDiscountItems, tierTimeDiscountItemFor, timeDiscountSalePrice, computeTierState, perUnitPrice, extractNumericId, sumMemberQuantityInCart, resolveEligibility, unitPriceAtTier, computeProgressState, formatTempBoxLabel, joinNaturally, computeOrderSummary, computeTierButtonsSignature, withUnitAnchor, cartBaselineOtherQty, clamp, sortTiersByMinQty, normalizeTierPricing, formatMoney, computeWidgetViewModel, buildMixMatchRows, formatItemsChosen, buildDisplayMixMatchItems, listedMixMatchItems, computeProgressDot, classifyOfferState, buildPromoLine, buildStatusCopy } = require('../product-tier-pricing/assets/tier-pricing.js')
+const { isTimeDiscountWindowActive, tierTimeDiscountItems, tierTimeDiscountItemFor, timeDiscountSalePrice, computeTierState, perUnitPrice, extractNumericId, sumMemberQuantityInCart, resolveEligibility, unitPriceAtTier, computeProgressState, formatTempBoxLabel, joinNaturally, computeOrderSummary, computeTierButtonsSignature, withUnitAnchor, cartBaselineOtherQty, clamp, sortTiersByMinQty, normalizeTierPricing, formatMoney, computeWidgetViewModel, buildMixMatchRows, buildCartChange, cartErrorMessage, formatItemsChosen, buildDisplayMixMatchItems, listedMixMatchItems, computeProgressDot, classifyOfferState, buildPromoLine, buildStatusCopy } = require('../product-tier-pricing/assets/tier-pricing.js')
 
 test('below every tier: no discount, lists every tier as a delta from current quantity', () => {
   const tiers = [{ minQty: 7, percentOff: 5 }, { minQty: 14, percentOff: 10 }]
@@ -929,8 +929,8 @@ test('buildMixMatchRows: one row per item with its live cart quantity, the link 
   const state = computeProgressState(REDESIGN_TIERS_FIXED, 0, 10)
   const rows = buildMixMatchRows(ROW_PRODUCTS, [{ product_id: 1, variant_id: 10, quantity: 6 }, { product_id: 3, variant_id: 30, quantity: 2 }], { combinedQty: state.combinedQty, tierState: state.tierState, formatMoney: fmt })
   assert.deepEqual(rows, [
-    { href: '/products/chicken-salmon', title: 'Chicken & Salmon 85g', imageUrl: 'https://example.com/s.png', qty: 6, priceLabel: '£1.63', available: true, cartVariantId: '10' },
-    { href: '/products/chicken-herring', title: 'Chicken & Herring 85g', imageUrl: null, qty: 0, priceLabel: '£1.63', available: false, cartVariantId: '20' },
+    { href: '/products/chicken-salmon', title: 'Chicken & Salmon 85g', imageUrl: 'https://example.com/s.png', qty: 6, priceLabel: '£1.63', available: true, cartVariantId: '10', canAdd: true, canRemove: true, needsOptions: false },
+    { href: '/products/chicken-herring', title: 'Chicken & Herring 85g', imageUrl: null, qty: 0, priceLabel: '£1.63', available: false, cartVariantId: '20', canAdd: false, canRemove: false, needsOptions: false },
   ])
 })
 
@@ -947,6 +947,7 @@ test('buildMixMatchRows: a row with no price gets an empty label; availability d
   assert.equal(rows[0].priceLabel, '')
   assert.equal(rows[0].available, true)
   assert.equal(rows[0].cartVariantId, null)
+  assert.deepEqual([rows[0].canAdd, rows[0].canRemove, rows[0].needsOptions], [false, false, true]) // no single variant to add: link to the product instead
 })
 
 test('buildMixMatchRows: a variant-scoped member matches only that exact variant\'s cart quantity', () => {
@@ -966,4 +967,43 @@ test('buildMixMatchRows: the link is exactly the url Liquid provided, including 
 test('formatItemsChosen: singular and plural', () => {
   assert.equal(formatItemsChosen(1), '1 item chosen')
   assert.equal(formatItemsChosen(16), '16 items chosen')
+})
+
+// Cart changes from the list.
+
+const CART_LINES = [
+  { key: 'k10:abc', variant_id: 10, product_id: 1, quantity: 6 },
+  { key: 'k99:abc', variant_id: 99, product_id: 3, quantity: 2 },
+]
+
+test('buildCartChange: "+" adds one unit of the row\'s variant through /cart/add.js', () => {
+  const row = buildMixMatchRows([ROW_PRODUCTS[0]], CART_LINES, null)[0]
+  assert.deepEqual(buildCartChange(row, CART_LINES, 1), { url: '/cart/add.js', body: { items: [{ id: 10, quantity: 1 }] } })
+})
+
+test('buildCartChange: "−" lowers the matching cart line by one through /cart/change.js, by line key', () => {
+  const row = buildMixMatchRows([ROW_PRODUCTS[0]], CART_LINES, null)[0]
+  assert.deepEqual(buildCartChange(row, CART_LINES, -1), { url: '/cart/change.js', body: { id: 'k10:abc', quantity: 5 } })
+})
+
+test('buildCartChange: nothing to do when the row cannot add, has nothing to remove, or has no single variant', () => {
+  const [salmon, herring] = buildMixMatchRows(ROW_PRODUCTS, CART_LINES, null)
+  assert.equal(buildCartChange(herring, CART_LINES, 1), null) // sold out
+  assert.equal(buildCartChange(herring, CART_LINES, -1), null) // none in the cart
+  const noVariant = buildMixMatchRows([{ title: 'X', url: '/x', productId: 'gid://shopify/Product/9', imageUrl: null }], [], null)[0]
+  assert.equal(buildCartChange(noVariant, [], 1), null)
+  assert.notEqual(buildCartChange(salmon, CART_LINES, 1), null)
+})
+
+test('buildCartChange: with the same variant on several cart lines, the first line that still has units is lowered', () => {
+  const lines = [{ key: 'a', variant_id: 10, product_id: 1, quantity: 0 }, { key: 'b', variant_id: 10, product_id: 1, quantity: 2 }]
+  const row = buildMixMatchRows([ROW_PRODUCTS[0]], lines, null)[0]
+  assert.deepEqual(buildCartChange(row, lines, -1), { url: '/cart/change.js', body: { id: 'b', quantity: 1 } })
+})
+
+test('cartErrorMessage: uses Shopify\'s own description, then its message, then a plain fallback', () => {
+  assert.equal(cartErrorMessage({ description: 'You can only add 3 of this item to your cart.', message: 'Cannot add' }), 'You can only add 3 of this item to your cart.')
+  assert.equal(cartErrorMessage({ message: 'Cannot find variant' }), 'Cannot find variant')
+  assert.equal(cartErrorMessage({}), 'Could not update the cart. Please try again.')
+  assert.equal(cartErrorMessage(null), 'Could not update the cart. Please try again.')
 })
