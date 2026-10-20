@@ -211,7 +211,9 @@ describe('tier widget painting (redesign)', () => {
 
   async function mountTiers(quantity: number, extra: Record<string, unknown> = {}) {
     document.body.innerHTML = `
-      <form id="theme-form" action="/cart/add"><input name="quantity" value="${quantity}"><button type="submit" name="add">Add to cart</button></form>
+      <form class="installment" action="/cart/add"><input type="hidden" name="id" value="1"></form>
+      <input name="quantity" value="${quantity}" form="theme-form">
+      <form id="theme-form" action="/cart/add"><button type="submit" name="add">Add to cart</button></form>
       <div id="sparkly-tier-pricing-t1" class="sparkly-tier-pricing sparkly-tier-pricing--card" data-sparkly-tier-pricing
         data-discount='${JSON.stringify({ ...discount, ...extra })}' data-time-discount="{}"
         data-product-id='"gid://shopify/Product/9"' data-selected-variant-id="10"

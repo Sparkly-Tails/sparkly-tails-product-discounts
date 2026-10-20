@@ -1149,8 +1149,18 @@ if (typeof document !== 'undefined') {
     }, true)
   }
 
+  // The product's own form: the one the quantity box belongs to (its `form`
+  // attribute counts), else the one holding the add button. A page can hold other
+  // forms that post to /cart/add (Dawn's payment installments form comes first).
+  function findProductForm({ doc }) {
+    const quantityInput = doc.querySelector('input[name="quantity"]')
+    if (quantityInput && quantityInput.form) return quantityInput.form
+    const addButton = doc.querySelector('form[action*="/cart/add"] button[name="add"]')
+    return addButton ? addButton.form : doc.querySelector('form[action*="/cart/add"]')
+  }
+
   function wireAddToCartForm(render) {
-    const addToCartForm = document.querySelector('form[action*="/cart/add"]')
+    const addToCartForm = findProductForm({ doc: document })
     if (!addToCartForm) return
     // Best-effort immediate re-check; self-corrects on the next poll if
     // /cart/add.js hasn't finished yet.
@@ -1275,7 +1285,7 @@ if (typeof document !== 'undefined') {
 
       wireQuantityStepper(render)
       wireAddToCartForm(render)
-      const productForm = document.querySelector('form[action*="/cart/add"]')
+      const productForm = findProductForm({ doc: document })
       if (productForm && config.isGroup) {
         wireSelectionSubmit({ doc: document, form: productForm, hasSelection: render.hasSelection, addSelection: render.addSelectionToCart })
       }
