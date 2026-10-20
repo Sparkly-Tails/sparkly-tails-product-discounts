@@ -67,7 +67,7 @@ export default async function DiscountPage({
               Save title
             </button>
           </div>
-          <p className="text-xs text-muted mt-2">Shown to customers in the storefront widget's promo text.</p>
+          <p className="text-xs text-muted mt-2">Shown to customers in the storefront widget&apos;s promo text.</p>
         </form>
       </section>
 
