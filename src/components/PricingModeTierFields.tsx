@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import TierFields from '@/components/TierFields'
 import FixedPriceTierFields from '@/components/FixedPriceTierFields'
 
@@ -24,10 +24,10 @@ export default function PricingModeTierFields({
 
   // If membership changes after mount (e.g. the picker adds a
   // differently-priced member) and fixed mode is no longer valid, fall
-  // back to percent rather than leaving an invalid mode selected.
-  useEffect(() => {
-    if (!allowPriceBasedModes && mode === 'fixed') setMode('percent')
-  }, [allowPriceBasedModes, mode])
+  // back to percent rather than leaving an invalid mode selected. Adjusted
+  // while rendering (React's pattern for state derived from props), not in
+  // an effect, so the invalid mode is never painted.
+  if (!allowPriceBasedModes && mode === 'fixed') setMode('percent')
 
   return (
     <div className="space-y-4">

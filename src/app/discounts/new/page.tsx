@@ -50,7 +50,7 @@ export default function NewDiscountPage() {
             placeholder="e.g. Canagan Tuna Soup"
             className="w-full border border-line rounded px-3 py-2 text-sm transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:border-accent"
           />
-          <p className="text-xs text-muted mt-2">Shown to customers in the storefront widget's promo text.</p>
+          <p className="text-xs text-muted mt-2">Shown to customers in the storefront widget&apos;s promo text.</p>
         </div>
 
         <div>
