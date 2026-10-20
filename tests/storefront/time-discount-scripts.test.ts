@@ -168,15 +168,21 @@ describe('tier widget painting (redesign)', () => {
   let cartItems: CartLine[] = []
   let cartRequests: Array<{ url: string; body: Record<string, unknown> }> = []
   let nextCartError: Record<string, string> | null = null
+  let holdAdd: Promise<void> | null = null
+  let events: string[] = []
   const rowProductFor = (variantId: number) => (variantId === 10 ? 9 : 20)
   beforeEach(() => {
     cartItems = []
     vi.useFakeTimers({ now: NOW })
     cartRequests = []
+    events = []
+    holdAdd = null
     nextCartError = null
     vi.stubGlobal('fetch', vi.fn(async (url: string, init?: { body?: string }) => {
       if (url === '/cart.js') return { ok: true, json: async () => ({ items: cartItems }) }
       cartRequests.push({ url, body: JSON.parse(init!.body!) })
+      events.push('request ' + url)
+      if (holdAdd) await holdAdd
       if (nextCartError) return { ok: false, json: async () => nextCartError }
       const body = JSON.parse(init!.body!)
       if (url === '/cart/add.js') {
@@ -205,7 +211,7 @@ describe('tier widget painting (redesign)', () => {
 
   async function mountTiers(quantity: number, extra: Record<string, unknown> = {}) {
     document.body.innerHTML = `
-      <input name="quantity" value="${quantity}">
+      <form id="theme-form" action="/cart/add"><input name="quantity" value="${quantity}"><button type="submit" name="add">Add to cart</button></form>
       <div id="sparkly-tier-pricing-t1" class="sparkly-tier-pricing sparkly-tier-pricing--card" data-sparkly-tier-pricing
         data-discount='${JSON.stringify({ ...discount, ...extra })}' data-time-discount="{}"
         data-product-id='"gid://shopify/Product/9"' data-selected-variant-id="10"
@@ -430,6 +436,75 @@ describe('tier widget painting (redesign)', () => {
     const rows = [...document.querySelectorAll('.sparkly-tier-pricing__list-item')]
     expect(rows[2].querySelector('[data-selection-delta]')).toBeNull()
     expect(rows[2].querySelector('.sparkly-tier-pricing__options-link')!.getAttribute('href')).toBe('/products/duck')
+  })
+
+  // Add to cart: the theme's own handler is what adds the page product; the widget
+  // adds the selected siblings just before it, in one request.
+  function attachTheme() {
+    const form = document.getElementById('theme-form') as HTMLFormElement
+    form.addEventListener('submit', (event) => {
+      event.preventDefault()
+      events.push('theme add')
+    })
+  }
+  async function settle() {
+    for (let n = 0; n < 6; n++) await vi.advanceTimersByTimeAsync(0)
+  }
+  const rowNumbers = () => [...document.querySelectorAll('.sparkly-tier-pricing__list-qty')].map((el) => el.textContent)
+
+  it('Add to cart first adds the selected siblings in one request, then lets the theme add the page product', async () => {
+    await openList()
+    attachTheme()
+    await click('[data-selection-delta="1"]', 1)
+    await click('[data-selection-delta="1"]', 1)
+    await click('button[name="add"]')
+    await settle()
+    expect(cartRequests).toEqual([{ url: '/cart/add.js', body: { items: [{ id: 200, quantity: 2 }] } }])
+    expect(events).toEqual(['request /cart/add.js', 'theme add'])
+    expect(rowNumbers()).toEqual(['0', '2', '0']) // now in the cart, nothing left selected
+  })
+
+  it('without a selection the widget does not touch Add to cart', async () => {
+    await openList()
+    attachTheme()
+    await click('button[name="add"]')
+    await settle()
+    expect(events).toEqual(['theme add'])
+    expect(cartRequests).toEqual([])
+  })
+
+  it('a refused request shows Shopify\'s own message, keeps the selection and does not add the page product', async () => {
+    await openList()
+    attachTheme()
+    await click('[data-selection-delta="1"]', 1)
+    nextCartError = { status: '422', message: 'Cart Error', description: 'You can only add 1 of this item to your cart.' }
+    await click('button[name="add"]')
+    await settle()
+    expect(events).toEqual(['request /cart/add.js'])
+    const message = document.querySelector('[data-tier-pricing-list-message]') as HTMLElement
+    expect(message.hidden).toBe(false)
+    expect(message.textContent).toBe('You can only add 1 of this item to your cart.')
+    expect(rowNumbers()).toEqual(['0', '1', '0'])
+    // fixing the selection clears the message and the next try goes through
+    nextCartError = null
+    await click('button[name="add"]')
+    await settle()
+    expect(events).toEqual(['request /cart/add.js', 'request /cart/add.js', 'theme add'])
+  })
+
+  it('pressing Add to cart twice while the siblings are being added sends one request and one theme add', async () => {
+    await openList()
+    attachTheme()
+    await click('[data-selection-delta="1"]', 1)
+    let release = () => {}
+    holdAdd = new Promise<void>((resolve) => { release = resolve })
+    await click('button[name="add"]')
+    await click('button[name="add"]')
+    await settle()
+    expect(cartRequests).toHaveLength(1)
+    release()
+    await settle()
+    expect(events).toEqual(['request /cart/add.js', 'theme add'])
   })
 
   describe('accessibility', () => {

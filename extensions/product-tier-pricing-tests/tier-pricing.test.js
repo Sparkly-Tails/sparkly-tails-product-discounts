@@ -1,6 +1,6 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
-const { isTimeDiscountWindowActive, tierTimeDiscountItems, tierTimeDiscountItemFor, timeDiscountSalePrice, computeTierState, perUnitPrice, extractNumericId, sumMemberQuantityInCart, resolveEligibility, unitPriceAtTier, computeProgressState, formatTempBoxLabel, joinNaturally, computeOrderSummary, computeTierButtonsSignature, withUnitAnchor, cartBaselineOtherQty, clamp, sortTiersByMinQty, normalizeTierPricing, formatMoney, computeWidgetViewModel, buildMixMatchRows, adjustSelection, sumSelection, dropSelection, cartErrorMessage, buildProgressSemantics, formatItemsChosen, buildDisplayMixMatchItems, listedMixMatchItems, computeProgressDot, classifyOfferState, buildPromoLine, buildStatusCopy } = require('../product-tier-pricing/assets/tier-pricing.js')
+const { isTimeDiscountWindowActive, tierTimeDiscountItems, tierTimeDiscountItemFor, timeDiscountSalePrice, computeTierState, perUnitPrice, extractNumericId, sumMemberQuantityInCart, resolveEligibility, unitPriceAtTier, computeProgressState, formatTempBoxLabel, joinNaturally, computeOrderSummary, computeTierButtonsSignature, withUnitAnchor, cartBaselineOtherQty, clamp, sortTiersByMinQty, normalizeTierPricing, formatMoney, computeWidgetViewModel, buildMixMatchRows, adjustSelection, sumSelection, dropSelection, buildSelectionRequest, cartErrorMessage, buildProgressSemantics, formatItemsChosen, buildDisplayMixMatchItems, listedMixMatchItems, computeProgressDot, classifyOfferState, buildPromoLine, buildStatusCopy } = require('../product-tier-pricing/assets/tier-pricing.js')
 
 test('below every tier: no discount, lists every tier as a delta from current quantity', () => {
   const tiers = [{ minQty: 7, percentOff: 5 }, { minQty: 14, percentOff: 10 }]
@@ -1058,4 +1058,19 @@ test('buildMixMatchRows: a variant-scoped member matches only that exact variant
     pricing: null, selection: {}, currentVariantId: null, stepperQty: 1,
   })
   assert.equal(rows[0].qty, 3)
+})
+
+// Add to cart: the selected siblings go into the cart in one request.
+
+test('buildSelectionRequest: one /cart/add.js request with a line per selected variant', () => {
+  assert.deepEqual(buildSelectionRequest({ selection: { 10: 2, 20: 1 }, excludeVariantId: null }), {
+    url: '/cart/add.js',
+    body: { items: [{ id: 10, quantity: 2 }, { id: 20, quantity: 1 }] },
+  })
+})
+
+test('buildSelectionRequest: leaves out the variant on the page (the form adds it) and is null when nothing is selected', () => {
+  assert.deepEqual(buildSelectionRequest({ selection: { 10: 2, 20: 1 }, excludeVariantId: '10' }).body.items, [{ id: 20, quantity: 1 }])
+  assert.equal(buildSelectionRequest({ selection: { 10: 2 }, excludeVariantId: '10' }), null)
+  assert.equal(buildSelectionRequest({ selection: {}, excludeVariantId: null }), null)
 })

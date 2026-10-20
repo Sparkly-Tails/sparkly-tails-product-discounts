@@ -462,6 +462,17 @@ function buildMixMatchRows({ products, cartItems, pricing, selection, currentVar
   })
 }
 
+// The one request that adds every selected variant to the cart, or null when
+// nothing is selected. The variant on the page is left out: the product form
+// adds it.
+function buildSelectionRequest({ selection, excludeVariantId }) {
+  const items = Object.keys(selection)
+    .filter((variantId) => variantId !== String(excludeVariantId))
+    .map((variantId) => ({ id: Number(variantId), quantity: selection[variantId] }))
+  if (items.length === 0) return null
+  return { url: '/cart/add.js', body: { items } }
+}
+
 // Shopify's cart endpoints answer errors with { status, message, description };
 // the description is the customer-facing one ("You can only add 3 ...").
 function cartErrorMessage(error) {
@@ -586,6 +597,7 @@ if (typeof module !== 'undefined' && module.exports) {
     adjustSelection,
     sumSelection,
     dropSelection,
+    buildSelectionRequest,
     buildProgressSemantics,
     cartErrorMessage,
     formatItemsChosen,
@@ -1045,6 +1057,28 @@ if (typeof document !== 'undefined') {
       })
     }
 
+    function hasSelection() {
+      return sumSelection({ selection: selectionRef.value, excludeVariantId: variantStateRef.value }) > 0
+    }
+
+    // Adds the selected siblings to the cart. True when there was nothing to add
+    // or they were added; false (with Shopify's message shown) when refused.
+    async function addSelectionToCart() {
+      const request = buildSelectionRequest({ selection: selectionRef.value, excludeVariantId: variantStateRef.value })
+      if (!request) return true
+      showListMessage('')
+      const result = await postCartRequest({ request, fetchFn: fetch })
+      if (!result.ok) {
+        showListMessage(cartErrorMessage(result.error))
+        return false
+      }
+      selectionRef.value = {}
+      await render()
+      return true
+    }
+
+    render.hasSelection = hasSelection
+    render.addSelectionToCart = addSelectionToCart
     render.variantStateRef = variantStateRef
     return render
   }
@@ -1066,6 +1100,53 @@ if (typeof document !== 'undefined') {
     quantityScope.querySelectorAll('button[aria-label="Increase quantity"], button[aria-label="Decrease quantity"]').forEach((btn) => {
       btn.addEventListener('click', () => setTimeout(render, 0))
     })
+  }
+
+  // POSTs a cart request; `error` is Shopify's answer body when it refused.
+  async function postCartRequest({ request, fetchFn }) {
+    try {
+      const response = await fetchFn(request.url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify(request.body),
+      })
+      if (response.ok) return { ok: true, error: null }
+      return { ok: false, error: await response.json().catch(() => null) }
+    } catch {
+      return { ok: false, error: null }
+    }
+  }
+
+  function resubmitForm({ form, submitter }) {
+    if (typeof form.requestSubmit === 'function') form.requestSubmit(submitter)
+    else form.submit()
+  }
+
+  // Add to cart: when siblings are selected, the form's submit is held back,
+  // they are added in one request, then the submit is sent again and the
+  // theme's own add runs as usual (drawer, count, errors). The listener sits on
+  // the document in the capture phase so it runs before the theme's handler.
+  function wireSelectionSubmit({ doc, form, hasSelection, addSelection }) {
+    const state = { pending: false, passThrough: false }
+    doc.addEventListener('submit', (event) => {
+      if (event.target !== form) return
+      if (state.passThrough) {
+        state.passThrough = false
+        return
+      }
+      if (!state.pending && !hasSelection()) return
+      event.preventDefault()
+      event.stopImmediatePropagation()
+      if (state.pending) return
+      state.pending = true
+      const submitter = event.submitter
+      addSelection().then((added) => {
+        state.pending = false
+        if (!added) return
+        state.passThrough = true
+        resubmitForm({ form, submitter })
+      })
+    }, true)
   }
 
   function wireAddToCartForm(render) {
@@ -1194,6 +1275,10 @@ if (typeof document !== 'undefined') {
 
       wireQuantityStepper(render)
       wireAddToCartForm(render)
+      const productForm = document.querySelector('form[action*="/cart/add"]')
+      if (productForm && config.isGroup) {
+        wireSelectionSubmit({ doc: document, form: productForm, hasSelection: render.hasSelection, addSelection: render.addSelectionToCart })
+      }
       wireVariantChange(container, render)
       wireLoopSubscriptionsPricePoll(container, render)
       if (config.hasTiers) wireCartAwarePolling(render)
