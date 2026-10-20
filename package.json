@@ -1,6 +1,6 @@
 {
   "name": "sparkly-tails-product-discounts",
-  "version": "0.23.36",
+  "version": "0.23.37",
   "private": true,
   "engines": {
     "node": ">=20.9.0"
@@ -9,7 +9,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint",
+    "lint": "eslint && npm run lint:extensions",
+    "lint:extensions": "eslint -c eslint.extensions.config.mjs extensions/product-tier-pricing/assets",
     "test": "vitest run",
     "test:watch": "vitest",
     "check:isolation": "node scripts/check-store-isolation.mjs",
