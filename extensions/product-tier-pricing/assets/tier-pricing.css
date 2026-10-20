@@ -70,9 +70,8 @@
 }
 
 .sparkly-tier-pricing__tier-btn:focus-visible,
-.sparkly-tier-pricing__step:focus-visible,
 .sparkly-tier-pricing__toggle:focus-visible,
-.sparkly-tier-pricing__options-link:focus-visible,
+.sparkly-tier-pricing__add:focus-visible,
 .sparkly-tier-pricing__list-link:focus-visible {
   outline: 2px solid var(--sparkly-tier-accent);
   outline-offset: 2px;
@@ -328,8 +327,8 @@
   gap: 8px 12px;
 }
 
-/* The product link wants at least 240px; when the stepper does not fit beside
-   it, the stepper drops to a second line and the name gets the full width. */
+/* The product link wants at least 240px; when the count and Add link do not fit
+   beside it, they drop to a second line and the name gets the full width. */
 .sparkly-tier-pricing__list-link {
   display: flex;
   flex: 1 1 240px;
@@ -340,7 +339,7 @@
   color: inherit;
 }
 
-/* Phones: the name always gets the whole row; the stepper sits under it. */
+/* Phones: the name always gets the whole row; the count and Add link sit under it. */
 @media (max-width: 480px) {
   .sparkly-tier-pricing__list-link {
     flex-basis: 100%;
@@ -378,51 +377,12 @@
   color: var(--sparkly-tier-accent);
 }
 
-.sparkly-tier-pricing__stepper {
+.sparkly-tier-pricing__row-action {
   display: flex;
   flex: none;
   margin-left: auto;
   align-items: center;
-  gap: 2px;
-  padding: 2px;
-  border: 1px solid var(--sparkly-tier-border);
-  border-radius: 999px;
-  background: var(--sparkly-tier-track);
-}
-
-.sparkly-tier-pricing__step {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  padding: 0;
-  border: none;
-  border-radius: 50%;
-  background: transparent;
-  font-family: var(--font-stack-body);
-  font-size: 14px;
-  font-weight: 700;
-  line-height: 1;
-  color: var(--sparkly-tier-ink);
-  cursor: pointer;
-}
-
-/* A 44px touch target around the 24px button (WCAG 2.5.5). */
-.sparkly-tier-pricing__step::after {
-  content: '';
-  position: absolute;
-  inset: -10px;
-}
-
-.sparkly-tier-pricing__step:hover:not(:disabled) {
-  background: var(--sparkly-tier-moss-tint);
-}
-
-.sparkly-tier-pricing__step:disabled {
-  opacity: 0.35;
-  cursor: not-allowed;
+  gap: 10px;
 }
 
 .sparkly-tier-pricing__list-qty {
@@ -435,30 +395,31 @@
   color: var(--sparkly-tier-accent);
 }
 
-.sparkly-tier-pricing__options-link {
-  padding: 0 8px;
-  font-family: var(--font-stack-body);
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--sparkly-tier-ink);
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
-
-.sparkly-tier-pricing__list[aria-busy="true"] .sparkly-tier-pricing__step {
-  pointer-events: none;
-  opacity: 0.5;
-}
-
-.sparkly-tier-pricing__list-message {
-  margin: 8px 0 0;
+.sparkly-tier-pricing__add {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 12px;
+  border: 1px solid var(--sparkly-tier-border);
+  border-radius: 999px;
+  background: var(--sparkly-tier-track);
   font-family: var(--font-stack-body);
   font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
   color: var(--sparkly-tier-ink);
+  text-decoration: none;
 }
 
-.sparkly-tier-pricing__list-message[hidden] {
-  display: none;
+/* A 44px touch target around the small button (WCAG 2.5.5). */
+.sparkly-tier-pricing__add::after {
+  content: '';
+  position: absolute;
+  inset: -10px;
+}
+
+.sparkly-tier-pricing__add:hover {
+  background: var(--sparkly-tier-moss-tint);
 }
 
 @keyframes sparklyTierFadeIn {
