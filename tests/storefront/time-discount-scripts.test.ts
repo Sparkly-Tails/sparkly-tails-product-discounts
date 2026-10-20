@@ -38,8 +38,8 @@ function mount(discount: Record<string, unknown>, opts: { selectedVariantId?: nu
         <span class="sparkly-tier-pricing__each-label" data-tier-pricing-each-label>each</span>
       </div>
       <div class="sparkly-tier-pricing__card" data-tier-pricing-card hidden>
-        <div data-tier-pricing-breakdown></div>
-        <div class="sparkly-tier-pricing__bar-wrap"><div class="sparkly-tier-pricing__track"><div data-tier-pricing-fill></div></div><div data-tier-pricing-stops></div></div>
+        <div class="sparkly-tier-pricing__status-row"><span data-tier-pricing-status></span><span data-tier-pricing-aside></span></div>
+        <div class="sparkly-tier-pricing__bar-wrap"><div class="sparkly-tier-pricing__track"><div data-tier-pricing-fill></div></div><div data-tier-pricing-markers></div><span data-tier-pricing-dot></span></div>
         <div data-tier-pricing-tiers></div>
       </div>
     </div>
@@ -155,5 +155,315 @@ describe('storefront scripts share one global scope', () => {
     expect(tierNames.length).toBeGreaterThan(0)
     expect(countdownNames.length).toBeGreaterThan(0)
     expect(tierNames.filter((name) => countdownNames.includes(name))).toEqual([])
+  })
+})
+
+/**
+ * The redesigned tier widget: status row, bar with a dot on the current
+ * quantity, and the copy per state. Markup mirrors tier-pricing.liquid; the
+ * cart comes from a stubbed /cart.js.
+ */
+describe('tier widget painting (redesign)', () => {
+  type CartLine = { key?: string; product_id: number; variant_id: number; quantity: number }
+  let cartItems: CartLine[] = []
+  let cartRequests: Array<{ url: string; body: Record<string, unknown> }> = []
+  let nextCartError: Record<string, string> | null = null
+  const rowProductFor = (variantId: number) => (variantId === 10 ? 9 : 20)
+  beforeEach(() => {
+    cartItems = []
+    vi.useFakeTimers({ now: NOW })
+    cartRequests = []
+    nextCartError = null
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: { body?: string }) => {
+      if (url === '/cart.js') return { ok: true, json: async () => ({ items: cartItems }) }
+      cartRequests.push({ url, body: JSON.parse(init!.body!) })
+      if (nextCartError) return { ok: false, json: async () => nextCartError }
+      const body = JSON.parse(init!.body!)
+      if (url === '/cart/add.js') {
+        const { id, quantity } = body.items[0]
+        const line = cartItems.find((item) => item.variant_id === id)
+        if (line) line.quantity += quantity
+        else cartItems.push({ key: String(id) + ':k', product_id: rowProductFor(id), variant_id: id, quantity })
+      } else if (url === '/cart/change.js') {
+        const line = cartItems.find((item) => item.key === body.id)!
+        line.quantity = body.quantity
+        cartItems = cartItems.filter((item) => item.quantity > 0)
+      }
+      return { ok: true, json: async () => ({}) }
+    }))
+  })
+  afterEach(() => { vi.clearAllTimers(); vi.useRealTimers(); vi.unstubAllGlobals(); document.body.innerHTML = '' })
+
+  const discount = {
+    title: 'Tins',
+    tiers: [{ minQty: 8, percentOff: 3.5503 }, { minQty: 16, percentOff: 8.284 }],
+    siblings: [],
+    ownVariantIds: null,
+    ownVariantOptions: [],
+    selfVariantId: V10,
+  }
+
+  async function mountTiers(quantity: number, extra: Record<string, unknown> = {}) {
+    document.body.innerHTML = `
+      <input name="quantity" value="${quantity}">
+      <div id="sparkly-tier-pricing-t1" class="sparkly-tier-pricing sparkly-tier-pricing--card" data-sparkly-tier-pricing
+        data-discount='${JSON.stringify({ ...discount, ...extra })}' data-time-discount="{}"
+        data-product-id='"gid://shopify/Product/9"' data-selected-variant-id="10"
+        data-base-price="1.69" data-compare-at-price="0" data-money-format='"£{{amount}}"'>
+        <div class="sparkly-tier-pricing__price-row">
+          <span data-tier-pricing-price data-original-price="true">£1.69</span>
+          <span data-discounted-price hidden>£1.69</span>
+          <span data-tier-pricing-each-label>each</span>
+        </div>
+        <p data-tier-pricing-promo></p>
+        <div data-tier-pricing-card hidden>
+          <div><span data-tier-pricing-status></span><span data-tier-pricing-aside></span></div>
+          <div data-tier-pricing-bar role="progressbar"><div><div data-tier-pricing-fill></div></div><div data-tier-pricing-markers></div><span data-tier-pricing-dot></span></div>
+          <div data-tier-pricing-tiers></div>
+          <div><button data-tier-pricing-toggle aria-expanded="false"><span data-tier-pricing-toggle-label>mix &amp; match products</span><span data-tier-pricing-toggle-arrow aria-hidden="true">▼</span></button><span data-tier-pricing-chosen hidden></span></div>
+          <div data-tier-pricing-list hidden></div>
+          <p data-tier-pricing-list-message hidden></p>
+        </div>
+      </div>`
+    ;(0, eval)(tierScript)
+    await vi.advanceTimersByTimeAsync(0)
+  }
+
+  async function setQuantity(value: number) {
+    const input = document.querySelector('input[name="quantity"]') as HTMLInputElement
+    input.value = String(value)
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    await vi.advanceTimersByTimeAsync(0)
+  }
+
+  function painted() {
+    const text = (selector: string) => (document.querySelector(selector) as HTMLElement).textContent
+    const dot = document.querySelector('[data-tier-pricing-dot]') as HTMLElement
+    const aside = document.querySelector('[data-tier-pricing-aside]') as HTMLElement
+    return {
+      promo: text('[data-tier-pricing-promo]'),
+      status: text('[data-tier-pricing-status]'),
+      aside: aside.textContent,
+      asideIsBadge: aside.classList.contains('sparkly-tier-pricing__aside--badge'),
+      dot: dot.textContent,
+      dotLeft: dot.style.left,
+      fill: (document.querySelector('[data-tier-pricing-fill]') as HTMLElement).style.width,
+      markers: [...document.querySelectorAll('.sparkly-tier-pricing__marker')].map((m) => ({ text: m.textContent, reached: m.classList.contains('sparkly-tier-pricing__marker--reached'), covered: m.classList.contains('sparkly-tier-pricing__marker--covered') })),
+    }
+  }
+
+  it('below the first offer: units owned, a hint to the next price, the dot on the quantity', async () => {
+    await mountTiers(5)
+    expect(painted()).toEqual({
+      promo: 'Buy 8+ for £1.63 or 16+ for £1.55',
+      status: 'You have 5 units',
+      aside: 'Add 3 for £1.63/ea',
+      asideIsBadge: false,
+      dot: '5',
+      dotLeft: '29%',
+      fill: '29%',
+      markers: [
+        { text: '1', reached: true, covered: false },
+        { text: '8', reached: false, covered: false },
+        { text: '16', reached: false, covered: false },
+      ],
+    })
+  })
+
+  it('middle tier: "Offer unlocked", a Save badge, the reached marker filled, the dot between tiers', async () => {
+    await mountTiers(5)
+    await setQuantity(10)
+    expect(painted()).toMatchObject({
+      promo: 'Offer unlocked! Add 6 more to unlock the highest discount for £1.55',
+      status: '10 units × £1.63 (Offer unlocked)',
+      aside: 'Save £0.60',
+      asideIsBadge: true,
+      dot: '10',
+      dotLeft: '63%',
+    })
+    expect(painted().markers.map((m) => m.reached)).toEqual([true, true, false])
+  })
+
+  function pills() {
+    return [...document.querySelectorAll('[data-tier-pricing-tiers] > *')].map((el) => ({
+      text: el.textContent,
+      kind: el.classList.contains('sparkly-tier-pricing__temp-btn') ? 'temp' : 'pill',
+      active: el.classList.contains('sparkly-tier-pricing__tier-btn--active'),
+      dimmed: el.classList.contains('sparkly-tier-pricing__tier-btn--dimmed'),
+    }))
+  }
+
+  it('pills show the unit price per tier; between tiers the lower ones are dimmed and a dashed box shows the quantity', async () => {
+    await mountTiers(5)
+    expect(pills()).toEqual([
+      { text: '1 × £1.69', kind: 'pill', active: false, dimmed: false },
+      { text: '5 × £1.69', kind: 'temp', active: false, dimmed: false },
+      { text: '8 × £1.63', kind: 'pill', active: false, dimmed: false },
+      { text: '16 × £1.55', kind: 'pill', active: false, dimmed: false },
+    ])
+    await setQuantity(10)
+    expect(pills()).toEqual([
+      { text: '1 × £1.69', kind: 'pill', active: false, dimmed: true },
+      { text: '8 × £1.63', kind: 'pill', active: false, dimmed: false },
+      { text: '10 × £1.63', kind: 'temp', active: false, dimmed: false },
+      { text: '16 × £1.55', kind: 'pill', active: false, dimmed: false },
+    ])
+  })
+
+  it('a quantity exactly on a tier ticks that pill and shows no dashed box', async () => {
+    await mountTiers(8)
+    expect(pills()).toEqual([
+      { text: '1 × £1.69', kind: 'pill', active: false, dimmed: true },
+      { text: '8 × £1.63✓', kind: 'pill', active: true, dimmed: false },
+      { text: '16 × £1.55', kind: 'pill', active: false, dimmed: false },
+    ])
+  })
+
+  it('highest tier: "Highest discount unlocked" and the dot on the last marker', async () => {
+    await mountTiers(5)
+    await setQuantity(16)
+    expect(painted()).toMatchObject({
+      promo: 'Highest discount unlocked: £1.55/each applied! (Save £2.24)',
+      status: 'You have 16 units',
+      aside: '✓ Highest discount (£1.55/ea)',
+      asideIsBadge: false,
+      dot: '16',
+      dotLeft: '100%',
+    })
+    expect(painted().markers.map((m) => [m.reached, m.covered])).toEqual([[true, false], [true, false], [true, true]])
+  })
+
+  it('opens the mix & match list: a row per member with thumbnail slot, name, price at the applied tier and its cart quantity', async () => {
+    cartItems = [{ key: '10:k', product_id: 9, variant_id: 10, quantity: 6 }, { key: '200:k', product_id: 20, variant_id: 200, quantity: 4 }]
+    await mountTiers(1, {
+      ownVariantOptions: [{ variantId: V10, title: 'Chicken & Salmon 85g', url: '/products/salmon', imageUrl: 'https://example.com/s.png', price: 169, available: true, cartVariantId: 10 }],
+      siblings: [{ productId: 'gid://shopify/Product/20', variantId: null, title: 'Chicken & Herring 85g', url: '/products/herring', imageUrl: null, price: 169, available: false, cartVariantId: 200, listed: true }],
+    })
+    ;(document.querySelector('[data-tier-pricing-toggle]') as HTMLElement).click()
+    await vi.advanceTimersByTimeAsync(0)
+    const rows = [...document.querySelectorAll('.sparkly-tier-pricing__list-item')].map((row) => ({
+      name: row.querySelector('.sparkly-tier-pricing__list-name')!.textContent,
+      price: row.querySelector('.sparkly-tier-pricing__list-price')!.textContent,
+      qty: row.querySelector('.sparkly-tier-pricing__list-qty')!.textContent,
+      href: row.querySelector('a')!.getAttribute('href'),
+      hasImage: !!row.querySelector('img'),
+    }))
+    expect(rows).toEqual([
+      { name: 'Chicken & Salmon 85g', price: '£1.63', qty: '6', href: '/products/salmon', hasImage: true },
+      { name: 'Chicken & Herring 85g', price: 'Sold out', qty: '4', href: '/products/herring', hasImage: false },
+    ])
+    const chosen = document.querySelector('[data-tier-pricing-chosen]') as HTMLElement
+    expect(chosen.hidden).toBe(false)
+    expect(chosen.textContent).toBe('10 items chosen')
+  })
+
+  const LIST = {
+    ownVariantOptions: [{ variantId: V10, title: 'Chicken & Salmon 85g', url: '/products/salmon', imageUrl: null, price: 169, available: true, cartVariantId: 10 }],
+    siblings: [
+      { productId: 'gid://shopify/Product/20', variantId: null, title: 'Chicken & Herring 85g', url: '/products/herring', imageUrl: null, price: 169, available: true, cartVariantId: 200, listed: true },
+      { productId: 'gid://shopify/Product/30', variantId: null, title: 'Duck Mix', url: '/products/duck', imageUrl: null, price: 169, available: true, cartVariantId: null, listed: true },
+    ],
+  }
+
+  async function openList(quantity = 1) {
+    await mountTiers(quantity, LIST)
+    ;(document.querySelector('[data-tier-pricing-toggle]') as HTMLElement).click()
+    await vi.advanceTimersByTimeAsync(0)
+  }
+
+  async function click(selector: string, index = 0) {
+    ;(document.querySelectorAll(selector)[index] as HTMLElement).click()
+    await vi.advanceTimersByTimeAsync(0)
+  }
+
+  it('"+" on a row adds one unit to the real cart, then the bar, dot, copy and rows follow the cart', async () => {
+    await openList()
+    await click('[data-cart-delta="1"]', 1) // Chicken & Herring
+    expect(cartRequests).toEqual([{ url: '/cart/add.js', body: { items: [{ id: 200, quantity: 1 }] } }])
+    expect(painted()).toMatchObject({ status: 'You have 1 unit', dot: '1' })
+    for (let n = 0; n < 7; n++) await click('[data-cart-delta="1"]', 1)
+    // 8 in the cart across the group -> the first offer applies, everywhere at once
+    expect(painted()).toMatchObject({ status: '8 units × £1.63 (Offer unlocked)', aside: 'Save £0.48', dot: '8' })
+    expect(document.querySelector('[data-tier-pricing-chosen]')!.textContent).toBe('8 items chosen')
+    expect([...document.querySelectorAll('.sparkly-tier-pricing__list-qty')].map((el) => el.textContent)).toEqual(['0', '8', '0'])
+  })
+
+  it('"−" lowers the matching cart line by its key, and is disabled when the row has none in the cart', async () => {
+    cartItems = [{ key: '200:k', product_id: 20, variant_id: 200, quantity: 2 }]
+    await openList()
+    const minus = [...document.querySelectorAll('[data-cart-delta="-1"]')] as HTMLButtonElement[]
+    expect(minus.map((b) => b.disabled)).toEqual([true, false]) // own row has none; Duck Mix has no stepper
+    await click('[data-cart-delta="-1"]', 1)
+    expect(cartRequests).toEqual([{ url: '/cart/change.js', body: { id: '200:k', quantity: 1 } }])
+    expect([...document.querySelectorAll('.sparkly-tier-pricing__list-qty')].map((el) => el.textContent)).toEqual(['0', '1', '0'])
+  })
+
+  it('a row with no single variant links to the product instead of showing − / +', async () => {
+    await openList()
+    const rows = [...document.querySelectorAll('.sparkly-tier-pricing__list-item')]
+    expect(rows[2].querySelector('[data-cart-delta]')).toBeNull()
+    expect(rows[2].querySelector('.sparkly-tier-pricing__options-link')!.getAttribute('href')).toBe('/products/duck')
+  })
+
+  it('a refused change shows Shopify\'s own message and leaves the cart and the widget as they were', async () => {
+    await openList()
+    nextCartError = { status: '422', message: 'Cart Error', description: 'You can only add 3 of this item to your cart.' }
+    await click('[data-cart-delta="1"]', 1)
+    const message = document.querySelector('[data-tier-pricing-list-message]') as HTMLElement
+    expect(message.hidden).toBe(false)
+    expect(message.textContent).toBe('You can only add 3 of this item to your cart.')
+    expect(cartItems).toEqual([])
+    expect(painted()).toMatchObject({ status: 'You have 1 unit' })
+    nextCartError = null
+    await click('[data-cart-delta="1"]', 1)
+    expect(message.hidden).toBe(true) // the message clears on the next attempt
+  })
+
+  describe('accessibility', () => {
+    it('the bar is a progressbar with the quantity, its range and a spoken summary', async () => {
+      await mountTiers(10)
+      const bar = document.querySelector('[data-tier-pricing-bar]') as HTMLElement
+      expect(bar.getAttribute('role')).toBe('progressbar')
+      expect(bar.getAttribute('aria-valuenow')).toBe('10')
+      expect(bar.getAttribute('aria-valuemin')).toBe('1')
+      expect(bar.getAttribute('aria-valuemax')).toBe('16')
+      expect(bar.getAttribute('aria-valuetext')).toBe('10 of 16 units. Offer unlocked, highest discount at 16.')
+    })
+
+    it('a discounted price reads as "Discounted price" then "Original price", never as two bare numbers', async () => {
+      await mountTiers(10)
+      const price = document.querySelector('[data-tier-pricing-price]') as HTMLElement
+      expect(price.textContent!.replace(/\s+/g, ' ').trim()).toBe('Discounted price: £1.63 Original price: £1.69')
+      expect(price.querySelectorAll('.sparkly-tier-pricing__sr-only')).toHaveLength(2)
+    })
+
+    it('the pill that matches the quantity is pressed, the others are not', async () => {
+      await mountTiers(8)
+      const pressed = [...document.querySelectorAll('[data-tier-pricing-tiers] button')].map((b) => b.getAttribute('aria-pressed'))
+      expect(pressed).toEqual(['false', 'true', 'false'])
+    })
+
+    it('the list toggle tells assistive technology whether the list is open', async () => {
+      await openList()
+      const toggle = document.querySelector('[data-tier-pricing-toggle]') as HTMLElement
+      expect(toggle.getAttribute('aria-expanded')).toBe('true')
+      ;(toggle as HTMLElement).click()
+      expect(toggle.getAttribute('aria-expanded')).toBe('false')
+    })
+
+    it('live text is only rewritten when it changed, so the once-a-second refresh does not re-announce it', async () => {
+      await mountTiers(5)
+      const status = document.querySelector('[data-tier-pricing-status]') as HTMLElement
+      const promo = document.querySelector('[data-tier-pricing-promo]') as HTMLElement
+      const writes: string[] = []
+      const observer = new MutationObserver((records) => records.forEach((r) => writes.push((r.target as HTMLElement).tagName)))
+      observer.observe(status, { childList: true, characterData: true, subtree: true })
+      observer.observe(promo, { childList: true, characterData: true, subtree: true })
+      await vi.advanceTimersByTimeAsync(3500) // three polling renders, nothing changed
+      expect(writes).toHaveLength(0)
+      await setQuantity(10)
+      expect(writes.length).toBeGreaterThan(0) // a real change is still written
+      observer.disconnect()
+    })
   })
 })

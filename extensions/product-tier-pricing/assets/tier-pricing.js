@@ -97,10 +97,6 @@ function unitPriceAtTier(basePrice, tier) {
   return perUnitPrice(basePrice, tier.minQty, { ...normalizeTierPricing(tier), minQty: tier.minQty })
 }
 
-function totalAtTier(basePrice, tier) {
-  return Math.round(unitPriceAtTier(basePrice, tier) * tier.minQty * 100) / 100
-}
-
 // Synthetic { minQty: 1, percentOff: 0 } tier so the button row always has
 // a "1 x <base price>" anchor and the temp-box gap-detection below has two
 // entries to bracket a quantity between, even for single-tier configs.
@@ -152,32 +148,6 @@ function cartBaselineOtherQty(trueCartQty) {
   return Math.max(0, trueCartQty - 1)
 }
 
-// Evenly-spaced scale points for the progress track: always starts at 0
-// (the synthetic qty:1 anchor tier reads as "0" here, same convention
-// buildPromoText/tierButtons already use), followed by each real tier's
-// minQty. Spacing is even regardless of the value gaps between tiers —
-// matching the fixed circle layout — so combinedQty's fill position is
-// interpolated within whichever even-width segment it currently falls in,
-// not scaled linearly across the whole 0..topThreshold range.
-function computeProgressTrack(sortedTiers, combinedQty) {
-  const values = [0].concat(sortedTiers.slice(1).map((t) => t.minQty))
-  const stops = values.map((value) => ({ value, active: combinedQty >= value }))
-
-  const n = values.length
-  const step = n > 1 ? 100 / (n - 1) : 100
-  let fillPct = 100
-  for (let i = 0; i < n - 1; i++) {
-    if (combinedQty <= values[i + 1]) {
-      const span = values[i + 1] - values[i]
-      const frac = span > 0 ? (combinedQty - values[i]) / span : 1
-      fillPct = Math.round(clamp(i * step + frac * step, 0, 100))
-      break
-    }
-  }
-
-  return { stops, fillPct }
-}
-
 // Progress/derived state
 
 function computeProgressState(tiers, otherQty, addingQty) {
@@ -186,7 +156,6 @@ function computeProgressState(tiers, otherQty, addingQty) {
   const combinedQty = otherQty + addingQty
   const tierState = computeTierState(sorted, combinedQty)
   const maxed = combinedQty >= topThreshold
-  const track = computeProgressTrack(sorted, combinedQty)
 
   // Buttons/temp-box are driven entirely by combinedQty (the true cart
   // total), not addingQty alone — the boxes always reflect what's actually
@@ -206,50 +175,23 @@ function computeProgressState(tiers, otherQty, addingQty) {
     ? { afterIndex: reachedTierIndex, tier: sorted[reachedTierIndex] }
     : null
 
-  return { combinedQty, topThreshold, maxed, tierState, tierButtons, tempBox, stops: track.stops, fillPct: track.fillPct }
+  return { combinedQty, startThreshold: sorted[0].minQty, topThreshold, maxed, tierState, tierButtons, tempBox }
 }
 
 function computeTierButtonsSignature(state, basePrice, addingQty) {
   return JSON.stringify(state.tierButtons) + '|' +
     (state.tempBox ? state.tempBox.afterIndex + ':' + state.tempBox.tier.minQty : 'none') +
-    '|' + addingQty + '|' + basePrice
+    // combinedQty, not just the stepper: the temporary box shows the combined
+    // quantity, which also moves when the cart changes under a still stepper.
+    '|' + state.combinedQty + '|' + addingQty + '|' + basePrice
 }
 
 // Copy formatting — formatMoney is injected as an (n) => string abstraction.
 
-// Naive English pluralization for a discount's title: append "s" unless it
-// already reads as plural, or the customer only has exactly one. Necessary
-// because real configured titles mix conventions — "Canagan Cat Soup"
-// (singular) vs "Canagan Wet Cat Tins" (already plural) — so blindly
-// appending "s" would double-pluralize the latter into "Tinss".
-function pluralizeTitle(title, qty) {
-  if (qty === 1 || /s$/i.test(title)) return title
-  return title + 's'
-}
-
-// Below-tier breakdown copy: states how many of the named discount are
-// already in the cart and how many more to add to unlock the next tier's
-// price (whether that's the first tier or a later one — either way it's
-// "the next tier ahead"). Only makes sense before the top tier is reached —
-// once maxed, there's no "more" to add, so computeWidgetViewModel falls
-// back to the addingQty/savings line instead.
-function formatAddMoreText(progressState, tiers, basePrice, formatMoneyFn, title) {
-  const ts = progressState.tierState
-  const next = ts.nextTier || (ts.remainingTiers && ts.remainingTiers[0])
-  const hasTitle = title != null && title !== ''
-  const nextPrice = formatMoneyFn(unitPriceAtTier(basePrice, next))
-  if (!hasTitle) {
-    return 'Add ' + next.delta + ' more to get them for ' + nextPrice
-  }
-  const qty = progressState.combinedQty
-  return 'You have ' + qty + ' ' + pluralizeTitle(title, qty) + ', add ' + next.delta + ' to get them for ' + nextPrice
-}
-
 function formatTempBoxLabel(progressState, basePrice, formatMoneyFn) {
   if (!progressState.tempBox) return ''
   const qty = progressState.combinedQty
-  const total = Math.round(unitPriceAtTier(basePrice, progressState.tempBox.tier) * qty * 100) / 100
-  return qty + 'x ' + formatMoneyFn(total)
+  return qty + ' × ' + formatMoneyFn(perUnitPrice(basePrice, qty, progressState.tierState))
 }
 
 function computeOrderSummary(basePrice, addingQty, unitPrice) {
@@ -268,21 +210,130 @@ function joinNaturally(parts) {
   return parts.slice(0, -1).join(', ') + ', or ' + parts[parts.length - 1]
 }
 
-function buildPromoText(tiers, basePrice, formatMoneyFn, isGroup, title) {
-  const sorted = sortTiersByMinQty(tiers)
-  const clauses = sorted.slice(1).map((t) => t.minQty + ' or more for ' + formatMoneyFn(unitPriceAtTier(basePrice, t)))
-  const tail = joinNaturally(clauses)
-  const hasTitle = title != null && title !== ''
-  if (isGroup) {
-    return hasTitle ? 'Mix and match any ' + title + ' and get ' + tail : 'Mix and match and get ' + tail
+// Redesign (Stitch design) view-model pieces: pure, unused by the DOM until the
+// layout PRs paint them.
+
+// Progress bar with a dot on the current quantity. Markers sit at each tier's
+// own minQty (the synthetic minQty:1 anchor is the start), evenly spaced
+// whatever the value gaps. The dot is
+// interpolated inside the segment it falls in; past the last tier it stays at
+// the end but keeps showing the real quantity. A marker the dot sits exactly
+// on is `covered` so the DOM can hide its label under the dot.
+function computeProgressDot(sortedTiers, combinedQty) {
+  const values = sortedTiers.map((t) => t.minQty)
+  const n = values.length
+  const step = n > 1 ? 100 / (n - 1) : 0
+  let dotPct = 100
+  if (combinedQty <= values[0]) {
+    dotPct = 0
+  } else {
+    for (let i = 0; i < n - 1; i++) {
+      if (combinedQty <= values[i + 1]) {
+        const span = values[i + 1] - values[i]
+        dotPct = Math.round(clamp(i * step + ((combinedQty - values[i]) / span) * step, 0, 100))
+        break
+      }
+    }
   }
-  return hasTitle ? 'Buy ' + title + ' and get ' + tail : 'Buy more and get ' + tail
+  const markers = values.map((value, i) => {
+    const pct = Math.round(i * step)
+    return { value, pct, reached: combinedQty >= value, covered: pct === dotPct }
+  })
+  return { dotValue: combinedQty, dotPct, markers }
+}
+
+// 'progress': no discount applied yet. 'offer': a middle tier applies.
+// 'highest': the top tier applies (or is passed). Discounted means the same as
+// computeWidgetViewModel's price row: a fixed price or a percent off.
+function classifyOfferState(progressState) {
+  const ts = progressState.tierState
+  const discounted = ts.fixedPrice != null || ts.percentOff > 0
+  if (!discounted) return 'progress'
+  return progressState.maxed ? 'highest' : 'offer'
+}
+
+function pluralizeUnits(qty) {
+  return qty + (qty === 1 ? ' unit' : ' units')
+}
+
+// The line under the price before any offer applies: "Mix and match 8+ for
+// £1.63 or 16+ for £1.55" (group) / "Buy 8+ for …" (standalone).
+function buildPromoLine(tiers, basePrice, formatMoneyFn, isGroup) {
+  const clauses = sortTiersByMinQty(tiers).slice(1).map((t) => t.minQty + '+ for ' + formatMoneyFn(unitPriceAtTier(basePrice, t)))
+  if (clauses.length === 0) return ''
+  return (isGroup ? 'Mix and match ' : 'Buy ') + joinNaturally(clauses)
+}
+
+// Status row + headline copy per state. `hintText`/`badgeText` go in the
+// status row's right-hand slot; `headlineText` replaces the promo line under
+// the price once an offer applies. No "Tier N" wording: middle tiers read
+// "Offer unlocked", the top one "Highest discount unlocked".
+function buildStatusCopy({ progressState, tiers, basePrice, formatMoney: formatMoneyFn }) {
+  const state = classifyOfferState(progressState)
+  const sorted = sortTiersByMinQty(tiers)
+  const qty = progressState.combinedQty
+  const ts = progressState.tierState
+  const unit = perUnitPrice(basePrice, qty, ts)
+  const savings = computeOrderSummary(basePrice, qty, unit).savings
+  const nextRaw = ts.nextTier || (ts.remainingTiers && ts.remainingTiers[0])
+  // The state's nextTier only carries minQty/percentOff/fixedPrice; price the
+  // configured tier itself so an anchor tier is priced right.
+  const next = nextRaw ? sorted.find((t) => t.minQty === nextRaw.minQty) : null
+  const nextPrice = next ? formatMoneyFn(unitPriceAtTier(basePrice, next)) : null
+
+  if (state === 'progress') {
+    return {
+      state,
+      statusText: 'You have ' + pluralizeUnits(qty),
+      hintText: next ? 'Add ' + nextRaw.delta + ' for ' + nextPrice + '/ea' : null,
+      badgeText: null,
+      headlineText: null,
+    }
+  }
+  if (state === 'offer') {
+    const nextIsHighest = next && next.minQty === progressState.topThreshold
+    return {
+      state,
+      statusText: pluralizeUnits(qty) + ' × ' + formatMoneyFn(unit) + ' (Offer unlocked)',
+      hintText: null,
+      badgeText: 'Save ' + formatMoneyFn(savings),
+      headlineText: 'Offer unlocked! Add ' + nextRaw.delta + ' more to unlock ' + (nextIsHighest ? 'the highest discount' : 'the next offer') + ' for ' + nextPrice,
+    }
+  }
+  return {
+    state,
+    statusText: 'You have ' + pluralizeUnits(qty),
+    hintText: '✓ Highest discount (' + formatMoneyFn(unit) + '/ea)',
+    badgeText: null,
+    headlineText: 'Highest discount unlocked: ' + formatMoneyFn(unit) + '/each applied! (Save ' + formatMoneyFn(savings) + ')',
+  }
+}
+
+// role="progressbar" values and the text a screen reader speaks for the bar.
+// The value is clamped to the range; the text keeps the real quantity.
+function buildProgressSemantics(progressState) {
+  const qty = progressState.combinedQty
+  const min = progressState.startThreshold
+  const max = progressState.topThreshold
+  const state = classifyOfferState(progressState)
+  const head = qty > max ? pluralizeUnits(qty) : qty + ' of ' + max + ' units'
+  let tail = ''
+  if (state === 'highest') {
+    tail = 'Highest discount unlocked'
+  } else if (state === 'offer') {
+    tail = 'Offer unlocked, highest discount at ' + max
+  } else {
+    const ts = progressState.tierState
+    const next = ts.nextTier || (ts.remainingTiers && ts.remainingTiers[0])
+    if (next) tail = 'Next offer at ' + next.minQty
+  }
+  return { valueNow: clamp(qty, min, max), valueMin: min, valueMax: max, valueText: head + '. ' + (tail ? tail + '.' : '') }
 }
 
 // View-model assembly: decides WHAT the widget shows. The DOM layer below
 // only paints whatever this returns.
 
-function computeWidgetViewModel({ tiers, basePrice, compareAtPrice, otherQty, addingQty, title, isGroup, formatMoney: formatMoneyFn }) {
+function computeWidgetViewModel({ tiers, basePrice, compareAtPrice, otherQty, addingQty, isGroup, formatMoney: formatMoneyFn }) {
   const plainPrice = formatMoneyFn(basePrice)
 
   if (!tiers || tiers.length === 0) {
@@ -294,12 +345,15 @@ function computeWidgetViewModel({ tiers, basePrice, compareAtPrice, otherQty, ad
       showCard: false,
       discountedPrice: hasCompareAtDiscount ? plainPrice : null,
       plainPrice: hasCompareAtDiscount ? formatMoneyFn(compareAtPrice) : plainPrice,
-      promoText: '',
       progressState: null,
       tierButtons: [],
       tempBoxLabel: null,
       tempBoxAfterIndex: null,
-      breakdownText: null, // null = leave it alone, distinct from '' = clear it
+      offerState: null,
+      dot: null,
+      promoLine: '',
+      status: null,
+      semantics: null,
     }
   }
 
@@ -310,49 +364,86 @@ function computeWidgetViewModel({ tiers, basePrice, compareAtPrice, otherQty, ad
   const isDiscounted = progressState.tierState.fixedPrice != null || progressState.tierState.percentOff > 0
 
   const sortedTiers = sortTiersByMinQty(tiers)
+  // "8 × £1.63": the unit price at each tier. Tiers below the applied one are
+  // dimmed; none are before the first offer applies.
+  const appliedMinQty = classifyOfferState(progressState) === 'progress' ? 0 : progressState.tierState.minQty
   const tierButtons = progressState.tierButtons.map((btn, i) => ({
     minQty: btn.minQty,
     active: btn.active,
-    label: btn.minQty + ' x ' + formatMoneyFn(totalAtTier(basePrice, sortedTiers[i])),
+    dimmed: btn.minQty < appliedMinQty,
+    label: btn.minQty + ' × ' + formatMoneyFn(unitPriceAtTier(basePrice, sortedTiers[i])),
   }))
-
-  const summary = computeOrderSummary(basePrice, addingQty, unit)
-  const unitLabel = addingQty === 1 ? ' unit' : ' units'
-  let breakdownText = addingQty + unitLabel + ' × ' + formatMoneyFn(unit)
-  if (summary.savings > 0) {
-    breakdownText += ' · full price ' + formatMoneyFn(summary.fullPrice) + ' — you save ' + formatMoneyFn(summary.savings)
-  }
-  if (!progressState.maxed) {
-    breakdownText = formatAddMoreText(progressState, tiers, basePrice, formatMoneyFn, title)
-  }
 
   return {
     showCard: true,
     discountedPrice: isDiscounted ? formatMoneyFn(unit) : null,
     plainPrice,
-    promoText: tiers.length > 1 ? buildPromoText(tiers, basePrice, formatMoneyFn, isGroup, title) : '',
     progressState,
     tierButtons,
     tempBoxLabel: progressState.tempBox ? formatTempBoxLabel(progressState, basePrice, formatMoneyFn) : null,
     tempBoxAfterIndex: progressState.tempBox ? progressState.tempBox.afterIndex : null,
-    breakdownText,
+    offerState: classifyOfferState(progressState),
+    dot: computeProgressDot(sortedTiers, progressState.combinedQty),
+    promoLine: buildPromoLine(tiers, basePrice, formatMoneyFn, isGroup),
+    status: buildStatusCopy({ progressState, tiers, basePrice, formatMoney: formatMoneyFn }),
+    semantics: buildProgressSemantics(progressState),
   }
 }
 
 // Mix & match product list — pure row-building, then a thin DOM paint.
 
-function buildMixMatchRows(products, cartItems) {
+// `pricing` ({ combinedQty, tierState, formatMoney }) prices each row at the
+// per-unit price the applied tier gives it; null leaves the price label empty.
+// Prices in `products` are Shopify's integer minor units (cents).
+function buildMixMatchRows(products, cartItems, pricing) {
   return products.map((product) => {
     const member = { productId: extractNumericId(product.productId), variantId: product.variantId ? extractNumericId(product.variantId) : undefined }
     const qty = sumMemberQuantityInCart(cartItems || [], [member])
+    const cartVariantId = product.cartVariantId != null ? String(product.cartVariantId) : null
+    const priceLabel = product.price != null && pricing
+      ? pricing.formatMoney(perUnitPrice(product.price / 100, pricing.combinedQty, pricing.tierState))
+      : ''
     return {
       // The theme (Liquid) builds the link from the live product, including any ?variant= query.
       href: product.url,
       title: product.title,
       imageUrl: product.imageUrl || null,
-      qtyLabel: qty === 1 ? '1 in cart' : qty + ' in cart',
+      qty,
+      priceLabel,
+      available: product.available !== false,
+      cartVariantId,
+      canAdd: cartVariantId != null && product.available !== false,
+      canRemove: cartVariantId != null && qty > 0,
+      // No single variant to add (a whole product that has several): the row
+      // links to the product instead of showing − / +.
+      needsOptions: cartVariantId == null,
     }
   })
+}
+
+// The request that lowers (-1) or raises (+1) a row's cart quantity by one, or
+// null when the row can't do that. Adding goes through /cart/add.js; lowering
+// changes the existing cart line by its key.
+function buildCartChange(row, cartItems, delta) {
+  if (row.cartVariantId == null) return null
+  if (delta > 0) {
+    return row.canAdd ? { url: '/cart/add.js', body: { items: [{ id: Number(row.cartVariantId), quantity: 1 }] } } : null
+  }
+  if (!row.canRemove) return null
+  const line = (cartItems || []).find((item) => String(item.variant_id) === row.cartVariantId && item.quantity > 0)
+  return line ? { url: '/cart/change.js', body: { id: line.key, quantity: line.quantity - 1 } } : null
+}
+
+// Shopify's cart endpoints answer errors with { status, message, description };
+// the description is the customer-facing one ("You can only add 3 ...").
+function cartErrorMessage(error) {
+  if (error && error.description) return error.description
+  if (error && error.message) return error.message
+  return 'Could not update the cart. Please try again.'
+}
+
+function formatItemsChosen(qty) {
+  return qty + (qty === 1 ? ' item chosen' : ' items chosen')
 }
 
 // Cross-product siblings plus every one of this product's own other
@@ -373,7 +464,10 @@ function buildDisplayMixMatchItems(config) {
     variantId: opt.variantId,
     title: opt.title,
     url: opt.url,
-    imageUrl: null,
+    imageUrl: opt.imageUrl || null,
+    price: opt.price,
+    available: opt.available,
+    cartVariantId: opt.cartVariantId,
   }))
   return ownRows.concat(config.mixMatchListItems)
 }
@@ -448,20 +542,23 @@ if (typeof module !== 'undefined' && module.exports) {
     sumMemberQuantityInCart,
     resolveEligibility,
     unitPriceAtTier,
-    totalAtTier,
     computeProgressState,
-    computeProgressTrack,
-    pluralizeTitle,
-    formatAddMoreText,
     formatTempBoxLabel,
     joinNaturally,
-    buildPromoText,
     computeOrderSummary,
     computeTierButtonsSignature,
     withUnitAnchor,
     cartBaselineOtherQty,
+    computeProgressDot,
+    classifyOfferState,
+    buildPromoLine,
+    buildStatusCopy,
     computeWidgetViewModel,
     buildMixMatchRows,
+    buildCartChange,
+    buildProgressSemantics,
+    cartErrorMessage,
+    formatItemsChosen,
     buildDisplayMixMatchItems,
     listedMixMatchItems,
   }
@@ -474,11 +571,20 @@ if (typeof document !== 'undefined') {
     return (amount) => formatMoney(amount, moneyFormat)
   }
 
+  // Rewrites text only when it changed: live regions re-announce on every
+  // write, and the widget repaints once a second.
+  function setText(el, text) {
+    if (el && el.textContent !== text) el.textContent = text
+  }
+
   function paintPriceRow(elements, viewModel) {
     if (viewModel.discountedPrice) {
-      elements.priceEl.innerHTML = viewModel.discountedPrice + ' <s>' + viewModel.plainPrice + '</s>'
+      // Screen readers would otherwise read the two prices as bare numbers.
+      const html = '<span class="sparkly-tier-pricing__sr-only">Discounted price: </span>' + viewModel.discountedPrice +
+        ' <s><span class="sparkly-tier-pricing__sr-only">Original price: </span>' + viewModel.plainPrice + '</s>'
+      if (elements.priceEl.innerHTML !== html) elements.priceEl.innerHTML = html
     } else {
-      elements.priceEl.textContent = viewModel.plainPrice
+      setText(elements.priceEl, viewModel.plainPrice)
     }
     // "each" only makes sense once there's a per-unit/bulk-pricing story to
     // explain — showCard already means "this product has a discount
@@ -487,37 +593,72 @@ if (typeof document !== 'undefined') {
   }
 
   function paintPromo(elements, viewModel) {
-    if (elements.promoEl) elements.promoEl.textContent = viewModel.promoText
+    if (!elements.promoEl) return
+    // Once an offer applies the headline replaces the "buy more" line.
+    const headline = viewModel.status && viewModel.status.headlineText
+    setText(elements.promoEl, headline || viewModel.promoLine)
   }
 
   function paintCard(elements, viewModel) {
     if (elements.cardEl) elements.cardEl.hidden = !viewModel.showCard
   }
 
-  function paintBreakdown(elements, viewModel) {
-    // null = no discount configured — leave existing text alone (card is hidden anyway).
-    if (elements.breakdownEl && viewModel.breakdownText != null) {
-      elements.breakdownEl.textContent = viewModel.breakdownText
+  // Status row: what the customer has (left) and the hint, badge or highest
+  // discount tick (right). The badge ("Save £0.60") gets its own look.
+  function paintStatus(elements, viewModel) {
+    const status = viewModel.status
+    if (!status) return
+    setText(elements.statusEl, status.statusText)
+    if (elements.asideEl) {
+      setText(elements.asideEl, status.badgeText || status.hintText || '')
+      elements.asideEl.classList.toggle('sparkly-tier-pricing__aside--badge', !!status.badgeText)
     }
   }
 
-  function paintProgressStops(elements, stops) {
-    elements.stopsEl.innerHTML = ''
-    stops.forEach((stop) => {
+  // Bar: fill up to the dot, a marker per tier number, and the dot showing the
+  // current quantity. A marker the dot sits on is hidden under it.
+  function paintProgressBar(elements, dot, semantics) {
+    elements.fillEl.style.width = dot.dotPct + '%'
+    elements.markersEl.innerHTML = ''
+    dot.markers.forEach((marker) => {
       const el = document.createElement('span')
-      el.className = 'sparkly-tier-pricing__stop' + (stop.active ? ' sparkly-tier-pricing__stop--active' : '')
-      el.textContent = String(stop.value)
-      elements.stopsEl.appendChild(el)
+      el.className = 'sparkly-tier-pricing__marker' +
+        (marker.reached ? ' sparkly-tier-pricing__marker--reached' : '') +
+        (marker.covered ? ' sparkly-tier-pricing__marker--covered' : '')
+      el.style.left = marker.pct + '%'
+      el.textContent = String(marker.value)
+      elements.markersEl.appendChild(el)
     })
+    elements.dotEl.style.left = dot.dotPct + '%'
+    elements.dotEl.textContent = String(dot.dotValue)
+    if (elements.barEl && semantics) {
+      elements.barEl.setAttribute('aria-valuenow', String(semantics.valueNow))
+      elements.barEl.setAttribute('aria-valuemin', String(semantics.valueMin))
+      elements.barEl.setAttribute('aria-valuemax', String(semantics.valueMax))
+      elements.barEl.setAttribute('aria-valuetext', semantics.valueText)
+    }
   }
 
+  // One pill per tier ("8 × £1.63"); the exact-match pill carries a tick and
+  // tiers below the applied one are dimmed. A dashed box between two pills
+  // shows the quantity that sits between tiers.
   function paintTierButtons(elements, viewModel) {
     elements.tiersEl.innerHTML = ''
     viewModel.tierButtons.forEach((btn, i) => {
       const el = document.createElement('button')
       el.type = 'button'
-      el.className = 'sparkly-tier-pricing__tier-btn' + (btn.active ? ' sparkly-tier-pricing__tier-btn--active' : '')
+      el.className = 'sparkly-tier-pricing__tier-btn' +
+        (btn.active ? ' sparkly-tier-pricing__tier-btn--active' : '') +
+        (btn.dimmed ? ' sparkly-tier-pricing__tier-btn--dimmed' : '')
       el.textContent = btn.label
+      el.setAttribute('aria-pressed', btn.active ? 'true' : 'false')
+      if (btn.active) {
+        const tick = document.createElement('span')
+        tick.className = 'sparkly-tier-pricing__tier-tick'
+        tick.setAttribute('aria-hidden', 'true')
+        tick.textContent = '✓'
+        el.appendChild(tick)
+      }
       el.addEventListener('click', () => setQuantityInput(btn.minQty))
       elements.tiersEl.appendChild(el)
 
@@ -537,8 +678,7 @@ if (typeof document !== 'undefined') {
     if (!viewModel.showCard || !viewModel.progressState) return
     const state = viewModel.progressState
 
-    elements.fillEl.style.width = state.fillPct + '%'
-    paintProgressStops(elements, state.stops)
+    paintProgressBar(elements, viewModel.dot, viewModel.semantics)
 
     const signature = computeTierButtonsSignature(state, basePrice, addingQty)
     if (tierButtonsSignatureRef.value === signature) return
@@ -551,20 +691,25 @@ if (typeof document !== 'undefined') {
     paintPromo(elements, viewModel)
     paintCard(elements, viewModel)
     paintProgressCard(elements, viewModel, basePrice, addingQty, tierButtonsSignatureRef)
-    paintBreakdown(elements, viewModel)
+    paintStatus(elements, viewModel)
   }
 
+  // One row per member: thumbnail, name and price (a link to the product), and
+  // the quantity already in the cart. Rows are read-only here.
   function paintMixMatchList(listEl, rows) {
     listEl.innerHTML = ''
     rows.forEach((row) => {
+      const item = document.createElement('div')
+      item.className = 'sparkly-tier-pricing__list-item'
+
       const link = document.createElement('a')
       link.href = row.href
-      link.className = 'sparkly-tier-pricing__list-item'
+      link.className = 'sparkly-tier-pricing__list-link'
 
       if (row.imageUrl) {
         const img = document.createElement('img')
         img.src = row.imageUrl
-        img.alt = row.title
+        img.alt = ''
         img.className = 'sparkly-tier-pricing__list-thumb'
         link.appendChild(img)
       } else {
@@ -573,22 +718,63 @@ if (typeof document !== 'undefined') {
         link.appendChild(placeholder)
       }
 
+      const text = document.createElement('span')
+      text.className = 'sparkly-tier-pricing__list-text'
       const name = document.createElement('span')
       name.className = 'sparkly-tier-pricing__list-name'
       name.textContent = row.title
-      link.appendChild(name)
+      text.appendChild(name)
+      const price = document.createElement('span')
+      price.className = 'sparkly-tier-pricing__list-price'
+      price.textContent = row.available ? row.priceLabel : 'Sold out'
+      text.appendChild(price)
+      link.appendChild(text)
+      item.appendChild(link)
 
-      const qtyLabel = document.createElement('span')
-      qtyLabel.className = 'sparkly-tier-pricing__list-qty'
-      qtyLabel.textContent = row.qtyLabel
-      link.appendChild(qtyLabel)
+      item.appendChild(paintRowStepper(row))
 
-      listEl.appendChild(link)
+      listEl.appendChild(item)
     })
   }
 
-  function renderMixMatchList(listEl, products, cartItems) {
-    paintMixMatchList(listEl, buildMixMatchRows(products, cartItems))
+  // − [qty] + for a row that can change the cart; a "Choose options" link when
+  // it has no single variant to add.
+  function paintRowStepper(row) {
+    const group = document.createElement('div')
+    group.className = 'sparkly-tier-pricing__stepper'
+
+    if (row.needsOptions) {
+      const options = document.createElement('a')
+      options.href = row.href
+      options.className = 'sparkly-tier-pricing__options-link'
+      options.textContent = 'Choose options'
+      group.appendChild(options)
+    }
+
+    function stepButton(delta, enabled, symbol, label) {
+      const btn = document.createElement('button')
+      btn.type = 'button'
+      btn.className = 'sparkly-tier-pricing__step'
+      btn.textContent = symbol
+      btn.disabled = !enabled
+      btn.setAttribute('aria-label', label + ' ' + row.title)
+      btn.setAttribute('data-cart-delta', String(delta))
+      btn.setAttribute('data-cart-variant', row.cartVariantId || '')
+      return btn
+    }
+
+    if (!row.needsOptions) group.appendChild(stepButton(-1, row.canRemove, '−', 'Remove one'))
+    const qty = document.createElement('span')
+    qty.className = 'sparkly-tier-pricing__list-qty'
+    qty.textContent = String(row.qty)
+    qty.setAttribute('aria-label', row.qty + ' in cart')
+    group.appendChild(qty)
+    if (!row.needsOptions) group.appendChild(stepButton(1, row.canAdd, '+', 'Add one'))
+    return group
+  }
+
+  function renderMixMatchList(listEl, products, cartItems, pricing) {
+    paintMixMatchList(listEl, buildMixMatchRows(products, cartItems, pricing))
   }
 
   function setQuantityInput(value) {
@@ -627,6 +813,34 @@ if (typeof document !== 'undefined') {
     lastKnownSelfQtyRef.value = selfQtyNow
   }
 
+  // Tells the theme the cart changed behind its back. Only themes that expose
+  // a global publish() and PUB_SUB_EVENTS.cartUpdate (Dawn-family) are told, and
+  // only one with a #cart-icon-bubble gets its header count refreshed; anywhere
+  // else the widget stays correct but the theme's own cart count refreshes on
+  // its next update. Each part is best effort: a theme hook failing must never
+  // break the widget.
+  async function refreshHeaderCartBubble() {
+    const bubble = document.getElementById('cart-icon-bubble')
+    if (!bubble) return
+    const root = (window.Shopify && window.Shopify.routes && window.Shopify.routes.root) || '/'
+    const response = await fetch(root + '?sections=cart-icon-bubble')
+    const sections = await response.json()
+    const html = new DOMParser().parseFromString(sections['cart-icon-bubble'], 'text/html')
+    const fresh = html.querySelector('.shopify-section')
+    if (fresh) bubble.innerHTML = fresh.innerHTML
+  }
+
+  function notifyThemeCartChanged() {
+    try {
+      if (typeof publish === 'function' && typeof PUB_SUB_EVENTS !== 'undefined' && PUB_SUB_EVENTS.cartUpdate) {
+        publish(PUB_SUB_EVENTS.cartUpdate, { source: 'sparkly-tier-pricing' })
+      }
+    } catch {
+      // see above
+    }
+    refreshHeaderCartBubble().catch(() => {})
+  }
+
   // DOM: per-widget setup
 
   function parseWidgetConfig(container) {
@@ -644,6 +858,10 @@ if (typeof document !== 'undefined') {
       variantId: extractNumericId(o.variantId),
       title: o.title,
       url: o.url,
+      imageUrl: o.imageUrl || null,
+      price: o.price,
+      available: o.available,
+      cartVariantId: o.cartVariantId != null ? String(o.cartVariantId) : null,
     }))
     const siblingMembers = (discount.siblings || []).map((s) => ({
       productId: extractNumericId(s.productId),
@@ -677,12 +895,18 @@ if (typeof document !== 'undefined') {
       eachLabelEl: container.querySelector('[data-tier-pricing-each-label]'),
       promoEl: container.querySelector('[data-tier-pricing-promo]'),
       cardEl: container.querySelector('[data-tier-pricing-card]'),
-      breakdownEl: container.querySelector('[data-tier-pricing-breakdown]'),
+      statusEl: container.querySelector('[data-tier-pricing-status]'),
+      asideEl: container.querySelector('[data-tier-pricing-aside]'),
       fillEl: container.querySelector('[data-tier-pricing-fill]'),
-      stopsEl: container.querySelector('[data-tier-pricing-stops]'),
+      barEl: container.querySelector('[data-tier-pricing-bar]'),
+      markersEl: container.querySelector('[data-tier-pricing-markers]'),
+      dotEl: container.querySelector('[data-tier-pricing-dot]'),
       tiersEl: container.querySelector('[data-tier-pricing-tiers]'),
       toggleEl: container.querySelector('[data-tier-pricing-toggle]'),
+      toggleArrowEl: container.querySelector('[data-tier-pricing-toggle-arrow]'),
       listEl: container.querySelector('[data-tier-pricing-list]'),
+      chosenEl: container.querySelector('[data-tier-pricing-chosen]'),
+      messageEl: container.querySelector('[data-tier-pricing-list-message]'),
     }
   }
 
@@ -695,6 +919,7 @@ if (typeof document !== 'undefined') {
     const variantStateRef = { value: config.initialVariantId }
     const formatMoneyFn = createMoneyFormatter(config.moneyFormat)
     let lastCartItems = []
+    let lastPricing = null
 
     async function render() {
       const basePrice = Number(container.dataset.basePrice)
@@ -726,11 +951,13 @@ if (typeof document !== 'undefined') {
         compareAtPrice,
         otherQty,
         addingQty,
-        title: config.title,
         isGroup: config.isGroup,
         formatMoney: formatMoneyFn,
       })
       paintWidget(elements, viewModel, basePrice, addingQty, tierButtonsSignatureRef)
+      lastPricing = viewModel.progressState
+        ? { combinedQty: viewModel.progressState.combinedQty, tierState: viewModel.progressState.tierState, formatMoney: formatMoneyFn }
+        : null
 
       const timeDiscountJson = container.dataset.timeDiscount
       if (timeDiscountJson) {
@@ -738,7 +965,8 @@ if (typeof document !== 'undefined') {
       }
 
       if (config.isGroup && elements.listEl && !elements.listEl.hidden) {
-        renderMixMatchList(elements.listEl, buildDisplayMixMatchItems(config), lastCartItems)
+        renderMixMatchList(elements.listEl, buildDisplayMixMatchItems(config), lastCartItems, lastPricing)
+        if (lastPricing) setText(elements.chosenEl, formatItemsChosen(lastPricing.combinedQty))
       }
     }
 
@@ -754,8 +982,62 @@ if (typeof document !== 'undefined') {
       elements.toggleEl.addEventListener('click', () => {
         open = !open
         elements.listEl.hidden = !open
-        elements.toggleEl.textContent = 'mix & match products ' + (open ? '▲' : '▼')
-        if (open) renderMixMatchList(elements.listEl, buildDisplayMixMatchItems(config), lastCartItems)
+        if (elements.chosenEl) elements.chosenEl.hidden = !open
+        elements.toggleEl.setAttribute('aria-expanded', open ? 'true' : 'false')
+        if (elements.toggleArrowEl) elements.toggleArrowEl.textContent = open ? '▲' : '▼'
+        if (open) {
+          renderMixMatchList(elements.listEl, buildDisplayMixMatchItems(config), lastCartItems, lastPricing)
+          if (lastPricing) setText(elements.chosenEl, formatItemsChosen(lastPricing.combinedQty))
+        }
+      })
+    }
+
+    // − / + on a row: change the real cart, then repaint everything from the
+    // fresh cart so the bar, dot, copy, pills and rows stay in step.
+    let cartBusy = false
+    function showListMessage(text) {
+      if (!elements.messageEl) return
+      elements.messageEl.textContent = text
+      elements.messageEl.hidden = !text
+    }
+
+    async function changeCart(variantId, delta) {
+      if (cartBusy) return
+      const rows = buildMixMatchRows(buildDisplayMixMatchItems(config), lastCartItems, lastPricing)
+      const row = rows.find((candidate) => candidate.cartVariantId === variantId)
+      const change = row && buildCartChange(row, lastCartItems, delta)
+      if (!change) return
+      cartBusy = true
+      elements.listEl.setAttribute('aria-busy', 'true')
+      showListMessage('')
+      try {
+        const response = await fetch(change.url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify(change.body),
+        })
+        if (!response.ok) {
+          showListMessage(cartErrorMessage(await response.json().catch(() => null)))
+          return
+        }
+        // Adding this product's own variant resets the page stepper to 1 (see
+        // resetStepperIfJustAdded), like Add to cart does, so the widget's
+        // numbers keep matching the cart.
+        notifyThemeCartChanged()
+        await render()
+      } catch {
+        showListMessage(cartErrorMessage(null))
+      } finally {
+        cartBusy = false
+        elements.listEl.removeAttribute('aria-busy')
+      }
+    }
+
+    if (elements.listEl) {
+      elements.listEl.addEventListener('click', (event) => {
+        const button = event.target.closest && event.target.closest('[data-cart-delta]')
+        if (!button || button.disabled) return
+        changeCart(button.getAttribute('data-cart-variant'), Number(button.getAttribute('data-cart-delta')))
       })
     }
 
