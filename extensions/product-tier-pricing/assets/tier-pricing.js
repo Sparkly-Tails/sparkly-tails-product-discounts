@@ -739,6 +739,11 @@ if (typeof document !== 'undefined') {
   // One row per member: thumbnail, name and price (a link to the product), and
   // one number (in the cart plus selected) with − / + that only select.
   function paintMixMatchList(listEl, rows) {
+    // The widget repaints once a second: rebuild only when a row changed, so the
+    // buttons stay in place (clicks land, focus is not dropped).
+    const signature = JSON.stringify(rows)
+    if (listEl.dataset.rowsSignature === signature) return
+    const focused = findFocusedControl({ doc: document, listEl })
     listEl.innerHTML = ''
     rows.forEach((row) => {
       const item = document.createElement('div')
@@ -777,6 +782,26 @@ if (typeof document !== 'undefined') {
 
       listEl.appendChild(item)
     })
+    listEl.dataset.rowsSignature = signature
+    restoreFocusedControl({ listEl, focused })
+  }
+
+  // The − / + control that has keyboard focus inside the list, as { variant, delta }, or null.
+  function findFocusedControl({ doc, listEl }) {
+    const active = doc.activeElement
+    if (!active || !listEl.contains(active)) return null
+    const delta = active.getAttribute('data-selection-delta')
+    if (delta == null) return null
+    return { variant: active.getAttribute('data-selection-variant'), delta }
+  }
+
+  // Puts focus back on the repainted twin of the control that had it; when that
+  // control is now disabled (nothing left to lower), on the row's other control.
+  function restoreFocusedControl({ listEl, focused }) {
+    if (!focused) return
+    const find = (delta) => listEl.querySelector('[data-selection-variant="' + focused.variant + '"][data-selection-delta="' + delta + '"]:not(:disabled)')
+    const target = find(focused.delta) || find(focused.delta === '1' ? '-1' : '1')
+    if (target) target.focus()
   }
 
   // The spoken form of a row's number: "8 in total: 6 in cart, 2 selected".

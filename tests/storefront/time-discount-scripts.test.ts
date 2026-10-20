@@ -509,6 +509,36 @@ describe('tier widget painting (redesign)', () => {
     expect(events).toEqual(['request /cart/add.js', 'theme add'])
   })
 
+  // The widget repaints once a second; the list must keep its buttons while nothing
+  // changed, and keyboard focus must stay on the control the customer is using.
+  it('keeps the list buttons while nothing changed (a once-a-second repaint does not rebuild them)', async () => {
+    await openList()
+    const before = document.querySelectorAll('[data-selection-delta="1"]')[1]
+    await vi.advanceTimersByTimeAsync(3500)
+    expect(document.querySelectorAll('[data-selection-delta="1"]')[1]).toBe(before)
+  })
+
+  it('keeps keyboard focus on the same control after a press repaints the list', async () => {
+    await openList()
+    const plus = () => document.querySelectorAll('[data-selection-delta="1"]')[1] as HTMLButtonElement
+    plus().focus()
+    plus().click()
+    await settle()
+    expect(document.activeElement).toBe(plus())
+    expect(document.activeElement!.getAttribute('data-selection-variant')).toBe('200')
+  })
+
+  it('moves focus to "+" when "−" becomes disabled because nothing is selected any more', async () => {
+    await openList()
+    await click('[data-selection-delta="1"]', 1)
+    const minus = () => document.querySelectorAll('[data-selection-delta="-1"]')[1] as HTMLButtonElement
+    minus().focus()
+    minus().click()
+    await settle()
+    expect(minus().disabled).toBe(true)
+    expect(document.activeElement).toBe(document.querySelectorAll('[data-selection-delta="1"]')[1])
+  })
+
   describe('accessibility', () => {
     it('the bar is a progressbar with the quantity, its range and a spoken summary', async () => {
       await mountTiers(10)
