@@ -1017,3 +1017,20 @@ test('buildMixMatchRows: a variant-scoped member matches only that exact variant
   })
   assert.equal(rows[0].qty, 3)
 })
+
+// A theme that saved the old default (44px) must still be accepted: Shopify
+// refuses to upload a template whose saved setting is above the schema maximum.
+
+test('the price size setting accepts the value 44 that themes saved earlier, defaults to 32, and says the display is capped at 36px', () => {
+  const fs = require('node:fs')
+  const path = require('node:path')
+  const root = path.join(__dirname, '../product-tier-pricing')
+  const block = fs.readFileSync(path.join(root, 'blocks/tier-pricing.liquid'), 'utf8')
+  const schema = JSON.parse(block.split('{% schema %}')[1].split('{% endschema %}')[0])
+  const setting = schema.settings.find((item) => item.id === 'price_font_size')
+  assert.ok(setting.max >= 44)
+  assert.equal(setting.default, 32)
+  assert.equal(setting.info, 't:price_font_size_info')
+  const strings = JSON.parse(fs.readFileSync(path.join(root, 'locales/en.default.schema.json'), 'utf8'))
+  assert.match(strings.price_font_size_info, /36px/)
+})
