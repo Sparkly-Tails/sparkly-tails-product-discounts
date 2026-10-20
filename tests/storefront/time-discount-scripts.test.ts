@@ -376,47 +376,60 @@ describe('tier widget painting (redesign)', () => {
     await vi.advanceTimersByTimeAsync(0)
   }
 
-  it('"+" on a row adds one unit to the real cart, then the bar, dot, copy and rows follow the cart', async () => {
+  it('"+" on a row only selects: no cart request is made, and the bar, dot, copy and totals follow the selection', async () => {
     await openList()
-    await click('[data-cart-delta="1"]', 1) // Chicken & Herring
-    expect(cartRequests).toEqual([{ url: '/cart/add.js', body: { items: [{ id: 200, quantity: 1 }] } }])
-    expect(painted()).toMatchObject({ status: 'You have 1 unit', dot: '1' })
-    for (let n = 0; n < 7; n++) await click('[data-cart-delta="1"]', 1)
-    // 8 in the cart across the group -> the first offer applies, everywhere at once
+    for (let n = 0; n < 7; n++) await click('[data-selection-delta="1"]', 1) // Chicken & Herring
+    expect(cartRequests).toEqual([])
+    expect(cartItems).toEqual([])
+    // 7 selected + the unit on the page = 8: the first offer applies, everywhere at once
     expect(painted()).toMatchObject({ status: '8 units × £1.63 (Offer unlocked)', aside: 'Save £0.48', dot: '8' })
     expect(document.querySelector('[data-tier-pricing-chosen]')!.textContent).toBe('8 items chosen')
-    expect([...document.querySelectorAll('.sparkly-tier-pricing__list-qty')].map((el) => el.textContent)).toEqual(['0', '8', '0'])
+    expect([...document.querySelectorAll('.sparkly-tier-pricing__list-qty')].map((el) => el.textContent)).toEqual(['0', '7', '0'])
   })
 
-  it('"−" lowers the matching cart line by its key, and is disabled when the row has none in the cart', async () => {
+  it('"−" lowers the selection and is disabled when nothing is selected', async () => {
+    await openList()
+    const minus = () => [...document.querySelectorAll('[data-selection-delta="-1"]')] as HTMLButtonElement[]
+    expect(minus().map((button) => button.disabled)).toEqual([true, true]) // own row at rest, Herring; Duck Mix has no stepper
+    await click('[data-selection-delta="1"]', 1)
+    await click('[data-selection-delta="1"]', 1)
+    expect(minus()[1].disabled).toBe(false)
+    await click('[data-selection-delta="-1"]', 1)
+    expect([...document.querySelectorAll('.sparkly-tier-pricing__list-qty')].map((el) => el.textContent)).toEqual(['0', '1', '0'])
+    expect(cartRequests).toEqual([])
+  })
+
+  it('a row shows what is in the cart plus what is selected, and "−" never goes below what is in the cart', async () => {
     cartItems = [{ key: '200:k', product_id: 20, variant_id: 200, quantity: 2 }]
     await openList()
-    const minus = [...document.querySelectorAll('[data-cart-delta="-1"]')] as HTMLButtonElement[]
-    expect(minus.map((b) => b.disabled)).toEqual([true, false]) // own row has none; Duck Mix has no stepper
-    await click('[data-cart-delta="-1"]', 1)
-    expect(cartRequests).toEqual([{ url: '/cart/change.js', body: { id: '200:k', quantity: 1 } }])
-    expect([...document.querySelectorAll('.sparkly-tier-pricing__list-qty')].map((el) => el.textContent)).toEqual(['0', '1', '0'])
+    const number = () => document.querySelectorAll('.sparkly-tier-pricing__list-qty')[1] as HTMLElement
+    expect(number().textContent).toBe('2')
+    await click('[data-selection-delta="1"]', 1)
+    expect(number().textContent).toBe('3')
+    expect(number().getAttribute('aria-label')).toBe('3 in total: 2 in cart, 1 selected')
+    await click('[data-selection-delta="-1"]', 1)
+    expect(number().textContent).toBe('2')
+    expect((document.querySelectorAll('[data-selection-delta="-1"]')[1] as HTMLButtonElement).disabled).toBe(true)
+    expect(cartRequests).toEqual([])
+  })
+
+  it('the row of the variant on the page changes the page quantity box instead of a selection', async () => {
+    await openList()
+    const input = document.querySelector('input[name="quantity"]') as HTMLInputElement
+    await click('[data-selection-delta="1"]', 0) // own row "+"
+    expect(input.value).toBe('2')
+    expect([...document.querySelectorAll('.sparkly-tier-pricing__list-qty')].map((el) => el.textContent)[0]).toBe('1')
+    expect(painted()).toMatchObject({ status: 'You have 2 units' })
+    await click('[data-selection-delta="-1"]', 0)
+    expect(input.value).toBe('1')
+    expect(cartRequests).toEqual([])
   })
 
   it('a row with no single variant links to the product instead of showing − / +', async () => {
     await openList()
     const rows = [...document.querySelectorAll('.sparkly-tier-pricing__list-item')]
-    expect(rows[2].querySelector('[data-cart-delta]')).toBeNull()
+    expect(rows[2].querySelector('[data-selection-delta]')).toBeNull()
     expect(rows[2].querySelector('.sparkly-tier-pricing__options-link')!.getAttribute('href')).toBe('/products/duck')
-  })
-
-  it('a refused change shows Shopify\'s own message and leaves the cart and the widget as they were', async () => {
-    await openList()
-    nextCartError = { status: '422', message: 'Cart Error', description: 'You can only add 3 of this item to your cart.' }
-    await click('[data-cart-delta="1"]', 1)
-    const message = document.querySelector('[data-tier-pricing-list-message]') as HTMLElement
-    expect(message.hidden).toBe(false)
-    expect(message.textContent).toBe('You can only add 3 of this item to your cart.')
-    expect(cartItems).toEqual([])
-    expect(painted()).toMatchObject({ status: 'You have 1 unit' })
-    nextCartError = null
-    await click('[data-cart-delta="1"]', 1)
-    expect(message.hidden).toBe(true) // the message clears on the next attempt
   })
 
   describe('accessibility', () => {

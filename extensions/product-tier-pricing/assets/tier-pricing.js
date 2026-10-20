@@ -392,46 +392,74 @@ function computeWidgetViewModel({ tiers, basePrice, compareAtPrice, otherQty, ad
 
 // Mix & match product list — pure row-building, then a thin DOM paint.
 
-// `pricing` ({ combinedQty, tierState, formatMoney }) prices each row at the
-// per-unit price the applied tier gives it; null leaves the price label empty.
-// Prices in `products` are Shopify's integer minor units (cents).
-function buildMixMatchRows(products, cartItems, pricing) {
+// Staged selection: what the customer picked in the list but has not added to
+// the cart yet, { [variantId]: quantity }. Nothing here touches the cart.
+
+function adjustSelection({ selection, variantId, delta }) {
+  const nextQty = Math.max(0, (selection[variantId] || 0) + delta)
+  const next = { ...selection }
+  if (nextQty === 0) delete next[variantId]
+  else next[variantId] = nextQty
+  return next
+}
+
+// The total selected, leaving out the variant the page quantity box stands for.
+function sumSelection({ selection, excludeVariantId }) {
+  return Object.keys(selection)
+    .filter((variantId) => variantId !== String(excludeVariantId))
+    .reduce((total, variantId) => total + selection[variantId], 0)
+}
+
+function dropSelection({ selection, variantId }) {
+  const next = { ...selection }
+  delete next[variantId]
+  return next
+}
+
+// The price label of a row: its own price at the per-unit price the applied
+// tier gives it ('' without a price or without pricing context).
+function formatRowPrice({ priceCents, pricing }) {
+  if (priceCents == null || !pricing) return ''
+  return pricing.formatMoney(perUnitPrice(priceCents / 100, pricing.combinedQty, pricing.tierState))
+}
+
+// What a row has selected: the page quantity box above its first unit for the
+// variant on the page, the staged selection for every other row.
+function readRowSelected({ isCurrent, stepperQty, selection, cartVariantId }) {
+  if (isCurrent) return Math.max(stepperQty - 1, 0)
+  return selection[cartVariantId] || 0
+}
+
+// `pricing` ({ combinedQty, tierState, formatMoney }) prices each row; null
+// leaves the price label empty. Prices in `products` are Shopify's integer
+// minor units (cents). A row shows ONE number: what is in the cart plus what
+// is selected (`total`).
+function buildMixMatchRows({ products, cartItems, pricing, selection, currentVariantId, stepperQty }) {
   return products.map((product) => {
     const member = { productId: extractNumericId(product.productId), variantId: product.variantId ? extractNumericId(product.variantId) : undefined }
     const qty = sumMemberQuantityInCart(cartItems || [], [member])
     const cartVariantId = product.cartVariantId != null ? String(product.cartVariantId) : null
-    const priceLabel = product.price != null && pricing
-      ? pricing.formatMoney(perUnitPrice(product.price / 100, pricing.combinedQty, pricing.tierState))
-      : ''
+    const isCurrent = cartVariantId != null && currentVariantId != null && cartVariantId === String(currentVariantId)
+    const selected = readRowSelected({ isCurrent, stepperQty, selection, cartVariantId })
     return {
       // The theme (Liquid) builds the link from the live product, including any ?variant= query.
       href: product.url,
       title: product.title,
       imageUrl: product.imageUrl || null,
       qty,
-      priceLabel,
+      selected,
+      total: qty + selected,
+      isCurrent,
+      priceLabel: formatRowPrice({ priceCents: product.price, pricing }),
       available: product.available !== false,
       cartVariantId,
       canAdd: cartVariantId != null && product.available !== false,
-      canRemove: cartVariantId != null && qty > 0,
-      // No single variant to add (a whole product that has several): the row
+      canRemove: cartVariantId != null && selected > 0,
+      // No single variant to select (a whole product that has several): the row
       // links to the product instead of showing − / +.
       needsOptions: cartVariantId == null,
     }
   })
-}
-
-// The request that lowers (-1) or raises (+1) a row's cart quantity by one, or
-// null when the row can't do that. Adding goes through /cart/add.js; lowering
-// changes the existing cart line by its key.
-function buildCartChange(row, cartItems, delta) {
-  if (row.cartVariantId == null) return null
-  if (delta > 0) {
-    return row.canAdd ? { url: '/cart/add.js', body: { items: [{ id: Number(row.cartVariantId), quantity: 1 }] } } : null
-  }
-  if (!row.canRemove) return null
-  const line = (cartItems || []).find((item) => String(item.variant_id) === row.cartVariantId && item.quantity > 0)
-  return line ? { url: '/cart/change.js', body: { id: line.key, quantity: line.quantity - 1 } } : null
 }
 
 // Shopify's cart endpoints answer errors with { status, message, description };
@@ -555,7 +583,9 @@ if (typeof module !== 'undefined' && module.exports) {
     buildStatusCopy,
     computeWidgetViewModel,
     buildMixMatchRows,
-    buildCartChange,
+    adjustSelection,
+    sumSelection,
+    dropSelection,
     buildProgressSemantics,
     cartErrorMessage,
     formatItemsChosen,
@@ -695,7 +725,7 @@ if (typeof document !== 'undefined') {
   }
 
   // One row per member: thumbnail, name and price (a link to the product), and
-  // the quantity already in the cart. Rows are read-only here.
+  // one number (in the cart plus selected) with − / + that only select.
   function paintMixMatchList(listEl, rows) {
     listEl.innerHTML = ''
     rows.forEach((row) => {
@@ -737,8 +767,16 @@ if (typeof document !== 'undefined') {
     })
   }
 
-  // − [qty] + for a row that can change the cart; a "Choose options" link when
-  // it has no single variant to add.
+  // The spoken form of a row's number: "8 in total: 6 in cart, 2 selected".
+  function describeRowTotal(row) {
+    const parts = []
+    if (row.qty > 0) parts.push(row.qty + ' in cart')
+    if (row.selected > 0) parts.push(row.selected + ' selected')
+    return row.total + ' in total' + (parts.length ? ': ' + parts.join(', ') : '')
+  }
+
+  // − [total] + for a row that can be selected; a "Choose options" link when it
+  // has no single variant to select.
   function paintRowStepper(row) {
     const group = document.createElement('div')
     group.className = 'sparkly-tier-pricing__stepper'
@@ -758,23 +796,23 @@ if (typeof document !== 'undefined') {
       btn.textContent = symbol
       btn.disabled = !enabled
       btn.setAttribute('aria-label', label + ' ' + row.title)
-      btn.setAttribute('data-cart-delta', String(delta))
-      btn.setAttribute('data-cart-variant', row.cartVariantId || '')
+      btn.setAttribute('data-selection-delta', String(delta))
+      btn.setAttribute('data-selection-variant', row.cartVariantId || '')
       return btn
     }
 
-    if (!row.needsOptions) group.appendChild(stepButton(-1, row.canRemove, '−', 'Remove one'))
-    const qty = document.createElement('span')
-    qty.className = 'sparkly-tier-pricing__list-qty'
-    qty.textContent = String(row.qty)
-    qty.setAttribute('aria-label', row.qty + ' in cart')
-    group.appendChild(qty)
-    if (!row.needsOptions) group.appendChild(stepButton(1, row.canAdd, '+', 'Add one'))
+    if (!row.needsOptions) group.appendChild(stepButton(-1, row.canRemove, '−', 'Select one less'))
+    const total = document.createElement('span')
+    total.className = 'sparkly-tier-pricing__list-qty'
+    total.textContent = String(row.total)
+    total.setAttribute('aria-label', describeRowTotal(row))
+    group.appendChild(total)
+    if (!row.needsOptions) group.appendChild(stepButton(1, row.canAdd, '+', 'Select one more'))
     return group
   }
 
-  function renderMixMatchList(listEl, products, cartItems, pricing) {
-    paintMixMatchList(listEl, buildMixMatchRows(products, cartItems, pricing))
+  function renderMixMatchList({ listEl, products, cartItems, pricing, selection, currentVariantId, stepperQty }) {
+    paintMixMatchList(listEl, buildMixMatchRows({ products, cartItems, pricing, selection, currentVariantId, stepperQty }))
   }
 
   function setQuantityInput(value) {
@@ -811,34 +849,6 @@ if (typeof document !== 'undefined') {
       setQuantityInput(1)
     }
     lastKnownSelfQtyRef.value = selfQtyNow
-  }
-
-  // Tells the theme the cart changed behind its back. Only themes that expose
-  // a global publish() and PUB_SUB_EVENTS.cartUpdate (Dawn-family) are told, and
-  // only one with a #cart-icon-bubble gets its header count refreshed; anywhere
-  // else the widget stays correct but the theme's own cart count refreshes on
-  // its next update. Each part is best effort: a theme hook failing must never
-  // break the widget.
-  async function refreshHeaderCartBubble() {
-    const bubble = document.getElementById('cart-icon-bubble')
-    if (!bubble) return
-    const root = (window.Shopify && window.Shopify.routes && window.Shopify.routes.root) || '/'
-    const response = await fetch(root + '?sections=cart-icon-bubble')
-    const sections = await response.json()
-    const html = new DOMParser().parseFromString(sections['cart-icon-bubble'], 'text/html')
-    const fresh = html.querySelector('.shopify-section')
-    if (fresh) bubble.innerHTML = fresh.innerHTML
-  }
-
-  function notifyThemeCartChanged() {
-    try {
-      if (typeof publish === 'function' && typeof PUB_SUB_EVENTS !== 'undefined' && PUB_SUB_EVENTS.cartUpdate) {
-        publish(PUB_SUB_EVENTS.cartUpdate, { source: 'sparkly-tier-pricing' })
-      }
-    } catch {
-      // see above
-    }
-    refreshHeaderCartBubble().catch(() => {})
   }
 
   // DOM: per-widget setup
@@ -918,8 +928,10 @@ if (typeof document !== 'undefined') {
     const lastKnownSelfQtyRef = { value: null }
     const variantStateRef = { value: config.initialVariantId }
     const formatMoneyFn = createMoneyFormatter(config.moneyFormat)
+    const selectionRef = { value: {} }
     let lastCartItems = []
     let lastPricing = null
+    let lastAddingQty = 1
 
     async function render() {
       const basePrice = Number(container.dataset.basePrice)
@@ -932,6 +944,10 @@ if (typeof document !== 'undefined') {
       // misattribute stepper-reset detection once a product has more than
       // one own member variant.
       const selfMemberNow = { productId: config.productId, variantId: variantStateRef.value }
+      lastAddingQty = addingQty
+      // The variant on the page is selected through the page quantity box, so it
+      // leaves the staged selection (it may sit there after a variant change).
+      selectionRef.value = dropSelection({ selection: selectionRef.value, variantId: variantStateRef.value })
 
       let otherQty = 0
       if (config.hasTiers) {
@@ -945,11 +961,13 @@ if (typeof document !== 'undefined') {
         }
       }
 
+      // Selected siblings count toward the offer like units in the cart.
+      const stagedQty = sumSelection({ selection: selectionRef.value, excludeVariantId: variantStateRef.value })
       const viewModel = computeWidgetViewModel({
         tiers: eligible ? config.tiers : [],
         basePrice,
         compareAtPrice,
-        otherQty,
+        otherQty: otherQty + stagedQty,
         addingQty,
         isGroup: config.isGroup,
         formatMoney: formatMoneyFn,
@@ -964,10 +982,21 @@ if (typeof document !== 'undefined') {
         updateTimeDiscountDisplay(container, timeDiscountJson, basePrice, variantStateRef.value, formatMoneyFn)
       }
 
-      if (config.isGroup && elements.listEl && !elements.listEl.hidden) {
-        renderMixMatchList(elements.listEl, buildDisplayMixMatchItems(config), lastCartItems, lastPricing)
-        if (lastPricing) setText(elements.chosenEl, formatItemsChosen(lastPricing.combinedQty))
-      }
+      paintList()
+    }
+
+    function paintList() {
+      if (!(config.isGroup && elements.listEl && !elements.listEl.hidden)) return
+      renderMixMatchList({
+        listEl: elements.listEl,
+        products: buildDisplayMixMatchItems(config),
+        cartItems: lastCartItems,
+        pricing: lastPricing,
+        selection: selectionRef.value,
+        currentVariantId: variantStateRef.value,
+        stepperQty: lastAddingQty,
+      })
+      if (lastPricing) setText(elements.chosenEl, formatItemsChosen(lastPricing.combinedQty))
     }
 
     // Liquid now renders the toggle+list markup unconditionally (see the
@@ -985,59 +1014,34 @@ if (typeof document !== 'undefined') {
         if (elements.chosenEl) elements.chosenEl.hidden = !open
         elements.toggleEl.setAttribute('aria-expanded', open ? 'true' : 'false')
         if (elements.toggleArrowEl) elements.toggleArrowEl.textContent = open ? '▲' : '▼'
-        if (open) {
-          renderMixMatchList(elements.listEl, buildDisplayMixMatchItems(config), lastCartItems, lastPricing)
-          if (lastPricing) setText(elements.chosenEl, formatItemsChosen(lastPricing.combinedQty))
-        }
+        if (open) paintList()
       })
     }
 
-    // − / + on a row: change the real cart, then repaint everything from the
-    // fresh cart so the bar, dot, copy, pills and rows stay in step.
-    let cartBusy = false
+    // − / + on a row only SELECT: nothing reaches the cart until Add to cart.
+    // The variant on the page is changed through the page quantity box (its
+    // input event repaints); every other row through the staged selection.
     function showListMessage(text) {
       if (!elements.messageEl) return
       elements.messageEl.textContent = text
       elements.messageEl.hidden = !text
     }
 
-    async function changeCart(variantId, delta) {
-      if (cartBusy) return
-      const rows = buildMixMatchRows(buildDisplayMixMatchItems(config), lastCartItems, lastPricing)
-      const row = rows.find((candidate) => candidate.cartVariantId === variantId)
-      const change = row && buildCartChange(row, lastCartItems, delta)
-      if (!change) return
-      cartBusy = true
-      elements.listEl.setAttribute('aria-busy', 'true')
+    function changeSelection({ variantId, delta }) {
       showListMessage('')
-      try {
-        const response = await fetch(change.url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-          body: JSON.stringify(change.body),
-        })
-        if (!response.ok) {
-          showListMessage(cartErrorMessage(await response.json().catch(() => null)))
-          return
-        }
-        // Adding this product's own variant resets the page stepper to 1 (see
-        // resetStepperIfJustAdded), like Add to cart does, so the widget's
-        // numbers keep matching the cart.
-        notifyThemeCartChanged()
-        await render()
-      } catch {
-        showListMessage(cartErrorMessage(null))
-      } finally {
-        cartBusy = false
-        elements.listEl.removeAttribute('aria-busy')
+      if (variantId === String(variantStateRef.value)) {
+        setQuantityInput(Math.max(lastAddingQty + delta, 1))
+        return
       }
+      selectionRef.value = adjustSelection({ selection: selectionRef.value, variantId, delta })
+      render()
     }
 
     if (elements.listEl) {
       elements.listEl.addEventListener('click', (event) => {
-        const button = event.target.closest && event.target.closest('[data-cart-delta]')
+        const button = event.target.closest && event.target.closest('[data-selection-delta]')
         if (!button || button.disabled) return
-        changeCart(button.getAttribute('data-cart-variant'), Number(button.getAttribute('data-cart-delta')))
+        changeSelection({ variantId: button.getAttribute('data-selection-variant'), delta: Number(button.getAttribute('data-selection-delta')) })
       })
     }
 
