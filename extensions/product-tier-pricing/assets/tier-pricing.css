@@ -34,13 +34,23 @@
      price below it (600) and inverts the intended hierarchy — the
      discounted price is the one that should read as bold/primary. */
   font-weight: 700;
-  font-size: var(--sparkly-tier-price-font-size, 2.5rem);
+  /* The block setting, never above 36px (the design's price size): a value
+     saved before the cap existed (44px) no longer oversizes the price. In px,
+     not rem: themes such as Dawn set the root font size to 62.5%. */
+  font-size: min(var(--sparkly-tier-price-font-size, 32px), 36px);
+  line-height: 1.1;
   color: var(--sparkly-tier-ink);
+}
+
+@media (max-width: 749px) {
+  .sparkly-tier-pricing__price {
+    font-size: min(var(--sparkly-tier-price-font-size, 32px), 28px);
+  }
 }
 
 .sparkly-tier-pricing__price s {
   font-weight: 400;
-  font-size: 75%;
+  font-size: 65%;
   /* Theme's secondary text colour rather than a faded one: opacity dropped the
      struck price below 4.5:1 contrast. */
   color: var(--sparkly-tier-text-secondary);
@@ -71,13 +81,13 @@
 .sparkly-tier-pricing__each-label {
   font-family: var(--font-stack-body);
   font-weight: 600;
-  font-size: 0.875rem;
+  font-size: 14px;
   color: var(--sparkly-tier-text-secondary);
 }
 
 .sparkly-tier-pricing__promo {
   font-family: var(--font-stack-body);
-  font-size: 0.75rem;
+  font-size: 12px;
   color: var(--sparkly-tier-text-secondary);
   margin: 0 0 10px;
 }
@@ -312,18 +322,29 @@
 
 .sparkly-tier-pricing__list-item {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 8px 12px;
 }
 
+/* The product link wants at least 240px; when the stepper does not fit beside
+   it, the stepper drops to a second line and the name gets the full width. */
 .sparkly-tier-pricing__list-link {
   display: flex;
+  flex: 1 1 240px;
   align-items: center;
   gap: 10px;
   min-width: 0;
   text-decoration: none;
   color: inherit;
+}
+
+/* Phones: the name always gets the whole row; the stepper sits under it. */
+@media (max-width: 480px) {
+  .sparkly-tier-pricing__list-link {
+    flex-basis: 100%;
+  }
 }
 
 .sparkly-tier-pricing__list-thumb {
@@ -347,9 +368,7 @@
   font-size: 12px;
   font-weight: 600;
   color: var(--sparkly-tier-ink);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .sparkly-tier-pricing__list-price {
@@ -362,6 +381,7 @@
 .sparkly-tier-pricing__stepper {
   display: flex;
   flex: none;
+  margin-left: auto;
   align-items: center;
   gap: 2px;
   padding: 2px;

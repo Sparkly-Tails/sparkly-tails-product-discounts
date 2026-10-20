@@ -1030,3 +1030,15 @@ test('computeWidgetViewModel: carries the progress bar semantics', () => {
   const vm = computeWidgetViewModel({ tiers: REDESIGN_TIERS_FIXED, basePrice: REDESIGN_BASE, otherQty: 0, addingQty: 10, isGroup: true, formatMoney: fmt })
   assert.equal(vm.semantics.valueNow, 10)
 })
+
+// Themes such as Dawn set the root font size to 62.5%, so 1rem is 10px there.
+
+test('the tier stylesheet sizes its text in px, never rem, and caps the price at 36px', () => {
+  const fs = require('node:fs')
+  const path = require('node:path')
+  const style = fs.readFileSync(path.join(__dirname, '../product-tier-pricing/assets/tier-pricing.css'), 'utf8')
+  const remSizes = style.match(/font-size:\s*[\d.]+rem/g) || []
+  assert.deepEqual(remSizes, [])
+  assert.match(style, /font-size:\s*min\(var\(--sparkly-tier-price-font-size, 32px\), 36px\)/)
+  assert.match(style, /@media \(max-width: 749px\)[^}]*\{[^}]*font-size:\s*min\(var\(--sparkly-tier-price-font-size, 32px\), 28px\)/)
+})
