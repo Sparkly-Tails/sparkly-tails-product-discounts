@@ -392,30 +392,6 @@ function computeWidgetViewModel({ tiers, basePrice, compareAtPrice, otherQty, ad
 
 // Mix & match product list — pure row-building, then a thin DOM paint.
 
-// Staged selection: what the customer picked in the list but has not added to
-// the cart yet, { [variantId]: quantity }. Nothing here touches the cart.
-
-function adjustSelection({ selection, variantId, delta }) {
-  const nextQty = Math.max(0, (selection[variantId] || 0) + delta)
-  const next = { ...selection }
-  if (nextQty === 0) delete next[variantId]
-  else next[variantId] = nextQty
-  return next
-}
-
-// The total selected, leaving out the variant the page quantity box stands for.
-function sumSelection({ selection, excludeVariantId }) {
-  return Object.keys(selection)
-    .filter((variantId) => variantId !== String(excludeVariantId))
-    .reduce((total, variantId) => total + selection[variantId], 0)
-}
-
-function dropSelection({ selection, variantId }) {
-  const next = { ...selection }
-  delete next[variantId]
-  return next
-}
-
 // The price label of a row: its own price at the per-unit price the applied
 // tier gives it ('' without a price or without pricing context).
 function formatRowPrice({ priceCents, pricing }) {
@@ -423,51 +399,27 @@ function formatRowPrice({ priceCents, pricing }) {
   return pricing.formatMoney(perUnitPrice(priceCents / 100, pricing.combinedQty, pricing.tierState))
 }
 
-// What a row has selected: the page quantity box above its first unit for the
-// variant on the page, the staged selection for every other row.
-function readRowSelected({ isCurrent, stepperQty, selection, cartVariantId }) {
-  if (isCurrent) return Math.max(stepperQty - 1, 0)
-  return selection[cartVariantId] || 0
-}
-
 // `pricing` ({ combinedQty, tierState, formatMoney }) prices each row; null
 // leaves the price label empty. Prices in `products` are Shopify's integer
-// minor units (cents). A row shows ONE number: what is in the cart plus what
-// is selected (`total`).
-function buildMixMatchRows({ products, cartItems, pricing, selection, currentVariantId, stepperQty }) {
+// minor units (cents). A row shows what is in the cart (`qty`) and, unless it is
+// the product on the page or sold out, an Add link to that product (`showAdd`).
+function buildMixMatchRows({ products, cartItems, pricing, currentVariantId }) {
   return products.map((product) => {
     const member = { productId: extractNumericId(product.productId), variantId: product.variantId ? extractNumericId(product.variantId) : undefined }
-    const qty = sumMemberQuantityInCart(cartItems || [], [member])
     const cartVariantId = product.cartVariantId != null ? String(product.cartVariantId) : null
     const isCurrent = cartVariantId != null && currentVariantId != null && cartVariantId === String(currentVariantId)
-    const selected = readRowSelected({ isCurrent, stepperQty, selection, cartVariantId })
+    const available = product.available !== false
     return {
       // The theme (Liquid) builds the link from the live product, including any ?variant= query.
       href: product.url,
       title: product.title,
       imageUrl: product.imageUrl || null,
-      qty,
-      selected,
-      total: qty + selected,
-      isCurrent,
+      qty: sumMemberQuantityInCart(cartItems || [], [member]),
       priceLabel: formatRowPrice({ priceCents: product.price, pricing }),
-      available: product.available !== false,
-      cartVariantId,
-      canAdd: cartVariantId != null && product.available !== false,
-      canRemove: cartVariantId != null && selected > 0,
-      // No single variant to select (a whole product that has several): the row
-      // links to the product instead of showing − / +.
-      needsOptions: cartVariantId == null,
+      available,
+      showAdd: available && !isCurrent,
     }
   })
-}
-
-// Shopify's cart endpoints answer errors with { status, message, description };
-// the description is the customer-facing one ("You can only add 3 ...").
-function cartErrorMessage(error) {
-  if (error && error.description) return error.description
-  if (error && error.message) return error.message
-  return 'Could not update the cart. Please try again.'
 }
 
 function formatItemsChosen(qty) {
@@ -583,11 +535,7 @@ if (typeof module !== 'undefined' && module.exports) {
     buildStatusCopy,
     computeWidgetViewModel,
     buildMixMatchRows,
-    adjustSelection,
-    sumSelection,
-    dropSelection,
     buildProgressSemantics,
-    cartErrorMessage,
     formatItemsChosen,
     buildDisplayMixMatchItems,
     listedMixMatchItems,
@@ -724,8 +672,8 @@ if (typeof document !== 'undefined') {
     paintStatus(elements, viewModel)
   }
 
-  // One row per member: thumbnail, name and price (a link to the product), and
-  // one number (in the cart plus selected) with − / + that only select.
+  // One row per member: thumbnail, name and price (a link to the product), the
+  // number in the cart, and a small Add link that opens the product.
   function paintMixMatchList(listEl, rows) {
     listEl.innerHTML = ''
     rows.forEach((row) => {
@@ -761,58 +709,37 @@ if (typeof document !== 'undefined') {
       link.appendChild(text)
       item.appendChild(link)
 
-      item.appendChild(paintRowStepper(row))
+      item.appendChild(paintRowAction(row))
 
       listEl.appendChild(item)
     })
   }
 
-  // The spoken form of a row's number: "8 in total: 6 in cart, 2 selected".
-  function describeRowTotal(row) {
-    const parts = []
-    if (row.qty > 0) parts.push(row.qty + ' in cart')
-    if (row.selected > 0) parts.push(row.selected + ' selected')
-    return row.total + ' in total' + (parts.length ? ': ' + parts.join(', ') : '')
-  }
-
-  // − [total] + for a row that can be selected; a "Choose options" link when it
-  // has no single variant to select.
-  function paintRowStepper(row) {
+  // The number in the cart plus, when the product can be added, an "Add" link to
+  // it (the product on the page and sold-out rows have none).
+  function paintRowAction(row) {
     const group = document.createElement('div')
-    group.className = 'sparkly-tier-pricing__stepper'
+    group.className = 'sparkly-tier-pricing__row-action'
 
-    if (row.needsOptions) {
-      const options = document.createElement('a')
-      options.href = row.href
-      options.className = 'sparkly-tier-pricing__options-link'
-      options.textContent = 'Choose options'
-      group.appendChild(options)
+    const count = document.createElement('span')
+    count.className = 'sparkly-tier-pricing__list-qty'
+    count.textContent = String(row.qty)
+    count.setAttribute('aria-label', row.qty + ' in cart')
+    group.appendChild(count)
+
+    if (row.showAdd) {
+      const add = document.createElement('a')
+      add.href = row.href
+      add.className = 'sparkly-tier-pricing__add'
+      add.textContent = 'Add'
+      add.setAttribute('aria-label', 'Add ' + row.title)
+      group.appendChild(add)
     }
-
-    function stepButton(delta, enabled, symbol, label) {
-      const btn = document.createElement('button')
-      btn.type = 'button'
-      btn.className = 'sparkly-tier-pricing__step'
-      btn.textContent = symbol
-      btn.disabled = !enabled
-      btn.setAttribute('aria-label', label + ' ' + row.title)
-      btn.setAttribute('data-selection-delta', String(delta))
-      btn.setAttribute('data-selection-variant', row.cartVariantId || '')
-      return btn
-    }
-
-    if (!row.needsOptions) group.appendChild(stepButton(-1, row.canRemove, '−', 'Select one less'))
-    const total = document.createElement('span')
-    total.className = 'sparkly-tier-pricing__list-qty'
-    total.textContent = String(row.total)
-    total.setAttribute('aria-label', describeRowTotal(row))
-    group.appendChild(total)
-    if (!row.needsOptions) group.appendChild(stepButton(1, row.canAdd, '+', 'Select one more'))
     return group
   }
 
-  function renderMixMatchList({ listEl, products, cartItems, pricing, selection, currentVariantId, stepperQty }) {
-    paintMixMatchList(listEl, buildMixMatchRows({ products, cartItems, pricing, selection, currentVariantId, stepperQty }))
+  function renderMixMatchList({ listEl, products, cartItems, pricing, currentVariantId }) {
+    paintMixMatchList(listEl, buildMixMatchRows({ products, cartItems, pricing, currentVariantId }))
   }
 
   function setQuantityInput(value) {
@@ -916,7 +843,6 @@ if (typeof document !== 'undefined') {
       toggleArrowEl: container.querySelector('[data-tier-pricing-toggle-arrow]'),
       listEl: container.querySelector('[data-tier-pricing-list]'),
       chosenEl: container.querySelector('[data-tier-pricing-chosen]'),
-      messageEl: container.querySelector('[data-tier-pricing-list-message]'),
     }
   }
 
@@ -928,10 +854,8 @@ if (typeof document !== 'undefined') {
     const lastKnownSelfQtyRef = { value: null }
     const variantStateRef = { value: config.initialVariantId }
     const formatMoneyFn = createMoneyFormatter(config.moneyFormat)
-    const selectionRef = { value: {} }
     let lastCartItems = []
     let lastPricing = null
-    let lastAddingQty = 1
 
     async function render() {
       const basePrice = Number(container.dataset.basePrice)
@@ -944,10 +868,6 @@ if (typeof document !== 'undefined') {
       // misattribute stepper-reset detection once a product has more than
       // one own member variant.
       const selfMemberNow = { productId: config.productId, variantId: variantStateRef.value }
-      lastAddingQty = addingQty
-      // The variant on the page is selected through the page quantity box, so it
-      // leaves the staged selection (it may sit there after a variant change).
-      selectionRef.value = dropSelection({ selection: selectionRef.value, variantId: variantStateRef.value })
 
       let otherQty = 0
       if (config.hasTiers) {
@@ -961,13 +881,11 @@ if (typeof document !== 'undefined') {
         }
       }
 
-      // Selected siblings count toward the offer like units in the cart.
-      const stagedQty = sumSelection({ selection: selectionRef.value, excludeVariantId: variantStateRef.value })
       const viewModel = computeWidgetViewModel({
         tiers: eligible ? config.tiers : [],
         basePrice,
         compareAtPrice,
-        otherQty: otherQty + stagedQty,
+        otherQty,
         addingQty,
         isGroup: config.isGroup,
         formatMoney: formatMoneyFn,
@@ -992,9 +910,7 @@ if (typeof document !== 'undefined') {
         products: buildDisplayMixMatchItems(config),
         cartItems: lastCartItems,
         pricing: lastPricing,
-        selection: selectionRef.value,
         currentVariantId: variantStateRef.value,
-        stepperQty: lastAddingQty,
       })
       if (lastPricing) setText(elements.chosenEl, formatItemsChosen(lastPricing.combinedQty))
     }
@@ -1015,33 +931,6 @@ if (typeof document !== 'undefined') {
         elements.toggleEl.setAttribute('aria-expanded', open ? 'true' : 'false')
         if (elements.toggleArrowEl) elements.toggleArrowEl.textContent = open ? '▲' : '▼'
         if (open) paintList()
-      })
-    }
-
-    // − / + on a row only SELECT: nothing reaches the cart until Add to cart.
-    // The variant on the page is changed through the page quantity box (its
-    // input event repaints); every other row through the staged selection.
-    function showListMessage(text) {
-      if (!elements.messageEl) return
-      elements.messageEl.textContent = text
-      elements.messageEl.hidden = !text
-    }
-
-    function changeSelection({ variantId, delta }) {
-      showListMessage('')
-      if (variantId === String(variantStateRef.value)) {
-        setQuantityInput(Math.max(lastAddingQty + delta, 1))
-        return
-      }
-      selectionRef.value = adjustSelection({ selection: selectionRef.value, variantId, delta })
-      render()
-    }
-
-    if (elements.listEl) {
-      elements.listEl.addEventListener('click', (event) => {
-        const button = event.target.closest && event.target.closest('[data-selection-delta]')
-        if (!button || button.disabled) return
-        changeSelection({ variantId: button.getAttribute('data-selection-variant'), delta: Number(button.getAttribute('data-selection-delta')) })
       })
     }
 
