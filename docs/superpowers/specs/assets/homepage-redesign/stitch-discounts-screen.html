@@ -1,0 +1,454 @@
+<!DOCTYPE html><html lang="en" style="width: 1280px; height: 1644px; overflow: hidden; position: relative;"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Bulk &amp; Timed Discounts - Shopify Admin</title>
+<!-- Material Symbols Outlined font -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<!-- Inter Google Font -->
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "primary": "#173028",
+            "on-error-container": "#93000a",
+            "secondary-fixed-dim": "#ffb692",
+            "surface-container-high": "#eae8e3",
+            "on-secondary-fixed": "#341000",
+            "surface-container-highest": "#e4e2dd",
+            "on-primary-fixed": "#062019",
+            "on-secondary": "#ffffff",
+            "on-secondary-fixed-variant": "#6e381a",
+            "secondary-container": "#feae88",
+            "primary-fixed": "#cce9dd",
+            "tertiary-fixed": "#dae8be",
+            "surface": "#fbf9f4",
+            "primary-container": "#2d463e",
+            "on-tertiary": "#ffffff",
+            "surface-dim": "#dbdad5",
+            "secondary-fixed": "#ffdbcb",
+            "primary-fixed-dim": "#b1cdc2",
+            "on-surface-variant": "#424845",
+            "on-error": "#ffffff",
+            "surface-tint": "#4a645b",
+            "tertiary-container": "#394526",
+            "surface-container-low": "#f5f3ee",
+            "surface-bright": "#fbf9f4",
+            "on-primary": "#ffffff",
+            "surface-variant": "#e4e2dd",
+            "on-tertiary-fixed": "#141f05",
+            "inverse-surface": "#30312e",
+            "on-primary-fixed-variant": "#334c44",
+            "outline-variant": "#c2c8c4",
+            "on-secondary-container": "#784021",
+            "error": "#ba1a1a",
+            "background": "#fbf9f4",
+            "surface-container-lowest": "#ffffff",
+            "tertiary-fixed-dim": "#becca3",
+            "inverse-primary": "#b1cdc2",
+            "on-surface": "#1b1c19",
+            "error-container": "#ffdad6",
+            "on-primary-container": "#98b3a9",
+            "surface-container": "#f0eee9",
+            "tertiary": "#232f12",
+            "on-tertiary-container": "#a4b28b",
+            "outline": "#727975",
+            "on-tertiary-fixed-variant": "#3f4b2c",
+            "inverse-on-surface": "#f2f1ec",
+            "secondary": "#8b4f2f",
+            "on-background": "#1b1c19"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.25rem",
+            "lg": "0.5rem",
+            "xl": "0.75rem",
+            "full": "9999px"
+          },
+          "fontFamily": {
+            "headline": ["Inter", "sans-serif"],
+            "display": ["Inter", "sans-serif"],
+            "body": ["Inter", "sans-serif"],
+            "label": ["Inter", "sans-serif"]
+          }
+        },
+      },
+    }
+  </script>
+<style>
+    body {
+      background-color: #f9f7f2;
+      font-family: 'Inter', sans-serif;
+    }
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
+      font-size: 20px;
+      line-height: 1;
+      display: inline-block;
+    }
+  </style>
+</head>
+<body class="bg-surface text-on-surface min-h-screen antialiased flex flex-col">
+<!-- TopNavBar (Shared Component) -->
+<header class="bg-surface dark:bg-surface border-b border-outline-variant dark:border-outline-variant w-full sticky top-0 z-30">
+<div class="max-w-[1024px] mx-auto px-6 h-14 relative flex items-center justify-between"><div class="flex items-center space-x-8"><nav class="hidden md:flex items-center space-x-6"></nav></div><div class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center gap-2"><span class="w-7 h-7 rounded-lg bg-primary-container text-white flex items-center justify-center font-bold text-xs shadow-xs">ST</span><span class="font-display font-bold text-primary dark:text-inverse-primary text-base tracking-tight">Smooth Discounts</span></div><div class="flex items-center gap-2"></div></div>
+</header>
+<!-- Main Canvas Container -->
+<main class="w-full max-w-[1024px] mx-auto px-6 py-8 flex-1 flex flex-col gap-6">
+<!-- Top Breadcrumb & Page Header -->
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+<div>
+<div class="flex items-center gap-2 text-xs text-on-surface-variant mb-1">
+
+<span class="">/</span>
+
+</div>
+<div class="flex items-center gap-3">
+<h1 class="text-2xl font-bold tracking-tight text-on-surface font-headline">Discounts</h1>
+
+</div>
+</div>
+<div class="flex items-center gap-2">
+
+
+</div>
+</div>
+<!-- Section 1: Sidekick-style Suggestion Cards (Bento 2-Column Grid) -->
+<section class="flex flex-col gap-3"><div class="flex items-center justify-between"><button type="button" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-surface-container-lowest border border-outline-variant/70 rounded-lg text-xs font-medium text-on-surface hover:bg-surface-container transition-colors shadow-xs"><span class="material-symbols-outlined text-sm text-on-surface-variant">calendar_today</span><span class="">Last 30d</span></button></div><div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"><div class="bg-surface-container-lowest border border-outline-variant/70 rounded-xl p-5 flex flex-col justify-between shadow-xs"><div class="flex items-center gap-1.5 text-xs font-medium text-on-surface-variant mb-3"><span class="">Visitors</span><span class="material-symbols-outlined text-[15px] text-outline-variant cursor-pointer hover:text-on-surface-variant transition-colors" title="Total visitors in period">info</span></div><div class="text-2xl font-bold tracking-tight text-on-surface font-headline">16</div></div><div class="bg-surface-container-lowest border border-outline-variant/70 rounded-xl p-5 flex flex-col justify-between shadow-xs"><div class="flex items-center gap-1.5 text-xs font-medium text-on-surface-variant mb-3"><span class="">Bundle orders</span><span class="material-symbols-outlined text-[15px] text-outline-variant cursor-pointer hover:text-on-surface-variant transition-colors" title="Total bundle orders placed">info</span></div><div class="text-2xl font-bold tracking-tight text-on-surface font-headline">0</div></div><div class="bg-surface-container-lowest border border-outline-variant/70 rounded-xl p-5 flex flex-col justify-between shadow-xs"><div class="flex items-center gap-1.5 text-xs font-medium text-on-surface-variant mb-3"><span class="">AOV</span><span class="material-symbols-outlined text-[15px] text-outline-variant cursor-pointer hover:text-on-surface-variant transition-colors" title="Average order value with discount">info</span></div><div class="text-2xl font-bold tracking-tight text-on-surface font-headline">0.00</div></div><div class="bg-surface-container-lowest border border-outline-variant/70 rounded-xl p-5 flex flex-col justify-between shadow-xs"><div class="flex items-center gap-1.5 text-xs font-medium text-on-surface-variant mb-3"><span class="">Added revenue</span><span class="material-symbols-outlined text-[15px] text-outline-variant cursor-pointer hover:text-on-surface-variant transition-colors" title="Incremental revenue generated">info</span></div><div class="text-2xl font-bold tracking-tight text-on-surface font-headline">0.00</div></div></div></section><section class="grid grid-cols-1 md:grid-cols-2 gap-4">
+<!-- Card 1: Tier-based discount -->
+<article class="bg-surface-container-lowest border border-outline-variant/70 rounded-xl p-5 flex flex-col justify-between hover:border-outline transition-colors shadow-xs group">
+<div>
+<!-- Illustration Frame -->
+<div class="rounded-lg overflow-hidden bg-surface-container-low aspect-video w-full mb-4 border border-outline-variant/40">
+<img alt="Tier-based discount concept illustration" class="w-full h-full object-cover object-center group-hover:scale-[1.02] transition-transform duration-300" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCeMuzyQCmKDH9AMnZQ2egWHdvLH_AA_u2npkbCPMFObOxsEobdlhUDuxOCRGBf5Xa21V_0sxyZ6liMMQbTgkUMle1DAz7JQIO7DpZNL2VQvRrY0p-MzIZ8SrWBNsYkSNIPfezQRXjZnOTxbjbo9rffhLdJN6lZ3kWCFo0MLZRVhjKbiWsD09FZP_2H_7bTy8vdB2U0UIep-nizz9g1Zg4BL_UbAPdESfjFWFuoAU7IdVDpL6dkARIJwLBDU0xavIdvXGf5EvHh0vs">
+</div>
+<!-- Tag & Title -->
+<div class="flex items-center gap-1.5 mb-2">
+<span class="inline-flex items-center gap-1 text-[11px] font-semibold text-secondary bg-secondary-fixed/50 px-2 py-0.5 rounded-full">
+<span class="material-symbols-outlined text-[13px]">layers</span>
+              Tier-based discount
+            </span>
+</div>
+<h2 class="text-base font-bold text-on-surface tracking-tight mb-1.5">Tier-based discount</h2>
+<p class="text-xs leading-relaxed text-on-surface-variant mb-6">
+            Reward bigger orders. Offer percentage off or a fixed price as customers add more units of a product.
+          </p>
+</div>
+<!-- Card Bottom Actions -->
+<div class="flex items-center justify-between pt-2 border-t border-outline-variant/30">
+<button class="bg-primary-container hover:bg-primary text-white text-xs font-semibold px-3.5 py-2 rounded-lg transition-colors shadow-xs flex items-center gap-1.5">
+            Create tier discount
+            <span class="material-symbols-outlined text-[15px]">arrow_forward</span>
+</button>
+<a class="text-xs font-medium text-primary hover:underline inline-flex items-center gap-1" href="#">
+            More information
+          </a>
+</div>
+</article>
+<!-- Card 2: Time-based discount -->
+<article class="bg-surface-container-lowest border border-outline-variant/70 rounded-xl p-5 flex flex-col justify-between hover:border-outline transition-colors shadow-xs group">
+<div>
+<!-- Illustration Frame -->
+<div class="rounded-lg overflow-hidden bg-surface-container-low aspect-video w-full mb-4 border border-outline-variant/40">
+<img alt="Time-based discount concept illustration" class="w-full h-full object-cover object-center group-hover:scale-[1.02] transition-transform duration-300" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAfKkFYa1MYbuCFCRrkqnihFvyUM2ONzFjl-y5UumsVuUHZtaZHIS5KWBkQRHZM6Qqcvr94LxvcC4Y7uGsRggM_f-T0ay3O5UJhd0TpDboaoabnTk9589q3lnCGujiXqjer5VWGEAjJjMO43cdNtyCl1UvuBroIkqzLjCCLrW52GPPfaxdi165ZB6nQNKJaX3MyqtrMCkvAHbPjw6KSClCxNffvDMPAU_5D6FADhySEUOaV5RRMC1-u2Qcon8vpcrVD_SNUE87IlJ0">
+</div>
+<!-- Tag & Title -->
+<div class="flex items-center gap-1.5 mb-2">
+<span class="inline-flex items-center gap-1 text-[11px] font-semibold text-primary-container bg-primary-fixed/60 px-2 py-0.5 rounded-full">
+<span class="material-symbols-outlined text-[13px]">schedule</span>
+              Time-based discount
+            </span>
+</div>
+<h2 class="text-base font-bold text-on-surface tracking-tight mb-1.5">Tier discount with time limit</h2>
+<p class="text-xs leading-relaxed text-on-surface-variant mb-6">
+            Run a tier discounts on a schedule. Set a start and end date so promotions switch on and off automatically.
+          </p>
+</div>
+<!-- Card Bottom Actions -->
+<div class="flex items-center justify-between pt-2 border-t border-outline-variant/30">
+<button class="bg-primary-container hover:bg-primary text-white text-xs font-semibold px-3.5 py-2 rounded-lg transition-colors shadow-xs flex items-center gap-1.5">
+            Create tier time discount
+            <span class="material-symbols-outlined text-[15px]">arrow_forward</span>
+</button>
+<a class="text-xs font-medium text-primary hover:underline inline-flex items-center gap-1" href="#">
+            More information
+          </a>
+</div>
+</article>
+</section>
+<!-- Section 2: Discounts Table Card -->
+<section class="bg-surface-container-lowest border border-outline-variant/70 rounded-xl overflow-hidden shadow-xs flex flex-col">
+<!-- Card Header & Controls Bar -->
+<div class="p-5 border-b border-outline-variant/40 flex flex-col gap-4">
+<div class="flex items-center justify-between">
+<div>
+<h2 class="text-base font-bold text-on-surface tracking-tight">All discounts</h2>
+<p class="text-xs text-on-surface-variant">Manage active tier quantity breaks and scheduled promotional pricing.</p>
+</div>
+<div class="flex items-center gap-2">
+<button class="text-xs font-medium text-on-surface-variant hover:text-on-surface px-2.5 py-1.5 rounded-lg border border-outline-variant/70 hover:bg-surface-container transition-colors inline-flex items-center gap-1">
+<span class="material-symbols-outlined text-sm">filter_list</span>
+              Filters
+            </button>
+<button class="text-xs font-medium text-on-surface-variant hover:text-on-surface px-2.5 py-1.5 rounded-lg border border-outline-variant/70 hover:bg-surface-container transition-colors inline-flex items-center gap-1">
+<span class="material-symbols-outlined text-sm">swap_vert</span>
+              Sort
+            </button>
+</div>
+</div>
+<!-- Search input and Filter chips -->
+<div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-1">
+<!-- Filter Pill Tabs -->
+<div class="inline-flex p-1 bg-surface-container rounded-lg border border-outline-variant/40 text-xs self-start">
+<button class="px-3 py-1 font-semibold rounded-md bg-surface-container-lowest text-primary shadow-xs transition-all">
+              All <span class="ml-1 text-[11px] opacity-75 font-normal">6</span>
+</button>
+<button class="px-3 py-1 font-medium text-on-surface-variant hover:text-on-surface rounded-md transition-colors">
+              Active <span class="ml-1 text-[11px] opacity-75 font-normal">4</span>
+</button>
+<button class="px-3 py-1 font-medium text-on-surface-variant hover:text-on-surface rounded-md transition-colors">
+              Inactive <span class="ml-1 text-[11px] opacity-75 font-normal">2</span>
+</button>
+</div>
+<!-- Search Input with Icon -->
+<div class="relative w-full sm:w-72">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px] pointer-events-none">
+              search
+            </span>
+<input class="w-full text-xs pl-9 pr-3 py-2 bg-surface-container-lowest border border-outline-variant rounded-lg text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all" placeholder="Search discounts..." type="text">
+</div>
+</div>
+</div>
+<!-- Table Component -->
+<div class="overflow-x-auto">
+<table class="w-full text-left text-xs border-collapse">
+<thead>
+<tr class="border-b border-outline-variant/40 bg-surface-container-low/50 text-on-surface-variant font-medium">
+<th class="py-3 px-5 font-medium" scope="col">Discount title</th>
+<th class="py-3 px-4 font-medium w-16 text-center" scope="col">Type</th>
+<th class="py-3 px-4 font-medium w-28" scope="col">Status</th>
+<th class="py-3 px-4 font-medium hidden sm:table-cell" scope="col">Schedule / Rules</th>
+<th class="py-3 px-5 text-right w-12" scope="col"></th>
+</tr>
+</thead>
+<tbody class="divide-y divide-outline-variant/30 text-on-surface">
+<!-- Row 1 -->
+<tr class="hover:bg-surface-container-low/70 transition-colors cursor-pointer group">
+<td class="py-3.5 px-5">
+<div class="font-semibold text-sm text-on-surface group-hover:text-primary transition-colors">Buy more, save more - Salmon Oil</div>
+<div class="text-[11px] font-mono text-on-surface-variant mt-0.5">tier_salmon_oil_v2</div>
+</td>
+<td class="py-3.5 px-4 text-center">
+<span class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-surface-container text-primary-container border border-outline-variant/30 shadow-2xs" title="Tier-based discount">
+<svg class="w-4 h-4 fill-current" viewBox="0 0 24 24">
+<path d="M4 6h16v2H4zm2 5h12v2H6zm3 5h6v2H9z"></path>
+</svg>
+</span>
+</td>
+<td class="py-3.5 px-4">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-tertiary-fixed text-on-tertiary-fixed border border-tertiary-fixed-dim/60">
+<span class="w-1.5 h-1.5 rounded-full bg-[#5a7d3b]"></span>
+                  Active
+                </span>
+</td>
+<td class="py-3.5 px-4 text-on-surface-variant hidden sm:table-cell">
+<span class="">3+ units (10% off), 5+ units (20% off)</span>
+</td>
+<td class="py-3.5 px-5 text-right">
+<span class="material-symbols-outlined text-outline-variant group-hover:text-on-surface group-hover:translate-x-0.5 transition-all text-base">
+                  chevron_right
+                </span>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="hover:bg-surface-container-low/70 transition-colors cursor-pointer group">
+<td class="py-3.5 px-5">
+<div class="font-semibold text-sm text-on-surface group-hover:text-primary transition-colors">Joint Support 3-pack</div>
+<div class="text-[11px] font-mono text-on-surface-variant mt-0.5">joint_supp_bundle_q2</div>
+</td>
+<td class="py-3.5 px-4 text-center">
+<span class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-surface-container text-primary-container border border-outline-variant/30 shadow-2xs" title="Tier-based discount">
+<svg class="w-4 h-4 fill-current" viewBox="0 0 24 24">
+<path d="M4 6h16v2H4zm2 5h12v2H6zm3 5h6v2H9z"></path>
+</svg>
+</span>
+</td>
+<td class="py-3.5 px-4">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-tertiary-fixed text-on-tertiary-fixed border border-tertiary-fixed-dim/60">
+<span class="w-1.5 h-1.5 rounded-full bg-[#5a7d3b]"></span>
+                  Active
+                </span>
+</td>
+<td class="py-3.5 px-4 text-on-surface-variant hidden sm:table-cell">
+<span class="">Buy 3 tubs, pay $64 fixed bundle price</span>
+</td>
+<td class="py-3.5 px-5 text-right">
+<span class="material-symbols-outlined text-outline-variant group-hover:text-on-surface group-hover:translate-x-0.5 transition-all text-base">
+                  chevron_right
+                </span>
+</td>
+</tr>
+<!-- Row 3 -->
+<tr class="hover:bg-surface-container-low/70 transition-colors cursor-pointer group">
+<td class="py-3.5 px-5">
+<div class="font-semibold text-sm text-on-surface group-hover:text-primary transition-colors">Black Friday 2026 weekend</div>
+<div class="text-[11px] font-mono text-on-surface-variant mt-0.5">bfcm_2026_sitewide</div>
+</td>
+<td class="py-3.5 px-4 text-center">
+<span class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-surface-container text-secondary border border-outline-variant/30 shadow-2xs" title="Time-based discount">
+<svg class="w-4 h-4 fill-current" viewBox="0 0 24 24">
+<path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm4.2 14.2L11 13V7h1.5v5.2l4.5 2.7-.8 1.3z"></path>
+</svg>
+</span>
+</td>
+<td class="py-3.5 px-4">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-surface-container-highest text-on-surface-variant border border-outline-variant">
+<span class="w-1.5 h-1.5 rounded-full bg-outline"></span>
+                  Inactive
+                </span>
+</td>
+<td class="py-3.5 px-4 text-on-surface-variant hidden sm:table-cell">
+<span class="">Nov 27, 2026 - Nov 30, 2026 (Scheduled)</span>
+</td>
+<td class="py-3.5 px-5 text-right">
+<span class="material-symbols-outlined text-outline-variant group-hover:text-on-surface group-hover:translate-x-0.5 transition-all text-base">
+                  chevron_right
+                </span>
+</td>
+</tr>
+<!-- Row 4 -->
+<tr class="hover:bg-surface-container-low/70 transition-colors cursor-pointer group">
+<td class="py-3.5 px-5">
+<div class="font-semibold text-sm text-on-surface group-hover:text-primary transition-colors">Spring Probiotic Sale</div>
+<div class="text-[11px] font-mono text-on-surface-variant mt-0.5">spring_probiotic_promo</div>
+</td>
+<td class="py-3.5 px-4 text-center">
+<span class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-surface-container text-secondary border border-outline-variant/30 shadow-2xs" title="Time-based discount">
+<svg class="w-4 h-4 fill-current" viewBox="0 0 24 24">
+<path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm4.2 14.2L11 13V7h1.5v5.2l4.5 2.7-.8 1.3z"></path>
+</svg>
+</span>
+</td>
+<td class="py-3.5 px-4">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-tertiary-fixed text-on-tertiary-fixed border border-tertiary-fixed-dim/60">
+<span class="w-1.5 h-1.5 rounded-full bg-[#5a7d3b]"></span>
+                  Active
+                </span>
+</td>
+<td class="py-3.5 px-4 text-on-surface-variant hidden sm:table-cell">
+<span class="">Ends Sunday at 11:59 PM (15% off)</span>
+</td>
+<td class="py-3.5 px-5 text-right">
+<span class="material-symbols-outlined text-outline-variant group-hover:text-on-surface group-hover:translate-x-0.5 transition-all text-base">
+                  chevron_right
+                </span>
+</td>
+</tr>
+<!-- Row 5 -->
+<tr class="hover:bg-surface-container-low/70 transition-colors cursor-pointer group">
+<td class="py-3.5 px-5">
+<div class="font-semibold text-sm text-on-surface group-hover:text-primary transition-colors">Calming Chews bulk</div>
+<div class="text-[11px] font-mono text-on-surface-variant mt-0.5">calming_chews_vol</div>
+</td>
+<td class="py-3.5 px-4 text-center">
+<span class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-surface-container text-primary-container border border-outline-variant/30 shadow-2xs" title="Tier-based discount">
+<svg class="w-4 h-4 fill-current" viewBox="0 0 24 24">
+<path d="M4 6h16v2H4zm2 5h12v2H6zm3 5h6v2H9z"></path>
+</svg>
+</span>
+</td>
+<td class="py-3.5 px-4">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-tertiary-fixed text-on-tertiary-fixed border border-tertiary-fixed-dim/60">
+<span class="w-1.5 h-1.5 rounded-full bg-[#5a7d3b]"></span>
+                  Active
+                </span>
+</td>
+<td class="py-3.5 px-4 text-on-surface-variant hidden sm:table-cell">
+<span class="">2+ units ($5 off per tub)</span>
+</td>
+<td class="py-3.5 px-5 text-right">
+<span class="material-symbols-outlined text-outline-variant group-hover:text-on-surface group-hover:translate-x-0.5 transition-all text-base">
+                  chevron_right
+                </span>
+</td>
+</tr>
+<!-- Row 6 -->
+<tr class="hover:bg-surface-container-low/70 transition-colors cursor-pointer group">
+<td class="py-3.5 px-5">
+<div class="font-semibold text-sm text-on-surface group-hover:text-primary transition-colors">Summer Sale</div>
+<div class="text-[11px] font-mono text-on-surface-variant mt-0.5">summer_flash_sale</div>
+</td>
+<td class="py-3.5 px-4 text-center">
+<span class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-surface-container text-secondary border border-outline-variant/30 shadow-2xs" title="Time-based discount">
+<svg class="w-4 h-4 fill-current" viewBox="0 0 24 24">
+<path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm4.2 14.2L11 13V7h1.5v5.2l4.5 2.7-.8 1.3z"></path>
+</svg>
+</span>
+</td>
+<td class="py-3.5 px-4">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-surface-container-highest text-on-surface-variant border border-outline-variant">
+<span class="w-1.5 h-1.5 rounded-full bg-outline"></span>
+                  Inactive
+                </span>
+</td>
+<td class="py-3.5 px-4 text-on-surface-variant hidden sm:table-cell">
+<span class="">Ended Aug 31, 2025</span>
+</td>
+<td class="py-3.5 px-5 text-right">
+<span class="material-symbols-outlined text-outline-variant group-hover:text-on-surface group-hover:translate-x-0.5 transition-all text-base">
+                  chevron_right
+                </span>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Polaris-style Pagination Footer -->
+<div class="px-5 py-3.5 border-t border-outline-variant/40 flex items-center justify-between text-xs text-on-surface-variant bg-surface-container-low/30">
+<div class="">
+          Showing <span class="font-medium text-on-surface">1–6</span> of <span class="font-medium text-on-surface">6</span> discounts
+        </div>
+<div class="flex items-center space-x-2">
+<button class="px-3 py-1.5 rounded-lg border border-outline-variant/50 text-outline-variant cursor-not-allowed font-medium inline-flex items-center gap-1" disabled="">
+<span class="material-symbols-outlined text-[16px]">chevron_left</span>
+            Previous
+          </button>
+<button class="px-3 py-1.5 rounded-lg border border-outline-variant/50 text-outline-variant cursor-not-allowed font-medium inline-flex items-center gap-1" disabled="">
+            Next
+            <span class="material-symbols-outlined text-[16px]">chevron_right</span>
+</button>
+</div>
+</div>
+</section>
+<!-- Contextual Tip / Merchant Banner -->
+<div class="rounded-xl border border-outline-variant/60 bg-surface-container-low p-4 flex items-start gap-3">
+<span class="material-symbols-outlined text-secondary text-xl mt-0.5">lightbulb</span>
+<div class="text-xs text-on-surface-variant leading-relaxed">
+<strong class="font-semibold text-on-surface">Did you know?</strong> Tier-based quantity discounts automatically reflect on your product pages without touching your theme liquid files. For customized badge styles, visit <a class="text-primary font-medium hover:underline" href="#">Settings &gt; Visual badges</a>.
+      </div>
+</div>
+</main>
+<!-- Merchant Admin Minimal Footer -->
+<footer class="w-full border-t border-outline-variant/30 py-4 mt-auto">
+<div class="max-w-[1024px] mx-auto px-6 flex flex-col sm:flex-row items-center justify-between text-xs text-on-surface-variant gap-2">
+<div class="">Smooth Discounts v0.4.1</div>
+<div class="flex items-center gap-4">
+<a class="hover:text-on-surface transition-colors" href="#">Privacy</a>
+<a class="hover:text-on-surface transition-colors" href="#">Support</a>
+<a class="hover:text-on-surface transition-colors" href="#">Shopify App Store</a>
+</div>
+</div>
+</footer>
+
+
+
+
+
+
+</body></html>
