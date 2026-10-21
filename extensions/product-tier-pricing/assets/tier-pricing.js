@@ -392,54 +392,34 @@ function computeWidgetViewModel({ tiers, basePrice, compareAtPrice, otherQty, ad
 
 // Mix & match product list — pure row-building, then a thin DOM paint.
 
-// `pricing` ({ combinedQty, tierState, formatMoney }) prices each row at the
-// per-unit price the applied tier gives it; null leaves the price label empty.
-// Prices in `products` are Shopify's integer minor units (cents).
-function buildMixMatchRows(products, cartItems, pricing) {
+// The price label of a row: its own price at the per-unit price the applied
+// tier gives it ('' without a price or without pricing context).
+function formatRowPrice({ priceCents, pricing }) {
+  if (priceCents == null || !pricing) return ''
+  return pricing.formatMoney(perUnitPrice(priceCents / 100, pricing.combinedQty, pricing.tierState))
+}
+
+// `pricing` ({ combinedQty, tierState, formatMoney }) prices each row; null
+// leaves the price label empty. Prices in `products` are Shopify's integer
+// minor units (cents). A row shows what is in the cart (`qty`) and, unless it is
+// the product on the page or sold out, an Add link to that product (`showAdd`).
+function buildMixMatchRows({ products, cartItems, pricing, currentVariantId }) {
   return products.map((product) => {
     const member = { productId: extractNumericId(product.productId), variantId: product.variantId ? extractNumericId(product.variantId) : undefined }
-    const qty = sumMemberQuantityInCart(cartItems || [], [member])
     const cartVariantId = product.cartVariantId != null ? String(product.cartVariantId) : null
-    const priceLabel = product.price != null && pricing
-      ? pricing.formatMoney(perUnitPrice(product.price / 100, pricing.combinedQty, pricing.tierState))
-      : ''
+    const isCurrent = cartVariantId != null && currentVariantId != null && cartVariantId === String(currentVariantId)
+    const available = product.available !== false
     return {
       // The theme (Liquid) builds the link from the live product, including any ?variant= query.
       href: product.url,
       title: product.title,
       imageUrl: product.imageUrl || null,
-      qty,
-      priceLabel,
-      available: product.available !== false,
-      cartVariantId,
-      canAdd: cartVariantId != null && product.available !== false,
-      canRemove: cartVariantId != null && qty > 0,
-      // No single variant to add (a whole product that has several): the row
-      // links to the product instead of showing − / +.
-      needsOptions: cartVariantId == null,
+      qty: sumMemberQuantityInCart(cartItems || [], [member]),
+      priceLabel: formatRowPrice({ priceCents: product.price, pricing }),
+      available,
+      showAdd: available && !isCurrent,
     }
   })
-}
-
-// The request that lowers (-1) or raises (+1) a row's cart quantity by one, or
-// null when the row can't do that. Adding goes through /cart/add.js; lowering
-// changes the existing cart line by its key.
-function buildCartChange(row, cartItems, delta) {
-  if (row.cartVariantId == null) return null
-  if (delta > 0) {
-    return row.canAdd ? { url: '/cart/add.js', body: { items: [{ id: Number(row.cartVariantId), quantity: 1 }] } } : null
-  }
-  if (!row.canRemove) return null
-  const line = (cartItems || []).find((item) => String(item.variant_id) === row.cartVariantId && item.quantity > 0)
-  return line ? { url: '/cart/change.js', body: { id: line.key, quantity: line.quantity - 1 } } : null
-}
-
-// Shopify's cart endpoints answer errors with { status, message, description };
-// the description is the customer-facing one ("You can only add 3 ...").
-function cartErrorMessage(error) {
-  if (error && error.description) return error.description
-  if (error && error.message) return error.message
-  return 'Could not update the cart. Please try again.'
 }
 
 function formatItemsChosen(qty) {
@@ -555,9 +535,7 @@ if (typeof module !== 'undefined' && module.exports) {
     buildStatusCopy,
     computeWidgetViewModel,
     buildMixMatchRows,
-    buildCartChange,
     buildProgressSemantics,
-    cartErrorMessage,
     formatItemsChosen,
     buildDisplayMixMatchItems,
     listedMixMatchItems,
@@ -694,8 +672,8 @@ if (typeof document !== 'undefined') {
     paintStatus(elements, viewModel)
   }
 
-  // One row per member: thumbnail, name and price (a link to the product), and
-  // the quantity already in the cart. Rows are read-only here.
+  // One row per member: thumbnail, name and price (a link to the product), the
+  // number in the cart, and a small Add link that opens the product.
   function paintMixMatchList(listEl, rows) {
     listEl.innerHTML = ''
     rows.forEach((row) => {
@@ -731,50 +709,37 @@ if (typeof document !== 'undefined') {
       link.appendChild(text)
       item.appendChild(link)
 
-      item.appendChild(paintRowStepper(row))
+      item.appendChild(paintRowAction(row))
 
       listEl.appendChild(item)
     })
   }
 
-  // − [qty] + for a row that can change the cart; a "Choose options" link when
-  // it has no single variant to add.
-  function paintRowStepper(row) {
+  // The number in the cart plus, when the product can be added, an "Add" link to
+  // it (the product on the page and sold-out rows have none).
+  function paintRowAction(row) {
     const group = document.createElement('div')
-    group.className = 'sparkly-tier-pricing__stepper'
+    group.className = 'sparkly-tier-pricing__row-action'
 
-    if (row.needsOptions) {
-      const options = document.createElement('a')
-      options.href = row.href
-      options.className = 'sparkly-tier-pricing__options-link'
-      options.textContent = 'Choose options'
-      group.appendChild(options)
+    const count = document.createElement('span')
+    count.className = 'sparkly-tier-pricing__list-qty'
+    count.textContent = String(row.qty)
+    count.setAttribute('aria-label', row.qty + ' in cart')
+    group.appendChild(count)
+
+    if (row.showAdd) {
+      const add = document.createElement('a')
+      add.href = row.href
+      add.className = 'sparkly-tier-pricing__add'
+      add.textContent = 'Add'
+      add.setAttribute('aria-label', 'Add ' + row.title)
+      group.appendChild(add)
     }
-
-    function stepButton(delta, enabled, symbol, label) {
-      const btn = document.createElement('button')
-      btn.type = 'button'
-      btn.className = 'sparkly-tier-pricing__step'
-      btn.textContent = symbol
-      btn.disabled = !enabled
-      btn.setAttribute('aria-label', label + ' ' + row.title)
-      btn.setAttribute('data-cart-delta', String(delta))
-      btn.setAttribute('data-cart-variant', row.cartVariantId || '')
-      return btn
-    }
-
-    if (!row.needsOptions) group.appendChild(stepButton(-1, row.canRemove, '−', 'Remove one'))
-    const qty = document.createElement('span')
-    qty.className = 'sparkly-tier-pricing__list-qty'
-    qty.textContent = String(row.qty)
-    qty.setAttribute('aria-label', row.qty + ' in cart')
-    group.appendChild(qty)
-    if (!row.needsOptions) group.appendChild(stepButton(1, row.canAdd, '+', 'Add one'))
     return group
   }
 
-  function renderMixMatchList(listEl, products, cartItems, pricing) {
-    paintMixMatchList(listEl, buildMixMatchRows(products, cartItems, pricing))
+  function renderMixMatchList({ listEl, products, cartItems, pricing, currentVariantId }) {
+    paintMixMatchList(listEl, buildMixMatchRows({ products, cartItems, pricing, currentVariantId }))
   }
 
   function setQuantityInput(value) {
@@ -811,34 +776,6 @@ if (typeof document !== 'undefined') {
       setQuantityInput(1)
     }
     lastKnownSelfQtyRef.value = selfQtyNow
-  }
-
-  // Tells the theme the cart changed behind its back. Only themes that expose
-  // a global publish() and PUB_SUB_EVENTS.cartUpdate (Dawn-family) are told, and
-  // only one with a #cart-icon-bubble gets its header count refreshed; anywhere
-  // else the widget stays correct but the theme's own cart count refreshes on
-  // its next update. Each part is best effort: a theme hook failing must never
-  // break the widget.
-  async function refreshHeaderCartBubble() {
-    const bubble = document.getElementById('cart-icon-bubble')
-    if (!bubble) return
-    const root = (window.Shopify && window.Shopify.routes && window.Shopify.routes.root) || '/'
-    const response = await fetch(root + '?sections=cart-icon-bubble')
-    const sections = await response.json()
-    const html = new DOMParser().parseFromString(sections['cart-icon-bubble'], 'text/html')
-    const fresh = html.querySelector('.shopify-section')
-    if (fresh) bubble.innerHTML = fresh.innerHTML
-  }
-
-  function notifyThemeCartChanged() {
-    try {
-      if (typeof publish === 'function' && typeof PUB_SUB_EVENTS !== 'undefined' && PUB_SUB_EVENTS.cartUpdate) {
-        publish(PUB_SUB_EVENTS.cartUpdate, { source: 'sparkly-tier-pricing' })
-      }
-    } catch {
-      // see above
-    }
-    refreshHeaderCartBubble().catch(() => {})
   }
 
   // DOM: per-widget setup
@@ -906,7 +843,6 @@ if (typeof document !== 'undefined') {
       toggleArrowEl: container.querySelector('[data-tier-pricing-toggle-arrow]'),
       listEl: container.querySelector('[data-tier-pricing-list]'),
       chosenEl: container.querySelector('[data-tier-pricing-chosen]'),
-      messageEl: container.querySelector('[data-tier-pricing-list-message]'),
     }
   }
 
@@ -964,10 +900,19 @@ if (typeof document !== 'undefined') {
         updateTimeDiscountDisplay(container, timeDiscountJson, basePrice, variantStateRef.value, formatMoneyFn)
       }
 
-      if (config.isGroup && elements.listEl && !elements.listEl.hidden) {
-        renderMixMatchList(elements.listEl, buildDisplayMixMatchItems(config), lastCartItems, lastPricing)
-        if (lastPricing) setText(elements.chosenEl, formatItemsChosen(lastPricing.combinedQty))
-      }
+      paintList()
+    }
+
+    function paintList() {
+      if (!(config.isGroup && elements.listEl && !elements.listEl.hidden)) return
+      renderMixMatchList({
+        listEl: elements.listEl,
+        products: buildDisplayMixMatchItems(config),
+        cartItems: lastCartItems,
+        pricing: lastPricing,
+        currentVariantId: variantStateRef.value,
+      })
+      if (lastPricing) setText(elements.chosenEl, formatItemsChosen(lastPricing.combinedQty))
     }
 
     // Liquid now renders the toggle+list markup unconditionally (see the
@@ -985,59 +930,7 @@ if (typeof document !== 'undefined') {
         if (elements.chosenEl) elements.chosenEl.hidden = !open
         elements.toggleEl.setAttribute('aria-expanded', open ? 'true' : 'false')
         if (elements.toggleArrowEl) elements.toggleArrowEl.textContent = open ? '▲' : '▼'
-        if (open) {
-          renderMixMatchList(elements.listEl, buildDisplayMixMatchItems(config), lastCartItems, lastPricing)
-          if (lastPricing) setText(elements.chosenEl, formatItemsChosen(lastPricing.combinedQty))
-        }
-      })
-    }
-
-    // − / + on a row: change the real cart, then repaint everything from the
-    // fresh cart so the bar, dot, copy, pills and rows stay in step.
-    let cartBusy = false
-    function showListMessage(text) {
-      if (!elements.messageEl) return
-      elements.messageEl.textContent = text
-      elements.messageEl.hidden = !text
-    }
-
-    async function changeCart(variantId, delta) {
-      if (cartBusy) return
-      const rows = buildMixMatchRows(buildDisplayMixMatchItems(config), lastCartItems, lastPricing)
-      const row = rows.find((candidate) => candidate.cartVariantId === variantId)
-      const change = row && buildCartChange(row, lastCartItems, delta)
-      if (!change) return
-      cartBusy = true
-      elements.listEl.setAttribute('aria-busy', 'true')
-      showListMessage('')
-      try {
-        const response = await fetch(change.url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-          body: JSON.stringify(change.body),
-        })
-        if (!response.ok) {
-          showListMessage(cartErrorMessage(await response.json().catch(() => null)))
-          return
-        }
-        // Adding this product's own variant resets the page stepper to 1 (see
-        // resetStepperIfJustAdded), like Add to cart does, so the widget's
-        // numbers keep matching the cart.
-        notifyThemeCartChanged()
-        await render()
-      } catch {
-        showListMessage(cartErrorMessage(null))
-      } finally {
-        cartBusy = false
-        elements.listEl.removeAttribute('aria-busy')
-      }
-    }
-
-    if (elements.listEl) {
-      elements.listEl.addEventListener('click', (event) => {
-        const button = event.target.closest && event.target.closest('[data-cart-delta]')
-        if (!button || button.disabled) return
-        changeCart(button.getAttribute('data-cart-variant'), Number(button.getAttribute('data-cart-delta')))
+        if (open) paintList()
       })
     }
 
