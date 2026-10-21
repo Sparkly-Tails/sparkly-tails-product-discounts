@@ -1,0 +1,74 @@
+/* Design tokens of the redesigned homepage (the Stitch "Discounts" screen).
+   Every colour is prefixed "home-" (--color-home-*), so Tailwind makes utilities
+   such as bg-home-surface and no other page changes colour. */
+
+@theme {
+  --color-home-primary: #173028;
+  --color-home-on-error-container: #93000a;
+  --color-home-secondary-fixed-dim: #ffb692;
+  --color-home-surface-container-high: #eae8e3;
+  --color-home-on-secondary-fixed: #341000;
+  --color-home-surface-container-highest: #e4e2dd;
+  --color-home-on-primary-fixed: #062019;
+  --color-home-on-secondary: #ffffff;
+  --color-home-on-secondary-fixed-variant: #6e381a;
+  --color-home-secondary-container: #feae88;
+  --color-home-primary-fixed: #cce9dd;
+  --color-home-tertiary-fixed: #dae8be;
+  --color-home-surface: #fbf9f4;
+  --color-home-primary-container: #2d463e;
+  --color-home-on-tertiary: #ffffff;
+  --color-home-surface-dim: #dbdad5;
+  --color-home-secondary-fixed: #ffdbcb;
+  --color-home-primary-fixed-dim: #b1cdc2;
+  --color-home-on-surface-variant: #424845;
+  --color-home-on-error: #ffffff;
+  --color-home-surface-tint: #4a645b;
+  --color-home-tertiary-container: #394526;
+  --color-home-surface-container-low: #f5f3ee;
+  --color-home-surface-bright: #fbf9f4;
+  --color-home-on-primary: #ffffff;
+  --color-home-surface-variant: #e4e2dd;
+  --color-home-on-tertiary-fixed: #141f05;
+  --color-home-inverse-surface: #30312e;
+  --color-home-on-primary-fixed-variant: #334c44;
+  --color-home-outline-variant: #c2c8c4;
+  --color-home-on-secondary-container: #784021;
+  --color-home-error: #ba1a1a;
+  --color-home-background: #fbf9f4;
+  --color-home-surface-container-lowest: #ffffff;
+  --color-home-tertiary-fixed-dim: #becca3;
+  --color-home-inverse-primary: #b1cdc2;
+  --color-home-on-surface: #1b1c19;
+  --color-home-error-container: #ffdad6;
+  --color-home-on-primary-container: #98b3a9;
+  --color-home-surface-container: #f0eee9;
+  --color-home-tertiary: #232f12;
+  --color-home-on-tertiary-container: #a4b28b;
+  --color-home-outline: #727975;
+  --color-home-on-tertiary-fixed-variant: #3f4b2c;
+  --color-home-inverse-on-surface: #f2f1ec;
+  --color-home-secondary: #8b4f2f;
+  --color-home-on-background: #1b1c19;
+}
+
+/* inline: the font variable (set by next/font on the page wrapper) is read where
+   the class is used, not at the root where it does not exist. */
+@theme inline {
+  --font-home: var(--font-inter), sans-serif;
+}
+
+/* One icon box for every inline SVG icon: it follows the text size of the
+   element (the design sizes its icons with text-* classes) and defaults to 20px.
+   In the components layer, so the size utilities still win. */
+@layer components {
+  .home-icon {
+    display: inline-block;
+    flex: none;
+    width: 1em;
+    height: 1em;
+    font-size: 20px;
+    line-height: 1;
+    vertical-align: middle;
+  }
+}
