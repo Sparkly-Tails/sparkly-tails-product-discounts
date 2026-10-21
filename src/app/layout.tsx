@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { SavedToastProvider } from "@/components/SavedToast";
+import VersionLabel from "@/components/VersionLabel";
 import { ensureFreshInstall } from "@/lib/freshInstall";
 import packageJson from "../../package.json";
 import "./globals.css";
@@ -29,9 +30,7 @@ export default async function RootLayout({
         <script src="https://cdn.shopify.com/shopifycloud/app-bridge.js"></script>
       </head>
       <body>
-        <div className="text-xs text-subtle text-right px-4 pt-1">
-          v{packageJson.version}
-        </div>
+        <VersionLabel version={packageJson.version} />
         <SavedToastProvider>{children}</SavedToastProvider>
       </body>
     </html>
