@@ -5,13 +5,14 @@ import {
   buildTimeRow,
   describeTierRules,
   describeTimeSchedule,
+  listTierSteps,
   pickRowSubtitle,
   pickRowTitle,
 } from '@/home/discountRows'
 import { formatNaiveDate } from '@/home/formatDate'
 
 const formatPounds = ({ amount }: { amount: number; currencyCode: string }) => '£' + amount.toFixed(2)
-const formatDate = (value: string) => formatNaiveDate({ value })
+const formatDate = formatNaiveDate
 
 describe('describeTierRules', () => {
   const base = { currencyCode: 'GBP', formatMoney: formatPounds }
@@ -35,6 +36,18 @@ describe('describeTierRules', () => {
 
   it('gives an empty text for a discount without tiers', () => {
     expect(describeTierRules({ ...base, steps: [], pricingMode: 'percent' })).toBe('')
+  })
+})
+
+describe('listTierSteps', () => {
+  it('takes the percent of each tier in percent mode and the price in fixed mode', () => {
+    const tiers = [{ minQty: 3, percentOff: 10 }, { minQty: 5, fixedPrice: 1.5 }]
+    expect(listTierSteps({ tiers, pricingMode: 'percent' })).toEqual([{ minQty: 3, amount: 10 }, { minQty: 5, amount: 0 }])
+    expect(listTierSteps({ tiers, pricingMode: 'fixed' })).toEqual([{ minQty: 3, amount: 0 }, { minQty: 5, amount: 1.5 }])
+  })
+
+  it('gives no steps for no tiers', () => {
+    expect(listTierSteps({ tiers: [], pricingMode: 'percent' })).toEqual([])
   })
 })
 

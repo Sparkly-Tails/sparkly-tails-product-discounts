@@ -14,6 +14,19 @@ export interface DiscountRow {
 
 export type TimeStatusLabel = 'Upcoming' | 'Active' | 'Expired'
 
+const AMOUNT_KEY = { percent: 'percentOff', fixed: 'fixedPrice' } as const
+
+// The quantity and amount of each tier: the percent in percent mode, the unit
+// price in fixed mode (0 when the tier has none).
+export function listTierSteps({ tiers, pricingMode }: {
+  tiers: { minQty: number; percentOff?: number; fixedPrice?: number }[]
+  pricingMode: 'percent' | 'fixed'
+}): { minQty: number; amount: number }[] {
+  const steps: { minQty: number; amount: number }[] = []
+  for (const tier of tiers) steps.push({ minQty: tier.minQty, amount: tier[AMOUNT_KEY[pricingMode]] ?? 0 })
+  return steps
+}
+
 // "3+ units (10% off), 5+ units (20% off)" or "3+ units (£1.50 each)".
 export function describeTierRules(options: {
   steps: { minQty: number; amount: number }[]
@@ -35,12 +48,12 @@ export function describeTimeSchedule(options: {
   startsAt: string
   endsAt: string
   statusLabel: TimeStatusLabel
-  formatDate: (value: string) => string
+  formatDate: (options: { value: string }) => string
 }): string {
   const { startsAt, endsAt, statusLabel, formatDate } = options
-  if (statusLabel === 'Upcoming') return formatDate(startsAt) + ' - ' + formatDate(endsAt) + ' (Scheduled)'
-  if (statusLabel === 'Active') return 'Ends ' + formatDate(endsAt)
-  return 'Ended ' + formatDate(endsAt)
+  if (statusLabel === 'Upcoming') return formatDate({ value: startsAt }) + ' - ' + formatDate({ value: endsAt }) + ' (Scheduled)'
+  if (statusLabel === 'Active') return 'Ends ' + formatDate({ value: endsAt })
+  return 'Ended ' + formatDate({ value: endsAt })
 }
 
 // The row title: the name, else the customer-facing title, else a placeholder.

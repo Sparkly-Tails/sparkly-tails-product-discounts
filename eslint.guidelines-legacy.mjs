@@ -11,7 +11,6 @@ export default [
   'src/actions/productSearchAction.ts',
   'src/app/discounts/\\[discountId\\]/page.tsx',
   'src/app/layout.tsx',
-  'src/app/page.tsx',
   'src/app/time-discounts/\\[discountId\\]/page.tsx',
   'src/components/ConfirmForm.tsx',
   'src/components/FixedPriceTierFields.tsx',
