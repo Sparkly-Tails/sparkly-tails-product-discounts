@@ -6,6 +6,12 @@ export async function getShopTimezone(): Promise<string> {
   return data.shop.ianaTimezone
 }
 
+/** The shop's currency code (e.g. "GBP"), used to write prices the way the shop does. */
+export async function getShopCurrencyCode(): Promise<string> {
+  const data = await shopifyQuery<{ shop: { currencyCode: string } }>(`query { shop { currencyCode } }`)
+  return data.shop.currencyCode
+}
+
 /**
  * Converts a naive "wall clock" datetime (no timezone offset — exactly what
  * <input type="datetime-local"> produces, e.g. "2026-07-01T12:00") as
