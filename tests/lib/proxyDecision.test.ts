@@ -31,6 +31,17 @@ describe('decideProxy', () => {
     }
   })
 
+  it('lets the public images of the homepage through without a token (an image request carries none)', async () => {
+    const imageHeaders = { authorization: null, secFetchDest: 'image', accept: 'image/*', rsc: null }
+    for (const pathname of ['/assets/home/tier-illustration.jpg', '/assets/home/time-illustration.jpg']) {
+      expect(await decideProxy(input({ pathname, headers: imageHeaders }))).toEqual({ kind: 'next' })
+    }
+  })
+
+  it('still refuses a page that only starts with the same letters as the public image folder', async () => {
+    expect(await decideProxy(input({ pathname: '/assets-private' }))).toMatchObject({ kind: 'deny' })
+  })
+
   it('lets everything through in development', async () => {
     expect(await decideProxy(input({ isDevelopment: true }))).toEqual({ kind: 'next' })
   })
