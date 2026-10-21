@@ -14,6 +14,7 @@ vi.mock('@/timeDiscounts/config', () => ({
   computeTimeDiscountStatusLabel: vi.fn(() => 'Active'),
 }))
 vi.mock('@/lib/shop', () => ({ getShopTimezone: vi.fn(async () => 'UTC'), getShopCurrencyCode: vi.fn(async () => 'GBP') }))
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }))
 vi.mock('@/home/homeFont', () => ({ homeFont: { variable: 'inter-variable' } }))
 
 const noSearch = Promise.resolve({})

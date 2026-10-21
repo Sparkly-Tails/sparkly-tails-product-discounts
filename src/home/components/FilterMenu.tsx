@@ -1,33 +1,36 @@
-import HiddenField from '@/home/components/HiddenField'
+'use client'
+
+import { useRouter } from 'next/navigation'
+import type { FormEvent } from 'react'
 import { FilterListIcon } from '@/home/components/icons'
-import type { TableQuery } from '@/home/tableQuery'
+import ToolbarMenu from '@/home/components/ToolbarMenu'
+import { buildTableHref, type TableQuery, type TypeFilter } from '@/home/tableQuery'
 
 const TYPE_OPTIONS = [
   { value: 'all', label: 'All types' },
   { value: 'tier', label: 'Tier-based' },
   { value: 'time', label: 'Time-based' },
 ]
-const BUTTON_CLASS =
-  'cursor-pointer list-none [&::-webkit-details-marker]:hidden text-xs font-medium text-home-on-surface-variant hover:text-home-on-surface px-2.5 py-1.5 rounded-lg border border-home-outline-variant/70 hover:bg-home-surface-container transition-colors inline-flex items-center gap-1'
 
-// The "Filters" button. It opens a small panel (a plain form that sends the
-// chosen type to the address); the tab, search and sort are kept.
+// The "Filters" button and its panel. Applying goes to the new address through
+// the app's own router (a full page load would lose the Shopify session); the
+// tab, search and sort stay as they are.
 export default function FilterMenu({ query }: { query: TableQuery }) {
+  const router = useRouter()
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const type = String(new FormData(event.currentTarget).get('type')) as TypeFilter
+    router.push(buildTableHref({ query, changes: { type } }))
+  }
+
   return (
-    <details className="relative">
-      <summary className={BUTTON_CLASS}>
-        <FilterListIcon className="text-sm h-5" />
-        Filters
-      </summary>
+    <ToolbarMenu label="Filters" icon={<FilterListIcon className="text-sm h-5" />}>
       <form
         data-filter-form
-        method="get"
-        action="/"
-        className="absolute right-0 top-full mt-2 z-20 w-48 bg-home-surface-container-lowest border border-home-outline-variant/70 rounded-xl p-4 flex flex-col gap-3"
+        onSubmit={handleSubmit}
+        className="w-48 bg-home-surface-container-lowest border border-home-outline-variant/70 rounded-xl p-4 flex flex-col gap-3"
       >
-        <HiddenField name="tab" value={query.tab} skipValue="all" />
-        <HiddenField name="search" value={query.search} skipValue="" />
-        <HiddenField name="sort" value={query.sort} skipValue="default" />
         <fieldset className="flex flex-col gap-2">
           <legend className="text-xs font-semibold text-home-on-surface mb-2">Type</legend>
           {TYPE_OPTIONS.map((option) => (
@@ -37,13 +40,10 @@ export default function FilterMenu({ query }: { query: TableQuery }) {
             </label>
           ))}
         </fieldset>
-        <button
-          type="submit"
-          className="bg-home-primary-container hover:bg-home-primary text-white text-xs font-semibold px-3.5 py-2 rounded-lg transition-colors"
-        >
+        <button type="submit" className="bg-home-primary-container hover:bg-home-primary text-white text-xs font-semibold px-3.5 py-2 rounded-lg transition-colors">
           Apply
         </button>
       </form>
-    </details>
+    </ToolbarMenu>
   )
 }

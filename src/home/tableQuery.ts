@@ -22,6 +22,8 @@ export interface TableQuery {
 
 export const DEFAULT_QUERY: TableQuery = { tab: 'all', type: 'all', search: '', sort: 'default', page: 1 }
 export const PAGE_SIZE = 10
+// Below this many discounts the pagination line is left out.
+export const MIN_ROWS_FOR_PAGINATION = 5
 
 export interface TableView {
   visibleRows: DiscountRow[]

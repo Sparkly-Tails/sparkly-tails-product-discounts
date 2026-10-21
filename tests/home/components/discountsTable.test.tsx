@@ -1,11 +1,17 @@
 // @vitest-environment jsdom
-import { describe, it, expect, afterEach } from 'vitest'
+import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest'
 import { render, screen, cleanup, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import '@testing-library/jest-dom/vitest'
+
+const router = vi.hoisted(() => ({ push: vi.fn() }))
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: router.push }) }))
+
 import DiscountsTable from '@/home/components/DiscountsTable'
 import { DEFAULT_QUERY, TABLE_TOOLS, applyTableQuery, type TableQuery } from '@/home/tableQuery'
 import type { DiscountRow } from '@/home/discountRows'
 
+beforeEach(() => router.push.mockReset())
 afterEach(cleanup)
 
 function makeRow({ id, kind, title, isActive, subtitle = '', rules = '' }: { id: string; kind: 'tier' | 'time'; title: string; isActive: boolean; subtitle?: string; rules?: string }): DiscountRow {
@@ -55,44 +61,84 @@ describe('DiscountsTable header and tabs', () => {
 })
 
 describe('DiscountsTable search, filter and sort controls', () => {
-  it('has a search form that sends the text and keeps the tab, type and sort', () => {
-    const { container } = show({ changes: { tab: 'active', type: 'tier', sort: 'status', search: 'salmon' } })
-    const form = container.querySelector('form[role="search"]') as HTMLFormElement
-    expect(form).toHaveAttribute('method', 'get')
-    expect(form).toHaveAttribute('action', '/')
-    const input = within(form).getByLabelText('Search discounts') as HTMLInputElement
-    expect(input.name).toBe('search')
+  it('has a search box with the current text and the placeholder of the design', () => {
+    show({ changes: { search: 'salmon' } })
+    const input = screen.getByLabelText('Search discounts') as HTMLInputElement
     expect(input.value).toBe('salmon')
     expect(input).toHaveAttribute('placeholder', 'Search discounts...')
-    const hidden = [...form.querySelectorAll('input[type="hidden"]')].map((node) => [(node as HTMLInputElement).name, (node as HTMLInputElement).value])
-    expect(hidden).toEqual([['tab', 'active'], ['type', 'tier'], ['sort', 'status']])
   })
 
-  it('sends no hidden fields when everything is at its default', () => {
-    const { container } = show()
-    expect(container.querySelectorAll('form[role="search"] input[type="hidden"]')).toHaveLength(0)
+  it('searches without a page load: submitting goes to the address with the text and keeps the tab, type and sort', async () => {
+    const user = userEvent.setup()
+    show({ changes: { tab: 'active', type: 'tier', sort: 'status' } })
+    await user.type(screen.getByLabelText('Search discounts'), '  Salmon Oil {enter}')
+    expect(router.push).toHaveBeenCalledTimes(1)
+    expect(router.push).toHaveBeenCalledWith('/?tab=active&type=tier&search=Salmon+Oil&sort=status')
   })
 
-  it('has a Filters panel with the type options, the current one checked, that keeps the other settings', () => {
-    const { container } = show({ changes: { type: 'time', tab: 'active', search: 'sale' } })
-    const panel = container.querySelector('form[data-filter-form]') as HTMLFormElement
-    expect(panel).toHaveAttribute('method', 'get')
-    expect(within(panel).getByLabelText('All types')).not.toBeChecked()
-    expect(within(panel).getByLabelText('Tier-based')).not.toBeChecked()
-    expect(within(panel).getByLabelText('Time-based')).toBeChecked()
-    const hidden = [...panel.querySelectorAll('input[type="hidden"]')].map((node) => [(node as HTMLInputElement).name, (node as HTMLInputElement).value])
-    expect(hidden).toEqual([['tab', 'active'], ['search', 'sale']])
-    expect(within(panel).getByRole('button', { name: 'Apply' })).toBeInTheDocument()
+  it('clears the search by submitting an empty box, and goes back to the first page', async () => {
+    const user = userEvent.setup()
+    show({ rows: TWELVE, changes: { search: 'discount', page: 2 } })
+    await user.clear(screen.getByLabelText('Search discounts'))
+    await user.type(screen.getByLabelText('Search discounts'), '{enter}')
+    expect(router.push).toHaveBeenCalledWith('/')
   })
 
-  it('has a Sort menu of links, marking the current order', () => {
-    const { container } = show({ changes: { sort: 'type' } })
-    const menu = container.querySelector('[data-sort-menu]') as HTMLElement
-    const links = within(menu).getAllByRole('link')
-    expect(links.map((link) => link.textContent)).toEqual(['Default order', 'Title A-Z', 'Title Z-A', 'Type', 'Status'])
+  it('keeps the Filters panel closed until the button is pressed', async () => {
+    const user = userEvent.setup()
+    show()
+    const button = screen.getByRole('button', { name: 'Filters' })
+    expect(button).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByLabelText('Time-based')).toBeNull()
+    await user.click(button)
+    expect(button).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByLabelText('All types')).toBeChecked()
+  })
+
+  it('shows the current type as checked in the Filters panel', async () => {
+    const user = userEvent.setup()
+    show({ changes: { type: 'time' } })
+    await user.click(screen.getByRole('button', { name: 'Filters' }))
+    expect(screen.getByLabelText('Time-based')).toBeChecked()
+    expect(screen.getByLabelText('Tier-based')).not.toBeChecked()
+  })
+
+  it('applies a type without a page load and keeps the tab, search and sort', async () => {
+    const user = userEvent.setup()
+    show({ changes: { tab: 'active', search: 'sale', sort: 'type' } })
+    await user.click(screen.getByRole('button', { name: 'Filters' }))
+    await user.click(screen.getByLabelText('Time-based'))
+    await user.click(screen.getByRole('button', { name: 'Apply' }))
+    expect(router.push).toHaveBeenCalledWith('/?tab=active&type=time&search=sale&sort=type')
+  })
+
+  it('closes the Filters panel with Escape', async () => {
+    const user = userEvent.setup()
+    show()
+    await user.click(screen.getByRole('button', { name: 'Filters' }))
+    await user.keyboard('{Escape}')
+    expect(screen.queryByLabelText('All types')).toBeNull()
+  })
+
+  it('opens the Sort menu with five links, marking the current order', async () => {
+    const user = userEvent.setup()
+    show({ changes: { sort: 'type' } })
+    const button = screen.getByRole('button', { name: 'Sort' })
+    expect(screen.queryByRole('link', { name: 'Title A-Z' })).toBeNull()
+    await user.click(button)
+    const links = ['Default order', 'Title A-Z', 'Title Z-A', 'Type', 'Status'].map((name) => screen.getByRole('link', { name }))
     expect(links.map((link) => link.getAttribute('href'))).toEqual(['/', '/?sort=title-asc', '/?sort=title-desc', '/?sort=type', '/?sort=status'])
     expect(links[3]).toHaveAttribute('aria-current', 'true')
     expect(links[0]).not.toHaveAttribute('aria-current')
+  })
+
+  it('closes the Sort menu again when the button is pressed a second time', async () => {
+    const user = userEvent.setup()
+    show()
+    const button = screen.getByRole('button', { name: 'Sort' })
+    await user.click(button)
+    await user.click(button)
+    expect(screen.queryByRole('link', { name: 'Title A-Z' })).toBeNull()
   })
 })
 
@@ -126,7 +172,27 @@ describe('DiscountsTable rows', () => {
   })
 })
 
+const FOUR = SIX.slice(0, 4)
+const FIVE = SIX.slice(0, 5)
+
 describe('DiscountsTable pagination', () => {
+  it('is left out when there are fewer than 5 discounts', () => {
+    show({ rows: FOUR })
+    expect(screen.queryByTestId('showing')).toBeNull()
+    expect(screen.queryByText('Previous')).toBeNull()
+    expect(screen.getAllByTestId('discount-row')).toHaveLength(4)
+  })
+
+  it('is shown from 5 discounts on', () => {
+    show({ rows: FIVE })
+    expect(screen.getByTestId('showing').textContent).toBe('Showing 1–5 of 5 discounts')
+  })
+
+  it('is left out when a search leaves fewer than 5 discounts', () => {
+    show({ changes: { search: 'sale' } })
+    expect(screen.queryByTestId('showing')).toBeNull()
+  })
+
   it('on a single page shows "Showing 1–6 of 6 discounts" with Previous and Next switched off', () => {
     show()
     expect(screen.getByTestId('showing').textContent).toBe('Showing 1–6 of 6 discounts')

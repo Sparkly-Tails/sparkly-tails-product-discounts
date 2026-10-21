@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { ChevronLeftIcon, ChevronRightIcon } from '@/home/components/icons'
 import { buildTableHref, type TableQuery, type TableView } from '@/home/tableQuery'
 
@@ -18,10 +19,10 @@ export default function TablePagination({ view, query }: { view: TableView; quer
       </div>
       <div className="flex items-center space-x-2">
         {hasPrevious ? (
-          <a href={buildTableHref({ query, changes: { page: view.page - 1 } })} className={BUTTON_BASE + BUTTON_ON}>
+          <Link href={buildTableHref({ query, changes: { page: view.page - 1 } })} className={BUTTON_BASE + BUTTON_ON}>
             <ChevronLeftIcon className="text-[16px]" />
             Previous
-          </a>
+          </Link>
         ) : (
           <span aria-disabled="true" className={BUTTON_BASE + BUTTON_OFF}>
             <ChevronLeftIcon className="text-[16px]" />
@@ -29,10 +30,10 @@ export default function TablePagination({ view, query }: { view: TableView; quer
           </span>
         )}
         {hasNext ? (
-          <a href={buildTableHref({ query, changes: { page: view.page + 1 } })} className={BUTTON_BASE + BUTTON_ON}>
+          <Link href={buildTableHref({ query, changes: { page: view.page + 1 } })} className={BUTTON_BASE + BUTTON_ON}>
             Next
             <ChevronRightIcon className="text-[16px]" />
-          </a>
+          </Link>
         ) : (
           <span aria-disabled="true" className={BUTTON_BASE + BUTTON_OFF}>
             Next
