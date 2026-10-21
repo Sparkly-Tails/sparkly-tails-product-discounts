@@ -6,7 +6,7 @@ import TablePagination from '@/home/components/TablePagination'
 import TableToolbar from '@/home/components/TableToolbar'
 import { ChevronRightIcon, TierTypeIcon, TimeTypeIcon } from '@/home/components/icons'
 import type { DiscountRow } from '@/home/discountRows'
-import type { TableQuery, TableView } from '@/home/tableQuery'
+import { MIN_ROWS_FOR_PAGINATION, type TableQuery, type TableView } from '@/home/tableQuery'
 
 const HEAD_CELL = 'py-3 px-4 font-medium '
 
@@ -101,6 +101,8 @@ function EmptyState({ hasDiscounts }: { hasDiscounts: boolean }) {
 // table, and the pagination line.
 export default function DiscountsTable({ view, query }: { view: TableView; query: TableQuery }) {
   const hasMatches = view.matchCount > 0
+  // A new key closes the Filters and Sort menus whenever the table settings change.
+  const settings = JSON.stringify(query)
   return (
     <section className="bg-home-surface-container-lowest border border-home-outline-variant/70 rounded-xl overflow-hidden flex flex-col">
       <div className="p-5 border-b border-home-outline-variant/40 flex flex-col gap-4">
@@ -110,14 +112,14 @@ export default function DiscountsTable({ view, query }: { view: TableView; query
             <p className="text-xs text-home-on-surface-variant">Manage active tier quantity breaks and scheduled promotional pricing.</p>
           </div>
           <div className="flex items-center gap-2">
-            <FilterMenu query={query} />
-            <SortMenu query={query} />
+            <FilterMenu key={'filter-' + settings} query={query} />
+            <SortMenu key={'sort-' + settings} query={query} />
           </div>
         </div>
         <TableToolbar query={query} counts={view.counts} />
       </div>
       {hasMatches ? <RowsTable rows={view.visibleRows} /> : <EmptyState hasDiscounts={view.counts.all > 0} />}
-      {hasMatches ? <TablePagination view={view} query={query} /> : null}
+      {view.matchCount >= MIN_ROWS_FOR_PAGINATION ? <TablePagination view={view} query={query} /> : null}
     </section>
   )
 }

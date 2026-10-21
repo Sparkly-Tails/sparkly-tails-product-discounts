@@ -2,7 +2,7 @@
 // centred, as in the design.
 export default function HomeHeader() {
   return (
-    <header className="bg-home-surface border-b border-home-outline-variant w-full sticky top-0 z-30">
+    <header className="bg-home-surface-container-lowest border-b border-home-outline-variant w-full sticky top-0 z-30">
       <div className="max-w-[1024px] mx-auto px-6 h-14 relative flex items-center justify-between">
         <div className="flex items-center space-x-8">
           <nav className="hidden md:flex items-center space-x-6"></nav>

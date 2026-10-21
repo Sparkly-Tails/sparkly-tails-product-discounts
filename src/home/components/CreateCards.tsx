@@ -17,7 +17,7 @@ export default function CreateCards() {
       <article className={ARTICLE_CLASS}>
         <div>
           <div className="rounded-lg overflow-hidden bg-home-surface-container-low aspect-video w-full mb-4 border border-home-outline-variant/40">
-            <Image src="/home/tier-illustration.jpg" alt="Tier-based discount concept illustration" width={512} height={286} unoptimized className={IMAGE_CLASS} />
+            <Image src="/assets/home/tier-illustration.jpg" alt="Tier-based discount concept illustration" width={512} height={286} unoptimized className={IMAGE_CLASS} />
           </div>
           <div className="flex items-center gap-1.5 mb-2">
             <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-home-secondary bg-home-secondary-fixed/50 px-2 py-0.5 rounded-full">
@@ -41,7 +41,7 @@ export default function CreateCards() {
       <article className={ARTICLE_CLASS}>
         <div>
           <div className="rounded-lg overflow-hidden bg-home-surface-container-low aspect-video w-full mb-4 border border-home-outline-variant/40">
-            <Image src="/home/time-illustration.jpg" alt="Time-based discount concept illustration" width={512} height={286} unoptimized className={IMAGE_CLASS} />
+            <Image src="/assets/home/time-illustration.jpg" alt="Time-based discount concept illustration" width={512} height={286} unoptimized className={IMAGE_CLASS} />
           </div>
           <div className="flex items-center gap-1.5 mb-2">
             <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-home-primary-container bg-home-primary-fixed/60 px-2 py-0.5 rounded-full">

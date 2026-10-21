@@ -11,6 +11,13 @@ import * as icons from '@/home/components/icons'
 afterEach(cleanup)
 
 describe('HomeHeader', () => {
+  it('has a white background, not the cream of the page', () => {
+    const { container } = render(<HomeHeader />)
+    const header = container.querySelector('header') as HTMLElement
+    expect(header).toHaveClass('bg-home-surface-container-lowest')
+    expect(header).not.toHaveClass('bg-home-surface')
+  })
+
   it('shows the "ST" mark and the app name from the design', () => {
     render(<HomeHeader />)
     expect(screen.getByText('ST')).toBeInTheDocument()

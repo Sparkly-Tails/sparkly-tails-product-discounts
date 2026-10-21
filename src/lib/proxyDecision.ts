@@ -21,7 +21,7 @@ export type ProxyDecision =
   | { kind: 'bounce'; reason: string }
   | { kind: 'deny'; status: 401 | 403 | 503; message: string; reason: string }
 
-const EXEMPT_PREFIXES = ['/_next/', '/webhooks/']
+const EXEMPT_PREFIXES = ['/_next/', '/webhooks/', '/assets/']
 
 /** A page load: a navigation, or the iframe/frame the Shopify admin embeds the app in (browsers label that `iframe`). */
 const PAGE_DESTINATIONS = ['document', 'iframe', 'frame']
