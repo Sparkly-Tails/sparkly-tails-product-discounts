@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { getShopTimezone, zonedTimeToUtc } from '@/lib/shop'
+import { getShopCurrencyCode, getShopTimezone, zonedTimeToUtc } from '@/lib/shop'
 import * as shopifyClient from '@/lib/shopify-client'
 
 describe('getShopTimezone', () => {
@@ -8,6 +8,16 @@ describe('getShopTimezone', () => {
   it('returns the shop\'s IANA timezone', async () => {
     vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({ shop: { ianaTimezone: 'Europe/London' } })
     expect(await getShopTimezone()).toBe('Europe/London')
+  })
+})
+
+describe('getShopCurrencyCode', () => {
+  beforeEach(() => vi.restoreAllMocks())
+
+  it('returns the currency code of the shop', async () => {
+    const spy = vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({ shop: { currencyCode: 'GBP' } })
+    expect(await getShopCurrencyCode()).toBe('GBP')
+    expect(spy.mock.calls[0][0]).toContain('currencyCode')
   })
 })
 
