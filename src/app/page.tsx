@@ -1,4 +1,3 @@
-import '@/home/home.css'
 import HomeView from '@/home/components/HomeView'
 import { loadDiscountRows } from '@/home/loadDiscountRows'
 import { ROW_TOOLS } from '@/home/rowTools'

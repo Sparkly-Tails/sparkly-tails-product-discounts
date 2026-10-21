@@ -1,4 +1,6 @@
 @import "tailwindcss";
+/* The homepage design tokens: imported here so Tailwind sees their @theme and generates the home-* utilities. */
+@import "../home/home.css";
 
 :root {
   --background: oklch(99% 0.003 145);
