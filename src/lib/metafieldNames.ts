@@ -21,4 +21,6 @@ export const METAFIELD_KEYS = {
   timeConfig: 'time_config',
   /** Discount. */
   timeFunctionConfig: 'time_function_config',
+  /** Discount (the Shopify discount of a flash sale): which tier discount that record applies. */
+  flashRecord: 'flash_record',
 } as const
