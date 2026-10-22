@@ -194,6 +194,7 @@
   display: flex;
   flex-wrap: nowrap;
   overflow-x: auto;
+  scrollbar-width: thin;
   align-items: center;
   gap: 6px;
   /* 6px below the (empty) caption row of the design, then its 4px top and bottom padding. */
