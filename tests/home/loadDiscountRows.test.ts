@@ -8,8 +8,9 @@ const tier = (overrides: Record<string, unknown> = {}) => ({
 })
 const time = (overrides: Record<string, unknown> = {}) => ({ discountId: 'm1', title: 'Spring Sale', startsAt: '2026-03-01T09:00', endsAt: '2026-03-31T23:59', ...overrides })
 
-function load({ tiers = [tier()], times = [time()], label = 'Active' as 'Upcoming' | 'Active' | 'Expired' } = {}) {
+function load({ tiers = [tier()], times = [time()], label = 'Active' as 'Upcoming' | 'Active' | 'Expired', flashStatus = 'Active' as 'Upcoming' | 'Active' | 'Ended' } = {}) {
   const getStatusLabel = vi.fn(() => label)
+  const getFlashStatus = vi.fn(() => flashStatus)
   const loadTimezone = vi.fn(async () => 'Europe/London')
   const rowsPromise = loadDiscountRows({
     loadTierDiscounts: async () => tiers,
@@ -17,9 +18,10 @@ function load({ tiers = [tier()], times = [time()], label = 'Active' as 'Upcomin
     loadTimezone,
     loadCurrencyCode: async () => 'GBP',
     getStatusLabel,
+    getFlashStatus,
     tools: ROW_TOOLS,
   })
-  return { rowsPromise, getStatusLabel, loadTimezone }
+  return { rowsPromise, getStatusLabel, getFlashStatus, loadTimezone }
 }
 
 describe('loadDiscountRows', () => {
@@ -66,8 +68,47 @@ describe('loadDiscountRows', () => {
       loadTimezone: async () => 'UTC',
       loadCurrencyCode: async () => 'GBP',
       getStatusLabel: () => 'Active',
+      getFlashStatus: () => 'Active',
       tools: ROW_TOOLS,
     })
     await expect(failing).rejects.toThrow('Shopify is down')
+  })
+})
+
+describe('loadDiscountRows with flash sales', () => {
+  const flash = { startsAt: '2026-11-27T09:00', endsAt: '2026-11-30T23:59' }
+  const flashTier = (overrides: Record<string, unknown> = {}) => tier({ flash, tiers: [{ minQty: 3, percentOff: 10 }], ...overrides })
+
+  it('shows the window and the state after the tier rules, and asks for the state with the shop timezone', async () => {
+    const { rowsPromise, getFlashStatus } = load({ tiers: [flashTier()], times: [], flashStatus: 'Upcoming' })
+    const [row] = await rowsPromise
+    expect(row.rules).toBe('3+ units (10% off) · Flash sale: Nov 27, 2026 - Nov 30, 2026 (Upcoming)')
+    expect(getFlashStatus).toHaveBeenCalledWith({ startsAt: '2026-11-27T09:00', endsAt: '2026-11-30T23:59', timezone: 'Europe/London' })
+  })
+
+  it('counts a live sale as active only while it is Active; Upcoming and Ended rows are inactive', async () => {
+    const states = [] as boolean[]
+    for (const flashStatus of ['Upcoming', 'Active', 'Ended'] as const) {
+      const [row] = await load({ tiers: [flashTier()], times: [], flashStatus }).rowsPromise
+      states.push(row.isActive)
+    }
+    expect(states).toEqual([false, true, false])
+  })
+
+  it('keeps an Ended sale in the list with the word Ended', async () => {
+    const [row] = await load({ tiers: [flashTier()], times: [], flashStatus: 'Ended' }).rowsPromise
+    expect(row.rules).toContain('(Ended)')
+  })
+
+  it('makes a draft sale inactive even inside its window', async () => {
+    const [row] = await load({ tiers: [flashTier({ status: 'draft' })], times: [], flashStatus: 'Active' }).rowsPromise
+    expect(row.isActive).toBe(false)
+  })
+
+  it('leaves a discount without a flash sale exactly as before and never asks for a flash state', async () => {
+    const { rowsPromise, getFlashStatus } = load({ times: [] })
+    const [row] = await rowsPromise
+    expect([row.rules, row.isActive]).toEqual(['3+ units (10% off), 5+ units (20% off)', true])
+    expect(getFlashStatus).not.toHaveBeenCalled()
   })
 })

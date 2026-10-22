@@ -7,7 +7,7 @@ import type { shopifyQuery } from '@/lib/shopify-client'
 import { METAFIELD_KEYS, METAFIELD_NAMESPACE } from '@/lib/metafieldNames'
 
 /** Must match the `handle` in extensions/product-discount/shopify.extension.toml. */
-const TIER_FUNCTION_HANDLE = 'product-discount'
+export const TIER_FUNCTION_HANDLE = 'product-discount'
 
 export type ShopifyQuery = typeof shopifyQuery
 

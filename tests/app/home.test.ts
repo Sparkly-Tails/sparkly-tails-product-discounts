@@ -13,7 +13,7 @@ vi.mock('@/timeDiscounts/config', () => ({
   getTimeDiscountsConfig: vi.fn(async () => ({ discounts: [] })),
   computeTimeDiscountStatusLabel: vi.fn(() => 'Active'),
 }))
-vi.mock('@/lib/shop', () => ({ getShopTimezone: vi.fn(async () => 'UTC'), getShopCurrencyCode: vi.fn(async () => 'GBP') }))
+vi.mock('@/lib/shop', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/shop')>()), getShopTimezone: vi.fn(async () => 'UTC'), getShopCurrencyCode: vi.fn(async () => 'GBP') }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }))
 vi.mock('@/home/homeFont', () => ({ homeFont: { variable: 'inter-variable' } }))
 
@@ -21,7 +21,7 @@ const noSearch = Promise.resolve({})
 const liveDiscount = { discountId: 'd1', name: 'Salmon Oil', title: '', status: 'live' as const, pricingMode: 'percent' as const, members: [], tiers: [{ minQty: 3, percentOff: 10 }] }
 const draftDiscount = { ...liveDiscount, discountId: 'd2', name: 'Calming Chews', status: 'draft' as const }
 
-afterEach(cleanup)
+afterEach(() => { cleanup(); vi.useRealTimers() })
 
 describe('Home', () => {
   beforeEach(() => {
@@ -57,6 +57,18 @@ describe('Home', () => {
     const rows = screen.getAllByTestId('discount-row')
     expect(rows.map((row) => within(row).getAllByRole('link')[0].textContent)).toEqual(['Salmon Oil', 'Calming Chews', 'Spring Sale'])
     expect(within(rows[2]).getByRole('link')).toHaveAttribute('href', '/time-discounts/m1')
+  })
+
+  it('lists a flash sale with its window and counts it as inactive until the sale is Active', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-11-01T10:00:00Z'))
+    const flashDiscount = { ...liveDiscount, discountId: 'f1', name: 'Black Friday', flash: { startsAt: '2026-11-27T09:00', endsAt: '2026-11-30T23:59', showTeaser: true } }
+    vi.mocked(getConfig).mockResolvedValue({ discounts: [flashDiscount] })
+
+    render(await Home({ searchParams: Promise.resolve({ tab: 'inactive' }) }))
+
+    const [row] = screen.getAllByTestId('discount-row')
+    expect(within(row).getByText(/Flash sale: Nov 27, 2026 - Nov 30, 2026 \(Upcoming\)/)).toBeInTheDocument()
   })
 
   it('applies the table settings found in the address', async () => {

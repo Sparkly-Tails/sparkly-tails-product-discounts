@@ -2,6 +2,8 @@
 // Collaborators (text formatters, title pickers) are passed in, so each
 // function here is a small pure step.
 
+import type { FlashStatus } from '@/flash/status'
+
 export interface DiscountRow {
   key: string
   kind: 'tier' | 'time'
@@ -56,6 +58,25 @@ export function describeTimeSchedule(options: {
   return 'Ended ' + formatDate({ value: endsAt })
 }
 
+// "Flash sale: Nov 27, 2026 - Nov 30, 2026 (Upcoming)": the whole window with the state of the sale.
+export function describeFlashSchedule(options: {
+  startsAt: string
+  endsAt: string
+  flashStatus: FlashStatus
+  formatDate: (options: { value: string }) => string
+}): string {
+  const { startsAt, endsAt, flashStatus, formatDate } = options
+  return 'Flash sale: ' + formatDate({ value: startsAt }) + ' - ' + formatDate({ value: endsAt }) + ' (' + flashStatus + ')'
+}
+
+// The texts of a row's rules column, joined with a dot; an empty text is left out.
+export function joinRuleTexts({ parts }: { parts: string[] }): string {
+  return parts.filter(Boolean).join(' · ')
+}
+
+// A live flash sale counts as active only while it is Active; any other discount is active when it is live.
+const FLASH_ACTIVE: Record<string, boolean> = { Active: true, Upcoming: false, Ended: false }
+
 // The row title: the name, else the customer-facing title, else a placeholder.
 export function pickRowTitle({ name, title }: { name: string; title: string }): string {
   return name.trim() || title.trim() || 'Untitled discount'
@@ -73,10 +94,12 @@ export function buildTierRow(options: {
   title: string
   status: 'draft' | 'live'
   rules: string
+  /** The state of the flash sale, or null/absent for a discount that is not one. */
+  flashStatus?: FlashStatus | null
   pickTitle: (options: { name: string; title: string }) => string
   pickSubtitle: (options: { rowTitle: string; title: string }) => string
 }): DiscountRow {
-  const { discountId, name, title, status, rules, pickTitle, pickSubtitle } = options
+  const { discountId, name, title, status, rules, flashStatus, pickTitle, pickSubtitle } = options
   const rowTitle = pickTitle({ name, title })
   return {
     key: 'tier:' + discountId,
@@ -84,7 +107,7 @@ export function buildTierRow(options: {
     title: rowTitle,
     subtitle: pickSubtitle({ rowTitle, title }),
     rules,
-    isActive: status === 'live',
+    isActive: status === 'live' && (FLASH_ACTIVE[String(flashStatus)] ?? true),
     href: '/discounts/' + encodeURIComponent(discountId),
   }
 }
