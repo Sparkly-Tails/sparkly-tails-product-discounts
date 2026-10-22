@@ -27,14 +27,14 @@ The same piece of work **aligns the storefront widget to the new Stitch design**
 - A "trust badges" area (the design shows an empty one) and an "Actions & Stepper" segment of its own: not built.
 - Making the "High Demand" tag data driven: it is a manual checkbox.
 - Touching or keeping the time-based discount: it stays as it is until it is removed in a separate change; no new code may import from it.
-- Changing checkout combining rules for existing discounts, other than what "Risks" says is needed.
+- Changing the existing tier Function or the shared tier discount's price calculation: they stay as they are. (The only change to existing checkout behaviour is the combining setting named under "Risks".)
 
 ## Anti-goals (a failure even if it technically works)
 
 - A flash sale whose discount still applies at checkout after the end time, or whose widget still shows after it.
 - A widget that differs visibly from the design (spacing, colours, type, copy), or that breaks existing non-flash tier discounts.
 - Code that imports from `src/timeDiscounts/`, `extensions/time-based-discount/` or the time-based storefront files (they will be deleted).
-- A discount whose data is stored twice and can drift (see "How the data flows").
+- A discount whose data is stored in both configs at once, or a product that is in two active discounts.
 
 ## Decisions by the owner
 
@@ -74,10 +74,11 @@ The timer shows hours only while one hour or more remains (`HH : MM : SS`, else 
 
 ## How the data flows
 
-- **Admin source of truth:** the existing shop-level `tier_config` (every discount with its members, tiers and status). A discount gains an optional `flash` object `{ startsAt, endsAt, showTeaser, shopifyDiscountId }` (times as shop-local naive strings) and an optional `highDemand` boolean. Nothing else about the tier data changes.
-- **Checkout:** the existing shared Shopify discount ("Product tier discounts") keeps running every **non-flash** live discount. Each **flash** discount gets its **own** Shopify automatic discount (created, updated and deleted like the time-based one: `discountAutomaticAppCreate`/`Update`/`Delete`, native `startsAt`/`endsAt` in UTC) that runs the **same tier Function**. Shopify turns it on and off by its native window. The record carries a tiny Function config, `{ discountId }`, in a discount-level metafield; the Function reads the shop-level config as today and then applies **only the discount whose id the record names**; the shared record (no discount config) applies every discount that has no `flash`. No tier data is copied into the record, so it cannot drift.
+- **Two configs, so the existing tier Function stays untouched (owner's decision):** regular tier discounts stay in the shop-level `tier_config` read by the existing Function, exactly as today. **Flash discounts live in their own shop-level config, `flash_config`** (same shape as a tier discount plus `flash: { startsAt, endsAt, showTeaser }` and the shared `highDemand`; times as shop-local naive strings; this mirrors how the time-based discounts have their own `time_config`). The admin reads and writes both and merges them for lists and forms. Turning the flash switch on or off in the form **moves** the discount between the two configs (one save, with the Shopify record created or deleted to match).
+- **One product, one active discount (owner's rule, already the rule today):** the form does not let a product or variant be added to a discount if another **active** (Live) discount already holds it. The check (`isProductAvailable`) must look at **both** configs, so a product cannot be in a regular and a flash discount at once.
+- **Checkout, a second Function:** a new Function extension `flash-discount` is a **copy of the existing tier Function** (`product-discount`) whose input query reads `flash_config` (and the record's own `{ discountId }` config) instead of `tier_config`, and which applies only the discount named by the record it runs for. Each flash discount gets its **own** Shopify automatic discount running this Function (created, updated and deleted like the time-based one: `discountAutomaticAppCreate`/`Update`/`Delete`, native `startsAt`/`endsAt` in UTC, class `PRODUCT`). Shopify turns it on and off by its window. The existing shared record and Function are not changed.
 - **When the Shopify record exists:** only while the discount is Live and its flash switch is on. Going Live (or switching the flash on) creates it; going Draft, switching the flash off or deleting the discount deletes it; editing updates it. An ended sale keeps its record until the owner changes it (Shopify no longer applies it after the end).
-- **Storefront:** the per-product metafield `tier_discount` (written by the existing product sync) gains `flash: { startsAtUnix, endsAtUnix, showTeaser }` and `highDemand`. Unix seconds let Liquid compare with the current time (`'now' | date: '%s'`) and let the script compare with `Date.now()`. The widget renders nothing in Liquid when the end has passed, and its script hides it at the end without a reload.
+- **Storefront:** the per-product metafield `tier_discount` (written by the product sync, which now takes the discount for a product from either config) gains `flash: { startsAtUnix, endsAtUnix, showTeaser }` and `highDemand`. Unix seconds let Liquid compare with the current time (`'now' | date: '%s'`) and let the script compare with `Date.now()`. The widget renders nothing in Liquid when the end has passed, and its script hides it at the end without a reload.
 - **Status of a flash discount** (admin list, edit page, homepage table): `Upcoming` before the start, `Active` inside the window, `Ended` after it. A Draft discount does not run whatever the window says; Live plus window decides. The homepage table counts Upcoming and Ended as Inactive, as for the time-based ones.
 
 ## Where the time-based code is copied from (map)
@@ -92,7 +93,8 @@ Copy and rename (no import from the originals); keep tests with them:
 | `src/timeDiscounts/metafieldSync.ts` (product metafields) | folded into the existing tier product sync (`src/lib/product-tiers.ts`) as the new fields |
 | `src/timeDiscounts/components/TitleScheduleFields.tsx` and `useTitleSchedule.ts` (date-time inputs, shop timezone label, validation message) | `src/flash/components/FlashSaleFields.tsx` |
 | `extensions/product-tier-pricing/assets/time-based-discount.js` (countdown, boundaries) | `extensions/product-tier-pricing/assets/flash-sale.js` (prefix every global with `flash`; shared global scope) |
-| `extensions/time-based-discount/` (Function) | **not copied**: the tier Function is reused |
+| `extensions/product-discount/` (the tier Function, 1,900 lines of price maths and tests) | `extensions/flash-discount/` (a copy that reads `flash_config` and applies the one discount its record names); the time-based Function is not copied |
+| `src/lib/config.ts` (`getConfig`, `saveConfig`, `isProductAvailable`) | `src/flash/config.ts` (`getFlashConfig`, `saveFlashConfig`) and a merged read for the admin; `isProductAvailable` checks both configs |
 
 ## My calls (not discussed with the owner; check these)
 
@@ -109,10 +111,10 @@ Copy and rename (no import from the originals); keep tests with them:
 
 ## Risks to check early
 
-- **Combining.** The shared tier discount and each flash discount are separate Shopify discounts of the product class; by default Shopify may apply only one automatic product discount to a cart, which would drop the other when a cart holds a flash product and a regular tier product. The records may need `combinesWith { productDiscounts: true }` (the current shared record sets none). Check on a dev store with a mixed cart before building further; if it needs the setting, add it to the shared record on its next sync (a change to existing behaviour, to be named in the PR).
-- **Shopify discount limits.** Shopify caps the number of active automatic app discounts per store; one extra record per active flash sale counts against it. The form should refuse a new flash sale with a clear message when Shopify refuses the record.
-- **Function change.** The tier Function gains a branch (read the record's config, filter discounts); it has 1,900 lines of tests-worth of math that must stay untouched; its tests must prove the shared record still applies exactly the non-flash discounts, and a flash record applies exactly one.
-- **Page caching.** A cached product page may render the widget just before the end; the script hides it at the end; the price shown by the widget and the price charged at checkout can differ for a moment around the boundary (the checkout is authoritative).
+- **Carts with a flash product and a regular tier product.** The one-product-one-discount rule keeps one product out of two discounts, but a cart can still hold a product of a flash discount and a product of a regular tier discount. They are two separate Shopify discounts, and Shopify's docs say discounts combine only as the rules set on each discount allow (the shared tier record sets none, so by default they do not combine). Both the shared record and every flash record therefore need `combinesWith { productDiscounts: true }`. Setting it on the shared record is a change to existing behaviour (it only affects carts that also qualify for another discount) and is named in the PR. To be checked on a dev store with a mixed cart before building further.
+- **Shopify allows at most 25 active discount Functions per store** (Shopify's Discount Function API page; the changelog of 21 Nov 2024 raised the automatic app discount limit from 5 to 25). The shared tier discount uses one and every active flash record uses one more, together with every other app discount on the store, so a store has room for fewer than 25 flash sales at a time. Draft flash sales have no record and do not count. The form must show Shopify's refusal as a clear message when the limit is reached. Whether a scheduled (not yet started) record counts as active is not stated in the docs and is to be tested.
+- **Copy drift.** The new Function is a copy of the tier Function; a later fix to the price maths has to be made in both until the time-based and tier code are brought together. The copy keeps the same tests, and the document of the change names the original.
+- **Page caching** is not a risk here: the existing time-based mechanism (Liquid check at render plus the script hiding the widget at the end) already works and is copied (owner's confirmation); the checkout stays authoritative around the boundary.
 
 ## Left to the builder
 
