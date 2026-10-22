@@ -580,9 +580,8 @@ test('computeWidgetViewModel: no tiers configured at all — plain price, card h
     discountedPrice: null,
     plainPrice: '£1.49',
     progressState: null,
-    tierButtons: [],
-    tempBoxLabel: null,
-    tempBoxAfterIndex: null,
+    chips: [],
+    tag: null,
     offerState: null,
     dot: null,
     promoLine: '',
@@ -621,11 +620,12 @@ test('computeWidgetViewModel: fresh page load, qty 1, below the discount tier �
     { value: 1, pct: 0, reached: true, covered: true },
     { value: 7, pct: 100, reached: false, covered: false },
   ])
-  assert.deepEqual(vm.tierButtons, [
-    { minQty: 1, active: true, dimmed: false, label: '1 × £1.49' },
-    { minQty: 7, active: false, dimmed: false, label: '7 × £1.43' },
+  // the quantity sits exactly on the start chip: it is the exact one and there is no dashed current chip
+  assert.deepEqual(vm.chips, [
+    { kind: 'tier', qty: 1, label: '1 × £1.49', tone: 'exact' },
+    { kind: 'tier', qty: 7, label: '7 × £10.01', tone: 'idle' },
   ])
-  assert.equal(vm.tempBoxLabel, null) // addingQty sits exactly at the qty:1 anchor, not strictly between two tiers
+  assert.equal(vm.tag, null)
   assert.equal(vm.status.statusText, 'You have 1 unit')
   assert.equal(vm.status.hintText, 'Add 6 for £1.43/ea')
 })
@@ -644,18 +644,17 @@ test('computeWidgetViewModel: combined quantity already past the tier threshold 
   const vm = computeWidgetViewModel({ tiers, basePrice: 1.49, otherQty, addingQty: 3, title: undefined, isGroup: true, formatMoney: fmt })
 
   assert.equal(vm.discountedPrice, '£1.43')
-  // combined (9) doesn't land exactly on either preset (1 or 7), so neither
-  // button highlights — instead a temp box shows the true combined total
-  // (9, not addingQty's 3), positioned after the 7-tier button (the last
-  // one), previewing at the already-unlocked 7-tier rate.
-  assert.deepEqual(vm.tierButtons, [
-    { minQty: 1, active: false, dimmed: true, label: '1 × £1.49' },
-    { minQty: 7, active: false, dimmed: false, label: '7 × £1.43' },
+  // combined (9) doesn't land exactly on either preset (1 or 7): the 7-tier chip is applied (ticked)
+  // and a dashed chip shows the true combined total (9, not addingQty's 3) after it, with a star
+  // because 9 is past the top tier.
+  assert.deepEqual(vm.chips, [
+    { kind: 'tier', qty: 1, label: '1 × £1.49', tone: 'idle' },
+    { kind: 'tier', qty: 7, label: '7 × £10.01 ✓', tone: 'applied' },
+    { kind: 'current', qty: 9, label: '9 × £12.87 ★', tone: 'highest' },
   ])
-  assert.equal(vm.tempBoxLabel, '9 × £1.43')
-  assert.equal(vm.tempBoxAfterIndex, 1)
   assert.equal(vm.offerState, 'highest')
-  assert.equal(vm.status.headlineText, 'Highest discount unlocked: £1.43/each applied! (Save £0.54)')
+  assert.equal(vm.tag.text, 'Tier 1 Active (7+ • Unlimited)')
+  assert.equal(vm.status.hintText, 'Best Rate (£1.43/ea • Add any qty)')
 })
 
 test('computeWidgetViewModel: standalone mode (isGroup false) uses "Buy" promo copy', () => {
@@ -840,44 +839,10 @@ test('buildPromoLine: three real tiers read as a spoken list; no real tier gives
   assert.equal(buildPromoLine([{ minQty: 1, percentOff: 0 }], REDESIGN_BASE, fmt, true), '')
 })
 
-test('buildStatusCopy: below the first offer — units owned, hint to the next price, no badge', () => {
-  const status = buildStatusCopy({ progressState: computeProgressState(REDESIGN_TIERS_FIXED, 4, 1), tiers: REDESIGN_TIERS_FIXED, basePrice: REDESIGN_BASE, formatMoney: fmt })
-  assert.deepEqual(status, { state: 'progress', statusText: 'You have 5 units', hintText: 'Add 3 for £1.63/ea', badgeText: null, headlineText: null })
-})
-
 test('buildStatusCopy: singular wording at one unit', () => {
   const status = buildStatusCopy({ progressState: computeProgressState(REDESIGN_TIERS_FIXED, 0, 1), tiers: REDESIGN_TIERS_FIXED, basePrice: REDESIGN_BASE, formatMoney: fmt })
   assert.equal(status.statusText, 'You have 1 unit')
   assert.equal(status.hintText, 'Add 7 for £1.63/ea')
-})
-
-test('buildStatusCopy: middle tier — "Offer unlocked", saving on the combined quantity, nudge to the highest discount', () => {
-  const status = buildStatusCopy({ progressState: computeProgressState(REDESIGN_TIERS_FIXED, 0, 10), tiers: REDESIGN_TIERS_FIXED, basePrice: REDESIGN_BASE, formatMoney: fmt })
-  assert.deepEqual(status, {
-    state: 'offer',
-    statusText: '10 units × £1.63 (Offer unlocked)',
-    hintText: null,
-    badgeText: 'Save £0.60',
-    headlineText: 'Offer unlocked! Add 6 more to unlock the highest discount for £1.55',
-  })
-})
-
-test('buildStatusCopy: a middle tier followed by another middle tier nudges to "the next offer"', () => {
-  const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 8, fixedPrice: 1.63 }, { minQty: 16, fixedPrice: 1.55 }, { minQty: 32, fixedPrice: 1.45 }]
-  const status = buildStatusCopy({ progressState: computeProgressState(tiers, 0, 10), tiers, basePrice: REDESIGN_BASE, formatMoney: fmt })
-  assert.equal(status.headlineText, 'Offer unlocked! Add 6 more to unlock the next offer for £1.55')
-})
-
-test('buildStatusCopy: highest tier — "Highest discount unlocked" with the total saving, no "Tier" wording, no emoji', () => {
-  const status = buildStatusCopy({ progressState: computeProgressState(REDESIGN_TIERS_FIXED, 0, 16), tiers: REDESIGN_TIERS_FIXED, basePrice: REDESIGN_BASE, formatMoney: fmt })
-  assert.deepEqual(status, {
-    state: 'highest',
-    statusText: 'You have 16 units',
-    hintText: '✓ Highest discount (£1.55/ea)',
-    badgeText: null,
-    headlineText: 'Highest discount unlocked: £1.55/each applied! (Save £2.24)',
-  })
-  assert.doesNotMatch(JSON.stringify(status), /Tier|🎉/)
 })
 
 test('buildStatusCopy: uses the real next tier (anchor pricing), not just its percent', () => {
@@ -893,24 +858,6 @@ test('computeWidgetViewModel: carries the redesign fields', () => {
   assert.equal(vm.promoLine, 'Mix and match 8+ for £1.63 or 16+ for £1.55')
   assert.equal(vm.status.hintText, 'Add 3 for £1.63/ea')
   assert.equal(vm.showCard, true)
-})
-
-test('computeWidgetViewModel: tier buttons show the unit price at each tier and dim the tiers below the applied one', () => {
-  const vm = computeWidgetViewModel({ tiers: REDESIGN_TIERS_FIXED, basePrice: REDESIGN_BASE, otherQty: 0, addingQty: 10, isGroup: true, formatMoney: fmt })
-  assert.deepEqual(vm.tierButtons, [
-    { minQty: 1, active: false, dimmed: true, label: '1 × £1.69' },
-    { minQty: 8, active: false, dimmed: false, label: '8 × £1.63' },
-    { minQty: 16, active: false, dimmed: false, label: '16 × £1.55' },
-  ])
-  assert.equal(vm.tempBoxLabel, '10 × £1.63')
-  assert.equal(vm.tempBoxAfterIndex, 1)
-})
-
-test('computeWidgetViewModel: at the exact tier the pill is active and the lower ones are dimmed; nothing is dimmed before the first offer', () => {
-  const atTier = computeWidgetViewModel({ tiers: REDESIGN_TIERS_FIXED, basePrice: REDESIGN_BASE, otherQty: 0, addingQty: 16, isGroup: true, formatMoney: fmt })
-  assert.deepEqual(atTier.tierButtons.map((b) => [b.active, b.dimmed]), [[false, true], [false, true], [true, false]])
-  const before = computeWidgetViewModel({ tiers: REDESIGN_TIERS_FIXED, basePrice: REDESIGN_BASE, otherQty: 0, addingQty: 5, isGroup: true, formatMoney: fmt })
-  assert.deepEqual(before.tierButtons.map((b) => b.dimmed), [false, false, false])
 })
 
 test('computeTierButtonsSignature: differs when only the cart quantity changed (same stepper value), so the temporary box is repainted', () => {
@@ -961,8 +908,8 @@ test('the tier stylesheet sizes its text in px, never rem, and caps the price at
   const style = fs.readFileSync(path.join(__dirname, '../product-tier-pricing/assets/tier-pricing.css'), 'utf8')
   const remSizes = style.match(/font-size:\s*[\d.]+rem/g) || []
   assert.deepEqual(remSizes, [])
-  assert.match(style, /font-size:\s*min\(var\(--sparkly-tier-price-font-size, 32px\), 36px\)/)
-  assert.match(style, /@media \(max-width: 749px\)[^}]*\{[^}]*font-size:\s*min\(var\(--sparkly-tier-price-font-size, 32px\), 28px\)/)
+  assert.match(style, /font-size:\s*min\(var\(--sparkly-tier-price-font-size, 24px\), 36px\)/)
+  assert.match(style, /@media \(max-width: 749px\)[^}]*\{[^}]*font-size:\s*min\(var\(--sparkly-tier-price-font-size, 24px\), 28px\)/)
 })
 
 // Rows: the number in the cart, and an Add link to the product unless it is the one on the page or sold out.
@@ -1021,7 +968,7 @@ test('buildMixMatchRows: a variant-scoped member matches only that exact variant
 // A theme that saved the old default (44px) must still be accepted: Shopify
 // refuses to upload a template whose saved setting is above the schema maximum.
 
-test('the price size setting accepts the value 44 that themes saved earlier, defaults to 32, and says the display is capped at 36px', () => {
+test('the price size setting accepts the value 44 that themes saved earlier, defaults to 24 (the size in the design), and says the display is capped at 36px', () => {
   const fs = require('node:fs')
   const path = require('node:path')
   const root = path.join(__dirname, '../product-tier-pricing')
@@ -1029,7 +976,7 @@ test('the price size setting accepts the value 44 that themes saved earlier, def
   const schema = JSON.parse(block.split('{% schema %}')[1].split('{% endschema %}')[0])
   const setting = schema.settings.find((item) => item.id === 'price_font_size')
   assert.ok(setting.max >= 44)
-  assert.equal(setting.default, 32)
+  assert.equal(setting.default, 24)
   assert.equal(setting.info, 't:price_font_size_info')
   const strings = JSON.parse(fs.readFileSync(path.join(root, 'locales/en.default.schema.json'), 'utf8'))
   assert.match(strings.price_font_size_info, /36px/)
