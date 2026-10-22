@@ -8,7 +8,8 @@ pub mod schema {
     #[query(
         "src/cart_lines_discounts_generate_run.graphql",
         custom_scalar_overrides = {
-            "Input.shop.metafield.jsonValue" => super::cart_lines_discounts_generate_run::Config
+            "Input.shop.metafield.jsonValue" => super::cart_lines_discounts_generate_run::Config,
+            "Input.discount.metafield.jsonValue" => super::cart_lines_discounts_generate_run::RecordConfig
         }
     )]
     pub mod cart_lines_discounts_generate_run {}
