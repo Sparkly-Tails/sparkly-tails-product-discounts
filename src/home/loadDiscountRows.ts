@@ -2,7 +2,8 @@
 // table. Everything it calls is handed in, so the page decides where the data
 // comes from.
 import type { DiscountRow, TimeStatusLabel } from '@/home/discountRows'
-import type { ROW_TOOLS } from '@/home/rowTools'
+import type { GetFlashStatus } from '@/home/buildRows'
+import type { RowTools } from '@/home/rowTools'
 
 export interface TierDiscountInput {
   discountId: string
@@ -11,6 +12,8 @@ export interface TierDiscountInput {
   status: 'draft' | 'live'
   pricingMode: 'percent' | 'fixed'
   tiers: { minQty: number; percentOff?: number; fixedPrice?: number }[]
+  /** Present when the discount runs as a flash sale (the shop's local times). */
+  flash?: { startsAt: string; endsAt: string }
 }
 
 export interface TimeDiscountInput {
@@ -26,9 +29,10 @@ export async function loadDiscountRows(options: {
   loadTimezone: () => Promise<string>
   loadCurrencyCode: () => Promise<string>
   getStatusLabel: (options: { startsAt: string; endsAt: string; timezone: string }) => TimeStatusLabel
-  tools: typeof ROW_TOOLS
+  getFlashStatus: GetFlashStatus
+  tools: RowTools
 }): Promise<DiscountRow[]> {
-  const { loadTierDiscounts, loadTimeDiscounts, loadTimezone, loadCurrencyCode, getStatusLabel, tools } = options
+  const { loadTierDiscounts, loadTimeDiscounts, loadTimezone, loadCurrencyCode, getStatusLabel, getFlashStatus, tools } = options
   const [tierDiscounts, timeDiscounts, timezone, currencyCode] = await Promise.all([
     loadTierDiscounts(),
     loadTimeDiscounts(),
@@ -36,29 +40,7 @@ export async function loadDiscountRows(options: {
     loadCurrencyCode(),
   ])
 
-  const tierRows: DiscountRow[] = []
-  for (const discount of tierDiscounts) {
-    const steps = tools.listTierSteps({ tiers: discount.tiers, pricingMode: discount.pricingMode })
-    const rules = tools.describeTierRules({ steps, pricingMode: discount.pricingMode, currencyCode, formatMoney: tools.formatMoneyAmount })
-    tierRows.push(
-      tools.buildTierRow({
-        discountId: discount.discountId,
-        name: discount.name,
-        title: discount.title,
-        status: discount.status,
-        rules,
-        pickTitle: tools.pickRowTitle,
-        pickSubtitle: tools.pickRowSubtitle,
-      }),
-    )
-  }
-
-  const timeRows: DiscountRow[] = []
-  for (const discount of timeDiscounts) {
-    const statusLabel = getStatusLabel({ startsAt: discount.startsAt, endsAt: discount.endsAt, timezone })
-    const schedule = tools.describeTimeSchedule({ startsAt: discount.startsAt, endsAt: discount.endsAt, statusLabel, formatDate: tools.formatNaiveDate })
-    timeRows.push(tools.buildTimeRow({ discountId: discount.discountId, title: discount.title, schedule, statusLabel, pickTitle: tools.pickRowTitle }))
-  }
-
+  const tierRows = tools.buildTierRows({ discounts: tierDiscounts, currencyCode, timezone, getFlashStatus, tools })
+  const timeRows = tools.buildTimeRows({ discounts: timeDiscounts, timezone, getStatusLabel, tools })
   return tools.buildDiscountRows({ tierRows, timeRows })
 }
