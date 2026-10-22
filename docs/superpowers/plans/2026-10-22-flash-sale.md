@@ -15,6 +15,7 @@
 - One Function, one config. No import from `src/timeDiscounts/`, `extensions/time-based-discount/` or the time-based storefront files (copy the code instead; they will be deleted).
 - Flash statuses: `Upcoming` (before the start), `Active` (inside the window), `Ended` (after it). A Draft discount never runs. The Shopify record exists only while the discount is Live and has `flash`.
 - Times are shop-local naive strings (`2026-11-27T09:00`) in `tier_config`; UTC only at the Shopify API (`zonedTimeToUtc` in `src/lib/shop.ts`); Unix seconds in the product metafield.
+- Unit word: "units" and "each" (not "tins"): `Tier 1 Active (8+ units)`. The Shopify record title is the discount's `title`, no prefix.
 - Bar copy (exact): teaser `Flash sale starts in 02 : 10 : 00`; running below tier 1 `Flash sale ends in 04 : 18 : 49`; tier 1 reached `Tier 1 unlocked! Flash sale active` with `£1.63/ea` on the right and the timer chip; higher tier `Tier 2 active (£1.55/ea · Keep adding)` with the chip `14:32`. Hours appear only while one hour or more remains. No bar for a non-flash discount; after the end nothing renders.
 - The checkbox "Show a teaser before the sale starts" is on by default; "Show the High Demand tag" is a manual checkbox (off by default). Trust badges are not built.
 - The tier price maths in the Function and in `src/lib/tier-math.ts` does not change.

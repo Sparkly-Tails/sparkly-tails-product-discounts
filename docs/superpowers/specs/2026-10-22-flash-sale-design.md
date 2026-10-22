@@ -49,6 +49,10 @@ The same piece of work **aligns the storefront widget to the new Stitch design**
 - **One Function, as simple as possible**: the existing tier Function gets a small change; no second, nearly identical Function. Flash discounts stay in the existing tier config.
 - Feature branch, atomic commits, tests on localhost, result identical to the design.
 - The bar copy was proposed and approved ("go for it"): see "The bar states".
+- **Unit word (owner, 2026-10-22):** the widget keeps "units" and "each", not the design's "tins": "You have 5 units", "Tier 1 Active (8+ units)", "£1.63 each".
+- **Shopify discount title (owner, 2026-10-22):** the Shopify discount of a flash sale gets the discount's customer-facing title only, without a prefix.
+- **Dev store (owner, 2026-10-22):** full test access to `demo-nlmhyat3`: test Shopify discounts through the Admin API (created and deleted by the agent) and temporary tier metafields on an existing published product, with a backup and a verified restore.
+- **PRs (owner, 2026-10-22):** stacked, built one on the other without waiting for merges; merged by the owner in order with "Create a merge commit".
 
 ## The bar states (copy approved)
 
