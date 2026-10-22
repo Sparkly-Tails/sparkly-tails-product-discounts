@@ -159,3 +159,21 @@ describe('pricesUniform', () => {
     expect(pricesUniform([1.49, 1.59])).toBe(false)
   })
 })
+
+describe('getConfig keeps the flash sale fields of a discount', () => {
+  it('returns flash and highDemand as stored', async () => {
+    const stored = { discounts: [{ discountId: 'd1', name: 'N', title: 'T', status: 'live', pricingMode: 'percent', members: [], tiers: [], flash: { startsAt: '2026-11-27T09:00', endsAt: '2026-11-30T23:59', showTeaser: true, shopifyDiscountId: 'gid://shopify/DiscountAutomaticNode/1' }, highDemand: true }] }
+    vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({ shop: { metafield: { value: JSON.stringify(stored) } } })
+    const config = await getConfig()
+    expect(config.discounts[0].flash).toEqual(stored.discounts[0].flash)
+    expect(config.discounts[0].highDemand).toBe(true)
+  })
+
+  it('leaves both fields undefined for an older discount', async () => {
+    const stored = { discounts: [{ discountId: 'd1', name: 'N', title: 'T', status: 'live', pricingMode: 'percent', members: [], tiers: [] }] }
+    vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({ shop: { metafield: { value: JSON.stringify(stored) } } })
+    const config = await getConfig()
+    expect(config.discounts[0].flash).toBeUndefined()
+    expect(config.discounts[0].highDemand).toBeUndefined()
+  })
+})

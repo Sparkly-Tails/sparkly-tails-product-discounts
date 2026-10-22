@@ -39,6 +39,8 @@ describe('buildProductMetafields', () => {
         { productId: P2, variantId: V20 },
         { productId: P2, variantId: V21 },
       ],
+      flash: null,
+      highDemand: false,
     })
     expect(built.productRefs).toEqual([])
     expect(built.variantRefs).toEqual([V20, V21])
@@ -100,6 +102,40 @@ describe('buildProductMetafields', () => {
   })
 })
 
+describe('buildProductMetafields: flash sale and High Demand', () => {
+  const flashDiscount: Discount = { ...mix, flash: { startsAt: '2026-11-27T09:00', endsAt: '2026-11-30T23:59', showTeaser: true, shopifyDiscountId: 'gid://shopify/DiscountAutomaticNode/9' }, highDemand: true }
+  const window = { startsAtUnix: 1_795_000_000, endsAtUnix: 1_795_100_000 }
+
+  it('a regular discount carries flash null and highDemand false, and nothing else changes', () => {
+    const built = buildProductMetafields(mix, P1, SIBLING_REFERENCE_LIMIT)
+    expect(built.value.flash).toBeNull()
+    expect(built.value.highDemand).toBe(false)
+    expect(built.value.tiers).toEqual(mix.tiers)
+    expect(built.value.siblings).toHaveLength(2)
+  })
+
+  it('a flash discount carries the Unix window and the teaser flag it was given, not the stored text', () => {
+    const built = buildProductMetafields(flashDiscount, P1, SIBLING_REFERENCE_LIMIT, undefined, window)
+    expect(built.value.flash).toEqual({ startsAtUnix: 1_795_000_000, endsAtUnix: 1_795_100_000, showTeaser: true })
+    expect(JSON.stringify(built.value)).not.toContain('2026-11-27')
+    expect(JSON.stringify(built.value)).not.toContain('shopifyDiscountId')
+  })
+
+  it('carries the teaser flag switched off', () => {
+    const quiet: Discount = { ...flashDiscount, flash: { ...flashDiscount.flash!, showTeaser: false } }
+    expect(buildProductMetafields(quiet, P1, SIBLING_REFERENCE_LIMIT, undefined, window).value.flash?.showTeaser).toBe(false)
+  })
+
+  it('carries the High Demand flag, on a flash and on a regular discount', () => {
+    expect(buildProductMetafields({ ...mix, highDemand: true }, P1, SIBLING_REFERENCE_LIMIT).value.highDemand).toBe(true)
+    expect(buildProductMetafields(flashDiscount, P1, SIBLING_REFERENCE_LIMIT, undefined, window).value.highDemand).toBe(true)
+  })
+
+  it('a flash discount without a window (not computed) carries no flash object', () => {
+    expect(buildProductMetafields(flashDiscount, P1, SIBLING_REFERENCE_LIMIT).value.flash).toBeNull()
+  })
+})
+
 describe('metafieldWrites', () => {
   it('sets the discount and each non-empty list, and deletes each empty list', () => {
     const built = buildProductMetafields(mix, P1, SIBLING_REFERENCE_LIMIT)
@@ -129,6 +165,7 @@ interface ShopifyAnswers {
 
 function mockShopify({ missingIds = [], setErrors = [], deleteErrors = [] }: ShopifyAnswers = {}) {
   return vi.spyOn(shopifyClient, 'shopifyQuery').mockImplementation((async (query: string, variables?: { ids?: string[] }) => {
+    if (query.includes('ianaTimezone')) return { shop: { ianaTimezone: 'Europe/London' } }
     if (query.includes('nodes(ids')) return { nodes: (variables?.ids ?? []).map((id) => (missingIds.includes(id) ? null : { id })) }
     return { metafieldsSet: { userErrors: setErrors }, metafieldsDelete: { userErrors: deleteErrors } }
   }) as never)
@@ -198,6 +235,22 @@ describe('syncDiscountMetafields', () => {
       const lists = (call[1] as { metafields: { key: string; value: string }[] }).metafields.filter((m) => m.key !== METAFIELD_KEYS.tierDiscount)
       expect(lists.some((m) => m.value.includes(gone))).toBe(false)
     }
+  })
+
+  it('converts the shop-local window of a flash discount with the shop timezone before writing it (summer London is one hour ahead of UTC)', async () => {
+    const querySpy = mockShopify()
+    const flashDiscount: Discount = { ...mix, members: [{ productId: P1 }], flash: { startsAt: '2026-07-01T12:00', endsAt: '2026-07-01T18:00', showTeaser: true } }
+
+    await syncDiscountMetafields(flashDiscount)
+
+    const written = JSON.parse((callsOf(querySpy, 'metafieldsSet')[0][1] as { metafields: { value: string }[] }).metafields[0].value)
+    expect(written.flash).toEqual({ startsAtUnix: Date.UTC(2026, 6, 1, 11, 0) / 1000, endsAtUnix: Date.UTC(2026, 6, 1, 17, 0) / 1000, showTeaser: true })
+  })
+
+  it('does not ask for the shop timezone for a regular discount', async () => {
+    const querySpy = mockShopify()
+    await syncDiscountMetafields({ ...mix, members: [{ productId: P1 }] })
+    expect(querySpy.mock.calls.some((c) => (c[0] as string).includes('ianaTimezone'))).toBe(false)
   })
 
   it('looks every referenced product and variant up once, before writing anything', async () => {

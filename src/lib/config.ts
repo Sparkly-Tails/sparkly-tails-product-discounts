@@ -34,6 +34,20 @@ export interface DiscountMember {
   variantId?: string
 }
 
+/**
+ * The sale window of a flash sale. Times are the shop's wall-clock time as
+ * written by a datetime-local input (`2026-11-27T09:00`), converted to UTC only
+ * at the Shopify API; `shopifyDiscountId` is the Shopify discount that runs the
+ * sale while the discount is live.
+ */
+export interface FlashSale {
+  startsAt: string
+  endsAt: string
+  /** Show a "starts in" teaser on the product page before the sale begins. */
+  showTeaser: boolean
+  shopifyDiscountId?: string
+}
+
 export interface Discount {
   discountId: string
   /** Internal admin-facing label. */
@@ -44,6 +58,10 @@ export interface Discount {
   pricingMode: 'percent' | 'fixed'
   members: DiscountMember[]
   tiers: Tier[]
+  /** Present when the discount runs as a flash sale. */
+  flash?: FlashSale
+  /** Show the "High Demand" tag in the storefront widget (switched on by hand). */
+  highDemand?: boolean
 }
 
 export interface Config {

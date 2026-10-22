@@ -6,7 +6,7 @@ describe('metafield names', () => {
     expect(METAFIELD_NAMESPACE).toBe('$app:smooth_discount')
   })
 
-  it('has the seven keys with these exact values', () => {
+  it('has the eight keys with these exact values', () => {
     expect(METAFIELD_KEYS).toEqual({
       tierConfig: 'tier_config',
       tierDiscount: 'tier_discount',
@@ -15,6 +15,7 @@ describe('metafield names', () => {
       timeDiscount: 'time_discount',
       timeConfig: 'time_config',
       timeFunctionConfig: 'time_function_config',
+      flashRecord: 'flash_record',
     })
   })
 

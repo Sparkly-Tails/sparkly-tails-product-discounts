@@ -1,5 +1,7 @@
 import { shopifyQuery } from '@/lib/shopify-client'
 import type { Discount } from '@/lib/config'
+import { computeFlashWindowUnix, type FlashWindowUnix } from '@/flash/window'
+import { getShopTimezone, zonedTimeToUtc } from '@/lib/shop'
 import { METAFIELD_NAMESPACE, METAFIELD_KEYS } from '@/lib/metafieldNames'
 
 export const SIBLING_PRODUCTS_KEY = METAFIELD_KEYS.tierSiblingProducts
@@ -27,6 +29,10 @@ interface DiscountMetafieldValue {
   ownVariantIds: string[] | null
   /** IDs only: the theme reads each sibling's title, link and image live through the reference lists. */
   siblings: DiscountMetafieldSibling[]
+  /** The flash sale window in Unix seconds (and whether to tease it); null for a regular discount. */
+  flash: (FlashWindowUnix & { showTeaser: boolean }) | null
+  /** Show the "High Demand" tag in the widget. */
+  highDemand: boolean
 }
 
 export interface ProductMetafields {
@@ -63,12 +69,16 @@ interface MetafieldIdentifier {
  * one deleted member would block the whole save: such an ID stays in `siblings`
  * (still counted, shown as not listed) but is left out of the reference lists and
  * does not use up a slot of the limit. Omitted = every ID is taken to exist.
+ *
+ * `flashWindow` is the flash sale window already converted to Unix seconds by the
+ * caller (it needs the shop timezone); a discount without it carries `flash: null`.
  */
 export function buildProductMetafields(
   discount: Discount,
   productId: string,
   limit: number,
   existingIds?: ReadonlySet<string>,
+  flashWindow: FlashWindowUnix | null = null,
 ): ProductMetafields {
   const exists = (id: string) => !existingIds || existingIds.has(id)
   const own = discount.members.filter((m) => m.productId === productId)
@@ -83,6 +93,8 @@ export function buildProductMetafields(
       tiers: discount.tiers,
       ownVariantIds,
       siblings: others.map((m) => (m.variantId == null ? { productId: m.productId } : { productId: m.productId, variantId: m.variantId })),
+      flash: discount.flash && flashWindow ? { ...flashWindow, showTeaser: discount.flash.showTeaser } : null,
+      highDemand: discount.highDemand === true,
     },
     productRefs: others.filter((m) => m.variantId == null).map((m) => m.productId).filter(exists).slice(0, limit),
     variantRefs: others.filter((m) => m.variantId != null).map((m) => m.variantId!).filter(exists).slice(0, limit),
@@ -136,9 +148,13 @@ export async function syncDiscountMetafields(discount: Discount): Promise<void> 
   // What a sibling reference points at: the variant for a variant member, else the product.
   const existingIds = await findExistingIds([...new Set(discount.members.map((m) => m.variantId ?? m.productId))])
 
+  const flashWindow = discount.flash
+    ? computeFlashWindowUnix({ startsAt: discount.flash.startsAt, endsAt: discount.flash.endsAt, timeZone: await getShopTimezone(), convertToUtc: zonedTimeToUtc })
+    : null
+
   const results = await Promise.allSettled(
     uniqueProductIds.map((productId) => {
-      const { toSet, toDelete } = metafieldWrites(productId, buildProductMetafields(discount, productId, SIBLING_REFERENCE_LIMIT, existingIds))
+      const { toSet, toDelete } = metafieldWrites(productId, buildProductMetafields(discount, productId, SIBLING_REFERENCE_LIMIT, existingIds, flashWindow))
       return writeProductMetafields(toSet, toDelete)
     }),
   )
