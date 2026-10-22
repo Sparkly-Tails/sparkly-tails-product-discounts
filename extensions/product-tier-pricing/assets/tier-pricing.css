@@ -685,6 +685,9 @@
 
 .sparkly-tier-pricing__flash[data-variant='tier-first'] {
   background: var(--sparkly-tier-success-900);
+  /* This bar holds the sentence, the unit price and the timer chip: 11px instead of 12px
+     (all three together) keeps it on one line in a 389px card. */
+  font-size: 11px;
 }
 
 .sparkly-tier-pricing__flash-main,
