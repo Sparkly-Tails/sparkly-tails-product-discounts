@@ -64,6 +64,15 @@ One element at the top of the card. It changes with the flash phase and with the
 
 The timer shows hours only while one hour or more remains (`HH : MM : SS`, else `MM : SS`). The number of the tier in the text is the position of the reached tier ("Tier 1", "Tier 2", ...). For a non-flash discount there is no bar.
 
+## Open decision: where flash discounts are stored (the owner chooses; both leave the existing Function untouched)
+
+Verified in the existing Function's Rust (`extensions/product-discount/src/cart_lines_discounts_generate_run.rs`): it applies exactly the discounts whose `status` is `"live"` and has no idea of a flash sale. So a flash discount stored in `tier_config` with the status `"live"` would be applied all the time. Two ways to keep it out without touching that Function:
+
+- **A. Two configs (the text of this document):** flash discounts in their own `flash_config`; the admin merges both; `isProductAvailable` and the product sync read both; the flash switch moves a discount between them.
+- **B. One config, a different status value:** flash discounts stay in `tier_config` but are stored with the status `"flash-live"` while Live (the admin still shows Live and Draft), so the existing Function ignores them (it only takes `"live"`). The new Function is a copy that applies `"flash-live"` discounts and the one its record names. The availability check, the product sync and the lists stay as they are, with a small helper that treats `"flash-live"` as live. The literal status `'live'` or `'draft'` is used in about ten places in `src/` (found by search, not by reading each one), which would use the helper.
+
+My estimate (not measured): B needs less new code and has no move between two stores, A keeps the stored meaning of `status` clean. Which one is built is decided before the plan.
+
 ## Constraints
 
 - Next.js 16, React 19, Tailwind 4 (admin); Liquid, plain JavaScript and CSS (theme app extension, one global script scope shared by blocks, theme-check limits: the known two offenses only); Rust Shopify Function (api 2026-04).
