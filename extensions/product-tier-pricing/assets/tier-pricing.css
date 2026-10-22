@@ -1,60 +1,134 @@
 /* extensions/product-tier-pricing/assets/tier-pricing.css */
 
+/* Layout, spacing, proportions and copy follow the Stitch widget design; fonts
+   and the text, border and surface colours come from the theme (the block's
+   own moss/cream settings are the fallbacks). The success greens and the warm
+   hint colour are the design's own. */
+.sparkly-tier-pricing,
+.sparkly-tier-pricing *,
+.sparkly-tier-pricing *::before,
+.sparkly-tier-pricing *::after {
+  box-sizing: border-box;
+}
+
 .sparkly-tier-pricing {
   --sparkly-tier-ink: var(--color-text-main, #2a2a22);
   --sparkly-tier-text-secondary: var(--color-secondary-text-main, #5b5c4e);
   --sparkly-tier-border: var(--color-borders-main, #ddd6c2);
-  --sparkly-tier-moss-tint: color-mix(in srgb, var(--sparkly-tier-moss, #434625) 15%, white);
-  --sparkly-tier-track: #fffdf6;
-  /* Inactive rail: at least 3:1 against the card (WCAG 1.4.11), derived from the theme's text colour. */
-  --sparkly-tier-track-empty: color-mix(in srgb, var(--sparkly-tier-ink) 55%, var(--sparkly-tier-track));
+  --sparkly-tier-surface: var(--sparkly-tier-cream, #f3ecd9);
+  --sparkly-tier-sand: color-mix(in srgb, var(--sparkly-tier-border) 70%, var(--sparkly-tier-surface));
+  --sparkly-tier-track: #fff;
+  --sparkly-tier-olive: var(--sparkly-tier-moss, #434625);
+  --sparkly-tier-warm: #c47b44;
+  --sparkly-tier-success-50: #ecfdf5;
+  --sparkly-tier-success-100: #d1fae5;
+  --sparkly-tier-success-600: #059669;
+  --sparkly-tier-success-700: #047857;
+  --sparkly-tier-success-800: #065f46;
+  --sparkly-tier-success-900: #064e3b;
+  --sparkly-tier-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --sparkly-tier-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
   /* Theme's "selected" colour — the same variable the theme's own variant
-     picker uses for its checked/selected swatch border — not the block's
-     own "sun" setting, so the progress bar reads as the theme's native
-     selected state rather than a merchant-picked accent that may not
-     match. Falls back to the block's configurable moss color, then a
-     hardcoded default, for any theme that doesn't define this variable. */
+     picker uses for its checked/selected swatch border. Falls back to the
+     block's configurable moss color, then a hardcoded default. */
   --sparkly-tier-accent: var(--color-text-main, var(--sparkly-tier-moss, #434625));
-  --sparkly-tier-radius: var(--border-radius-cards, 8px);
   --sparkly-tier-ease: cubic-bezier(0.4, 0, 0.2, 1);
   font-family: var(--font-stack-body);
 }
 
+/* The card: a product with a tier discount. The body holds the padding so a
+   bar at the top of the card (flash sale) can run edge to edge. */
+.sparkly-tier-pricing--card {
+  margin: 16px 0;
+  overflow: hidden;
+  border: 1px solid var(--sparkly-tier-border);
+  border-radius: 16px;
+  background: var(--sparkly-tier-track);
+  box-shadow: 0 8px 24px -4px rgba(35, 38, 28, 0.08), 0 2px 6px -1px rgba(35, 38, 28, 0.04);
+}
+
+.sparkly-tier-pricing--card .sparkly-tier-pricing__body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
+}
+
+.sparkly-tier-pricing__summary {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sparkly-tier-pricing__card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sparkly-tier-pricing__card[hidden] {
+  display: none;
+}
+
+/* Price row: the price, "each" and the struck original on the left, the tag on the right. */
 .sparkly-tier-pricing__price-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
-  gap: 10px;
-  margin-bottom: 4px;
+  justify-content: space-between;
+  gap: 4px 8px;
+}
+
+.sparkly-tier-pricing__price-group {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
 }
 
 .sparkly-tier-pricing__price {
-  font-family: var(--font-stack-headings);
+  font-family: var(--font-stack-body);
   /* Hardcoded rather than var(--font-weight-body-bold): this theme sets
      that var to 500 for body copy, which is lighter than the struck-out
-     price below it (600) and inverts the intended hierarchy — the
-     discounted price is the one that should read as bold/primary. */
+     price beside it and inverts the intended hierarchy. */
   font-weight: 700;
-  /* The block setting, never above 36px (the design's price size): a value
+  /* The block setting (24px as in the design), never above 36px: a value
      saved before the cap existed (44px) no longer oversizes the price. In px,
      not rem: themes such as Dawn set the root font size to 62.5%. */
-  font-size: min(var(--sparkly-tier-price-font-size, 32px), 36px);
-  line-height: 1.1;
+  font-size: min(var(--sparkly-tier-price-font-size, 24px), 36px);
+  line-height: 1.3334;
+  font-variant-numeric: tabular-nums;
   color: var(--sparkly-tier-ink);
 }
 
 @media (max-width: 749px) {
   .sparkly-tier-pricing__price {
-    font-size: min(var(--sparkly-tier-price-font-size, 32px), 28px);
+    font-size: min(var(--sparkly-tier-price-font-size, 24px), 28px);
   }
 }
 
-.sparkly-tier-pricing__price s {
+.sparkly-tier-pricing__each-label {
+  font-family: var(--font-stack-body);
+  font-weight: 500;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--sparkly-tier-text-secondary);
+}
+
+.sparkly-tier-pricing__struck {
+  font-family: var(--font-stack-body);
   font-weight: 400;
-  font-size: 65%;
+  font-size: 12px;
+  line-height: 16px;
+  font-variant-numeric: tabular-nums;
   /* Theme's secondary text colour rather than a faded one: opacity dropped the
      struck price below 4.5:1 contrast. */
   color: var(--sparkly-tier-text-secondary);
   text-decoration: line-through;
+}
+
+.sparkly-tier-pricing__struck[hidden],
+.sparkly-tier-pricing__tag[hidden] {
+  display: none;
 }
 
 .sparkly-tier-pricing__sr-only {
@@ -69,7 +143,45 @@
   border: 0;
 }
 
-.sparkly-tier-pricing__tier-btn:focus-visible,
+/* The tag: the tier pill, or the High Demand tag with a flame. */
+.sparkly-tier-pricing__tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--sparkly-tier-success-100);
+  color: var(--sparkly-tier-success-800);
+  font-family: var(--font-stack-body);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 700;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.sparkly-tier-pricing__tag[data-kind='high-demand'] {
+  font-weight: 600;
+}
+
+.sparkly-tier-pricing__tag[data-kind='high-demand']::before {
+  content: '';
+  width: 12px;
+  height: 12px;
+  background: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2c1 3.5-1.5 5-1.5 7.5 0 1.2.8 2 1.9 2 .9 0 1.6-.6 1.6-1.6 2.2 1.2 3.5 3.2 3.5 5.6A5.5 5.5 0 0 1 12 21a5.5 5.5 0 0 1-5.5-5.5C6.5 11 9.5 8.5 12 2z'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2c1 3.5-1.5 5-1.5 7.5 0 1.2.8 2 1.9 2 .9 0 1.6-.6 1.6-1.6 2.2 1.2 3.5 3.2 3.5 5.6A5.5 5.5 0 0 1 12 21a5.5 5.5 0 0 1-5.5-5.5C6.5 11 9.5 8.5 12 2z'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+.sparkly-tier-pricing__promo {
+  margin: 0;
+  font-family: var(--font-stack-body);
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--sparkly-tier-text-secondary);
+}
+
+.sparkly-tier-pricing__chip:focus-visible,
 .sparkly-tier-pricing__toggle:focus-visible,
 .sparkly-tier-pricing__add:focus-visible,
 .sparkly-tier-pricing__list-link:focus-visible {
@@ -77,87 +189,180 @@
   outline-offset: 2px;
 }
 
-.sparkly-tier-pricing__each-label {
-  font-family: var(--font-stack-body);
-  font-weight: 600;
-  font-size: 14px;
-  color: var(--sparkly-tier-text-secondary);
+/* Chips: "8 × £13.00" per tier, the applied tier ticked, a dashed chip for the current quantity. */
+.sparkly-tier-pricing__tiers {
+  display: flex;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  align-items: center;
+  gap: 6px;
+  /* 6px below the (empty) caption row of the design, then its 4px top and bottom padding. */
+  padding: 4px 0;
+  margin: 6px 0 0;
 }
 
-.sparkly-tier-pricing__promo {
+.sparkly-tier-pricing__chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin: 0;
+  padding: 6px 12px;
+  border: 1px solid var(--sparkly-tier-border);
+  border-radius: 8px;
+  background: var(--sparkly-tier-track);
+  color: var(--sparkly-tier-text-secondary);
   font-family: var(--font-stack-body);
   font-size: 12px;
-  color: var(--sparkly-tier-text-secondary);
-  margin: 0 0 10px;
+  line-height: 16px;
+  font-weight: 500;
+  text-align: center;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color 120ms ease;
 }
 
-.sparkly-tier-pricing--card {
-  background: var(--sparkly-tier-cream, #f3ecd9);
-  border: 1px solid var(--sparkly-tier-border);
-  border-radius: var(--sparkly-tier-radius);
-  padding: 20px;
-  margin: 16px 0;
+.sparkly-tier-pricing__chip:hover {
+  border-color: var(--sparkly-tier-ink);
 }
 
-.sparkly-tier-pricing__card {
+.sparkly-tier-pricing__chip--applied {
+  border-color: var(--sparkly-tier-success-600);
+  background: var(--sparkly-tier-success-50);
+  color: var(--sparkly-tier-success-800);
+}
+
+.sparkly-tier-pricing__chip--exact,
+.sparkly-tier-pricing__chip--current-progress,
+.sparkly-tier-pricing__chip--current-offer,
+.sparkly-tier-pricing__chip--current-highest {
+  border-width: 2px;
+  font-weight: 700;
+  box-shadow: var(--sparkly-tier-shadow-sm);
+}
+
+.sparkly-tier-pricing__chip--exact,
+.sparkly-tier-pricing__chip--current-progress {
+  border-color: var(--sparkly-tier-ink);
+  background: var(--sparkly-tier-surface);
+  color: var(--sparkly-tier-ink);
+}
+
+.sparkly-tier-pricing__chip--current-offer {
+  border-color: var(--sparkly-tier-olive);
   background: var(--sparkly-tier-track);
+  color: var(--sparkly-tier-olive);
+}
+
+.sparkly-tier-pricing__chip--current-highest {
+  border-color: var(--sparkly-tier-success-600);
+  background: var(--sparkly-tier-success-50);
+  color: var(--sparkly-tier-success-800);
+}
+
+.sparkly-tier-pricing__chip--current-progress,
+.sparkly-tier-pricing__chip--current-offer,
+.sparkly-tier-pricing__chip--current-highest {
+  border-style: dashed;
+  cursor: default;
+  animation: sparklyTierFadeIn 180ms var(--sparkly-tier-ease);
+}
+
+/* The status and rail card. */
+.sparkly-tier-pricing__rail-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
   border: 1px solid var(--sparkly-tier-border);
-  border-radius: var(--sparkly-tier-radius);
-  padding: 16px;
-  margin: 16px 0 0;
+  border-radius: 12px;
+  background: var(--sparkly-tier-surface);
 }
 
 .sparkly-tier-pricing__status-row {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
   justify-content: space-between;
-  gap: 4px 12px;
-  margin-bottom: 14px;
   font-family: var(--font-stack-body);
   font-size: 12px;
+  line-height: 16px;
 }
 
 .sparkly-tier-pricing__status {
-  font-weight: 500;
   color: var(--sparkly-tier-ink);
 }
 
-.sparkly-tier-pricing__aside {
+.sparkly-tier-pricing__rail-card[data-offer-state='offer'] .sparkly-tier-pricing__status-row {
+  padding-top: 2px;
+}
+
+.sparkly-tier-pricing__rail-card[data-offer-state='highest'] .sparkly-tier-pricing__status-row {
+  font-weight: 500;
+}
+
+.sparkly-tier-pricing__status strong {
   font-weight: 700;
+}
+
+.sparkly-tier-pricing__aside {
+  font-weight: 600;
   text-align: right;
-  color: var(--sparkly-tier-accent);
+  color: var(--sparkly-tier-warm);
 }
 
-.sparkly-tier-pricing__aside--badge {
-  padding: 2px 8px;
-  border-radius: var(--sparkly-tier-radius);
-  background: var(--sparkly-tier-moss-tint);
+.sparkly-tier-pricing__aside[data-tone='olive'] {
+  color: var(--sparkly-tier-olive);
 }
 
+.sparkly-tier-pricing__aside[data-tone='success'] {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--sparkly-tier-success-700);
+  font-weight: 700;
+  font-size: 11px;
+  line-height: 16.5px;
+}
+
+.sparkly-tier-pricing__aside[data-tone='success']::before {
+  content: '';
+  flex: none;
+  width: 14px;
+  height: 14px;
+  background: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm-2 15-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm-2 15-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+/* The pin rail: a 6px track with a pin at every tier quantity and the current quantity. */
 .sparkly-tier-pricing__bar-wrap {
   position: relative;
-  height: 34px;
-  margin: 0 15px 16px;
+  width: 100%;
+  margin: 2px 0;
+  padding: 8px 0;
 }
 
 .sparkly-tier-pricing__track {
-  position: absolute;
-  top: 50%;
-  left: 0;
-  right: 0;
   height: 6px;
-  transform: translateY(-50%);
-  background: var(--sparkly-tier-track-empty);
-  border-radius: 999px;
+  width: 100%;
   overflow: hidden;
+  border-radius: 999px;
+  background: var(--sparkly-tier-sand);
 }
 
 .sparkly-tier-pricing__fill {
   height: 100%;
-  background: var(--sparkly-tier-accent);
+  background: var(--sparkly-tier-olive);
   border-radius: 999px;
   transition: width 200ms var(--sparkly-tier-ease);
+}
+
+.sparkly-tier-pricing__rail-card[data-offer-state='highest'] .sparkly-tier-pricing__track {
+  background: var(--sparkly-tier-success-600);
+}
+
+.sparkly-tier-pricing__rail-card[data-offer-state='highest'] .sparkly-tier-pricing__fill {
+  background: transparent;
 }
 
 .sparkly-tier-pricing__marker,
@@ -171,22 +376,30 @@
   border-radius: 50%;
   font-family: var(--font-stack-body);
   font-variant-numeric: tabular-nums;
+  font-weight: 700;
 }
 
+/* The end pins sit inside the rail (their edge on the rail's edge), as in the design. */
 .sparkly-tier-pricing__marker {
+  left: clamp(12px, var(--sparkly-tier-pct, 0%), calc(100% - 12px));
   width: 24px;
   height: 24px;
   border: 1px solid var(--sparkly-tier-border);
   background: var(--sparkly-tier-track);
+  box-shadow: var(--sparkly-tier-shadow-sm);
   font-size: 10px;
-  font-weight: 600;
+  line-height: 1.5;
   color: var(--sparkly-tier-text-secondary);
 }
 
-.sparkly-tier-pricing__marker--reached {
-  border-color: var(--sparkly-tier-accent);
-  background: var(--sparkly-tier-accent);
-  color: var(--sparkly-tier-track);
+.sparkly-tier-pricing__rail-card:not([data-offer-state='progress']) .sparkly-tier-pricing__marker--reached {
+  border: 0;
+  background: var(--sparkly-tier-success-600);
+  color: #fff;
+}
+
+.sparkly-tier-pricing__rail-card[data-offer-state='highest'] .sparkly-tier-pricing__marker--reached {
+  background: var(--sparkly-tier-success-800);
 }
 
 .sparkly-tier-pricing__marker--covered {
@@ -194,107 +407,123 @@
 }
 
 .sparkly-tier-pricing__dot {
+  left: clamp(14px, var(--sparkly-tier-pct, 0%), calc(100% - 14px));
   z-index: 1;
-  min-width: 30px;
-  height: 30px;
+  min-width: 28px;
+  height: 28px;
   padding: 0 4px;
-  box-sizing: border-box;
-  border: 2px solid var(--sparkly-tier-accent);
+  border: 2px solid var(--sparkly-tier-ink);
   border-radius: 999px;
   background: var(--sparkly-tier-track);
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--sparkly-tier-accent);
+  box-shadow: var(--sparkly-tier-shadow);
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--sparkly-tier-ink);
   transition: left 200ms var(--sparkly-tier-ease);
 }
 
-.sparkly-tier-pricing__tiers {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
-  gap: 6px;
+.sparkly-tier-pricing__rail-card[data-offer-state='offer'] .sparkly-tier-pricing__dot {
+  border-color: var(--sparkly-tier-olive);
+  color: var(--sparkly-tier-olive);
 }
 
-.sparkly-tier-pricing__tier-btn,
-.sparkly-tier-pricing__temp-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  padding: 7px 8px;
-  border-radius: 999px;
-  font-family: var(--font-stack-body);
-  font-size: 12px;
-  line-height: 1.2;
-  white-space: nowrap;
+.sparkly-tier-pricing__rail-card[data-offer-state='highest'] .sparkly-tier-pricing__dot {
+  border-color: #fff;
+  background: var(--sparkly-tier-success-900);
+  color: #fff;
 }
 
-.sparkly-tier-pricing__tier-btn {
-  font-weight: 600;
-  cursor: pointer;
+/* The drawer: a trigger when closed, the list with a header when open. */
+.sparkly-tier-pricing__drawer {
   border: 1px solid var(--sparkly-tier-border);
-  background: var(--sparkly-tier-track);
-  color: var(--sparkly-tier-text-secondary);
-  transition: border-color 120ms ease, background-color 120ms ease;
+  border-radius: 12px;
+  background: var(--sparkly-tier-surface);
 }
 
-.sparkly-tier-pricing__tier-btn:hover {
-  border-color: color-mix(in srgb, var(--sparkly-tier-accent) 50%, transparent);
-}
-
-.sparkly-tier-pricing__tier-btn--active {
-  border: 2px solid var(--sparkly-tier-accent);
-  background: var(--sparkly-tier-cream, #f3ecd9);
-  color: var(--sparkly-tier-ink);
-  font-weight: 700;
-}
-
-.sparkly-tier-pricing__tier-btn--dimmed {
-  opacity: 0.7;
-}
-
-.sparkly-tier-pricing__tier-tick {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: var(--sparkly-tier-accent);
-  color: var(--sparkly-tier-track);
-  font-size: 9px;
-}
-
-.sparkly-tier-pricing__temp-btn {
-  font-weight: 700;
-  cursor: default;
-  border: 2px dashed var(--sparkly-tier-accent);
-  background: var(--sparkly-tier-moss-tint);
-  color: var(--sparkly-tier-ink);
-  animation: sparklyTierFadeIn 180ms var(--sparkly-tier-ease);
+.sparkly-tier-pricing__drawer[data-open='true'] {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
 }
 
 .sparkly-tier-pricing__toggle {
-  display: block;
-  border: none;
-  background: none;
-  padding: 10px 0 0;
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
   margin: 0;
+  padding: 10px 14px;
+  border: 0;
+  background: none;
+  color: var(--sparkly-tier-ink);
   font-family: var(--font-stack-body);
-  font-weight: 600;
   font-size: 12px;
-  color: var(--sparkly-tier-moss, #434625);
+  line-height: 16px;
+  font-weight: 600;
+  text-align: left;
   cursor: pointer;
-  text-decoration: underline;
-  text-underline-offset: 2px;
+  border-radius: 12px;
+}
+
+.sparkly-tier-pricing__toggle[hidden] {
+  display: none;
+}
+
+.sparkly-tier-pricing__drawer[data-open='true'] .sparkly-tier-pricing__toggle {
+  padding: 0 0 4px;
+  border-bottom: 1px solid color-mix(in srgb, var(--sparkly-tier-border) 60%, transparent);
+  border-radius: 0;
+  font-weight: 700;
+}
+
+.sparkly-tier-pricing__drawer-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  /* The design's icon line is 24px tall. */
+  min-height: 24px;
+}
+
+.sparkly-tier-pricing__drawer[data-open='true'] .sparkly-tier-pricing__drawer-title {
+  gap: 6px;
+  min-height: 20px;
+}
+
+.sparkly-tier-pricing__icon {
+  flex: none;
+  color: var(--sparkly-tier-olive);
+}
+
+.sparkly-tier-pricing__icon--open,
+.sparkly-tier-pricing__collapse {
+  display: none;
+}
+
+.sparkly-tier-pricing__drawer[data-open='true'] .sparkly-tier-pricing__icon--open {
+  display: inline;
+}
+
+.sparkly-tier-pricing__drawer[data-open='true'] .sparkly-tier-pricing__icon--closed,
+.sparkly-tier-pricing__drawer[data-open='true'] .sparkly-tier-pricing__chevron {
+  display: none;
+}
+
+.sparkly-tier-pricing__drawer-aside {
+  display: inline-flex;
+  align-items: center;
+  color: var(--sparkly-tier-text-secondary);
+}
+
+.sparkly-tier-pricing__drawer[data-open='true'] .sparkly-tier-pricing__collapse {
+  display: inline;
+  font-weight: 600;
 }
 
 .sparkly-tier-pricing__list {
-  margin-top: 10px;
-  padding-top: 12px;
-  border-top: 1px solid var(--sparkly-tier-border);
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   animation: sparklyTierFadeIn 160ms var(--sparkly-tier-ease);
 }
 
@@ -302,21 +531,17 @@
   display: none;
 }
 
-.sparkly-tier-pricing__list-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
+.sparkly-tier-pricing__chosen {
+  margin: 0;
+  font-family: var(--font-stack-body);
+  font-size: 11px;
+  line-height: 16px;
+  font-weight: 600;
+  color: var(--sparkly-tier-text-secondary);
 }
 
-.sparkly-tier-pricing__chosen {
-  padding-top: 10px;
-  font-family: var(--font-stack-body);
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--sparkly-tier-text-secondary);
+.sparkly-tier-pricing__chosen[hidden] {
+  display: none;
 }
 
 .sparkly-tier-pricing__list-item {
@@ -325,13 +550,18 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px 12px;
+  padding: 10px;
+  border: 1px solid var(--sparkly-tier-border);
+  border-radius: 12px;
+  background: var(--sparkly-tier-track);
+  box-shadow: var(--sparkly-tier-shadow-sm);
 }
 
-/* The product link wants at least 240px; when the count and Add link do not fit
+/* The product link wants at least 140px; when the count and Add button do not fit
    beside it, they drop to a second line and the name gets the full width. */
 .sparkly-tier-pricing__list-link {
   display: flex;
-  flex: 1 1 240px;
+  flex: 1 1 140px;
   align-items: center;
   gap: 10px;
   min-width: 0;
@@ -339,7 +569,7 @@
   color: inherit;
 }
 
-/* Phones: the name always gets the whole row; the count and Add link sit under it. */
+/* Phones: the name always gets the whole row; the count and Add button sit under it. */
 @media (max-width: 480px) {
   .sparkly-tier-pricing__list-link {
     flex-basis: 100%;
@@ -347,13 +577,13 @@
 }
 
 .sparkly-tier-pricing__list-thumb {
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   flex: none;
   border-radius: 8px;
   border: 1px solid var(--sparkly-tier-border);
   object-fit: cover;
-  background: var(--sparkly-tier-cream, #f3ecd9);
+  background: var(--sparkly-tier-surface);
 }
 
 .sparkly-tier-pricing__list-text {
@@ -365,7 +595,8 @@
 .sparkly-tier-pricing__list-name {
   font-family: var(--font-stack-body);
   font-size: 12px;
-  font-weight: 600;
+  line-height: 16px;
+  font-weight: 700;
   color: var(--sparkly-tier-ink);
   overflow-wrap: anywhere;
 }
@@ -373,8 +604,9 @@
 .sparkly-tier-pricing__list-price {
   font-family: var(--font-stack-body);
   font-size: 11px;
-  font-weight: 600;
-  color: var(--sparkly-tier-accent);
+  line-height: 16.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--sparkly-tier-text-secondary);
 }
 
 .sparkly-tier-pricing__row-action {
@@ -392,21 +624,23 @@
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   text-align: center;
-  color: var(--sparkly-tier-accent);
+  color: var(--sparkly-tier-olive);
 }
 
 .sparkly-tier-pricing__add {
   position: relative;
   display: inline-flex;
   align-items: center;
-  padding: 3px 12px;
+  justify-content: center;
+  padding: 4px 10px;
   border: 1px solid var(--sparkly-tier-border);
-  border-radius: 999px;
+  border-radius: 6px;
   background: var(--sparkly-tier-track);
+  box-shadow: var(--sparkly-tier-shadow-sm);
   font-family: var(--font-stack-body);
   font-size: 12px;
-  font-weight: 600;
-  line-height: 1.2;
+  line-height: 16px;
+  font-weight: 500;
   color: var(--sparkly-tier-ink);
   text-decoration: none;
 }
@@ -419,7 +653,7 @@
 }
 
 .sparkly-tier-pricing__add:hover {
-  background: var(--sparkly-tier-moss-tint);
+  background: var(--sparkly-tier-surface);
 }
 
 @keyframes sparklyTierFadeIn {
@@ -436,8 +670,7 @@
 @media (prefers-reduced-motion: reduce) {
   .sparkly-tier-pricing__fill,
   .sparkly-tier-pricing__dot,
-  .sparkly-tier-pricing__tier-btn,
-  .sparkly-tier-pricing__temp-btn,
+  .sparkly-tier-pricing__chip,
   .sparkly-tier-pricing__list {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;

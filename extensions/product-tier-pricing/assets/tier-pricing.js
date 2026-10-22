@@ -264,48 +264,38 @@ function buildPromoLine(tiers, basePrice, formatMoneyFn, isGroup) {
   return (isGroup ? 'Mix and match ' : 'Buy ') + joinNaturally(clauses)
 }
 
-// Status row + headline copy per state. `hintText`/`badgeText` go in the
-// status row's right-hand slot; `headlineText` replaces the promo line under
-// the price once an offer applies. No "Tier N" wording: middle tiers read
-// "Offer unlocked", the top one "Highest discount unlocked".
+// Status row copy per state: what the customer has (the quantity in bold) on
+// the left, and the hint on the right. No headline replaces the promo line any
+// more: the promo line stays in every state (the design keeps it).
+//   progress: "You have 5 units" / "Add 3 for £1.63/ea" (accent colour)
+//   offer:    "You have 10 units" / "Add 6 for £1.55/ea" (olive)
+//   highest:  "You have 16 units" / "Best Rate (£1.55/ea • Add any qty)" (success green, a check drawn before it);
+//             beyond the top tier the sentence adds " (Exceeds 16+ tier)".
 function buildStatusCopy({ progressState, tiers, basePrice, formatMoney: formatMoneyFn }) {
   const state = classifyOfferState(progressState)
   const sorted = sortTiersByMinQty(tiers)
   const qty = progressState.combinedQty
   const ts = progressState.tierState
   const unit = perUnitPrice(basePrice, qty, ts)
-  const savings = computeOrderSummary(basePrice, qty, unit).savings
   const nextRaw = ts.nextTier || (ts.remainingTiers && ts.remainingTiers[0])
   // The state's nextTier only carries minQty/percentOff/fixedPrice; price the
   // configured tier itself so an anchor tier is priced right.
   const next = nextRaw ? sorted.find((t) => t.minQty === nextRaw.minQty) : null
-  const nextPrice = next ? formatMoneyFn(unitPriceAtTier(basePrice, next)) : null
-
-  if (state === 'progress') {
-    return {
-      state,
-      statusText: 'You have ' + pluralizeUnits(qty),
-      hintText: next ? 'Add ' + nextRaw.delta + ' for ' + nextPrice + '/ea' : null,
-      badgeText: null,
-      headlineText: null,
-    }
-  }
-  if (state === 'offer') {
-    const nextIsHighest = next && next.minQty === progressState.topThreshold
-    return {
-      state,
-      statusText: pluralizeUnits(qty) + ' × ' + formatMoneyFn(unit) + ' (Offer unlocked)',
-      hintText: null,
-      badgeText: 'Save ' + formatMoneyFn(savings),
-      headlineText: 'Offer unlocked! Add ' + nextRaw.delta + ' more to unlock ' + (nextIsHighest ? 'the highest discount' : 'the next offer') + ' for ' + nextPrice,
-    }
-  }
+  const nextHint = next ? 'Add ' + nextRaw.delta + ' for ' + formatMoneyFn(unitPriceAtTier(basePrice, next)) + '/ea' : null
+  const beyondTop = state === 'highest' && qty > progressState.topThreshold
+  const after = beyondTop ? ' (Exceeds ' + progressState.topThreshold + '+ tier)' : ''
+  const strong = pluralizeUnits(qty)
+  const hint = {
+    progress: { hintText: nextHint, hintTone: 'accent' },
+    offer: { hintText: nextHint, hintTone: 'olive' },
+    highest: { hintText: 'Best Rate (' + formatMoneyFn(unit) + '/ea • Add any qty)', hintTone: 'success' },
+  }[state]
   return {
     state,
-    statusText: 'You have ' + pluralizeUnits(qty),
-    hintText: '✓ Highest discount (' + formatMoneyFn(unit) + '/ea)',
-    badgeText: null,
-    headlineText: 'Highest discount unlocked: ' + formatMoneyFn(unit) + '/each applied! (Save ' + formatMoneyFn(savings) + ')',
+    statusText: 'You have ' + strong + after,
+    statusParts: { before: 'You have ', strong, after },
+    hintText: hint.hintText,
+    hintTone: hint.hintTone,
   }
 }
 
@@ -330,10 +320,76 @@ function buildProgressSemantics(progressState) {
   return { valueNow: clamp(qty, min, max), valueMin: min, valueMax: max, valueText: head + '. ' + (tail ? tail + '.' : '') }
 }
 
+// The price of the whole quantity at what the state gives each unit, in whole
+// pence. An anchored tier reproduces its exact total ("8 × £13.00").
+function totalAtQuantity(basePrice, qty, state) {
+  return Math.round(perUnitPrice(basePrice, qty, state) * qty * 100) / 100
+}
+
+// The hidden "1 × full price" start tier that withUnitAnchor adds: no discount of any kind.
+function isUnitAnchorTier(tier) {
+  return tier.minQty === 1 && !(tier.percentOff > 0) && tier.fixedPrice == null && tier.anchorPrice == null
+}
+
+// The chips of the design: "8 × £13.00" per tier (the exact total for that
+// quantity), the applied tier ticked, and a dashed chip for the current
+// quantity when it falls between tiers (a star past the top tier). `tone`:
+//   tier chips: 'idle', 'applied' (the tier that gives the price now) or
+//   'exact' (the quantity is exactly this tier and no offer applies yet);
+//   current chip: the offer state ('progress', 'offer' or 'highest').
+function buildTierChips({ tiers, basePrice, combinedQty, formatMoney: formatMoneyFn }) {
+  const sorted = sortTiersByMinQty(tiers)
+  const state = computeTierState(sorted, combinedQty)
+  const discounted = state.fixedPrice != null || state.percentOff > 0
+  const appliedMinQty = discounted ? state.minQty : null
+  const topMinQty = sorted[sorted.length - 1].minQty
+  const currentTone = !discounted ? 'progress' : combinedQty >= topMinQty ? 'highest' : 'offer'
+  const onTier = sorted.some((tier) => tier.minQty === combinedQty)
+  const chips = []
+  sorted.forEach((tier) => {
+    const applied = tier.minQty === appliedMinQty
+    const total = totalAtQuantity(basePrice, tier.minQty, computeTierState(sorted, tier.minQty))
+    chips.push({
+      kind: 'tier',
+      qty: tier.minQty,
+      label: tier.minQty + ' × ' + formatMoneyFn(total) + (applied ? ' ✓' : ''),
+      tone: applied ? 'applied' : tier.minQty === combinedQty ? 'exact' : 'idle',
+    })
+    if (!onTier && tier.minQty === state.minQty) {
+      chips.push({
+        kind: 'current',
+        qty: combinedQty,
+        label: combinedQty + ' × ' + formatMoneyFn(totalAtQuantity(basePrice, combinedQty, state)) + (currentTone === 'highest' ? ' ★' : ''),
+        tone: currentTone,
+      })
+    }
+  })
+  return chips
+}
+
+// "Tier 1 Active (8+ units)"; the top tier is unlimited: "Tier 2 Active (16+ • Unlimited)".
+// Tier numbers count the discount's real tiers; the hidden start tier is not one.
+function formatTierPill({ tiers, minQty }) {
+  const sorted = sortTiersByMinQty(tiers)
+  const index = sorted.findIndex((tier) => tier.minQty === minQty)
+  const number = index + (isUnitAnchorTier(sorted[0]) ? 0 : 1)
+  const isTop = minQty === sorted[sorted.length - 1].minQty
+  return 'Tier ' + number + ' Active (' + minQty + '+' + (isTop ? ' • Unlimited' : ' units') + ')'
+}
+
+// The tag at the right of the price row: the tier pill once an offer applies,
+// else the High Demand tag when it is switched on, else nothing.
+function buildPriceTag({ progressState, tiers, highDemand }) {
+  if (classifyOfferState(progressState) !== 'progress') {
+    return { kind: 'tier', text: formatTierPill({ tiers, minQty: progressState.tierState.minQty }) }
+  }
+  return highDemand ? { kind: 'high-demand', text: 'High Demand' } : null
+}
+
 // View-model assembly: decides WHAT the widget shows. The DOM layer below
 // only paints whatever this returns.
 
-function computeWidgetViewModel({ tiers, basePrice, compareAtPrice, otherQty, addingQty, isGroup, formatMoney: formatMoneyFn }) {
+function computeWidgetViewModel({ tiers, basePrice, compareAtPrice, otherQty, addingQty, isGroup, highDemand, formatMoney: formatMoneyFn }) {
   const plainPrice = formatMoneyFn(basePrice)
 
   if (!tiers || tiers.length === 0) {
@@ -346,9 +402,8 @@ function computeWidgetViewModel({ tiers, basePrice, compareAtPrice, otherQty, ad
       discountedPrice: hasCompareAtDiscount ? plainPrice : null,
       plainPrice: hasCompareAtDiscount ? formatMoneyFn(compareAtPrice) : plainPrice,
       progressState: null,
-      tierButtons: [],
-      tempBoxLabel: null,
-      tempBoxAfterIndex: null,
+      chips: [],
+      tag: null,
       offerState: null,
       dot: null,
       promoLine: '',
@@ -364,24 +419,14 @@ function computeWidgetViewModel({ tiers, basePrice, compareAtPrice, otherQty, ad
   const isDiscounted = progressState.tierState.fixedPrice != null || progressState.tierState.percentOff > 0
 
   const sortedTiers = sortTiersByMinQty(tiers)
-  // "8 × £1.63": the unit price at each tier. Tiers below the applied one are
-  // dimmed; none are before the first offer applies.
-  const appliedMinQty = classifyOfferState(progressState) === 'progress' ? 0 : progressState.tierState.minQty
-  const tierButtons = progressState.tierButtons.map((btn, i) => ({
-    minQty: btn.minQty,
-    active: btn.active,
-    dimmed: btn.minQty < appliedMinQty,
-    label: btn.minQty + ' × ' + formatMoneyFn(unitPriceAtTier(basePrice, sortedTiers[i])),
-  }))
 
   return {
     showCard: true,
     discountedPrice: isDiscounted ? formatMoneyFn(unit) : null,
     plainPrice,
     progressState,
-    tierButtons,
-    tempBoxLabel: progressState.tempBox ? formatTempBoxLabel(progressState, basePrice, formatMoneyFn) : null,
-    tempBoxAfterIndex: progressState.tempBox ? progressState.tempBox.afterIndex : null,
+    chips: buildTierChips({ tiers, basePrice, combinedQty: progressState.combinedQty, formatMoney: formatMoneyFn }),
+    tag: buildPriceTag({ progressState, tiers, highDemand: !!highDemand }),
     offerState: classifyOfferState(progressState),
     dot: computeProgressDot(sortedTiers, progressState.combinedQty),
     promoLine: buildPromoLine(tiers, basePrice, formatMoneyFn, isGroup),
@@ -533,6 +578,11 @@ if (typeof module !== 'undefined' && module.exports) {
     classifyOfferState,
     buildPromoLine,
     buildStatusCopy,
+    totalAtQuantity,
+    isUnitAnchorTier,
+    buildTierChips,
+    formatTierPill,
+    buildPriceTag,
     computeWidgetViewModel,
     buildMixMatchRows,
     buildProgressSemantics,
@@ -556,46 +606,72 @@ if (typeof document !== 'undefined') {
   }
 
   function paintPriceRow(elements, viewModel) {
+    // Screen readers would otherwise read the two prices as bare numbers.
     if (viewModel.discountedPrice) {
-      // Screen readers would otherwise read the two prices as bare numbers.
-      const html = '<span class="sparkly-tier-pricing__sr-only">Discounted price: </span>' + viewModel.discountedPrice +
-        ' <s><span class="sparkly-tier-pricing__sr-only">Original price: </span>' + viewModel.plainPrice + '</s>'
-      if (elements.priceEl.innerHTML !== html) elements.priceEl.innerHTML = html
+      const priceHtml = '<span class="sparkly-tier-pricing__sr-only">Discounted price: </span>' + viewModel.discountedPrice
+      if (elements.priceEl.innerHTML !== priceHtml) elements.priceEl.innerHTML = priceHtml
     } else {
       setText(elements.priceEl, viewModel.plainPrice)
+    }
+    // The original price, struck, sits after "each".
+    if (elements.struckEl) {
+      elements.struckEl.hidden = !viewModel.discountedPrice
+      if (viewModel.discountedPrice) {
+        const struckHtml = '<span class="sparkly-tier-pricing__sr-only">Original price: </span>' + viewModel.plainPrice
+        if (elements.struckEl.innerHTML !== struckHtml) elements.struckEl.innerHTML = struckHtml
+      }
     }
     // "each" only makes sense once there's a per-unit/bulk-pricing story to
     // explain — showCard already means "this product has a discount
     // configured", the same condition that should hide it.
     if (elements.eachLabelEl) elements.eachLabelEl.hidden = !viewModel.showCard
+    paintTag(elements, viewModel)
   }
 
+  // The tag at the right of the price row: the tier pill, the High Demand tag, or nothing.
+  function paintTag(elements, viewModel) {
+    const el = elements.tagEl
+    if (!el) return
+    const tag = viewModel.tag
+    el.hidden = !tag
+    if (!tag) return
+    if (el.dataset.kind !== tag.kind) el.dataset.kind = tag.kind
+    setText(el, tag.text)
+  }
+
+  // The promo line stays in every state; the status row below carries what changes.
   function paintPromo(elements, viewModel) {
     if (!elements.promoEl) return
-    // Once an offer applies the headline replaces the "buy more" line.
-    const headline = viewModel.status && viewModel.status.headlineText
-    setText(elements.promoEl, headline || viewModel.promoLine)
+    setText(elements.promoEl, viewModel.promoLine)
   }
 
   function paintCard(elements, viewModel) {
     if (elements.cardEl) elements.cardEl.hidden = !viewModel.showCard
   }
 
-  // Status row: what the customer has (left) and the hint, badge or highest
-  // discount tick (right). The badge ("Save £0.60") gets its own look.
+  // Status row: "You have <b>5 units</b>" on the left (the quantity in bold),
+  // the hint on the right in the colour of the state. Rebuilt only when the
+  // text changed: live regions re-announce on every write.
   function paintStatus(elements, viewModel) {
     const status = viewModel.status
     if (!status) return
-    setText(elements.statusEl, status.statusText)
+    if (elements.statusEl && elements.statusEl.dataset.text !== status.statusText) {
+      elements.statusEl.dataset.text = status.statusText
+      elements.statusEl.textContent = ''
+      const strong = document.createElement('strong')
+      strong.textContent = status.statusParts.strong
+      elements.statusEl.append(status.statusParts.before, strong, status.statusParts.after)
+    }
     if (elements.asideEl) {
-      setText(elements.asideEl, status.badgeText || status.hintText || '')
-      elements.asideEl.classList.toggle('sparkly-tier-pricing__aside--badge', !!status.badgeText)
+      setText(elements.asideEl, status.hintText || '')
+      if (elements.asideEl.dataset.tone !== status.hintTone) elements.asideEl.dataset.tone = status.hintTone
     }
   }
 
-  // Bar: fill up to the dot, a marker per tier number, and the dot showing the
-  // current quantity. A marker the dot sits on is hidden under it.
-  function paintProgressBar(elements, dot, semantics) {
+  // Rail: fill up to the dot, a pin per tier quantity, and the dot showing the
+  // current quantity. A pin the dot sits on is hidden under it. Positions go
+  // through --sparkly-tier-pct so the stylesheet keeps the end pins inside the rail.
+  function paintProgressBar(elements, dot, semantics, offerState) {
     elements.fillEl.style.width = dot.dotPct + '%'
     elements.markersEl.innerHTML = ''
     dot.markers.forEach((marker) => {
@@ -603,65 +679,56 @@ if (typeof document !== 'undefined') {
       el.className = 'sparkly-tier-pricing__marker' +
         (marker.reached ? ' sparkly-tier-pricing__marker--reached' : '') +
         (marker.covered ? ' sparkly-tier-pricing__marker--covered' : '')
-      el.style.left = marker.pct + '%'
+      el.style.setProperty('--sparkly-tier-pct', marker.pct + '%')
       el.textContent = String(marker.value)
       elements.markersEl.appendChild(el)
     })
-    elements.dotEl.style.left = dot.dotPct + '%'
+    elements.dotEl.style.setProperty('--sparkly-tier-pct', dot.dotPct + '%')
     elements.dotEl.textContent = String(dot.dotValue)
-    if (elements.barEl && semantics) {
-      elements.barEl.setAttribute('aria-valuenow', String(semantics.valueNow))
-      elements.barEl.setAttribute('aria-valuemin', String(semantics.valueMin))
-      elements.barEl.setAttribute('aria-valuemax', String(semantics.valueMax))
-      elements.barEl.setAttribute('aria-valuetext', semantics.valueText)
+    if (elements.railEl && offerState) elements.railEl.dataset.offerState = offerState
+    if (elements.barEl) {
+      if (semantics) {
+        elements.barEl.setAttribute('aria-valuenow', String(semantics.valueNow))
+        elements.barEl.setAttribute('aria-valuemin', String(semantics.valueMin))
+        elements.barEl.setAttribute('aria-valuemax', String(semantics.valueMax))
+        elements.barEl.setAttribute('aria-valuetext', semantics.valueText)
+      }
     }
   }
 
-  // One pill per tier ("8 × £1.63"); the exact-match pill carries a tick and
-  // tiers below the applied one are dimmed. A dashed box between two pills
-  // shows the quantity that sits between tiers.
-  function paintTierButtons(elements, viewModel) {
+  // One chip per tier ("8 × £13.00", the applied tier ticked); a dashed chip
+  // between two tiers shows the total for the quantity that sits between them.
+  // Only the tier chips are buttons: they set the quantity on the page.
+  function paintChips(elements, viewModel) {
+    const combinedQty = viewModel.progressState.combinedQty
     elements.tiersEl.innerHTML = ''
-    viewModel.tierButtons.forEach((btn, i) => {
-      const el = document.createElement('button')
-      el.type = 'button'
-      el.className = 'sparkly-tier-pricing__tier-btn' +
-        (btn.active ? ' sparkly-tier-pricing__tier-btn--active' : '') +
-        (btn.dimmed ? ' sparkly-tier-pricing__tier-btn--dimmed' : '')
-      el.textContent = btn.label
-      el.setAttribute('aria-pressed', btn.active ? 'true' : 'false')
-      if (btn.active) {
-        const tick = document.createElement('span')
-        tick.className = 'sparkly-tier-pricing__tier-tick'
-        tick.setAttribute('aria-hidden', 'true')
-        tick.textContent = '✓'
-        el.appendChild(tick)
+    viewModel.chips.forEach((chip) => {
+      const isTier = chip.kind === 'tier'
+      const el = document.createElement(isTier ? 'button' : 'span')
+      el.className = 'sparkly-tier-pricing__chip sparkly-tier-pricing__chip--' + (isTier ? '' : 'current-') + chip.tone
+      el.textContent = chip.label
+      if (isTier) {
+        el.type = 'button'
+        el.setAttribute('aria-pressed', chip.qty === combinedQty ? 'true' : 'false')
+        el.addEventListener('click', () => setQuantityInput(chip.qty))
       }
-      el.addEventListener('click', () => setQuantityInput(btn.minQty))
       elements.tiersEl.appendChild(el)
-
-      if (viewModel.tempBoxAfterIndex === i) {
-        const temp = document.createElement('span')
-        temp.className = 'sparkly-tier-pricing__temp-btn'
-        temp.textContent = viewModel.tempBoxLabel
-        elements.tiersEl.appendChild(temp)
-      }
     })
   }
 
   // Skips the destructive rebuild (replays animation, clears focus) when
-  // nothing tier-button-related changed since last render — tracked via a
+  // nothing chip-related changed since last render — tracked via a
   // signature on tierButtonsSignatureRef, a { value } box the caller owns.
   function paintProgressCard(elements, viewModel, basePrice, addingQty, tierButtonsSignatureRef) {
     if (!viewModel.showCard || !viewModel.progressState) return
     const state = viewModel.progressState
 
-    paintProgressBar(elements, viewModel.dot, viewModel.semantics)
+    paintProgressBar(elements, viewModel.dot, viewModel.semantics, viewModel.offerState)
 
     const signature = computeTierButtonsSignature(state, basePrice, addingQty)
     if (tierButtonsSignatureRef.value === signature) return
     tierButtonsSignatureRef.value = signature
-    paintTierButtons(elements, viewModel)
+    paintChips(elements, viewModel)
   }
 
   function paintWidget(elements, viewModel, basePrice, addingQty, tierButtonsSignatureRef) {
@@ -704,7 +771,7 @@ if (typeof document !== 'undefined') {
       text.appendChild(name)
       const price = document.createElement('span')
       price.className = 'sparkly-tier-pricing__list-price'
-      price.textContent = row.available ? row.priceLabel : 'Sold out'
+      price.textContent = row.available ? (row.priceLabel ? row.priceLabel + ' each' : '') : 'Sold out'
       text.appendChild(price)
       link.appendChild(text)
       item.appendChild(link)
@@ -731,7 +798,7 @@ if (typeof document !== 'undefined') {
       const add = document.createElement('a')
       add.href = row.href
       add.className = 'sparkly-tier-pricing__add'
-      add.textContent = 'Add'
+      add.textContent = '+ Add'
       add.setAttribute('aria-label', 'Add ' + row.title)
       group.appendChild(add)
     }
@@ -811,6 +878,7 @@ if (typeof document !== 'undefined') {
       productId: selfProductId,
       tiers,
       title: discount.title,
+      highDemand: container.dataset.highDemand === 'true',
       hasTiers: !!(tiers && tiers.length > 0),
       ownVariantIds,
       ownVariantOptions,
@@ -830,17 +898,20 @@ if (typeof document !== 'undefined') {
     return {
       priceEl: container.querySelector('[data-tier-pricing-price]'),
       eachLabelEl: container.querySelector('[data-tier-pricing-each-label]'),
+      struckEl: container.querySelector('[data-tier-pricing-struck]'),
+      tagEl: container.querySelector('[data-tier-pricing-tag]'),
       promoEl: container.querySelector('[data-tier-pricing-promo]'),
       cardEl: container.querySelector('[data-tier-pricing-card]'),
       statusEl: container.querySelector('[data-tier-pricing-status]'),
       asideEl: container.querySelector('[data-tier-pricing-aside]'),
       fillEl: container.querySelector('[data-tier-pricing-fill]'),
       barEl: container.querySelector('[data-tier-pricing-bar]'),
+      railEl: container.querySelector('[data-tier-pricing-rail]'),
       markersEl: container.querySelector('[data-tier-pricing-markers]'),
       dotEl: container.querySelector('[data-tier-pricing-dot]'),
       tiersEl: container.querySelector('[data-tier-pricing-tiers]'),
+      drawerEl: container.querySelector('[data-tier-pricing-drawer]'),
       toggleEl: container.querySelector('[data-tier-pricing-toggle]'),
-      toggleArrowEl: container.querySelector('[data-tier-pricing-toggle-arrow]'),
       listEl: container.querySelector('[data-tier-pricing-list]'),
       chosenEl: container.querySelector('[data-tier-pricing-chosen]'),
     }
@@ -888,6 +959,7 @@ if (typeof document !== 'undefined') {
         otherQty,
         addingQty,
         isGroup: config.isGroup,
+        highDemand: config.highDemand,
         formatMoney: formatMoneyFn,
       })
       paintWidget(elements, viewModel, basePrice, addingQty, tierButtonsSignatureRef)
@@ -920,7 +992,7 @@ if (typeof document !== 'undefined') {
     // time (total member count), not per-variant, so hiding it once here
     // (rather than every render) is correct and matches how paintCard
     // already owns cardEl's hidden state.
-    if (elements.toggleEl) elements.toggleEl.hidden = !config.isGroup
+    if (elements.drawerEl) elements.drawerEl.hidden = !config.isGroup
 
     if (elements.toggleEl && elements.listEl && config.isGroup) {
       let open = false
@@ -928,8 +1000,8 @@ if (typeof document !== 'undefined') {
         open = !open
         elements.listEl.hidden = !open
         if (elements.chosenEl) elements.chosenEl.hidden = !open
+        if (elements.drawerEl) elements.drawerEl.dataset.open = open ? 'true' : 'false'
         elements.toggleEl.setAttribute('aria-expanded', open ? 'true' : 'false')
-        if (elements.toggleArrowEl) elements.toggleArrowEl.textContent = open ? '▲' : '▼'
         if (open) paintList()
       })
     }

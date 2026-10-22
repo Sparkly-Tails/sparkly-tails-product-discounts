@@ -207,21 +207,34 @@ describe('tier widget painting (redesign)', () => {
     document.body.innerHTML = `
       <input name="quantity" value="${quantity}">
       <div id="sparkly-tier-pricing-t1" class="sparkly-tier-pricing sparkly-tier-pricing--card" data-sparkly-tier-pricing
-        data-discount='${JSON.stringify({ ...discount, ...extra })}' data-time-discount="{}"
+        data-discount='${JSON.stringify({ ...discount, ...extra, highDemand: undefined })}' data-time-discount="{}"
         data-product-id='"gid://shopify/Product/9"' data-selected-variant-id="10"
-        data-base-price="1.69" data-compare-at-price="0" data-money-format='"£{{amount}}"'>
-        <div class="sparkly-tier-pricing__price-row">
-          <span data-tier-pricing-price data-original-price="true">£1.69</span>
-          <span data-discounted-price hidden>£1.69</span>
-          <span data-tier-pricing-each-label>each</span>
-        </div>
-        <p data-tier-pricing-promo></p>
-        <div data-tier-pricing-card hidden>
-          <div><span data-tier-pricing-status></span><span data-tier-pricing-aside></span></div>
-          <div data-tier-pricing-bar role="progressbar"><div><div data-tier-pricing-fill></div></div><div data-tier-pricing-markers></div><span data-tier-pricing-dot></span></div>
-          <div data-tier-pricing-tiers></div>
-          <div><button data-tier-pricing-toggle aria-expanded="false"><span data-tier-pricing-toggle-label>mix &amp; match products</span><span data-tier-pricing-toggle-arrow aria-hidden="true">▼</span></button><span data-tier-pricing-chosen hidden></span></div>
-          <div data-tier-pricing-list hidden></div>
+        data-base-price="1.69" data-compare-at-price="0" data-money-format='"£{{amount}}"' data-high-demand="${extra.highDemand ? 'true' : 'false'}">
+        <div class="sparkly-tier-pricing__body">
+          <div class="sparkly-tier-pricing__summary">
+            <div class="sparkly-tier-pricing__price-row">
+              <div class="sparkly-tier-pricing__price-group">
+                <span data-tier-pricing-price data-original-price="true">£1.69</span>
+                <span data-discounted-price hidden>£1.69</span>
+                <span data-tier-pricing-each-label>each</span>
+                <s data-tier-pricing-struck hidden></s>
+              </div>
+              <span data-tier-pricing-tag hidden></span>
+            </div>
+            <p data-tier-pricing-promo></p>
+          </div>
+          <div data-tier-pricing-card hidden>
+            <div data-tier-pricing-tiers></div>
+            <div data-tier-pricing-rail data-offer-state="progress">
+              <div><span data-tier-pricing-status></span><span data-tier-pricing-aside></span></div>
+              <div data-tier-pricing-bar role="progressbar"><div><div data-tier-pricing-fill></div></div><div data-tier-pricing-markers></div><span data-tier-pricing-dot></span></div>
+            </div>
+            <div data-tier-pricing-drawer data-open="false">
+              <button data-tier-pricing-toggle aria-expanded="false"><span>Mix &amp; match flavours</span></button>
+              <div data-tier-pricing-list hidden></div>
+              <p data-tier-pricing-chosen hidden></p>
+            </div>
+          </div>
         </div>
       </div>`
     ;(0, eval)(tierScript)
@@ -239,97 +252,132 @@ describe('tier widget painting (redesign)', () => {
     const text = (selector: string) => (document.querySelector(selector) as HTMLElement).textContent
     const dot = document.querySelector('[data-tier-pricing-dot]') as HTMLElement
     const aside = document.querySelector('[data-tier-pricing-aside]') as HTMLElement
+    const pct = (el: HTMLElement) => el.style.getPropertyValue('--sparkly-tier-pct')
     return {
       promo: text('[data-tier-pricing-promo]'),
       status: text('[data-tier-pricing-status]'),
       aside: aside.textContent,
-      asideIsBadge: aside.classList.contains('sparkly-tier-pricing__aside--badge'),
+      tone: aside.dataset.tone,
+      offerState: (document.querySelector('[data-tier-pricing-rail]') as HTMLElement).dataset.offerState,
       dot: dot.textContent,
-      dotLeft: dot.style.left,
+      dotPct: pct(dot),
       fill: (document.querySelector('[data-tier-pricing-fill]') as HTMLElement).style.width,
-      markers: [...document.querySelectorAll('.sparkly-tier-pricing__marker')].map((m) => ({ text: m.textContent, reached: m.classList.contains('sparkly-tier-pricing__marker--reached'), covered: m.classList.contains('sparkly-tier-pricing__marker--covered') })),
+      markers: [...document.querySelectorAll('.sparkly-tier-pricing__marker')].map((m) => ({ text: m.textContent, pct: pct(m as HTMLElement), reached: m.classList.contains('sparkly-tier-pricing__marker--reached'), covered: m.classList.contains('sparkly-tier-pricing__marker--covered') })),
     }
   }
 
-  it('below the first offer: units owned, a hint to the next price, the dot on the quantity', async () => {
+  it('below the first offer: units owned, a hint to the next price in the accent colour, the dot on the quantity', async () => {
     await mountTiers(5)
     expect(painted()).toEqual({
       promo: 'Buy 8+ for £1.63 or 16+ for £1.55',
       status: 'You have 5 units',
       aside: 'Add 3 for £1.63/ea',
-      asideIsBadge: false,
+      tone: 'accent',
+      offerState: 'progress',
       dot: '5',
-      dotLeft: '29%',
+      dotPct: '29%',
       fill: '29%',
       markers: [
-        { text: '1', reached: true, covered: false },
-        { text: '8', reached: false, covered: false },
-        { text: '16', reached: false, covered: false },
+        { text: '1', pct: '0%', reached: true, covered: false },
+        { text: '8', pct: '50%', reached: false, covered: false },
+        { text: '16', pct: '100%', reached: false, covered: false },
       ],
     })
   })
 
-  it('middle tier: "Offer unlocked", a Save badge, the reached marker filled, the dot between tiers', async () => {
+  it('middle tier: the same sentence, a hint to the next price, the reached markers filled, the promo line unchanged', async () => {
     await mountTiers(5)
     await setQuantity(10)
     expect(painted()).toMatchObject({
-      promo: 'Offer unlocked! Add 6 more to unlock the highest discount for £1.55',
-      status: '10 units × £1.63 (Offer unlocked)',
-      aside: 'Save £0.60',
-      asideIsBadge: true,
+      promo: 'Buy 8+ for £1.63 or 16+ for £1.55',
+      status: 'You have 10 units',
+      aside: 'Add 6 for £1.55/ea',
+      tone: 'olive',
+      offerState: 'offer',
       dot: '10',
-      dotLeft: '63%',
+      dotPct: '63%',
     })
     expect(painted().markers.map((m) => m.reached)).toEqual([true, true, false])
   })
 
-  function pills() {
+  function chips() {
     return [...document.querySelectorAll('[data-tier-pricing-tiers] > *')].map((el) => ({
       text: el.textContent,
-      kind: el.classList.contains('sparkly-tier-pricing__temp-btn') ? 'temp' : 'pill',
-      active: el.classList.contains('sparkly-tier-pricing__tier-btn--active'),
-      dimmed: el.classList.contains('sparkly-tier-pricing__tier-btn--dimmed'),
+      tag: el.tagName,
+      tone: el.className.replace('sparkly-tier-pricing__chip sparkly-tier-pricing__chip--', ''),
     }))
   }
 
-  it('pills show the unit price per tier; between tiers the lower ones are dimmed and a dashed box shows the quantity', async () => {
+  it('chips show the total per tier; between tiers a dashed chip shows the total for the quantity', async () => {
     await mountTiers(5)
-    expect(pills()).toEqual([
-      { text: '1 × £1.69', kind: 'pill', active: false, dimmed: false },
-      { text: '5 × £1.69', kind: 'temp', active: false, dimmed: false },
-      { text: '8 × £1.63', kind: 'pill', active: false, dimmed: false },
-      { text: '16 × £1.55', kind: 'pill', active: false, dimmed: false },
+    expect(chips()).toEqual([
+      { text: '1 × £1.69', tag: 'BUTTON', tone: 'idle' },
+      { text: '5 × £8.45', tag: 'SPAN', tone: 'current-progress' },
+      { text: '8 × £13.04', tag: 'BUTTON', tone: 'idle' },
+      { text: '16 × £24.80', tag: 'BUTTON', tone: 'idle' },
     ])
     await setQuantity(10)
-    expect(pills()).toEqual([
-      { text: '1 × £1.69', kind: 'pill', active: false, dimmed: true },
-      { text: '8 × £1.63', kind: 'pill', active: false, dimmed: false },
-      { text: '10 × £1.63', kind: 'temp', active: false, dimmed: false },
-      { text: '16 × £1.55', kind: 'pill', active: false, dimmed: false },
+    expect(chips()).toEqual([
+      { text: '1 × £1.69', tag: 'BUTTON', tone: 'idle' },
+      { text: '8 × £13.04 ✓', tag: 'BUTTON', tone: 'applied' },
+      { text: '10 × £16.30', tag: 'SPAN', tone: 'current-offer' },
+      { text: '16 × £24.80', tag: 'BUTTON', tone: 'idle' },
     ])
   })
 
-  it('a quantity exactly on a tier ticks that pill and shows no dashed box', async () => {
+  it('a quantity exactly on a tier ticks that chip and shows no dashed chip', async () => {
     await mountTiers(8)
-    expect(pills()).toEqual([
-      { text: '1 × £1.69', kind: 'pill', active: false, dimmed: true },
-      { text: '8 × £1.63✓', kind: 'pill', active: true, dimmed: false },
-      { text: '16 × £1.55', kind: 'pill', active: false, dimmed: false },
+    expect(chips()).toEqual([
+      { text: '1 × £1.69', tag: 'BUTTON', tone: 'idle' },
+      { text: '8 × £13.04 ✓', tag: 'BUTTON', tone: 'applied' },
+      { text: '16 × £24.80', tag: 'BUTTON', tone: 'idle' },
     ])
   })
 
-  it('highest tier: "Highest discount unlocked" and the dot on the last marker', async () => {
+  it('a quantity past the top tier shows a star on the dashed chip', async () => {
+    await mountTiers(20)
+    expect(chips().map((chip) => [chip.text, chip.tone])).toEqual([
+      ['1 × £1.69', 'idle'], ['8 × £13.04', 'idle'], ['16 × £24.80 ✓', 'applied'], ['20 × £31.00 ★', 'current-highest'],
+    ])
+  })
+
+  it('clicking a tier chip sets the quantity on the page', async () => {
+    await mountTiers(5)
+    await click('[data-tier-pricing-tiers] button', 1)
+    expect((document.querySelector('input[name="quantity"]') as HTMLInputElement).value).toBe('8')
+  })
+
+  it('highest tier: Best Rate in the success colour and the dot on the last marker', async () => {
     await mountTiers(5)
     await setQuantity(16)
     expect(painted()).toMatchObject({
-      promo: 'Highest discount unlocked: £1.55/each applied! (Save £2.24)',
+      promo: 'Buy 8+ for £1.63 or 16+ for £1.55',
       status: 'You have 16 units',
-      aside: '✓ Highest discount (£1.55/ea)',
-      asideIsBadge: false,
+      aside: 'Best Rate (£1.55/ea • Add any qty)',
+      tone: 'success',
+      offerState: 'highest',
       dot: '16',
-      dotLeft: '100%',
+      dotPct: '100%',
     })
     expect(painted().markers.map((m) => [m.reached, m.covered])).toEqual([[true, false], [true, false], [true, true]])
+  })
+
+  it('the quantity beyond the top tier says it exceeds the tier', async () => {
+    await mountTiers(5)
+    await setQuantity(22)
+    expect(painted().status).toBe('You have 22 units (Exceeds 16+ tier)')
+  })
+
+  it('the tag: the tier pill once an offer applies, High Demand when switched on before, nothing otherwise', async () => {
+    const tag = () => document.querySelector('[data-tier-pricing-tag]') as HTMLElement
+    await mountTiers(5)
+    expect(tag().hidden).toBe(true)
+    await setQuantity(10)
+    expect([tag().hidden, tag().textContent, tag().dataset.kind]).toEqual([false, 'Tier 1 Active (8+ units)', 'tier'])
+    await mountTiers(5, { highDemand: true })
+    expect([tag().hidden, tag().textContent, tag().dataset.kind]).toEqual([false, 'High Demand', 'high-demand'])
+    await setQuantity(16)
+    expect(tag().textContent).toBe('Tier 2 Active (16+ • Unlimited)')
   })
 
   it('opens the mix & match list: a row per member with thumbnail slot, name, price at the applied tier and its cart quantity', async () => {
@@ -348,7 +396,7 @@ describe('tier widget painting (redesign)', () => {
       hasImage: !!row.querySelector('img'),
     }))
     expect(rows).toEqual([
-      { name: 'Chicken & Salmon 85g', price: '£1.63', qty: '6', href: '/products/salmon', hasImage: true },
+      { name: 'Chicken & Salmon 85g', price: '£1.63 each', qty: '6', href: '/products/salmon', hasImage: true },
       { name: 'Chicken & Herring 85g', price: 'Sold out', qty: '4', href: '/products/herring', hasImage: false },
     ])
     const chosen = document.querySelector('[data-tier-pricing-chosen]') as HTMLElement
@@ -385,8 +433,8 @@ describe('tier widget painting (redesign)', () => {
     // row 1 is the product on the page: no link to itself
     expect(rowAdds()).toEqual([
       null,
-      { href: '/products/herring', label: 'Add Chicken & Herring 85g', text: 'Add', target: null },
-      { href: '/products/duck', label: 'Add Duck Mix', text: 'Add', target: null },
+      { href: '/products/herring', label: 'Add Chicken & Herring 85g', text: '+ Add', target: null },
+      { href: '/products/duck', label: 'Add Duck Mix', text: '+ Add', target: null },
     ])
   })
 
@@ -411,7 +459,7 @@ describe('tier widget painting (redesign)', () => {
     const numbers = () => [...document.querySelectorAll('.sparkly-tier-pricing__list-qty')]
     expect(numbers().map((el) => el.textContent)).toEqual(['0', '8', '0'])
     expect(numbers()[1].getAttribute('aria-label')).toBe('8 in cart')
-    expect(painted()).toMatchObject({ status: '8 units × £1.63 (Offer unlocked)', aside: 'Save £0.48', dot: '8' })
+    expect(painted()).toMatchObject({ status: 'You have 8 units', aside: 'Add 8 for £1.55/ea', dot: '8' })
     expect(document.querySelector('[data-tier-pricing-chosen]')!.textContent).toBe('8 items chosen')
   })
 
@@ -429,11 +477,15 @@ describe('tier widget painting (redesign)', () => {
     it('a discounted price reads as "Discounted price" then "Original price", never as two bare numbers', async () => {
       await mountTiers(10)
       const price = document.querySelector('[data-tier-pricing-price]') as HTMLElement
-      expect(price.textContent!.replace(/\s+/g, ' ').trim()).toBe('Discounted price: £1.63 Original price: £1.69')
-      expect(price.querySelectorAll('.sparkly-tier-pricing__sr-only')).toHaveLength(2)
+      const struck = document.querySelector('[data-tier-pricing-struck]') as HTMLElement
+      expect(price.textContent!.replace(/\s+/g, ' ').trim()).toBe('Discounted price: £1.63')
+      expect(struck.textContent!.replace(/\s+/g, ' ').trim()).toBe('Original price: £1.69')
+      expect(struck.hidden).toBe(false)
+      expect(price.querySelectorAll('.sparkly-tier-pricing__sr-only')).toHaveLength(1)
+      expect(struck.querySelectorAll('.sparkly-tier-pricing__sr-only')).toHaveLength(1)
     })
 
-    it('the pill that matches the quantity is pressed, the others are not', async () => {
+    it('the chip that matches the quantity is pressed, the others are not', async () => {
       await mountTiers(8)
       const pressed = [...document.querySelectorAll('[data-tier-pricing-tiers] button')].map((b) => b.getAttribute('aria-pressed'))
       expect(pressed).toEqual(['false', 'true', 'false'])
@@ -442,9 +494,10 @@ describe('tier widget painting (redesign)', () => {
     it('the list toggle tells assistive technology whether the list is open', async () => {
       await openList()
       const toggle = document.querySelector('[data-tier-pricing-toggle]') as HTMLElement
-      expect(toggle.getAttribute('aria-expanded')).toBe('true')
+      const drawer = document.querySelector('[data-tier-pricing-drawer]') as HTMLElement
+      expect([toggle.getAttribute('aria-expanded'), drawer.dataset.open]).toEqual(['true', 'true'])
       ;(toggle as HTMLElement).click()
-      expect(toggle.getAttribute('aria-expanded')).toBe('false')
+      expect([toggle.getAttribute('aria-expanded'), drawer.dataset.open]).toEqual(['false', 'false'])
     })
 
     it('live text is only rewritten when it changed, so the once-a-second refresh does not re-announce it', async () => {
