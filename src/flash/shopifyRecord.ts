@@ -22,6 +22,7 @@ export interface FlashRecordInput {
   discountClasses: ['PRODUCT']
   startsAt: string
   endsAt: string
+  combinesWith: { productDiscounts: true }
   metafields: { namespace: string; key: string; type: string; value: string }[]
 }
 
@@ -37,6 +38,8 @@ export function buildFlashRecordInput({ title, discountId, startsAtUtc, endsAtUt
     discountClasses: ['PRODUCT'],
     startsAt: startsAtUtc,
     endsAt: endsAtUtc,
+    // Shopify's default (no combining) drops the flash discount whenever the cart also holds a product of the shared tier discount.
+    combinesWith: { productDiscounts: true },
     metafields: [{ namespace: METAFIELD_NAMESPACE, key: METAFIELD_KEYS.flashRecord, type: 'json', value: JSON.stringify({ discountId }) }],
   }
 }

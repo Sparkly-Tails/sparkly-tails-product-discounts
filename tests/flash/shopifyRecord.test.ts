@@ -25,6 +25,10 @@ describe('buildFlashRecordInput', () => {
     })
   })
 
+  it('allows product discounts to combine, because a dev-store cart showed that a flash product next to a regular tier product gets no flash discount otherwise', () => {
+    expect(input.combinesWith).toEqual({ productDiscounts: true })
+  })
+
   it('carries only the id of the tier discount as the record config, never any tier data', () => {
     expect(input.metafields).toEqual([
       { namespace: '$app:smooth_discount', key: 'flash_record', type: 'json', value: '{"discountId":"disc_abc"}' },
