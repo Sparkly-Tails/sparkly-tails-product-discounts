@@ -369,12 +369,15 @@ function buildTierChips({ tiers, basePrice, combinedQty, formatMoney: formatMone
 
 // "Tier 1 Active (8+ units)"; the top tier is unlimited: "Tier 2 Active (16+ • Unlimited)".
 // Tier numbers count the discount's real tiers; the hidden start tier is not one.
+function tierNumberOf(tiers, minQty) {
+  const sorted = sortTiersByMinQty(tiers)
+  return sorted.findIndex((tier) => tier.minQty === minQty) + (isUnitAnchorTier(sorted[0]) ? 0 : 1)
+}
+
 function formatTierPill({ tiers, minQty }) {
   const sorted = sortTiersByMinQty(tiers)
-  const index = sorted.findIndex((tier) => tier.minQty === minQty)
-  const number = index + (isUnitAnchorTier(sorted[0]) ? 0 : 1)
   const isTop = minQty === sorted[sorted.length - 1].minQty
-  return 'Tier ' + number + ' Active (' + minQty + '+' + (isTop ? ' • Unlimited' : ' units') + ')'
+  return 'Tier ' + tierNumberOf(tiers, minQty) + ' Active (' + minQty + '+' + (isTop ? ' • Unlimited' : ' units') + ')'
 }
 
 // The tag at the right of the price row: the tier pill once an offer applies,
@@ -386,19 +389,89 @@ function buildPriceTag({ progressState, tiers, highDemand }) {
   return highDemand ? { kind: 'high-demand', text: 'High Demand' } : null
 }
 
+// Flash sale: the window is two Unix seconds written by the admin. The sale
+// runs from its start second up to (not including) its end second.
+
+function flashPhase({ nowSeconds, startsAtUnix, endsAtUnix }) {
+  if (nowSeconds < startsAtUnix) return 'before'
+  return nowSeconds < endsAtUnix ? 'running' : 'ended'
+}
+
+function flashPad(value) {
+  return value < 10 ? '0' + value : String(value)
+}
+
+// ['04', '18', '49'] while an hour or more is left, else ['18', '49']; never negative.
+function flashCountdownParts({ secondsLeft }) {
+  const total = Math.max(0, Math.floor(secondsLeft))
+  const hours = Math.floor(total / 3600)
+  const minutes = Math.floor((total % 3600) / 60)
+  const seconds = total % 60
+  return hours > 0 ? [flashPad(hours), flashPad(minutes), flashPad(seconds)] : [flashPad(minutes), flashPad(seconds)]
+}
+
+// "04 : 18 : 49" (hours only while an hour or more is left).
+function formatFlashCountdown({ secondsLeft }) {
+  return flashCountdownParts({ secondsLeft }).join(' : ')
+}
+
+// The compact timer of the chip: "14:32", or "1:00:05" from an hour up.
+function formatFlashChip({ secondsLeft }) {
+  const parts = flashCountdownParts({ secondsLeft })
+  if (parts.length === 3) parts[0] = String(Number(parts[0]))
+  return parts.join(':')
+}
+
+const FLASH_HIDDEN_BAR = { variant: 'hidden', text: '', label: '', timerParts: [], aside: '', chip: '' }
+
+// The bar at the top of the card. `variant` picks its look (dark with a bolt,
+// green banner, dark with a star); `text` is the whole sentence (for screen
+// readers), `label` the part before the timer boxes.
+//   before the start (teaser on): "Flash sale starts in 02 : 10 : 00"
+//   running below the first tier: "Flash sale ends in 04 : 18 : 49"
+//   first tier: "Tier 1 unlocked! Flash sale active", "£1.63/ea", the chip
+//   a higher tier: "Tier 2 active (£1.55/ea · Keep adding)", the chip
+//   before the start without the teaser, and after the end: no bar.
+function buildFlashBar({ phase, showTeaser, reachedTier, unitPriceLabel, countdownText, countdownParts, chipText }) {
+  if (phase === 'ended' || (phase === 'before' && !showTeaser)) return FLASH_HIDDEN_BAR
+  if (phase === 'before') {
+    return { variant: 'teaser', text: 'Flash sale starts in ' + countdownText, label: 'Flash sale starts in', timerParts: countdownParts, aside: '', chip: '' }
+  }
+  if (reachedTier === 0) {
+    return { variant: 'ends', text: 'Flash sale ends in ' + countdownText, label: 'Flash sale ends in', timerParts: countdownParts, aside: '', chip: '' }
+  }
+  if (reachedTier === 1) {
+    const first = 'Tier 1 unlocked! Flash sale active'
+    return { variant: 'tier-first', text: first, label: first, timerParts: [], aside: unitPriceLabel + '/ea', chip: chipText }
+  }
+  const higher = 'Tier ' + reachedTier + ' active (' + unitPriceLabel + '/ea · Keep adding)'
+  return { variant: 'tier-higher', text: higher, label: higher, timerParts: [], aside: '', chip: chipText }
+}
+
 // View-model assembly: decides WHAT the widget shows. The DOM layer below
 // only paints whatever this returns.
 
-function computeWidgetViewModel({ tiers, basePrice, compareAtPrice, otherQty, addingQty, isGroup, highDemand, formatMoney: formatMoneyFn }) {
+function computeWidgetViewModel({ tiers, basePrice, compareAtPrice, otherQty, addingQty, isGroup, highDemand, flash, nowSeconds, formatMoney: formatMoneyFn }) {
   const plainPrice = formatMoneyFn(basePrice)
+  const hasTiers = !!(tiers && tiers.length > 0)
+  const phase = flash && hasTiers ? flashPhase({ nowSeconds, startsAtUnix: flash.startsAtUnix, endsAtUnix: flash.endsAtUnix }) : null
+  const secondsLeft = phase === 'before' ? flash.startsAtUnix - nowSeconds : phase ? flash.endsAtUnix - nowSeconds : 0
 
-  if (!tiers || tiers.length === 0) {
-    // No app discount configured for this product — fall back to Shopify's
-    // own compare-at price, if the merchant set one, so a plain markdown
-    // still shows a crossed-out original price like a tiered discount does.
+  // No discount for this variant, or a flash sale that is not running (before
+  // its start, or over): the plain price only, with the teaser bar when it is
+  // switched on and the start is still ahead.
+  if (!hasTiers || (phase && phase !== 'running')) {
+    // Without a tier discount, fall back to Shopify's own compare-at price, if
+    // the merchant set one, so a plain markdown still shows a crossed-out
+    // original price like a tiered discount does.
     const hasCompareAtDiscount = compareAtPrice != null && compareAtPrice > basePrice
     return {
       showCard: false,
+      showChrome: !phase || (phase === 'before' && !!flash.showTeaser),
+      flashBar: phase ? buildFlashBar({
+        phase, showTeaser: !!flash.showTeaser, reachedTier: 0, unitPriceLabel: '',
+        countdownText: formatFlashCountdown({ secondsLeft }), countdownParts: flashCountdownParts({ secondsLeft }), chipText: formatFlashChip({ secondsLeft }),
+      }) : null,
       discountedPrice: hasCompareAtDiscount ? plainPrice : null,
       plainPrice: hasCompareAtDiscount ? formatMoneyFn(compareAtPrice) : plainPrice,
       progressState: null,
@@ -420,14 +493,27 @@ function computeWidgetViewModel({ tiers, basePrice, compareAtPrice, otherQty, ad
 
   const sortedTiers = sortTiersByMinQty(tiers)
 
+  const offerState = classifyOfferState(progressState)
+  const flashBar = !flash ? null : buildFlashBar({
+    phase: 'running',
+    showTeaser: !!flash.showTeaser,
+    reachedTier: offerState === 'progress' ? 0 : tierNumberOf(tiers, progressState.tierState.minQty),
+    unitPriceLabel: formatMoneyFn(unit),
+    countdownText: formatFlashCountdown({ secondsLeft }),
+    countdownParts: flashCountdownParts({ secondsLeft }),
+    chipText: formatFlashChip({ secondsLeft }),
+  })
+
   return {
     showCard: true,
+    showChrome: true,
+    flashBar,
     discountedPrice: isDiscounted ? formatMoneyFn(unit) : null,
     plainPrice,
     progressState,
     chips: buildTierChips({ tiers, basePrice, combinedQty: progressState.combinedQty, formatMoney: formatMoneyFn }),
     tag: buildPriceTag({ progressState, tiers, highDemand: !!highDemand }),
-    offerState: classifyOfferState(progressState),
+    offerState,
     dot: computeProgressDot(sortedTiers, progressState.combinedQty),
     promoLine: buildPromoLine(tiers, basePrice, formatMoneyFn, isGroup),
     status: buildStatusCopy({ progressState, tiers, basePrice, formatMoney: formatMoneyFn }),
@@ -583,6 +669,12 @@ if (typeof module !== 'undefined' && module.exports) {
     buildTierChips,
     formatTierPill,
     buildPriceTag,
+    tierNumberOf,
+    flashPhase,
+    flashCountdownParts,
+    formatFlashCountdown,
+    formatFlashChip,
+    buildFlashBar,
     computeWidgetViewModel,
     buildMixMatchRows,
     buildProgressSemantics,
@@ -716,6 +808,46 @@ if (typeof document !== 'undefined') {
     })
   }
 
+  // The flash bar: the sentence, the timer as one box per part (teaser and
+  // "ends in" only), the unit price on the right and the timer chip. Text is
+  // only rewritten when it changed; the timer changes every second.
+  function paintFlashBar(elements, viewModel) {
+    const el = elements.flashEl
+    if (!el) return
+    const bar = viewModel.flashBar
+    el.hidden = !bar || bar.variant === 'hidden'
+    if (el.hidden) return
+    if (el.dataset.variant !== bar.variant) el.dataset.variant = bar.variant
+    setText(elements.flashLabelEl, bar.label)
+    paintFlashTimer(elements.flashTimerEl, bar.timerParts)
+    setText(elements.flashAsideEl, bar.aside)
+    elements.flashChipEl.hidden = !bar.chip
+    setText(elements.flashChipTextEl, bar.chip)
+  }
+
+  function paintFlashTimer(timerEl, parts) {
+    if (!timerEl) return
+    if (parts.length === 0) {
+      if (timerEl.children.length > 0) timerEl.textContent = ''
+      return
+    }
+    if (timerEl.children.length !== parts.length * 2 - 1) {
+      timerEl.textContent = ''
+      parts.forEach((part, index) => {
+        if (index > 0) {
+          const sep = document.createElement('span')
+          sep.className = 'sparkly-tier-pricing__flash-sep'
+          sep.textContent = ':'
+          timerEl.appendChild(sep)
+        }
+        const digit = document.createElement('span')
+        digit.className = 'sparkly-tier-pricing__flash-digit'
+        timerEl.appendChild(digit)
+      })
+    }
+    parts.forEach((part, index) => setText(timerEl.children[index * 2], part))
+  }
+
   // Skips the destructive rebuild (replays animation, clears focus) when
   // nothing chip-related changed since last render — tracked via a
   // signature on tierButtonsSignatureRef, a { value } box the caller owns.
@@ -732,6 +864,7 @@ if (typeof document !== 'undefined') {
   }
 
   function paintWidget(elements, viewModel, basePrice, addingQty, tierButtonsSignatureRef) {
+    paintFlashBar(elements, viewModel)
     paintPriceRow(elements, viewModel)
     paintPromo(elements, viewModel)
     paintCard(elements, viewModel)
@@ -879,6 +1012,7 @@ if (typeof document !== 'undefined') {
       tiers,
       title: discount.title,
       highDemand: container.dataset.highDemand === 'true',
+      flash: parseFlashConfig(container.dataset.flash),
       hasTiers: !!(tiers && tiers.length > 0),
       ownVariantIds,
       ownVariantOptions,
@@ -894,8 +1028,24 @@ if (typeof document !== 'undefined') {
     }
   }
 
+  // { startsAtUnix, endsAtUnix, showTeaser } of a flash sale, or null for a discount that is not one.
+  function parseFlashConfig(raw) {
+    try {
+      const flash = JSON.parse(raw || 'null')
+      return flash && typeof flash.startsAtUnix === 'number' && typeof flash.endsAtUnix === 'number' ? flash : null
+    } catch {
+      return null
+    }
+  }
+
   function queryWidgetElements(container) {
     return {
+      flashEl: container.querySelector('[data-tier-pricing-flash]'),
+      flashLabelEl: container.querySelector('[data-flash-label]'),
+      flashTimerEl: container.querySelector('[data-flash-timer]'),
+      flashAsideEl: container.querySelector('[data-flash-aside]'),
+      flashChipEl: container.querySelector('[data-flash-chip]'),
+      flashChipTextEl: container.querySelector('[data-flash-chip-text]'),
       priceEl: container.querySelector('[data-tier-pricing-price]'),
       eachLabelEl: container.querySelector('[data-tier-pricing-each-label]'),
       struckEl: container.querySelector('[data-tier-pricing-struck]'),
@@ -960,8 +1110,12 @@ if (typeof document !== 'undefined') {
         addingQty,
         isGroup: config.isGroup,
         highDemand: config.highDemand,
+        flash: config.flash,
+        nowSeconds: Math.floor(Date.now() / 1000),
         formatMoney: formatMoneyFn,
       })
+      // A flash sale that has not started (teaser off) or is over has no card: only the plain price.
+      if (config.hasTiers) container.classList.toggle('sparkly-tier-pricing--card', viewModel.showChrome)
       paintWidget(elements, viewModel, basePrice, addingQty, tierButtonsSignatureRef)
       lastPricing = viewModel.progressState
         ? { combinedQty: viewModel.progressState.combinedQty, tierState: viewModel.progressState.tierState, formatMoney: formatMoneyFn }

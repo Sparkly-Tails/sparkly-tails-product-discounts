@@ -577,6 +577,8 @@ test('computeWidgetViewModel: no tiers configured at all — plain price, card h
   const vm = computeWidgetViewModel({ tiers: [], basePrice: 1.49, otherQty: 0, addingQty: 1, isGroup: false, formatMoney: fmt })
   assert.deepEqual(vm, {
     showCard: false,
+    showChrome: true,
+    flashBar: null,
     discountedPrice: null,
     plainPrice: '£1.49',
     progressState: null,

@@ -7,6 +7,17 @@
   otherwise.
 {% endcomment %}
 {%- assign discount_metafield = product.metafields['$app:smooth_discount'].tier_discount -%}
+{%- comment -%}
+  A flash sale that has ended renders as a product without a tier discount: only
+  the plain price. (The script also hides the widget at the end second without a
+  reload, for a page that was opened before it.)
+{%- endcomment -%}
+{%- if discount_metafield != blank and discount_metafield.value.flash != blank -%}
+  {%- assign flash_now = 'now' | date: '%s' | plus: 0 -%}
+  {%- if flash_now >= discount_metafield.value.flash.endsAtUnix -%}
+    {%- assign discount_metafield = nil -%}
+  {%- endif -%}
+{%- endif -%}
 {%- assign selected_variant_id = product.selected_or_first_available_variant.id | prepend: 'gid://shopify/ProductVariant/' -%}
 {%- assign discount_json = '{"tiers":[]}' -%}
 {%- if discount_metafield != blank -%}
@@ -140,8 +151,20 @@
   data-compare-at-price="{{ product.selected_or_first_available_variant.compare_at_price | default: 0 | divided_by: 100.0 | json }}"
   data-money-format='{{ shop.money_format | json | escape }}'
   data-high-demand="{{ discount_metafield.value.highDemand | default: false }}"
+  data-flash='{{ discount_metafield.value.flash | json | escape }}'
   style="--sparkly-tier-price-font-size: {{ block.settings.price_font_size }}px; --sparkly-tier-moss: {{ block.settings.moss_color }}; --sparkly-tier-cream: {{ block.settings.cream_color }}; --sparkly-tier-sun: {{ block.settings.sun_color }};"
 >
+  <div class="sparkly-tier-pricing__flash" data-tier-pricing-flash data-variant="hidden" hidden>
+    <div class="sparkly-tier-pricing__flash-main">
+      <span class="sparkly-tier-pricing__flash-icon" aria-hidden="true"></span>
+      <span class="sparkly-tier-pricing__flash-label" data-flash-label></span>
+    </div>
+    <div class="sparkly-tier-pricing__flash-side">
+      <span class="sparkly-tier-pricing__flash-timer" data-flash-timer></span>
+      <span class="sparkly-tier-pricing__flash-aside" data-flash-aside></span>
+      <span class="sparkly-tier-pricing__flash-chip" data-flash-chip hidden><span class="sparkly-tier-pricing__flash-hourglass" aria-hidden="true"></span><span data-flash-chip-text></span></span>
+    </div>
+  </div>
   <div class="sparkly-tier-pricing__body">
     <div class="sparkly-tier-pricing__summary">
       <div class="sparkly-tier-pricing__price-row">
