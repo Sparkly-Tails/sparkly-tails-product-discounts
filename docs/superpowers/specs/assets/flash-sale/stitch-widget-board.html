@@ -1,0 +1,333 @@
+<!DOCTYPE html><html class="h-full bg-[#F5F2EA]" lang="en" style=""><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Storefront Tiered Pricing &amp; Mix-and-Match Widget Exploration</title>
+<!-- Tailwind CSS CDN with forms and container queries plugins -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Google Fonts: Newsreader for editorial serif & Plus Jakarta Sans for clean modern UI -->
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              cream: '#FAF6EE',
+              surface: '#F4EFE4',
+              sand: '#E9E1D2',
+              border: '#E1D8C8',
+              olive: '#39432B',
+              'olive-dark': '#29311E',
+              'olive-light': '#4E5A3B',
+              accent: '#C47B44',
+              charcoal: '#1A1C16',
+              muted: '#6E7265'
+            }
+          },
+          fontFamily: {
+            serif: ['Newsreader', 'Georgia', 'serif'],
+            sans: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
+          },
+          boxShadow: {
+            subtle: '0 1px 3px rgba(35, 38, 28, 0.04), 0 4px 12px rgba(35, 38, 28, 0.03)',
+            elevated: '0 8px 24px -4px rgba(35, 38, 28, 0.08), 0 2px 6px -1px rgba(35, 38, 28, 0.04)',
+          }
+        }
+      }
+    }
+  </script>
+<!-- BEGIN: Custom Style Definitions -->
+<style data-purpose="custom-typography">
+    .font-feature-tnum {
+      font-variant-numeric: tabular-nums;
+    }
+  </style>
+<style data-purpose="interactive-states">
+    .smooth-transition {
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .custom-scroll::-webkit-scrollbar {
+      width: 5px;
+    }
+    .custom-scroll::-webkit-scrollbar-track {
+      background: #F4EFE4;
+      border-radius: 9999px;
+    }
+    .custom-scroll::-webkit-scrollbar-thumb {
+      background: #D2C8B4;
+      border-radius: 9999px;
+    }
+    .custom-scroll::-webkit-scrollbar-thumb:hover {
+      background: #B0A590;
+    }
+  </style>
+<!-- END: Custom Style Definitions -->
+<meta content="web_standard" name="shell-type"></head>
+<body class="min-h-full font-sans text-brand-charcoal antialiased selection:bg-brand-olive selection:text-white">
+<!-- BEGIN: Board Header -->
+<header class="border-b border-brand-border bg-brand-cream/90 backdrop-blur-md sticky top-0 z-50 shadow-sm">
+<div class="max-w-7xl mx-auto px-6 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+<div>
+<div class="flex items-center gap-2">
+<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-brand-olive text-brand-cream tracking-wide uppercase">Design System Exploration</span>
+<span class="text-xs text-brand-muted font-medium">Desktop Viewport Benchmark (460px – 520px)</span>
+</div>
+<h1 class="text-xl md:text-2xl font-bold tracking-tight text-brand-charcoal mt-1 font-serif">Tiered Pricing &amp; Mix-and-Match Widget</h1>
+</div>
+<div class="flex items-center gap-3 text-xs text-brand-muted">
+<span class="inline-flex items-center gap-1.5 bg-white border border-brand-border px-3 py-1.5 rounded-full shadow-subtle">
+<span class="w-2 h-2 rounded-full bg-emerald-600"></span> 2 Architectural Directions
+        </span>
+<span class="inline-flex items-center gap-1.5 bg-white border border-brand-border px-3 py-1.5 rounded-full shadow-subtle">
+<span class="w-2 h-2 rounded-full bg-brand-accent"></span> 3 Functional States
+        </span>
+</div>
+</div>
+</header>
+<!-- END: Board Header -->
+<!-- BEGIN: Main Showcase Board -->
+<main class="max-w-7xl mx-auto px-6 py-10 space-y-12">
+<div class="flex flex-col w-full">
+<!-- Top Exploration Hero Banner -->
+<div class="relative overflow-hidden rounded-2xl bg-white border border-brand-border p-6 md:p-8 mb-10 shadow-subtle">
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-6">
+<div class="max-w-2xl min-w-0">
+<div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-brand-olive/10 text-brand-olive text-xs font-bold uppercase tracking-wider mb-2.5">
+<span class="material-symbols-outlined text-sm leading-none" style="font-variation-settings: &quot;FILL&quot; 1;">bolt</span>
+          Component Exploration • Flash Sale Variant
+        </div>
+<h2 class="text-2xl md:text-3xl font-bold text-brand-charcoal font-serif tracking-tight">Fluid Progress Widget — Scalable Horizontal Tier Menu (Multi-Tier Architecture)</h2>
+<p class="text-sm md:text-base text-brand-muted mt-2 leading-relaxed">Combines 3-step volume discounts (1 → 8 → 16+ Tins) with an intuitive progress track and promotional countdown timers matching the tier structure: Mix and match 8+ for £1.63 or 16+ for £1.55.</p>
+</div>
+<div class="flex flex-wrap md:flex-col lg:flex-row items-start md:items-end gap-2.5">
+<span class="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-brand-surface border border-brand-border text-brand-charcoal text-xs font-semibold shadow-sm">
+<span class="w-2 h-2 rounded-full bg-brand-olive"></span> 3 Urgency Placements
+        </span>
+<span class="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-brand-surface border border-brand-border text-brand-charcoal text-xs font-semibold shadow-sm">
+<span class="w-2 h-2 rounded-full bg-emerald-600"></span> Fluid Pin Rail
+        </span>
+<span class="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-brand-surface border border-brand-border text-brand-charcoal text-xs font-semibold shadow-sm">
+<span class="w-2 h-2 rounded-full bg-brand-olive"></span> Mix &amp; Match Steppers
+        </span>
+</div>
+</div>
+</div>
+<!-- Variant Presentation Grid (Desktop 3-Column Viewport Showcase) -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+<!-- ========================================== -->
+<!-- VARIANT A: Top Anchor Flash Sale Countdown -->
+<!-- ========================================== -->
+<div class="flex flex-col bg-white rounded-2xl shadow-elevated border border-brand-border overflow-hidden transition-all duration-200">
+<!-- Tag Header -->
+
+<!-- Live Flash Countdown Header -->
+<div class="bg-brand-charcoal text-white px-5 py-3 flex items-center justify-between shadow-inner">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-amber-400 text-lg animate-pulse" style="font-variation-settings: &quot;FILL&quot; 1;">bolt</span>
+<span class="text-xs uppercase font-bold tracking-wider">Flash Sale Ends In</span>
+</div>
+<div class="flex items-center gap-1 font-mono text-xs">
+<span class="bg-white/15 px-2 py-1 rounded text-white font-bold">04</span>
+<span class="font-bold text-white/70">:</span>
+<span class="bg-white/15 px-2 py-1 rounded text-white font-bold">18</span>
+<span class="font-bold text-white/70">:</span>
+<span class="bg-white/15 px-2 py-1 rounded text-white font-bold timer-tick">51</span>
+</div>
+</div>
+<!-- Card Body -->
+<div class="p-5 flex flex-col justify-between flex-1 gap-5">
+<div class="flex flex-col gap-4">
+<!-- Price & Tag -->
+<div class="flex flex-col gap-1"><div class="flex items-baseline justify-between"><div class="flex items-baseline gap-2"><span class="text-2xl font-bold text-brand-charcoal font-feature-tnum">£1.69</span><span class="text-xs text-brand-muted font-medium">each</span></div><span class="inline-flex items-center gap-1 text-xs text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-full font-semibold"><span class="material-symbols-outlined text-xs" style="font-variation-settings: &quot;FILL&quot; 1;">local_fire_department</span> High Demand</span></div><p class="text-xs text-brand-muted">Mix and match 8+ for £1.63 or 16+ for £1.55</p></div>
+<!-- Tier Milestone Cards -->
+<div class="flex flex-col gap-1.5"><div class="flex items-center justify-between text-[11px] text-brand-muted px-0.5"></div><div class="flex items-center gap-1.5 pt-1 overflow-x-auto flex-nowrap pb-1"><button class="py-1.5 px-3 rounded-lg border border-brand-border bg-white text-brand-muted font-medium text-xs text-center hover:border-brand-charcoal transition-colors shrink-0 whitespace-nowrap" type="button">1 × £1.69</button><button class="py-1.5 px-3 rounded-lg border-2 border-dashed border-brand-charcoal bg-brand-surface font-bold text-brand-charcoal text-xs text-center shadow-sm shrink-0 whitespace-nowrap" type="button">5 × £8.45</button><button class="py-1.5 px-3 rounded-lg border border-brand-border bg-white text-brand-muted font-medium text-xs text-center hover:border-brand-charcoal transition-colors shrink-0 whitespace-nowrap" type="button">8 × £13.00</button><button class="py-1.5 px-3 rounded-lg border border-brand-border bg-white text-brand-muted font-medium text-xs text-center hover:border-brand-charcoal transition-colors shrink-0 whitespace-nowrap" type="button">16 × £24.80</button></div></div>
+<!-- Fluid Progress Rail HUD -->
+<div class="bg-brand-surface rounded-xl p-3 border border-brand-border flex flex-col gap-2"><div class="flex items-center justify-between text-xs"><span class="text-brand-charcoal">You have <strong class="font-bold text-brand-charcoal">5 units</strong></span><span class="text-brand-accent font-semibold">Add 3 for £1.63/ea</span></div><div class="relative w-full py-2 my-0.5"><div class="h-1.5 w-full bg-brand-sand rounded-full overflow-hidden"><div class="h-full bg-brand-olive rounded-full" style="width: 30%;"></div></div><div class="absolute left-0 top-1/2 -translate-y-1/2 flex items-center justify-center"><div class="w-6 h-6 rounded-full bg-white border border-brand-border shadow-sm flex items-center justify-center text-[10px] text-brand-muted font-bold">1</div></div><div class="absolute left-[30%] top-1/2 -translate-y-1/2 -translate-x-1/2 z-10 flex items-center justify-center"><div class="w-7 h-7 rounded-full bg-white border-2 border-brand-charcoal shadow flex items-center justify-center text-xs font-bold text-brand-charcoal">5</div></div><div class="absolute left-[54%] top-1/2 -translate-y-1/2 -translate-x-1/2 flex items-center justify-center"><div class="w-6 h-6 rounded-full bg-white border border-brand-border shadow-sm flex items-center justify-center text-[10px] text-brand-muted font-bold">8</div></div><div class="absolute right-0 top-1/2 -translate-y-1/2 flex items-center justify-center"><div class="w-6 h-6 rounded-full bg-white border border-brand-border shadow-sm flex items-center justify-center text-[10px] text-brand-muted font-bold">16</div></div></div></div>
+<!-- Collapsed Accordion Drawer Trigger -->
+<button class="w-full flex items-center justify-between py-2.5 px-3.5 rounded-xl bg-brand-surface border border-brand-border text-brand-charcoal text-xs font-semibold hover:bg-brand-sand/50 transition-colors" type="button">
+<span class="flex items-center gap-2">
+<span class="material-symbols-outlined text-base text-brand-olive">dashboard_customize</span>
+          Mix &amp; match flavours&nbsp;</span>
+<span class="material-symbols-outlined text-base text-brand-muted">expand_more</span>
+</button>
+</div>
+<!-- Actions & Stepper Segment -->
+<div class="flex flex-col gap-3 pt-2">
+<div class="flex items-center gap-2">
+</div>
+<!-- Trust Badges -->
+
+</div>
+</div>
+</div>
+<!-- ========================================== -->
+<!-- VARIANT B: Integrated Rail Urgency HUD     -->
+<!-- ========================================== -->
+<div class="flex flex-col bg-white rounded-2xl shadow-elevated border border-brand-border overflow-hidden transition-all duration-200">
+<!-- Tag Header -->
+
+<!-- Status Banner -->
+<div class="bg-emerald-900 text-white px-5 py-3 flex items-center justify-between shadow-inner">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-emerald-300 text-lg" style="font-variation-settings: &quot;FILL&quot; 1;">celebration</span>
+<span class="text-xs font-semibold">Tier 1 Unlocked! Flash extra 5% active</span>
+</div>
+<span class="text-emerald-300 text-xs font-bold">£1.63/ea</span>
+</div>
+<!-- Card Body -->
+<div class="p-5 flex flex-col justify-between flex-1 gap-5">
+<div class="flex flex-col gap-4">
+<!-- Price Summary -->
+<div class="flex flex-col gap-1"><div class="flex items-baseline justify-between"><div class="flex items-baseline gap-2"><span class="text-2xl font-bold text-brand-charcoal font-feature-tnum">£1.63</span><span class="text-xs text-brand-muted">/ tin</span><span class="text-xs text-brand-muted line-through font-feature-tnum">£1.69</span></div><span class="px-2.5 py-0.5 rounded-full text-xs bg-emerald-100 text-emerald-800 font-bold">Tier 1 Active (8+ Tins)</span></div><p class="text-xs text-brand-muted">Mix and match 8+ for £1.63 or 16+ for £1.55</p></div>
+<!-- Tier Chips -->
+<div class="flex flex-col gap-1.5"><div class="flex items-center justify-between text-[11px] text-brand-muted px-0.5"></div><div class="flex items-center gap-1.5 pt-1 overflow-x-auto flex-nowrap pb-1"><button class="py-1.5 px-3 rounded-lg border border-brand-border bg-white text-brand-muted font-medium text-xs text-center hover:border-brand-charcoal transition-colors shrink-0 whitespace-nowrap" type="button">1 × £1.69</button><button class="py-1.5 px-3 rounded-lg border border-emerald-600 bg-emerald-50 font-medium text-emerald-800 text-xs text-center shrink-0 whitespace-nowrap" type="button">8 × £13.00 ✓</button><button class="py-1.5 px-3 rounded-lg border-2 border-dashed border-brand-olive bg-white font-bold text-brand-olive text-xs text-center shadow-sm shrink-0 whitespace-nowrap" type="button">10 × £16.30</button><button class="py-1.5 px-3 rounded-lg border border-brand-border bg-white text-brand-muted font-medium text-xs text-center hover:border-brand-charcoal transition-colors shrink-0 whitespace-nowrap" type="button">16 × £24.80</button></div></div>
+<!-- Integrated Rail Urgency HUD Container -->
+<div class="bg-brand-surface rounded-xl p-3 border border-brand-border flex flex-col gap-2"><div class="flex items-center justify-between text-xs pt-0.5"><span class="text-brand-charcoal">You have <strong class="font-bold text-brand-charcoal">10 units</strong></span><span class="text-brand-olive font-semibold">Add 6 for £1.55/ea</span></div><div class="relative w-full py-2 my-0.5"><div class="h-1.5 w-full bg-brand-sand rounded-full overflow-hidden"><div class="h-full bg-brand-olive rounded-full" style="width: 65%;"></div></div><div class="absolute left-0 top-1/2 -translate-y-1/2 flex items-center justify-center"><div class="w-6 h-6 rounded-full bg-emerald-600 text-white shadow-sm flex items-center justify-center text-[10px] font-bold">1</div></div><div class="absolute left-[54%] top-1/2 -translate-y-1/2 -translate-x-1/2 flex items-center justify-center"><div class="w-6 h-6 rounded-full bg-emerald-600 text-white shadow-sm flex items-center justify-center text-[10px] font-bold">8</div></div><div class="absolute left-[65%] top-1/2 -translate-y-1/2 -translate-x-1/2 z-10 flex items-center justify-center"><div class="w-7 h-7 rounded-full bg-white border-2 border-brand-olive shadow flex items-center justify-center text-xs font-bold text-brand-olive">10</div></div><div class="absolute right-0 top-1/2 -translate-y-1/2 flex items-center justify-center"><div class="w-6 h-6 rounded-full bg-white border border-brand-border shadow-sm flex items-center justify-center text-[10px] text-brand-muted font-bold">16</div></div></div></div>
+<!-- Drawer Trigger -->
+<button class="w-full flex items-center justify-between py-2.5 px-3.5 rounded-xl bg-brand-surface border border-brand-border text-brand-charcoal text-xs font-semibold hover:bg-brand-sand/50 transition-colors" type="button">
+<span class="flex items-center gap-2">
+<span class="material-symbols-outlined text-base text-brand-olive">dashboard_customize</span>
+          Mix &amp; match flavours&nbsp;</span>
+<span class="material-symbols-outlined text-base text-brand-muted">expand_more</span>
+</button>
+</div>
+<!-- Actions & Stepper -->
+<div class="flex flex-col gap-3 pt-2">
+<!-- Trust Badges -->
+</div>
+</div>
+</div>
+<!-- ========================================== -->
+<!-- VARIANT C: Open Drawer State (Max Goal)    -->
+<!-- ========================================== -->
+<div class="flex flex-col bg-white rounded-2xl shadow-elevated border border-brand-border overflow-hidden transition-all duration-200">
+<!-- Tag Header -->
+
+<!-- Celebration Tag -->
+<div class="bg-brand-charcoal text-white px-5 py-3 flex items-center justify-between shadow-inner">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-amber-400 text-lg" style="font-variation-settings: &quot;FILL&quot; 1;">stars</span>
+<span class="text-xs font-bold">Tier 2 Active (£1.55/ea • Keep Adding)</span>
+</div>
+<div class="flex items-center gap-1 bg-white/15 px-2 py-0.5 rounded font-mono font-bold text-xs text-white">
+<span class="material-symbols-outlined text-xs">hourglass_top</span>
+<span class="">14:32</span>
+</div>
+</div>
+<!-- Card Body -->
+<div class="p-5 flex flex-col justify-between flex-1 gap-5">
+<div class="flex flex-col gap-4">
+<!-- Price Header -->
+<div class="flex flex-col gap-1"><div class="flex items-baseline justify-between"><div class="flex items-baseline gap-2"><span class="text-2xl font-bold text-brand-charcoal font-feature-tnum">£1.55</span><span class="text-xs text-brand-muted font-medium">/ tin</span><span class="text-xs text-brand-muted line-through font-feature-tnum">£1.69</span></div><span class="px-2.5 py-0.5 rounded-full text-xs bg-emerald-100 text-emerald-800 font-bold">Tier 2 Active (16+ • Unlimited)</span></div><p class="text-xs text-brand-muted">Mix and match 8+ for £1.63 or 16+ for £1.55</p></div><div class="flex flex-col gap-1.5"><div class="flex items-center justify-between text-[11px] text-brand-muted px-0.5"></div><div class="flex items-center gap-1.5 pt-1 overflow-x-auto flex-nowrap pb-1"><button class="py-1.5 px-3 rounded-lg border border-brand-border bg-white text-brand-muted font-medium text-xs text-center hover:border-brand-charcoal transition-colors shrink-0 whitespace-nowrap" type="button">1 × £1.69</button><button class="py-1.5 px-3 rounded-lg border border-brand-border bg-white text-brand-muted font-medium text-xs text-center hover:border-brand-charcoal transition-colors shrink-0 whitespace-nowrap" type="button">8 × £13.00</button><button class="py-1.5 px-3 rounded-lg border border-emerald-600 bg-emerald-50 font-medium text-emerald-800 text-xs text-center shrink-0 whitespace-nowrap" type="button">16 × £24.80 ✓</button><button class="py-1.5 px-3 rounded-lg border-2 border-dashed border-emerald-600 bg-emerald-50 font-bold text-emerald-800 text-xs text-center shadow-sm shrink-0 whitespace-nowrap" type="button">22 × £34.10 ★</button></div></div>
+<!-- Full Rail Display -->
+<div class="bg-brand-surface rounded-xl p-3 border border-brand-border flex flex-col gap-2"><div class="flex items-center justify-between text-xs font-medium"><span class="text-brand-charcoal">You have <strong class="font-bold text-brand-charcoal">22 units</strong> (Exceeds 16+ tier)</span><span class="text-emerald-700 font-bold flex items-center gap-1 text-[11px]"><span class="material-symbols-outlined text-sm font-bold">check_circle</span> Best Rate (£1.55/ea • Add any qty)</span></div><div class="relative w-full py-2 my-0.5"><div class="h-1.5 w-full bg-emerald-600 rounded-full"></div><div class="absolute left-0 top-1/2 -translate-y-1/2 flex items-center justify-center"><div class="w-6 h-6 rounded-full bg-emerald-800 text-white shadow-sm flex items-center justify-center text-[10px] font-bold">1</div></div><div class="absolute left-[54%] top-1/2 -translate-y-1/2 -translate-x-1/2 flex items-center justify-center"><div class="w-6 h-6 rounded-full bg-emerald-800 text-white shadow-sm flex items-center justify-center text-[10px] font-bold">8</div></div><div class="absolute right-0 top-1/2 -translate-y-1/2 flex items-center justify-center z-10"><div class="w-7 h-7 rounded-full bg-emerald-900 border-2 border-white text-white shadow flex items-center justify-center text-xs font-bold">16</div></div></div></div>
+<!-- Expanded Mix & Match Drawer Section -->
+<div class="bg-brand-surface rounded-xl p-3.5 border border-brand-border flex flex-col gap-3">
+<div class="flex items-center justify-between pb-1 border-b border-brand-border/60">
+<span class="text-xs text-brand-charcoal flex items-center gap-1.5 font-bold"><span class="material-symbols-outlined text-sm text-brand-olive">tune</span> Mix &amp; match flavours&nbsp;</span>
+<span class="text-xs text-brand-muted font-semibold cursor-pointer hover:text-brand-charcoal transition-colors">
+            ▲ Collapse
+          </span>
+</div>
+<!-- Product Item 1: Chicken & Salmon -->
+<div class="flex items-center justify-between p-2.5 rounded-xl bg-white border border-brand-border shadow-sm">
+<div class="flex items-center gap-2.5 min-w-0">
+<img class="w-10 h-10 rounded-lg object-cover bg-brand-surface flex-shrink-0 border border-brand-border" data-alt="Close up photograph of a gourmet cat food tin with chicken and salmon label on clean cream neutral kitchen counter, soft daylight studio product photography" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBmhH5F4LEWbVwmdiUC6QgSeVHzXpms1H5M1V3z5ck8eauN_whSknS2Uro_ZD1Ehy9OG8_ukqGQrRcuD6hsFYaf76dX9Rt6ULpoVoxESSPoNz6Rx5HuUQGYd30brf6WY-PFOT58cnbmy4NRPoMJz2WOsKAuYH2IBOGd1DTEP5Ppsw27jjvCyNGfXGy5sXO4fyUASF1iCssAv5WizOpEssSHa_4BGNCS0BrO_IFK7owUGJI55-q2mOjX">
+<div class="truncate">
+<div class="text-xs font-bold text-brand-charcoal truncate">Chicken &amp; Salmon 85g</div>
+<div class="text-[11px] text-brand-muted font-feature-tnum">£1.55 / tin</div>
+</div>
+</div>
+<button class="inline-flex items-center justify-center px-2.5 py-1 rounded-md bg-white hover:bg-brand-sand/50 text-brand-charcoal border border-brand-border text-xs font-medium shadow-sm transition-colors flex-shrink-0" type="button">+ Add</button>
+</div>
+<!-- Product Item 2: Chicken & Herring -->
+<div class="flex items-center justify-between p-2.5 rounded-xl bg-white border border-brand-border shadow-sm">
+<div class="flex items-center gap-2.5 min-w-0">
+<img class="w-10 h-10 rounded-lg object-cover bg-brand-surface flex-shrink-0 border border-brand-border" data-alt="Studio photograph of a premium cat food tin with fresh chicken and herring illustration on artisanal matte packaging, warm studio lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDt0Uhat6HgS-C49TfelsF78B3FfNLiJBYaDUi61THCZKvmYLDOoKjWswV-l1KSf1J9IVABybI9K7j1EBa3ms6gOpCBq8aFDAY_EGocunripD-ca4zX51QOMUjV856_Str8IKgkwCtYxkrNbIrnoImkmFvfmT8m4Odp3vN9YfoTww_Q_Cw6499uwHiTSSzW8EVpk6SgBj5Fm-0-JpHGQ_Frlf4rmhxevigoIixb25tWwpfLqx59qRXN">
+<div class="truncate">
+<div class="text-xs font-bold text-brand-charcoal truncate">Chicken &amp; Herring 85g</div>
+<div class="text-[11px] text-brand-muted font-feature-tnum">£1.55 / tin</div>
+</div>
+</div>
+<button class="inline-flex items-center justify-center px-2.5 py-1 rounded-md bg-white hover:bg-brand-sand/50 text-brand-charcoal border border-brand-border text-xs font-medium shadow-sm transition-colors flex-shrink-0" type="button">+ Add</button>
+</div>
+<!-- Product Item 3: Chicken & Turkey -->
+<div class="flex items-center justify-between p-2.5 rounded-xl bg-white border border-brand-border shadow-sm">
+<div class="flex items-center gap-2.5 min-w-0">
+<img class="w-10 h-10 rounded-lg object-cover bg-brand-surface flex-shrink-0 border border-brand-border" data-alt="Elegant tin of organic cat food with roast turkey motif, modern minimalist packaging on warm stone background with soft shadows" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBelgrH1JpTs0sU-73JTdhghAzrC03muy7woXaBi70rx6jK-urlI0Y9NFPSls237Sl9omVn-VO_MFBxpGItcT0Ulhz3DWGLQkOg3Toc9rvC6YRwJqZRzQY-1-6-M6SPL_2bdKS7cCQCHBolYgAsYlkVbySvK9KOV95HF9Oql1_5r-cxUDxsGjC3pDSr0c4E9d2VB2qyfNgxXisRVledPbwYKGyaUdUIdgAAONRAUA_i3JRxF7NuQzMq">
+<div class="truncate">
+<div class="text-xs font-bold text-brand-charcoal truncate">Chicken &amp; Turkey 85g</div>
+<div class="text-[11px] text-brand-muted font-feature-tnum">£1.55 / tin</div>
+</div>
+</div>
+<button class="inline-flex items-center justify-center px-2.5 py-1 rounded-md bg-white hover:bg-brand-sand/50 text-brand-charcoal border border-brand-border text-xs font-medium shadow-sm transition-colors flex-shrink-0" type="button">+ Add</button>
+</div>
+</div>
+</div>
+<!-- Actions & Stepper -->
+</div>
+</div>
+</div>
+<!-- Bottom Rationale & Implementation Guide -->
+<div class="mt-16 pt-8 border-t border-brand-border flex flex-col gap-6">
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-2">
+<div>
+<h3 class="text-xl font-bold text-brand-charcoal font-serif">Architecture Rationale &amp; Merchant Strategy</h3>
+<p class="text-sm text-brand-muted mt-1">Key behavioral drivers and performance trade-offs across the 3 flash urgency placements.</p>
+</div>
+<span class="self-start md:self-auto px-3.5 py-1 rounded-full bg-white border border-brand-border text-brand-muted text-xs font-semibold shadow-subtle">
+      Conversion Audit 2025
+    </span>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+<!-- Card 1 -->
+<div class="bg-white p-6 rounded-2xl border border-brand-border shadow-subtle flex flex-col gap-3">
+<div class="w-10 h-10 rounded-xl bg-brand-surface border border-brand-border flex items-center justify-center text-brand-olive mb-1">
+<span class="material-symbols-outlined text-xl">psychology</span>
+</div>
+<h4 class="text-base font-bold text-brand-charcoal font-serif">Placement Psychology</h4>
+<p class="text-xs text-brand-muted leading-relaxed">Combines 3-step volume discounts (1 → 8 → 16+ Tins) with an intuitive progress track and promotional countdown timers matching the tier structure: Mix and match 8+ for £1.63 or 16+ for £1.55.</p>
+</div>
+<!-- Card 2 -->
+<div class="bg-white p-6 rounded-2xl border border-brand-border shadow-subtle flex flex-col gap-3">
+<div class="w-10 h-10 rounded-xl bg-brand-surface border border-brand-border flex items-center justify-center text-brand-olive mb-1">
+<span class="material-symbols-outlined text-xl">layers</span>
+</div>
+<h4 class="text-base font-bold text-brand-charcoal font-serif">Discount Stacking Logic</h4>
+<p class="text-xs text-brand-muted leading-relaxed">Combines 3-step volume discounts (1 → 8 → 16+ Tins) with an intuitive progress track and promotional countdown timers matching the tier structure: Mix and match 8+ for £1.63 or 16+ for £1.55.</p>
+</div>
+<!-- Card 3 -->
+<div class="bg-white p-6 rounded-2xl border border-brand-border shadow-subtle flex flex-col gap-3">
+<div class="w-10 h-10 rounded-xl bg-brand-surface border border-brand-border flex items-center justify-center text-brand-olive mb-1">
+<span class="material-symbols-outlined text-xl">touch_app</span>
+</div>
+<h4 class="text-base font-bold text-brand-charcoal font-serif">Storefront Ergonomics</h4>
+<p class="text-xs text-brand-muted leading-relaxed">Combines 3-step volume discounts (1 → 8 → 16+ Tins) with an intuitive progress track and promotional countdown timers matching the tier structure: Mix and match 8+ for £1.63 or 16+ for £1.55.</p>
+</div>
+</div>
+</div>
+<!-- Micro-interaction JS for live seconds ticking visual effect -->
+<script>
+    (function() {
+      let secondsA = 39;
+      const elTick = document.querySelector('.timer-tick');
+      if (elTick) {
+        setInterval(function() {
+          secondsA = secondsA > 0 ? secondsA - 1 : 59;
+          elTick.textContent = secondsA < 10 ? '0' + secondsA : secondsA;
+        }, 1000);
+      }
+    })();
+  </script>
+</div>
+</main>
+<!-- END: Main Showcase Board -->
+<footer class="border-t border-brand-border bg-brand-cream/80 py-8 text-center text-xs text-brand-muted">
+  Interactive Component Exploration Board • Built for Desktop Presentation
+</footer>
+
+
+</body></html>
