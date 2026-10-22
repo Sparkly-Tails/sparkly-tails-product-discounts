@@ -4,7 +4,9 @@ import {
   buildTierRow,
   buildTimeRow,
   describeTierRules,
+  describeFlashSchedule,
   describeTimeSchedule,
+  joinRuleTexts,
   listTierSteps,
   pickRowSubtitle,
   pickRowTitle,
@@ -151,5 +153,41 @@ describe('buildDiscountRows', () => {
     ]
     const timeRows = [buildTimeRow({ discountId: 'c', title: 'C', schedule: '', statusLabel: 'Active', pickTitle: pickRowTitle })]
     expect(buildDiscountRows({ tierRows, timeRows }).map((row) => row.key)).toEqual(['tier:a', 'tier:b', 'time:c'])
+  })
+})
+
+describe('describeFlashSchedule', () => {
+  const base = { startsAt: '2026-11-27T09:00', endsAt: '2026-11-30T23:59', formatDate }
+
+  it('shows the whole window with the state of the sale', () => {
+    expect(describeFlashSchedule({ ...base, flashStatus: 'Upcoming' })).toBe('Flash sale: Nov 27, 2026 - Nov 30, 2026 (Upcoming)')
+    expect(describeFlashSchedule({ ...base, flashStatus: 'Active' })).toBe('Flash sale: Nov 27, 2026 - Nov 30, 2026 (Active)')
+    expect(describeFlashSchedule({ ...base, flashStatus: 'Ended' })).toBe('Flash sale: Nov 27, 2026 - Nov 30, 2026 (Ended)')
+  })
+})
+
+describe('joinRuleTexts', () => {
+  it('joins the texts with a dot and skips an empty one', () => {
+    expect(joinRuleTexts({ parts: ['3+ units (10% off)', 'Flash sale: Nov 27, 2026 - Nov 30, 2026 (Active)'] })).toBe('3+ units (10% off) · Flash sale: Nov 27, 2026 - Nov 30, 2026 (Active)')
+    expect(joinRuleTexts({ parts: ['3+ units (10% off)', ''] })).toBe('3+ units (10% off)')
+  })
+})
+
+describe('buildTierRow for a flash sale', () => {
+  const base = { discountId: 'd1', name: 'Salmon Oil', title: '', status: 'live' as const, rules: '3+ units (10% off) · Flash sale', pickTitle: pickRowTitle, pickSubtitle: pickRowSubtitle }
+
+  it('is active only while a live sale is Active', () => {
+    expect(buildTierRow({ ...base, flashStatus: 'Active' }).isActive).toBe(true)
+    expect(buildTierRow({ ...base, flashStatus: 'Upcoming' }).isActive).toBe(false)
+    expect(buildTierRow({ ...base, flashStatus: 'Ended' }).isActive).toBe(false)
+  })
+
+  it('is never active as a draft, even inside the window', () => {
+    expect(buildTierRow({ ...base, status: 'draft', flashStatus: 'Active' }).isActive).toBe(false)
+  })
+
+  it('stays as before for a discount that is not a flash sale', () => {
+    expect(buildTierRow({ ...base, flashStatus: null }).isActive).toBe(true)
+    expect(buildTierRow(base).isActive).toBe(true)
   })
 })

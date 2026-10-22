@@ -5,6 +5,12 @@ import { redirect } from 'next/navigation'
 import { syncDiscountMetafields, clearDiscountMetafields } from '@/lib/product-tiers'
 import { getMemberInfo } from '@/lib/products'
 import { ensureTierDiscount } from '@/lib/tierDiscount'
+import { shopifyQuery } from '@/lib/shopify-client'
+import { getShopTimezone, zonedTimeToUtc } from '@/lib/shop'
+import { fetchAvailabilityConfigs, isAvailableEverywhere } from '@/lib/discount-availability'
+import { parseFlashFromForm, parseHighDemandFromForm } from '@/flash/formFields'
+import { SCHEDULE_CHECKS, describeMissingTime, describeScheduleProblem, formatShopLocalNow } from '@/flash/schedule'
+import { DISCOUNT_RECORD_TOOLS, syncDiscountRecord } from '@/flash/discountRecord'
 
 function parseTiersFromForm(formData: FormData, pricingMode: 'percent' | 'fixed'): Tier[] {
   const tiers: Tier[] = []
@@ -78,6 +84,58 @@ async function assertMembersAvailable(members: DiscountMember[], excludeDiscount
   }
 }
 
+/** The shop's current local time (YYYY-MM-DDTHH:mm) in its own timezone. */
+async function readShopNow(): Promise<{ timeZone: string; nowLocal: string }> {
+  const timeZone = await getShopTimezone()
+  return { timeZone, nowLocal: formatShopLocalNow({ timeZone, now: new Date() }) }
+}
+
+/** Throws the message for a flash window that cannot be saved: a time missing, bad order or year, or an end that has passed. */
+function assertFlashWindow(flash: { startsAt: string; endsAt: string }, nowLocal: string): void {
+  const problem = describeMissingTime(flash) ?? describeScheduleProblem({ ...flash, nowLocal, checks: SCHEDULE_CHECKS })
+  if (problem) throw new Error(problem)
+}
+
+/** Like assertMembersAvailable, but across both kinds of discount (a time-based discount may have taken a product since). */
+async function assertMembersAvailableEverywhere(members: DiscountMember[], discountId: string): Promise<void> {
+  const { productConfig, timeConfig } = await fetchAvailabilityConfigs()
+  for (const member of members) {
+    if (!isAvailableEverywhere(productConfig, timeConfig, member.productId, member.variantId, discountId)) {
+      throw new Error(`${member.productId}${member.variantId ? ` (variant ${member.variantId})` : ''} already belongs to another discount`)
+    }
+  }
+}
+
+/** A live flash sale, or any discount that still has a Shopify discount to delete, needs its Shopify discount brought in step. */
+function needsRecordSync(discount: Discount, previousRecordId: string | undefined): boolean {
+  return (discount.status === 'live' && discount.flash !== undefined) || previousRecordId !== undefined
+}
+
+/**
+ * Brings the Shopify discount of the flash sale in step with the discount as it
+ * is now (in memory, not saved yet) and stores the id it returns on the
+ * discount. Shopify is changed BEFORE the config is saved, so a refusal (the
+ * limit, a bad window) throws with nothing saved: the stored discount stays as
+ * it was.
+ */
+async function syncRecordOf(discount: Discount, previousRecordId: string | undefined): Promise<void> {
+  const { timeZone, nowLocal } = await readShopNow()
+  const recordId = await syncDiscountRecord({
+    query: shopifyQuery,
+    discountId: discount.discountId,
+    title: discount.title,
+    status: discount.status,
+    flash: discount.flash ? { startsAt: discount.flash.startsAt, endsAt: discount.flash.endsAt } : undefined,
+    shopifyDiscountId: previousRecordId,
+    nowLocal,
+    convertToUtc: (naive) => zonedTimeToUtc(naive, timeZone),
+    tools: DISCOUNT_RECORD_TOOLS,
+  })
+  if (!discount.flash) return
+  if (recordId) discount.flash.shopifyDiscountId = recordId
+  else delete discount.flash.shopifyDiscountId
+}
+
 export async function createDiscount(formData: FormData): Promise<void> {
   const name = String(formData.get('name') ?? '').trim()
   if (!name) throw new Error('A name is required')
@@ -92,6 +150,10 @@ export async function createDiscount(formData: FormData): Promise<void> {
   const tiers = parseTiersFromForm(formData, pricingMode)
   if (tiers.length === 0) throw new Error('At least one tier is required')
 
+  const flash = parseFlashFromForm({ formData })
+  if (flash) assertFlashWindow(flash, (await readShopNow()).nowLocal)
+  const highDemand = parseHighDemandFromForm({ formData })
+
   await assertMembersAvailable(members)
   await assertPricingAllowed(members, pricingMode, tiers)
 
@@ -100,7 +162,7 @@ export async function createDiscount(formData: FormData): Promise<void> {
 
   const config = await getConfig()
   const discountId = `disc_${crypto.randomUUID()}`
-  const newDiscount: Discount = { discountId, name, title, status: 'draft', pricingMode, members, tiers }
+  const newDiscount: Discount = { discountId, name, title, status: 'draft', pricingMode, members, tiers, ...(flash ? { flash } : {}), ...(highDemand ? { highDemand } : {}) }
   await saveConfig({ discounts: [...config.discounts, newDiscount] })
 
   redirect(`/discounts/${encodeURIComponent(discountId)}`)
@@ -167,6 +229,7 @@ export async function updateDiscountTitle(discountId: string, formData: FormData
   const discount = findDiscountOrThrow(config, discountId)
 
   discount.title = title
+  if (needsRecordSync(discount, discount.flash?.shopifyDiscountId)) await syncRecordOf(discount, discount.flash?.shopifyDiscountId)
   await saveConfig(config)
 
   if (discount.status === 'live') {
@@ -179,8 +242,15 @@ export async function updateDiscountTitle(discountId: string, formData: FormData
 export async function setDiscountStatus(discountId: string, status: 'draft' | 'live'): Promise<void> {
   const config = await getConfig()
   const discount = findDiscountOrThrow(config, discountId)
+  const previousRecordId = discount.flash?.shopifyDiscountId
+
+  if (status === 'live' && discount.flash) {
+    assertFlashWindow(discount.flash, (await readShopNow()).nowLocal)
+    await assertMembersAvailableEverywhere(discount.members, discountId)
+  }
 
   discount.status = status
+  if (needsRecordSync(discount, previousRecordId)) await syncRecordOf(discount, previousRecordId)
   await saveConfig(config)
 
   if (status === 'live') {
@@ -196,10 +266,45 @@ export async function deleteDiscount(discountId: string): Promise<void> {
   const config = await getConfig()
   const discount = findDiscountOrThrow(config, discountId)
 
+  const previousRecordId = discount.flash?.shopifyDiscountId
+  if (previousRecordId) await syncRecordOf({ ...discount, status: 'draft', flash: undefined }, previousRecordId)
+
   const remaining = config.discounts.filter((d) => d.discountId !== discountId)
   await saveConfig({ discounts: remaining })
 
   await clearDiscountMetafields(discount.members)
 
   redirect('/')
+}
+
+export async function updateDiscountFlash(discountId: string, formData: FormData): Promise<void> {
+  const flash = parseFlashFromForm({ formData })
+  if (flash) assertFlashWindow(flash, (await readShopNow()).nowLocal)
+
+  const config = await getConfig()
+  const discount = findDiscountOrThrow(config, discountId)
+  const previousRecordId = discount.flash?.shopifyDiscountId
+
+  if (flash) discount.flash = { ...flash, ...(previousRecordId ? { shopifyDiscountId: previousRecordId } : {}) }
+  else delete discount.flash
+
+  if (needsRecordSync(discount, previousRecordId)) await syncRecordOf(discount, previousRecordId)
+  await saveConfig(config)
+
+  if (discount.status === 'live') await syncDiscountMetafields(discount)
+
+  redirect(`/discounts/${encodeURIComponent(discountId)}`)
+}
+
+export async function updateDiscountHighDemand(discountId: string, formData: FormData): Promise<void> {
+  const config = await getConfig()
+  const discount = findDiscountOrThrow(config, discountId)
+
+  if (parseHighDemandFromForm({ formData })) discount.highDemand = true
+  else delete discount.highDemand
+  await saveConfig(config)
+
+  if (discount.status === 'live') await syncDiscountMetafields(discount)
+
+  redirect(`/discounts/${encodeURIComponent(discountId)}`)
 }

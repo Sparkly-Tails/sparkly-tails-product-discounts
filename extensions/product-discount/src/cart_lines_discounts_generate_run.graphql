@@ -26,5 +26,8 @@ query Input {
   }
   discount {
     discountClasses
+    metafield(namespace: "$app:smooth_discount", key: "flash_record") {
+      jsonValue
+    }
   }
 }

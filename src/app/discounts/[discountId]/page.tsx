@@ -2,7 +2,11 @@ import { notFound } from 'next/navigation'
 import { getConfig, pricesUniform } from '@/lib/config'
 import { getMemberInfo } from '@/lib/products'
 import { resultingPrice, totalAtThreshold, clampedFixedPrice, totalAtThresholdFixed } from '@/lib/tier-math'
-import { updateDiscountMembers, updateDiscountTiers, updateDiscountTitle, setDiscountStatus, deleteDiscount } from '@/actions/discountActions'
+import { updateDiscountMembers, updateDiscountTiers, updateDiscountTitle, setDiscountStatus, deleteDiscount, updateDiscountFlash, updateDiscountHighDemand } from '@/actions/discountActions'
+import { getShopTimezone, zonedTimeToUtc } from '@/lib/shop'
+import { formatShopLocalNow } from '@/flash/schedule'
+import { computeLocalFlashStatus, describeFlashState, DISCOUNT_STATE_TOOLS } from '@/flash/discountState'
+import FlashSaleFields from '@/flash/components/FlashSaleFields'
 import MemberPicker from '@/components/MemberPicker'
 import TierFields from '@/components/TierFields'
 import FixedPriceTierFields from '@/components/FixedPriceTierFields'
@@ -30,6 +34,15 @@ export default async function DiscountPage({
   const goLive = setDiscountStatus.bind(null, discountId, 'live')
   const goDraft = setDiscountStatus.bind(null, discountId, 'draft')
   const remove = deleteDiscount.bind(null, discountId)
+  const updateFlashWithId = updateDiscountFlash.bind(null, discountId)
+  const updateHighDemandWithId = updateDiscountHighDemand.bind(null, discountId)
+
+  const shopTimezone = await getShopTimezone()
+  const now = new Date()
+  const flashStatus = discount.flash
+    ? computeLocalFlashStatus({ startsAt: discount.flash.startsAt, endsAt: discount.flash.endsAt, timeZone: shopTimezone, nowMs: now.getTime(), convertToUtc: zonedTimeToUtc, tools: DISCOUNT_STATE_TOOLS })
+    : null
+  const flashState = describeFlashState({ discountStatus: discount.status, flashStatus })
 
   return (
     <main className="p-8 max-w-2xl mx-auto">
@@ -43,6 +56,7 @@ export default async function DiscountPage({
       <h1 className="text-2xl font-semibold mb-2">{discount.name}</h1>
       <p className="text-sm text-muted mb-6">
         {discount.status} · {discount.pricingMode === 'fixed' ? 'Fixed price' : 'Percentage'}
+        {flashState && <> · <span data-testid="flash-state">{flashState}</span></>}
       </p>
 
       <section className="mb-8">
@@ -105,6 +119,39 @@ export default async function DiscountPage({
             className="bg-surface border border-line hover:bg-line px-4 py-3 rounded text-sm transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           >
             Save tiers
+          </button>
+        </form>
+      </section>
+
+      <section className="mb-8">
+        <h2 className="font-medium mb-2">Flash sale</h2>
+        <form action={updateFlashWithId} className="space-y-3">
+          <FlashSaleFields
+            shopTimezone={shopTimezone}
+            nowLocal={formatShopLocalNow({ timeZone: shopTimezone, now })}
+            initial={{ enabled: discount.flash !== undefined, startsAt: discount.flash?.startsAt ?? '', endsAt: discount.flash?.endsAt ?? '', showTeaser: discount.flash?.showTeaser ?? true }}
+          />
+          <button
+            type="submit"
+            className="bg-surface border border-line hover:bg-line px-4 py-3 rounded text-sm transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          >
+            Save flash sale
+          </button>
+        </form>
+      </section>
+
+      <section className="mb-8">
+        <h2 className="font-medium mb-2">High Demand tag</h2>
+        <form action={updateHighDemandWithId} className="space-y-3">
+          <label className="flex items-center gap-2 text-sm">
+            <input name="highDemand" type="checkbox" defaultChecked={discount.highDemand === true} />
+            Show the High Demand tag
+          </label>
+          <button
+            type="submit"
+            className="bg-surface border border-line hover:bg-line px-4 py-3 rounded text-sm transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          >
+            Save High Demand tag
           </button>
         </form>
       </section>
