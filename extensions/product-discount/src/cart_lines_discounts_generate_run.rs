@@ -30,12 +30,54 @@ pub struct Member {
     variant_id: Option<String>,
 }
 
+/// Present on a discount that runs as a flash sale. Only its presence matters
+/// here: the sale window is enforced by Shopify itself, through the start and
+/// end of the Shopify discount that runs this Function for the sale.
+#[derive(Deserialize, Default, PartialEq)]
+#[shopify_function(rename_all = "camelCase")]
+pub struct FlashMarker {
+    #[shopify_function(default)]
+    starts_at: Option<String>,
+    #[shopify_function(default)]
+    ends_at: Option<String>,
+}
+
 #[derive(Deserialize, Default, PartialEq)]
 #[shopify_function(rename_all = "camelCase")]
 pub struct DiscountConfig {
+    /// The id the admin gave the discount; a flash record names it.
+    #[shopify_function(default)]
+    discount_id: String,
     status: String,
     members: Vec<Member>,
     tiers: Vec<Tier>,
+    /// Present when the discount is a flash sale.
+    #[shopify_function(default)]
+    flash: Option<FlashMarker>,
+}
+
+/// The config of the Shopify discount (record) that runs this Function for one
+/// flash sale: which discount of the shop config it applies. The shared tier
+/// discount has no such config.
+#[derive(Deserialize, Default, PartialEq)]
+#[shopify_function(rename_all = "camelCase")]
+pub struct RecordConfig {
+    discount_id: String,
+}
+
+/// The live discounts one run applies. A flash record applies only the live
+/// discount it names (nothing if that discount is draft, gone or not named);
+/// the shared discount (no record config) applies every live discount that is
+/// not a flash sale, so a flash sale never runs outside its own record.
+pub fn select_discounts<'a>(discounts: &'a [DiscountConfig], record: Option<&RecordConfig>) -> Vec<&'a DiscountConfig> {
+    discounts
+        .iter()
+        .filter(|d| d.status == "live")
+        .filter(|d| match record {
+            Some(record) => d.discount_id == record.discount_id,
+            None => d.flash.is_none(),
+        })
+        .collect()
 }
 
 #[derive(Deserialize, Default, PartialEq)]
@@ -101,7 +143,9 @@ fn cart_lines_discounts_generate_run(
 
     let mut candidates = vec![];
 
-    for discount in config.discounts.iter().filter(|d| d.status == "live") {
+    let record: Option<&RecordConfig> = input.discount().metafield().map(|metafield| metafield.json_value());
+
+    for discount in select_discounts(&config.discounts, record) {
         let mut line_ids = vec![];
         let mut line_quantities: Vec<i32> = vec![];
         let mut line_unit_price: Option<f64> = None;
@@ -1913,6 +1957,138 @@ mod tests {
             }
             _ => panic!("expected ProductDiscountsAdd"),
         }
+        Ok(())
+    }
+
+    // ---- flash sales: which discounts a record applies --------------------
+
+    fn discount(id: &str, status: &str, flash: bool) -> DiscountConfig {
+        DiscountConfig {
+            discount_id: id.to_string(),
+            status: status.to_string(),
+            flash: if flash { Some(FlashMarker::default()) } else { None },
+            ..Default::default()
+        }
+    }
+
+    fn ids(selected: &[&DiscountConfig]) -> Vec<String> {
+        selected.iter().map(|d| d.discount_id.clone()).collect()
+    }
+
+    #[test]
+    fn without_a_record_selects_live_discounts_that_are_not_flash_sales() {
+        let discounts = vec![
+            discount("regular", "live", false),
+            discount("flash", "live", true),
+            discount("draft", "draft", false),
+        ];
+        assert_eq!(ids(&select_discounts(&discounts, None)), vec!["regular"]);
+    }
+
+    #[test]
+    fn with_a_record_selects_only_the_discount_it_names() {
+        let discounts = vec![
+            discount("regular", "live", false),
+            discount("flash", "live", true),
+            discount("other-flash", "live", true),
+        ];
+        let record = RecordConfig { discount_id: "flash".to_string() };
+        assert_eq!(ids(&select_discounts(&discounts, Some(&record))), vec!["flash"]);
+    }
+
+    #[test]
+    fn a_record_naming_a_draft_discount_selects_nothing() {
+        let discounts = vec![discount("flash", "draft", true)];
+        let record = RecordConfig { discount_id: "flash".to_string() };
+        assert!(select_discounts(&discounts, Some(&record)).is_empty());
+    }
+
+    #[test]
+    fn a_record_naming_an_unknown_discount_selects_nothing() {
+        let discounts = vec![discount("flash", "live", true), discount("regular", "live", false)];
+        let record = RecordConfig { discount_id: "deleted".to_string() };
+        assert!(select_discounts(&discounts, Some(&record)).is_empty());
+    }
+
+    #[test]
+    fn a_record_can_name_a_live_discount_even_if_it_has_no_flash_marker() {
+        // the admin decides which discounts get a record; the Function only follows the name
+        let discounts = vec![discount("regular", "live", false)];
+        let record = RecordConfig { discount_id: "regular".to_string() };
+        assert_eq!(ids(&select_discounts(&discounts, Some(&record))), vec!["regular"]);
+    }
+
+    const TWO_DISCOUNTS_INPUT: &str = r#"{
+        "cart": {
+            "lines": [
+                {
+                    "id": "gid://shopify/CartLine/0",
+                    "quantity": 5,
+                    "cost": { "amountPerQuantity": { "amount": "10.00" } },
+                    "merchandise": { "__typename": "ProductVariant", "id": "gid://shopify/ProductVariant/901", "product": { "id": "gid://shopify/Product/1" } }
+                },
+                {
+                    "id": "gid://shopify/CartLine/1",
+                    "quantity": 5,
+                    "cost": { "amountPerQuantity": { "amount": "10.00" } },
+                    "merchandise": { "__typename": "ProductVariant", "id": "gid://shopify/ProductVariant/902", "product": { "id": "gid://shopify/Product/2" } }
+                }
+            ]
+        },
+        "shop": {
+            "metafield": {
+                "jsonValue": {
+                    "discounts": [
+                        { "discountId": "regular", "status": "live", "members": [{ "productId": "gid://shopify/Product/1" }], "tiers": [{ "minQty": 5, "percentOff": 10.0 }] },
+                        { "discountId": "flash", "status": "live", "flash": { "startsAt": "2026-11-27T09:00", "endsAt": "2026-11-30T23:59" }, "members": [{ "productId": "gid://shopify/Product/2" }], "tiers": [{ "minQty": 5, "percentOff": 20.0 }] }
+                    ]
+                }
+            }
+        },
+        "discount": __DISCOUNT__
+    }"#;
+
+    fn percentages(result: &schema::CartLinesDiscountsGenerateRunResult) -> Vec<f64> {
+        match result.operations.first() {
+            Some(schema::CartOperation::ProductDiscountsAdd(op)) => op
+                .candidates
+                .iter()
+                .map(|c| match &c.value {
+                    schema::ProductDiscountCandidateValue::Percentage(p) => p.value.0,
+                    _ => panic!("expected a Percentage value"),
+                })
+                .collect(),
+            _ => vec![],
+        }
+    }
+
+    #[test]
+    fn the_shared_discount_applies_the_regular_discount_and_not_the_flash_sale() -> Result<()> {
+        let input = TWO_DISCOUNTS_INPUT.replace("__DISCOUNT__", r#"{ "discountClasses": ["PRODUCT"], "metafield": null }"#);
+        let result = run_function_with_input(cart_lines_discounts_generate_run, &input)?;
+        assert_eq!(percentages(&result), vec![10.0]);
+        Ok(())
+    }
+
+    #[test]
+    fn a_flash_record_applies_only_the_flash_sale_it_names() -> Result<()> {
+        let input = TWO_DISCOUNTS_INPUT.replace(
+            "__DISCOUNT__",
+            r#"{ "discountClasses": ["PRODUCT"], "metafield": { "jsonValue": { "discountId": "flash" } } }"#,
+        );
+        let result = run_function_with_input(cart_lines_discounts_generate_run, &input)?;
+        assert_eq!(percentages(&result), vec![20.0]);
+        Ok(())
+    }
+
+    #[test]
+    fn a_flash_record_for_a_deleted_discount_applies_nothing() -> Result<()> {
+        let input = TWO_DISCOUNTS_INPUT.replace(
+            "__DISCOUNT__",
+            r#"{ "discountClasses": ["PRODUCT"], "metafield": { "jsonValue": { "discountId": "deleted" } } }"#,
+        );
+        let result = run_function_with_input(cart_lines_discounts_generate_run, &input)?;
+        assert!(result.operations.is_empty());
         Ok(())
     }
 }
