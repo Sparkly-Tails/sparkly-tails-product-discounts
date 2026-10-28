@@ -114,8 +114,9 @@ describe('flash sale in the tier widget', () => {
     // the price now, and the price from the start (the most discounted tier)
     const nowLabel = document.querySelector('[data-tier-pricing-now-label]') as HTMLElement
     expect([nowLabel.hidden, nowLabel.textContent]).toEqual([false, 'It is now:'])
-    expect((document.querySelector('[data-tier-pricing-promo]') as HTMLElement).textContent).toBe('Get it from: £1.55')
-    expect(widget().textContent).not.toMatch(/1\.63/) // no middle tier price
+    expect((document.querySelector('[data-tier-pricing-promo]') as HTMLElement).textContent).toBe('Get it from: £1.69') // 3 units: below the first tier
+    await setQuantity(16)
+    expect((document.querySelector('[data-tier-pricing-promo]') as HTMLElement).textContent).toBe('Get it from: £1.55') // 16 units: the top tier
   })
 
   it('before the start with the teaser off: no bar and no card, only the plain price', async () => {

@@ -115,16 +115,26 @@ test('computeWidgetViewModel: the teaser shows the bar, the plain price and the 
   assert.equal(vm.semantics.valueText, '9 of 16 units. Tier prices start with the sale.')
 })
 
-test('computeWidgetViewModel: the teaser says what the price is now and what it will be from the most discounted tier', () => {
-  const vm = flashVm({ nowSeconds: START - 600 })
-  assert.deepEqual([vm.priceLabel, vm.plainPrice, vm.promoLine], ['It is now:', '£1.69', 'Get it from: £1.55'])
+test('computeWidgetViewModel: the teaser says the price now and the price from the start for the selected quantity', () => {
+  const vm = flashVm({ nowSeconds: START - 600, addingQty: 9 })
+  // 9 units reach the 8+ tier: £1.63 each once the sale starts
+  assert.deepEqual([vm.priceLabel, vm.plainPrice, vm.promoLine], ['It is now:', '£1.69', 'Get it from: £1.63'])
 })
 
-test('computeWidgetViewModel: the "from" price is the unit price of the top tier, an anchor price included', () => {
-  const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 8, percentOff: 3.5503, anchorPrice: 13 }, { minQty: 16, percentOff: 8.284, anchorPrice: 24.8 }]
-  assert.equal(flashVm({ nowSeconds: START - 600, tiers }).promoLine, 'Get it from: £1.55')
-  const single = [{ minQty: 1, percentOff: 0 }, { minQty: 8, fixedPrice: 1.63 }]
-  assert.equal(flashVm({ nowSeconds: START - 600, tiers: single }).promoLine, 'Get it from: £1.63')
+test('computeWidgetViewModel: the "from" price follows the quantity (page plus cart) through the tiers', () => {
+  const from = (quantity, over = {}) => flashVm({ nowSeconds: START - 600, addingQty: quantity, ...over }).promoLine
+  assert.deepEqual([1, 7, 8, 15, 16, 22].map((quantity) => from(quantity)), [
+    'Get it from: £1.69', 'Get it from: £1.69', 'Get it from: £1.63', 'Get it from: £1.63', 'Get it from: £1.55', 'Get it from: £1.55',
+  ])
+  assert.equal(from(1, { otherQty: 8 }), 'Get it from: £1.63') // 8 in the cart already, 1 on the page: 9 units
+})
+
+test('computeWidgetViewModel: an anchor tier prices the whole quantity (the total divided by the units)', () => {
+  const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 2, percentOff: 5, anchorPrice: 6 }, { minQty: 4, percentOff: 10, anchorPrice: 5 }]
+  const from = (quantity) => computeWidgetViewModel({
+    tiers, basePrice: 7.3, otherQty: 0, addingQty: quantity, isGroup: false, flash: { startsAtUnix: START, endsAtUnix: END, showTeaser: true }, nowSeconds: START - 600, formatMoney: fmt,
+  }).promoLine
+  assert.deepEqual([1, 2, 3, 4].map(from), ['Get it from: £7.30', 'Get it from: £3.00', 'Get it from: £4.31', 'Get it from: £1.25'])
 })
 
 test('computeWidgetViewModel: a running sale has no "It is now" label and keeps its promo line', () => {

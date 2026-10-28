@@ -476,14 +476,15 @@ function computeWidgetViewModel({ tiers, basePrice, compareAtPrice, otherQty, ad
       }),
       discountedPrice: null,
       plainPrice,
-      // "It is now: £1.69" and, from the start, "Get it from: £1.55" (the unit price of the most discounted tier).
+      // "It is now: £1.69" and, from the start, "Get it from: £1.63": the unit price the tiers give the quantity
+      // selected now (page plus cart), the same price the running sale shows. Below the first tier it is the plain price.
       priceLabel: 'It is now:',
       progressState,
       chips: [],
       tag: null,
       offerState: 'progress',
       dot: computeProgressDot(sortTiersByMinQty(tiers), quantity),
-      promoLine: 'Get it from: ' + formatMoneyFn(unitPriceAtTier(basePrice, sortTiersByMinQty(tiers)[tiers.length - 1])),
+      promoLine: 'Get it from: ' + formatMoneyFn(perUnitPrice(basePrice, quantity, progressState.tierState)),
       status: {
         state: 'progress',
         statusText: 'You have ' + pluralizeUnits(quantity),
