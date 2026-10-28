@@ -202,6 +202,11 @@
   margin: 6px 0 0;
 }
 
+.sparkly-tier-pricing__tiers[hidden],
+.sparkly-tier-pricing__drawer[hidden] {
+  display: none;
+}
+
 .sparkly-tier-pricing__chip {
   display: inline-flex;
   align-items: center;

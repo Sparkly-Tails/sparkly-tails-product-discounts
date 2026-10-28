@@ -457,9 +457,44 @@ function computeWidgetViewModel({ tiers, basePrice, compareAtPrice, otherQty, ad
   const phase = flash && hasTiers ? flashPhase({ nowSeconds, startsAtUnix: flash.startsAtUnix, endsAtUnix: flash.endsAtUnix }) : null
   const secondsLeft = phase === 'before' ? flash.startsAtUnix - nowSeconds : phase ? flash.endsAtUnix - nowSeconds : 0
 
+  // The teaser (before the start, switched on): the bar, the plain price and
+  // the progress bar with its pins and the quantity. Everything that carries a
+  // tier price (the chips, the hints, the promo line, the tag, the drawer) stays
+  // away until the sale starts.
+  if (phase === 'before' && flash.showTeaser) {
+    const progressState = computeProgressState(tiers, otherQty || 0, addingQty)
+    const quantity = progressState.combinedQty
+    const hint = 'Tier prices start with the sale'
+    return {
+      showCard: true,
+      showChips: false,
+      showDrawer: false,
+      showChrome: true,
+      flashBar: buildFlashBar({
+        phase, showTeaser: true, reachedTier: 0, unitPriceLabel: '',
+        countdownText: formatFlashCountdown({ secondsLeft }), countdownParts: flashCountdownParts({ secondsLeft }), chipText: formatFlashChip({ secondsLeft }),
+      }),
+      discountedPrice: null,
+      plainPrice,
+      progressState,
+      chips: [],
+      tag: null,
+      offerState: 'progress',
+      dot: computeProgressDot(sortTiersByMinQty(tiers), quantity),
+      promoLine: '',
+      status: {
+        state: 'progress',
+        statusText: 'You have ' + pluralizeUnits(quantity),
+        statusParts: { before: 'You have ', strong: pluralizeUnits(quantity), after: '' },
+        hintText: hint,
+        hintTone: 'accent',
+      },
+      semantics: { valueNow: clamp(quantity, progressState.startThreshold, progressState.topThreshold), valueMin: progressState.startThreshold, valueMax: progressState.topThreshold, valueText: (quantity > progressState.topThreshold ? pluralizeUnits(quantity) : quantity + ' of ' + progressState.topThreshold + ' units') + '. ' + hint + '.' },
+    }
+  }
+
   // No discount for this variant, or a flash sale that is not running (before
-  // its start, or over): the plain price only, with the teaser bar when it is
-  // switched on and the start is still ahead.
+  // its start without a teaser, or over): the plain price only.
   if (!hasTiers || (phase && phase !== 'running')) {
     // Without a tier discount, fall back to Shopify's own compare-at price, if
     // the merchant set one, so a plain markdown still shows a crossed-out
@@ -467,7 +502,9 @@ function computeWidgetViewModel({ tiers, basePrice, compareAtPrice, otherQty, ad
     const hasCompareAtDiscount = compareAtPrice != null && compareAtPrice > basePrice
     return {
       showCard: false,
-      showChrome: !phase || (phase === 'before' && !!flash.showTeaser),
+      showChips: false,
+      showDrawer: false,
+      showChrome: !phase,
       flashBar: phase ? buildFlashBar({
         phase, showTeaser: !!flash.showTeaser, reachedTier: 0, unitPriceLabel: '',
         countdownText: formatFlashCountdown({ secondsLeft }), countdownParts: flashCountdownParts({ secondsLeft }), chipText: formatFlashChip({ secondsLeft }),
@@ -506,6 +543,8 @@ function computeWidgetViewModel({ tiers, basePrice, compareAtPrice, otherQty, ad
 
   return {
     showCard: true,
+    showChips: true,
+    showDrawer: true,
     showChrome: true,
     flashBar,
     discountedPrice: isDiscounted ? formatMoneyFn(unit) : null,
@@ -856,6 +895,8 @@ if (typeof document !== 'undefined') {
     const state = viewModel.progressState
 
     paintProgressBar(elements, viewModel.dot, viewModel.semantics, viewModel.offerState)
+    if (elements.tiersEl) elements.tiersEl.hidden = !viewModel.showChips
+    if (!viewModel.showChips) return
 
     const signature = computeTierButtonsSignature(state, basePrice, addingQty)
     if (tierButtonsSignatureRef.value === signature) return
@@ -1116,6 +1157,7 @@ if (typeof document !== 'undefined') {
       })
       // A flash sale that has not started (teaser off) or is over has no card: only the plain price.
       if (config.hasTiers) container.classList.toggle('sparkly-tier-pricing--card', viewModel.showChrome)
+      if (elements.drawerEl) elements.drawerEl.hidden = !config.isGroup || !viewModel.showDrawer
       paintWidget(elements, viewModel, basePrice, addingQty, tierButtonsSignatureRef)
       lastPricing = viewModel.progressState
         ? { combinedQty: viewModel.progressState.combinedQty, tierState: viewModel.progressState.tierState, formatMoney: formatMoneyFn }
@@ -1141,12 +1183,9 @@ if (typeof document !== 'undefined') {
       if (lastPricing) setText(elements.chosenEl, formatItemsChosen(lastPricing.combinedQty))
     }
 
-    // Liquid now renders the toggle+list markup unconditionally (see the
-    // comment on data-discount above) — isGroup is fixed at metafield-sync
-    // time (total member count), not per-variant, so hiding it once here
-    // (rather than every render) is correct and matches how paintCard
-    // already owns cardEl's hidden state.
-    if (elements.drawerEl) elements.drawerEl.hidden = !config.isGroup
+    // Liquid renders the drawer markup unconditionally; render() shows it only
+    // for a group (isGroup is fixed at metafield-sync time) and not during the
+    // flash teaser.
 
     if (elements.toggleEl && elements.listEl && config.isGroup) {
       let open = false

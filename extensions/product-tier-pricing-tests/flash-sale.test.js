@@ -101,15 +101,28 @@ test('computeWidgetViewModel: the countdown and the chip count what is left to t
   assert.equal(chip.flashBar.chip, '14:32')
 })
 
-test('computeWidgetViewModel: the teaser shows the bar and the plain price only, no tier prices', () => {
+test('computeWidgetViewModel: the teaser shows the bar, the plain price and the progress bar, but no tier prices', () => {
   const vm = flashVm({ nowSeconds: START - (2 * 3600 + 10 * 60), addingQty: 9 })
   assert.equal(vm.flashBar.text, 'Flash sale starts in 02 : 10 : 00')
-  assert.deepEqual([vm.showChrome, vm.showCard, vm.discountedPrice, vm.plainPrice, vm.tag, vm.promoLine, vm.chips], [true, false, null, '£1.69', null, '', []])
+  // no discount, tag, promo line, chips or drawer: they all carry tier prices
+  assert.deepEqual([vm.showChrome, vm.discountedPrice, vm.plainPrice, vm.tag, vm.promoLine, vm.chips, vm.showChips, vm.showDrawer], [true, null, '£1.69', null, '', [], false, false])
+  // the progress bar is there: the quantity, the pins at the tier quantities, and no offer state
+  assert.deepEqual([vm.showCard, vm.offerState, vm.dot.dotValue, vm.dot.markers.map((m) => m.value)], [true, 'progress', 9, [1, 8, 16]])
+  assert.deepEqual(vm.status, {
+    state: 'progress', statusText: 'You have 9 units', statusParts: { before: 'You have ', strong: '9 units', after: '' },
+    hintText: 'Tier prices start with the sale', hintTone: 'accent',
+  })
+  assert.equal(vm.semantics.valueText, '9 of 16 units. Tier prices start with the sale.')
+})
+
+test('computeWidgetViewModel: a running sale shows the chips and the drawer too', () => {
+  const vm = flashVm({ addingQty: 9 })
+  assert.deepEqual([vm.showChips, vm.showDrawer], [true, true])
 })
 
 test('computeWidgetViewModel: before the start with the teaser off, and after the end, only the plain price remains', () => {
   const off = flashVm({ nowSeconds: START - 60, flash: { startsAtUnix: START, endsAtUnix: END, showTeaser: false } })
-  assert.deepEqual([off.flashBar.variant, off.showChrome, off.showCard, off.discountedPrice], ['hidden', false, false, null])
+  assert.deepEqual([off.flashBar.variant, off.showChrome, off.showCard, off.showChips, off.showDrawer, off.discountedPrice], ['hidden', false, false, false, false, null])
   const ended = flashVm({ nowSeconds: END, addingQty: 16 })
   assert.deepEqual([ended.flashBar.variant, ended.showChrome, ended.showCard, ended.discountedPrice, ended.plainPrice], ['hidden', false, false, null, '£1.69'])
 })
