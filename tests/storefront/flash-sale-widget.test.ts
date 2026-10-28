@@ -50,6 +50,7 @@ describe('flash sale in the tier widget', () => {
           <div class="sparkly-tier-pricing__summary">
             <div class="sparkly-tier-pricing__price-row">
               <div class="sparkly-tier-pricing__price-group">
+                <span data-tier-pricing-now-label hidden></span>
                 <span data-tier-pricing-price data-original-price="true">£1.69</span>
                 <span data-discounted-price hidden>£1.69</span>
                 <span data-tier-pricing-each-label>each</span>
@@ -109,9 +110,12 @@ describe('flash sale in the tier widget', () => {
     // everything with a tier price stays away
     expect((document.querySelector('[data-tier-pricing-tiers]') as HTMLElement).hidden).toBe(true)
     expect((document.querySelector('[data-tier-pricing-drawer]') as HTMLElement).hidden).toBe(true)
-    expect((document.querySelector('[data-tier-pricing-promo]') as HTMLElement).textContent).toBe('')
     expect((document.querySelector('[data-tier-pricing-tag]') as HTMLElement).hidden).toBe(true)
-    expect(widget().textContent).not.toMatch(/1\.63|1\.55/)
+    // the price now, and the price from the start (the most discounted tier)
+    const nowLabel = document.querySelector('[data-tier-pricing-now-label]') as HTMLElement
+    expect([nowLabel.hidden, nowLabel.textContent]).toEqual([false, 'It is now:'])
+    expect((document.querySelector('[data-tier-pricing-promo]') as HTMLElement).textContent).toBe('Get it from: £1.55')
+    expect(widget().textContent).not.toMatch(/1\.63/) // no middle tier price
   })
 
   it('before the start with the teaser off: no bar and no card, only the plain price', async () => {
@@ -125,6 +129,7 @@ describe('flash sale in the tier widget', () => {
     expect(bar()).toEqual({ hidden: false, variant: 'ends', label: 'Flash sale ends in', timer: ['04', '18', '49'], aside: '', chip: '' })
     expect([cardHidden(), hasChrome()]).toEqual([false, true])
     expect((document.querySelector('[data-tier-pricing-tiers]') as HTMLElement).hidden).toBe(false)
+    expect((document.querySelector('[data-tier-pricing-now-label]') as HTMLElement).hidden).toBe(true)
     expect((document.querySelector('[data-tier-pricing-status]') as HTMLElement).textContent).toBe('You have 3 units')
   })
 

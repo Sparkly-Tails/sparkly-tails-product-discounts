@@ -583,6 +583,7 @@ test('computeWidgetViewModel: no tiers configured at all — plain price, card h
     flashBar: null,
     discountedPrice: null,
     plainPrice: '£1.49',
+    priceLabel: null,
     progressState: null,
     chips: [],
     tag: null,

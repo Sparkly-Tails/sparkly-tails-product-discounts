@@ -476,12 +476,14 @@ function computeWidgetViewModel({ tiers, basePrice, compareAtPrice, otherQty, ad
       }),
       discountedPrice: null,
       plainPrice,
+      // "It is now: £1.69" and, from the start, "Get it from: £1.55" (the unit price of the most discounted tier).
+      priceLabel: 'It is now:',
       progressState,
       chips: [],
       tag: null,
       offerState: 'progress',
       dot: computeProgressDot(sortTiersByMinQty(tiers), quantity),
-      promoLine: '',
+      promoLine: 'Get it from: ' + formatMoneyFn(unitPriceAtTier(basePrice, sortTiersByMinQty(tiers)[tiers.length - 1])),
       status: {
         state: 'progress',
         statusText: 'You have ' + pluralizeUnits(quantity),
@@ -511,6 +513,7 @@ function computeWidgetViewModel({ tiers, basePrice, compareAtPrice, otherQty, ad
       }) : null,
       discountedPrice: hasCompareAtDiscount ? plainPrice : null,
       plainPrice: hasCompareAtDiscount ? formatMoneyFn(compareAtPrice) : plainPrice,
+      priceLabel: null,
       progressState: null,
       chips: [],
       tag: null,
@@ -549,6 +552,7 @@ function computeWidgetViewModel({ tiers, basePrice, compareAtPrice, otherQty, ad
     flashBar,
     discountedPrice: isDiscounted ? formatMoneyFn(unit) : null,
     plainPrice,
+    priceLabel: null,
     progressState,
     chips: buildTierChips({ tiers, basePrice, combinedQty: progressState.combinedQty, formatMoney: formatMoneyFn }),
     tag: buildPriceTag({ progressState, tiers, highDemand: !!highDemand }),
@@ -751,6 +755,10 @@ if (typeof document !== 'undefined') {
         const struckHtml = '<span class="sparkly-tier-pricing__sr-only">Original price: </span>' + viewModel.plainPrice
         if (elements.struckEl.innerHTML !== struckHtml) elements.struckEl.innerHTML = struckHtml
       }
+    }
+    if (elements.nowLabelEl) {
+      elements.nowLabelEl.hidden = !viewModel.priceLabel
+      setText(elements.nowLabelEl, viewModel.priceLabel || '')
     }
     // "each" only makes sense once there's a per-unit/bulk-pricing story to
     // explain — showCard already means "this product has a discount
@@ -1090,6 +1098,7 @@ if (typeof document !== 'undefined') {
       priceEl: container.querySelector('[data-tier-pricing-price]'),
       eachLabelEl: container.querySelector('[data-tier-pricing-each-label]'),
       struckEl: container.querySelector('[data-tier-pricing-struck]'),
+      nowLabelEl: container.querySelector('[data-tier-pricing-now-label]'),
       tagEl: container.querySelector('[data-tier-pricing-tag]'),
       promoEl: container.querySelector('[data-tier-pricing-promo]'),
       cardEl: container.querySelector('[data-tier-pricing-card]'),

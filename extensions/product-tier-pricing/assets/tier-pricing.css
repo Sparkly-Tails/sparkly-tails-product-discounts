@@ -106,6 +106,18 @@
   }
 }
 
+.sparkly-tier-pricing__now-label {
+  font-family: var(--font-stack-body);
+  font-weight: 500;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--sparkly-tier-text-secondary);
+}
+
+.sparkly-tier-pricing__now-label[hidden] {
+  display: none;
+}
+
 .sparkly-tier-pricing__each-label {
   font-family: var(--font-stack-body);
   font-weight: 500;

@@ -105,7 +105,7 @@ test('computeWidgetViewModel: the teaser shows the bar, the plain price and the 
   const vm = flashVm({ nowSeconds: START - (2 * 3600 + 10 * 60), addingQty: 9 })
   assert.equal(vm.flashBar.text, 'Flash sale starts in 02 : 10 : 00')
   // no discount, tag, promo line, chips or drawer: they all carry tier prices
-  assert.deepEqual([vm.showChrome, vm.discountedPrice, vm.plainPrice, vm.tag, vm.promoLine, vm.chips, vm.showChips, vm.showDrawer], [true, null, '£1.69', null, '', [], false, false])
+  assert.deepEqual([vm.showChrome, vm.discountedPrice, vm.plainPrice, vm.tag, vm.chips, vm.showChips, vm.showDrawer], [true, null, '£1.69', null, [], false, false])
   // the progress bar is there: the quantity, the pins at the tier quantities, and no offer state
   assert.deepEqual([vm.showCard, vm.offerState, vm.dot.dotValue, vm.dot.markers.map((m) => m.value)], [true, 'progress', 9, [1, 8, 16]])
   assert.deepEqual(vm.status, {
@@ -113,6 +113,23 @@ test('computeWidgetViewModel: the teaser shows the bar, the plain price and the 
     hintText: 'Tier prices start with the sale', hintTone: 'accent',
   })
   assert.equal(vm.semantics.valueText, '9 of 16 units. Tier prices start with the sale.')
+})
+
+test('computeWidgetViewModel: the teaser says what the price is now and what it will be from the most discounted tier', () => {
+  const vm = flashVm({ nowSeconds: START - 600 })
+  assert.deepEqual([vm.priceLabel, vm.plainPrice, vm.promoLine], ['It is now:', '£1.69', 'Get it from: £1.55'])
+})
+
+test('computeWidgetViewModel: the "from" price is the unit price of the top tier, an anchor price included', () => {
+  const tiers = [{ minQty: 1, percentOff: 0 }, { minQty: 8, percentOff: 3.5503, anchorPrice: 13 }, { minQty: 16, percentOff: 8.284, anchorPrice: 24.8 }]
+  assert.equal(flashVm({ nowSeconds: START - 600, tiers }).promoLine, 'Get it from: £1.55')
+  const single = [{ minQty: 1, percentOff: 0 }, { minQty: 8, fixedPrice: 1.63 }]
+  assert.equal(flashVm({ nowSeconds: START - 600, tiers: single }).promoLine, 'Get it from: £1.63')
+})
+
+test('computeWidgetViewModel: a running sale has no "It is now" label and keeps its promo line', () => {
+  const vm = flashVm({ addingQty: 2 })
+  assert.deepEqual([vm.priceLabel, vm.promoLine], [null, 'Mix and match 8+ for £1.63 or 16+ for £1.55'])
 })
 
 test('computeWidgetViewModel: a running sale shows the chips and the drawer too', () => {
