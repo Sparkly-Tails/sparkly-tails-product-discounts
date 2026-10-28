@@ -106,6 +106,18 @@
   }
 }
 
+.sparkly-tier-pricing__now-label {
+  font-family: var(--font-stack-body);
+  font-weight: 500;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--sparkly-tier-text-secondary);
+}
+
+.sparkly-tier-pricing__now-label[hidden] {
+  display: none;
+}
+
 .sparkly-tier-pricing__each-label {
   font-family: var(--font-stack-body);
   font-weight: 500;
@@ -200,6 +212,11 @@
   /* 6px below the (empty) caption row of the design, then its 4px top and bottom padding. */
   padding: 4px 0;
   margin: 6px 0 0;
+}
+
+.sparkly-tier-pricing__tiers[hidden],
+.sparkly-tier-pricing__drawer[hidden] {
+  display: none;
 }
 
 .sparkly-tier-pricing__chip {

@@ -50,6 +50,7 @@ describe('flash sale in the tier widget', () => {
           <div class="sparkly-tier-pricing__summary">
             <div class="sparkly-tier-pricing__price-row">
               <div class="sparkly-tier-pricing__price-group">
+                <span data-tier-pricing-now-label hidden></span>
                 <span data-tier-pricing-price data-original-price="true">£1.69</span>
                 <span data-discounted-price hidden>£1.69</span>
                 <span data-tier-pricing-each-label>each</span>
@@ -65,6 +66,7 @@ describe('flash sale in the tier widget', () => {
               <div><span data-tier-pricing-status></span><span data-tier-pricing-aside></span></div>
               <div data-tier-pricing-bar role="progressbar"><div><div data-tier-pricing-fill></div></div><div data-tier-pricing-markers></div><span data-tier-pricing-dot></span></div>
             </div>
+            <div data-tier-pricing-drawer data-open="false"><button data-tier-pricing-toggle aria-expanded="false">Mix</button><div data-tier-pricing-list hidden></div></div>
           </div>
         </div>
       </div>`
@@ -95,13 +97,25 @@ describe('flash sale in the tier widget', () => {
     await vi.advanceTimersByTimeAsync(0)
   }
 
-  it('before the start with the teaser on: the bar counts down to the start and only the plain price shows', async () => {
-    await mountFlash({ nowSeconds: START - (2 * 3600 + 10 * 60) })
+  it('before the start with the teaser on: the bar counts down to the start, the progress bar shows, no tier prices do', async () => {
+    await mountFlash({ nowSeconds: START - (2 * 3600 + 10 * 60), quantity: 3 })
     expect(bar()).toEqual({ hidden: false, variant: 'teaser', label: 'Flash sale starts in', timer: ['02', '10', '00'], aside: '', chip: '' })
-    expect([cardHidden(), hasChrome(), price()]).toEqual([true, true, '£1.69'])
-    expect((document.querySelector('[data-tier-pricing-promo]') as HTMLElement).textContent).toBe('')
+    expect([cardHidden(), hasChrome(), price()]).toEqual([false, true, '£1.69'])
+    // the progress bar: the quantity and the pins at the tier quantities, in the no-offer state
+    expect((document.querySelector('[data-tier-pricing-dot]') as HTMLElement).textContent).toBe('3')
+    expect([...document.querySelectorAll('.sparkly-tier-pricing__marker')].map((pin) => pin.textContent)).toEqual(['1', '8', '16'])
+    expect((document.querySelector('[data-tier-pricing-rail]') as HTMLElement).dataset.offerState).toBe('progress')
+    expect((document.querySelector('[data-tier-pricing-status]') as HTMLElement).textContent).toBe('You have 3 units')
+    expect((document.querySelector('[data-tier-pricing-aside]') as HTMLElement).textContent).toBe('Tier prices start with the sale')
+    // everything with a tier price stays away
+    expect((document.querySelector('[data-tier-pricing-tiers]') as HTMLElement).hidden).toBe(true)
+    expect((document.querySelector('[data-tier-pricing-drawer]') as HTMLElement).hidden).toBe(true)
     expect((document.querySelector('[data-tier-pricing-tag]') as HTMLElement).hidden).toBe(true)
-    expect((document.querySelector('[data-tier-pricing-each-label]') as HTMLElement).hidden).toBe(true)
+    // the price now, and the price from the start (the most discounted tier)
+    const nowLabel = document.querySelector('[data-tier-pricing-now-label]') as HTMLElement
+    expect([nowLabel.hidden, nowLabel.textContent]).toEqual([false, 'It is now:'])
+    expect((document.querySelector('[data-tier-pricing-promo]') as HTMLElement).textContent).toBe('Get it from: £1.55')
+    expect(widget().textContent).not.toMatch(/1\.63/) // no middle tier price
   })
 
   it('before the start with the teaser off: no bar and no card, only the plain price', async () => {
@@ -114,6 +128,8 @@ describe('flash sale in the tier widget', () => {
     await mountFlash({ nowSeconds: END - (4 * 3600 + 18 * 60 + 49), quantity: 3 })
     expect(bar()).toEqual({ hidden: false, variant: 'ends', label: 'Flash sale ends in', timer: ['04', '18', '49'], aside: '', chip: '' })
     expect([cardHidden(), hasChrome()]).toEqual([false, true])
+    expect((document.querySelector('[data-tier-pricing-tiers]') as HTMLElement).hidden).toBe(false)
+    expect((document.querySelector('[data-tier-pricing-now-label]') as HTMLElement).hidden).toBe(true)
     expect((document.querySelector('[data-tier-pricing-status]') as HTMLElement).textContent).toBe('You have 3 units')
   })
 
@@ -148,11 +164,12 @@ describe('flash sale in the tier widget', () => {
   it('at the start second the teaser turns into the running sale without a reload', async () => {
     await mountFlash({ nowSeconds: START - 2 })
     expect(bar().variant).toBe('teaser')
-    expect(cardHidden()).toBe(true)
+    expect((document.querySelector('[data-tier-pricing-tiers]') as HTMLElement).hidden).toBe(true)
     await vi.advanceTimersByTimeAsync(1000)
     expect(bar().variant).toBe('teaser') // one second left
     await vi.advanceTimersByTimeAsync(1000)
     expect([bar().variant, cardHidden(), hasChrome()]).toEqual(['ends', false, true])
+    expect((document.querySelector('[data-tier-pricing-tiers]') as HTMLElement).hidden).toBe(false)
   })
 
   it('at the start second a sale without a teaser gets its card', async () => {
