@@ -34,7 +34,7 @@ describe('createDiscount', () => {
     vi.spyOn(configLib, 'getConfig').mockResolvedValue({ discounts: [] })
     const saveSpy = vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
     vi.spyOn(products, 'getMemberInfo').mockResolvedValue([
-      { productId: 'gid://shopify/Product/1', variantId: undefined, title: 'Tuna Soup', price: 1.49, handle: 'tuna-soup', imageUrl: null },
+      { productId: 'gid://shopify/Product/1', variantId: undefined, title: 'Tuna Soup', productTitle: '', price: 1.49, handle: 'tuna-soup', imageUrl: null },
     ])
     vi.mocked(ensureTierDiscount).mockRejectedValue(new Error('The tier discount Function is not deployed'))
     const formData = memberFormData([{ productId: 'gid://shopify/Product/1' }], { name: 'Tuna Soup', title: 'Tuna Soup', 'tier-0-minQty': '5', 'tier-0-percentOff': '10' })
@@ -50,7 +50,7 @@ describe('createDiscount', () => {
     vi.spyOn(configLib, 'getConfig').mockResolvedValue({ discounts: [] })
     const saveSpy = vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
     vi.spyOn(products, 'getMemberInfo').mockResolvedValue([
-      { productId: 'gid://shopify/Product/1', variantId: undefined, title: 'Tuna Soup', price: 1.49, handle: 'tuna-soup', imageUrl: null },
+      { productId: 'gid://shopify/Product/1', variantId: undefined, title: 'Tuna Soup', productTitle: '', price: 1.49, handle: 'tuna-soup', imageUrl: null },
     ])
 
     const formData = memberFormData(
@@ -75,8 +75,8 @@ describe('createDiscount', () => {
     vi.spyOn(configLib, 'getConfig').mockResolvedValue({ discounts: [] })
     const saveSpy = vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
     vi.spyOn(products, 'getMemberInfo').mockResolvedValue([
-      { productId: 'gid://shopify/Product/1', variantId: undefined, title: 'Tuna Soup', price: 1.49, handle: 'tuna-soup', imageUrl: null },
-      { productId: 'gid://shopify/Product/2', variantId: 'gid://shopify/ProductVariant/20', title: 'Wet Cat Food – Chicken', price: 1.49, handle: 'wet-cat-food', imageUrl: null },
+      { productId: 'gid://shopify/Product/1', variantId: undefined, title: 'Tuna Soup', productTitle: '', price: 1.49, handle: 'tuna-soup', imageUrl: null },
+      { productId: 'gid://shopify/Product/2', variantId: 'gid://shopify/ProductVariant/20', title: 'Wet Cat Food – Chicken', productTitle: '', price: 1.49, handle: 'wet-cat-food', imageUrl: null },
     ])
 
     const formData = memberFormData(
@@ -99,8 +99,8 @@ describe('createDiscount', () => {
   it('rejects fixedPrice tiers when members have different prices', async () => {
     vi.spyOn(configLib, 'getConfig').mockResolvedValue({ discounts: [] })
     vi.spyOn(products, 'getMemberInfo').mockResolvedValue([
-      { productId: 'gid://shopify/Product/1', variantId: undefined, title: 'A', price: 1.49, handle: 'a', imageUrl: null },
-      { productId: 'gid://shopify/Product/2', variantId: undefined, title: 'B', price: 1.59, handle: 'b', imageUrl: null },
+      { productId: 'gid://shopify/Product/1', variantId: undefined, title: 'A', productTitle: '', price: 1.49, handle: 'a', imageUrl: null },
+      { productId: 'gid://shopify/Product/2', variantId: undefined, title: 'B', productTitle: '', price: 1.59, handle: 'b', imageUrl: null },
     ])
 
     const formData = memberFormData(
@@ -114,8 +114,8 @@ describe('createDiscount', () => {
   it('rejects an anchorPrice tier when members have different prices', async () => {
     vi.spyOn(configLib, 'getConfig').mockResolvedValue({ discounts: [] })
     vi.spyOn(products, 'getMemberInfo').mockResolvedValue([
-      { productId: 'gid://shopify/Product/1', variantId: undefined, title: 'A', price: 1.49, handle: 'a', imageUrl: null },
-      { productId: 'gid://shopify/Product/2', variantId: undefined, title: 'B', price: 1.59, handle: 'b', imageUrl: null },
+      { productId: 'gid://shopify/Product/1', variantId: undefined, title: 'A', productTitle: '', price: 1.49, handle: 'a', imageUrl: null },
+      { productId: 'gid://shopify/Product/2', variantId: undefined, title: 'B', productTitle: '', price: 1.59, handle: 'b', imageUrl: null },
     ])
 
     const formData = memberFormData(
@@ -130,8 +130,8 @@ describe('createDiscount', () => {
     vi.spyOn(configLib, 'getConfig').mockResolvedValue({ discounts: [] })
     const saveSpy = vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
     vi.spyOn(products, 'getMemberInfo').mockResolvedValue([
-      { productId: 'gid://shopify/Product/1', variantId: undefined, title: 'A', price: 1.49, handle: 'a', imageUrl: null },
-      { productId: 'gid://shopify/Product/2', variantId: undefined, title: 'B', price: 1.59, handle: 'b', imageUrl: null },
+      { productId: 'gid://shopify/Product/1', variantId: undefined, title: 'A', productTitle: '', price: 1.49, handle: 'a', imageUrl: null },
+      { productId: 'gid://shopify/Product/2', variantId: undefined, title: 'B', productTitle: '', price: 1.59, handle: 'b', imageUrl: null },
     ])
 
     const formData = memberFormData(
@@ -152,7 +152,7 @@ describe('createDiscount', () => {
     }
     vi.spyOn(configLib, 'getConfig').mockResolvedValue(existing)
     vi.spyOn(products, 'getMemberInfo').mockResolvedValue([
-      { productId: 'gid://shopify/Product/1', variantId: undefined, title: 'A', price: 1.49, handle: 'a', imageUrl: null },
+      { productId: 'gid://shopify/Product/1', variantId: undefined, title: 'A', productTitle: '', price: 1.49, handle: 'a', imageUrl: null },
     ])
 
     const formData = memberFormData(
@@ -177,8 +177,8 @@ describe('updateDiscountMembers', () => {
     }
     vi.spyOn(configLib, 'getConfig').mockResolvedValue({ discounts: [discount] })
     vi.spyOn(products, 'getMemberInfo').mockResolvedValue([
-      { productId: 'gid://shopify/Product/1', variantId: undefined, title: 'A', price: 1.49, handle: 'a', imageUrl: null },
-      { productId: 'gid://shopify/Product/2', variantId: undefined, title: 'B', price: 1.59, handle: 'b', imageUrl: null },
+      { productId: 'gid://shopify/Product/1', variantId: undefined, title: 'A', productTitle: '', price: 1.49, handle: 'a', imageUrl: null },
+      { productId: 'gid://shopify/Product/2', variantId: undefined, title: 'B', productTitle: '', price: 1.59, handle: 'b', imageUrl: null },
     ])
 
     const formData = memberFormData([{ productId: 'gid://shopify/Product/1' }, { productId: 'gid://shopify/Product/2' }])
@@ -193,8 +193,8 @@ describe('updateDiscountMembers', () => {
     }
     vi.spyOn(configLib, 'getConfig').mockResolvedValue({ discounts: [discount] })
     vi.spyOn(products, 'getMemberInfo').mockResolvedValue([
-      { productId: 'gid://shopify/Product/1', variantId: undefined, title: 'A', price: 1.49, handle: 'a', imageUrl: null },
-      { productId: 'gid://shopify/Product/2', variantId: undefined, title: 'B', price: 1.59, handle: 'b', imageUrl: null },
+      { productId: 'gid://shopify/Product/1', variantId: undefined, title: 'A', productTitle: '', price: 1.49, handle: 'a', imageUrl: null },
+      { productId: 'gid://shopify/Product/2', variantId: undefined, title: 'B', productTitle: '', price: 1.59, handle: 'b', imageUrl: null },
     ])
 
     const formData = memberFormData([{ productId: 'gid://shopify/Product/1' }, { productId: 'gid://shopify/Product/2' }])
@@ -210,8 +210,8 @@ describe('updateDiscountMembers', () => {
     vi.spyOn(configLib, 'getConfig').mockResolvedValue({ discounts: [discount] })
     const saveSpy = vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
     vi.spyOn(products, 'getMemberInfo').mockResolvedValue([
-      { productId: 'gid://shopify/Product/1', variantId: undefined, title: 'A', price: 1.49, handle: 'a', imageUrl: null },
-      { productId: 'gid://shopify/Product/2', variantId: undefined, title: 'B', price: 1.59, handle: 'b', imageUrl: null },
+      { productId: 'gid://shopify/Product/1', variantId: undefined, title: 'A', productTitle: '', price: 1.49, handle: 'a', imageUrl: null },
+      { productId: 'gid://shopify/Product/2', variantId: undefined, title: 'B', productTitle: '', price: 1.59, handle: 'b', imageUrl: null },
     ])
 
     const formData = memberFormData([{ productId: 'gid://shopify/Product/1' }, { productId: 'gid://shopify/Product/2' }])
@@ -234,8 +234,8 @@ describe('updateDiscountMembers', () => {
     vi.spyOn(configLib, 'getConfig').mockResolvedValue({ discounts: [discount] })
     const saveSpy = vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
     vi.spyOn(products, 'getMemberInfo').mockResolvedValue([
-      { productId: 'gid://shopify/Product/1', variantId: undefined, title: 'A', price: 1.49, handle: 'a', imageUrl: null },
-      { productId: 'gid://shopify/Product/2', variantId: undefined, title: 'B', price: 1.49, handle: 'b', imageUrl: null },
+      { productId: 'gid://shopify/Product/1', variantId: undefined, title: 'A', productTitle: '', price: 1.49, handle: 'a', imageUrl: null },
+      { productId: 'gid://shopify/Product/2', variantId: undefined, title: 'B', productTitle: '', price: 1.49, handle: 'b', imageUrl: null },
     ])
 
     const formData = memberFormData([{ productId: 'gid://shopify/Product/1' }, { productId: 'gid://shopify/Product/2' }])
@@ -261,7 +261,7 @@ describe('updateDiscountMembers', () => {
     const clearSpy = vi.spyOn(productTiers, 'clearDiscountMetafields').mockResolvedValue()
     const syncSpy = vi.spyOn(productTiers, 'syncDiscountMetafields').mockResolvedValue()
     vi.spyOn(products, 'getMemberInfo').mockResolvedValue([
-      { productId: 'gid://shopify/Product/1', variantId: undefined, title: 'A', price: 1.49, handle: 'a', imageUrl: null },
+      { productId: 'gid://shopify/Product/1', variantId: undefined, title: 'A', productTitle: '', price: 1.49, handle: 'a', imageUrl: null },
     ])
 
     const formData = memberFormData([{ productId: 'gid://shopify/Product/1' }])
@@ -296,8 +296,8 @@ describe('updateDiscountTiers', () => {
     }
     vi.spyOn(configLib, 'getConfig').mockResolvedValue({ discounts: [discount] })
     vi.spyOn(products, 'getMemberInfo').mockResolvedValue([
-      { productId: 'gid://shopify/Product/1', variantId: undefined, title: 'A', price: 1.49, handle: 'a', imageUrl: null },
-      { productId: 'gid://shopify/Product/2', variantId: undefined, title: 'B', price: 1.59, handle: 'b', imageUrl: null },
+      { productId: 'gid://shopify/Product/1', variantId: undefined, title: 'A', productTitle: '', price: 1.49, handle: 'a', imageUrl: null },
+      { productId: 'gid://shopify/Product/2', variantId: undefined, title: 'B', productTitle: '', price: 1.59, handle: 'b', imageUrl: null },
     ])
 
     const formData = new FormData()
@@ -315,8 +315,8 @@ describe('updateDiscountTiers', () => {
     }
     vi.spyOn(configLib, 'getConfig').mockResolvedValue({ discounts: [discount] })
     vi.spyOn(products, 'getMemberInfo').mockResolvedValue([
-      { productId: 'gid://shopify/Product/1', variantId: undefined, title: 'A', price: 1.49, handle: 'a', imageUrl: null },
-      { productId: 'gid://shopify/Product/2', variantId: undefined, title: 'B', price: 1.59, handle: 'b', imageUrl: null },
+      { productId: 'gid://shopify/Product/1', variantId: undefined, title: 'A', productTitle: '', price: 1.49, handle: 'a', imageUrl: null },
+      { productId: 'gid://shopify/Product/2', variantId: undefined, title: 'B', productTitle: '', price: 1.59, handle: 'b', imageUrl: null },
     ])
 
     const formData = new FormData()
@@ -336,8 +336,8 @@ describe('updateDiscountTiers', () => {
     vi.spyOn(configLib, 'getConfig').mockResolvedValue({ discounts: [discount] })
     const saveSpy = vi.spyOn(configLib, 'saveConfig').mockResolvedValue()
     vi.spyOn(products, 'getMemberInfo').mockResolvedValue([
-      { productId: 'gid://shopify/Product/1', variantId: undefined, title: 'A', price: 1.49, handle: 'a', imageUrl: null },
-      { productId: 'gid://shopify/Product/2', variantId: undefined, title: 'B', price: 1.59, handle: 'b', imageUrl: null },
+      { productId: 'gid://shopify/Product/1', variantId: undefined, title: 'A', productTitle: '', price: 1.49, handle: 'a', imageUrl: null },
+      { productId: 'gid://shopify/Product/2', variantId: undefined, title: 'B', productTitle: '', price: 1.59, handle: 'b', imageUrl: null },
     ])
 
     const formData = new FormData()

@@ -51,7 +51,7 @@ beforeEach(() => {
   vi.spyOn(configLib, 'getConfig').mockResolvedValue({ discounts: [] })
   redirectSpy = vi.mocked(redirect)
   redirectSpy.mockClear()
-  vi.spyOn(productsLib, 'getMemberInfo').mockResolvedValue([{ productId: P1, title: 'X', price: 10, handle: 'x', imageUrl: null }])
+  vi.spyOn(productsLib, 'getMemberInfo').mockResolvedValue([{ productId: P1, title: 'X', productTitle: '', price: 10, handle: 'x', imageUrl: null }])
   vi.spyOn(shopLib, 'getShopTimezone').mockResolvedValue('Europe/London')
   vi.spyOn(metafieldSync, 'syncTimeDiscountMetafields').mockResolvedValue(undefined)
   vi.spyOn(metafieldSync, 'clearTimeDiscountMetafields').mockResolvedValue(undefined)
@@ -82,8 +82,8 @@ describe('createTimeDiscount', () => {
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(new Date('2026-06-01T00:00:00Z'))
     vi.spyOn(productsLib, 'getMemberInfo').mockResolvedValue([
-      { productId: P1, title: 'Cat Toy', price: 10, handle: 'cat-toy', imageUrl: null },
-      { productId: P2, title: 'Dog Bed', price: 40, handle: 'dog-bed', imageUrl: null },
+      { productId: P1, title: 'Cat Toy', productTitle: '', price: 10, handle: 'cat-toy', imageUrl: null },
+      { productId: P2, title: 'Dog Bed', productTitle: '', price: 40, handle: 'dog-bed', imageUrl: null },
     ])
   })
   afterEach(() => vi.useRealTimers())
@@ -148,7 +148,7 @@ describe('createTimeDiscount', () => {
 
   it('rounds each amount to pence and keeps a variant row\'s variant', async () => {
     created()
-    vi.spyOn(productsLib, 'getMemberInfo').mockResolvedValue([{ productId: P1, variantId: V10, title: 'Cat Toy – Large', price: 60, handle: 'cat-toy', imageUrl: null }])
+    vi.spyOn(productsLib, 'getMemberInfo').mockResolvedValue([{ productId: P1, variantId: V10, title: 'Cat Toy – Large', productTitle: '', price: 60, handle: 'cat-toy', imageUrl: null }])
     await createTimeDiscount(null, form({ items: rows({ productId: P1, variantId: V10, pricingMode: 'fixed', amount: 49.999 }) }))
     expect(functionConfigSent().parsed).toEqual({ items: [{ productId: P1, variantId: V10, pricingMode: 'fixed', amount: 50 }] })
   })
@@ -190,7 +190,7 @@ describe('createTimeDiscount', () => {
 
   it('creates nothing when the rows would not fit the checkout config', async () => {
     const many = Array.from({ length: 100 }, (_, i) => ({ productId: `gid://shopify/Product/${1000 + i}`, variantId:`gid://shopify/ProductVariant/${5000 + i}`, pricingMode: 'percent', amount: 10 }))
-    vi.spyOn(productsLib, 'getMemberInfo').mockResolvedValue(many.map((m) => ({ ...m, title: 'P', price: 10, handle: 'p', imageUrl: null })))
+    vi.spyOn(productsLib, 'getMemberInfo').mockResolvedValue(many.map((m) => ({ ...m, title: 'P', productTitle: '', price: 10, handle: 'p', imageUrl: null })))
     const result = await createTimeDiscount(null, form({ items: JSON.stringify(many) }))
     expect(result).toEqual({ ok: false, error: expect.stringContaining('too many products/variants') })
     expect(shopifyQuerySpy).not.toHaveBeenCalled()
@@ -389,7 +389,7 @@ describe('saveTimeDiscountItem', () => {
 
   it('judges each row against its own regular price', async () => {
     storedDiscounts([discountWith([])])
-    vi.spyOn(productsLib, 'getMemberInfo').mockResolvedValue([{ productId: P1, variantId: V10, title: 'X – Large', price: 60, handle: 'x', imageUrl: null }])
+    vi.spyOn(productsLib, 'getMemberInfo').mockResolvedValue([{ productId: P1, variantId: V10, title: 'X – Large', productTitle: '', price: 60, handle: 'x', imageUrl: null }])
     expect(await saveTimeDiscountItem('time_disc_1', { productId: P1, variantId: V10, pricingMode: 'fixed', amount: 50 })).toEqual({ ok: true })
     expect(productsLib.getMemberInfo).toHaveBeenCalledWith([{ productId: P1, variantId: V10 }])
   })

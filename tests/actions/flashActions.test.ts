@@ -44,7 +44,7 @@ function setup(discount: Discount) {
   const syncSpy = vi.spyOn(productTiers, 'syncDiscountMetafields').mockResolvedValue()
   const clearSpy = vi.spyOn(productTiers, 'clearDiscountMetafields').mockResolvedValue()
   vi.spyOn(products, 'getMemberInfo').mockResolvedValue([
-    { productId: 'gid://shopify/Product/1', variantId: undefined, title: 'Soup', price: 1.49, handle: 'soup', imageUrl: null },
+    { productId: 'gid://shopify/Product/1', variantId: undefined, title: 'Soup', productTitle: '', price: 1.49, handle: 'soup', imageUrl: null },
   ])
   return { config, saveSpy, syncSpy, clearSpy }
 }
