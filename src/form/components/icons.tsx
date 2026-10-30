@@ -29,3 +29,7 @@ export function BoltIcon({ className }: IconProps) {
 export function CalendarTodayIcon({ className }: IconProps) {
   return <SvgIcon className={className} path="M20 3h-1V1h-2v2H7V1H5v2H4c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 18H4V8h16v13z" />
 }
+
+export function DeleteIcon({ className }: IconProps) {
+  return <SvgIcon className={className} path="M16 9v10H8V9h8m-1.5-6h-5l-1 1H5v2h14V4h-3.5l-1-1zM18 7H6v12c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7z" />
+}
