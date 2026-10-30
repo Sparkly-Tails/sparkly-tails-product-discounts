@@ -3,11 +3,13 @@ import { CategoryIcon, CloseIcon, SearchIcon } from '@/form/components/icons'
 
 // The search field of the products card with its clear button and the Browse
 // button. What the person should see under the field (the results) is a child.
-export default function SearchBox({ value, onChange, onClear, onBrowse, children }: {
+export default function SearchBox({ value, onChange, onClear, onBrowse, onFocus, onBlur, children }: {
   value: string
   onChange: (value: string) => void
   onClear: () => void
   onBrowse: () => void
+  onFocus?: () => void
+  onBlur?: () => void
   children?: ReactNode
 }) {
   return (
@@ -20,6 +22,8 @@ export default function SearchBox({ value, onChange, onClear, onBrowse, children
           placeholder="Search products or variants..."
           value={value}
           onChange={(event) => onChange(event.target.value)}
+          onFocus={onFocus}
+          onBlur={onBlur}
           className="w-full h-10 pl-9 pr-9 rounded-lg bg-form-surface-container-lowest border border-form-outline-variant/60 text-form-on-surface text-form-body-md focus:outline-none focus:border-form-secondary transition-colors"
         />
         {value ? (
