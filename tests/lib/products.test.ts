@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { searchProducts, getProductVariantOptions, getMemberInfo, getLowestVariantPrices } from '@/lib/products'
+import { searchProducts, listProducts, getProductVariantOptions, getMemberInfo, getLowestVariantPrices } from '@/lib/products'
 import * as shopifyClient from '@/lib/shopify-client'
 
 describe('searchProducts', () => {
@@ -11,21 +11,49 @@ describe('searchProducts', () => {
     expect(spy).not.toHaveBeenCalled()
   })
 
-  it('returns each product with its variant count', async () => {
+  it('returns each product with its variant count and its image', async () => {
     vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({
       products: {
         edges: [
-          { node: { id: 'gid://shopify/Product/1', title: 'Tuna Soup', variants: { edges: [{ node: {} }] } } },
-          { node: { id: 'gid://shopify/Product/2', title: 'Wet Cat Food', variants: { edges: [{ node: {} }, { node: {} }, { node: {} }] } } },
+          { node: { id: 'gid://shopify/Product/1', title: 'Tuna Soup', featuredImage: { url: 'https://cdn.example/tuna.png' }, variants: { edges: [{ node: {} }] } } },
+          { node: { id: 'gid://shopify/Product/2', title: 'Wet Cat Food', featuredImage: null, variants: { edges: [{ node: {} }, { node: {} }, { node: {} }] } } },
         ],
       },
     })
 
     const results = await searchProducts('soup')
     expect(results).toEqual([
-      { id: 'gid://shopify/Product/1', title: 'Tuna Soup', variantCount: 1 },
-      { id: 'gid://shopify/Product/2', title: 'Wet Cat Food', variantCount: 3 },
+      { id: 'gid://shopify/Product/1', title: 'Tuna Soup', variantCount: 1, imageUrl: 'https://cdn.example/tuna.png' },
+      { id: 'gid://shopify/Product/2', title: 'Wet Cat Food', variantCount: 3, imageUrl: null },
     ])
+  })
+
+  it('asks Shopify for the featured image', async () => {
+    const spy = vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({ products: { edges: [] } })
+    await searchProducts('soup')
+    expect(spy.mock.calls[0][0]).toContain('featuredImage { url }')
+  })
+})
+
+describe('listProducts', () => {
+  beforeEach(() => vi.restoreAllMocks())
+
+  it('lists the shop\'s first products with no search term, in the shape of a search result', async () => {
+    const spy = vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({
+      products: {
+        edges: [{ node: { id: 'gid://shopify/Product/1', title: 'Tuna Soup', featuredImage: null, variants: { edges: [{ node: {} }, { node: {} }] } } }],
+      },
+    })
+
+    const results = await listProducts({ limit: 8 })
+    expect(spy).toHaveBeenCalledTimes(1)
+    expect(spy.mock.calls[0][1]).toEqual({ limit: 8 })
+    expect(results).toEqual([{ id: 'gid://shopify/Product/1', title: 'Tuna Soup', variantCount: 2, imageUrl: null }])
+  })
+
+  it('returns an empty list when the shop has no products', async () => {
+    vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({ products: { edges: [] } })
+    expect(await listProducts({ limit: 8 })).toEqual([])
   })
 })
 

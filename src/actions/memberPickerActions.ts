@@ -1,34 +1,52 @@
 'use server'
 
-import { searchProducts, getProductVariantOptions, type ProductSearchResult, type ProductVariantOption } from '@/lib/products'
+import { searchProducts, listProducts, getProductVariantOptions, type ProductSearchResult, type ProductVariantOption } from '@/lib/products'
 import { getConfig, isProductAvailable } from '@/lib/config'
 
+// How many products Browse lists.
+const BROWSE_LIMIT = 8
+
 /**
- * Backs the picker's search box. Swallows errors — fires on every debounced
- * keystroke. Drops any product already fully claimed by another discount
+ * Drops every product already fully claimed by another discount
  * (excludeDiscountId lets an in-progress edit not flag its own members) —
  * a single-variant product is dropped outright, a multi-variant product
  * only if every one of its variants is already claimed somewhere.
- * Membership already selected in the CURRENT in-progress edit (not yet
- * saved) isn't known here — the picker component filters that itself.
+ */
+async function keepAvailableProducts(results: ProductSearchResult[], excludeDiscountId?: string): Promise<ProductSearchResult[]> {
+  const config = await getConfig()
+
+  const available = await Promise.all(
+    results.map(async (product) => {
+      if (product.variantCount <= 1) {
+        return isProductAvailable(config, product.id, undefined, excludeDiscountId)
+      }
+      const variants = await getProductVariantOptions(product.id)
+      return variants.some((v) => isProductAvailable(config, product.id, v.variantId, excludeDiscountId))
+    }),
+  )
+  return results.filter((_, i) => available[i])
+}
+
+/**
+ * Backs the picker's search box. Swallows errors — fires on every debounced
+ * keystroke. Membership already selected in the CURRENT in-progress edit
+ * (not yet saved) isn't known here — the picker component filters that itself.
  */
 export async function searchProductsAction(query: string, excludeDiscountId?: string): Promise<ProductSearchResult[]> {
   try {
-    const results = await searchProducts(query)
-    const config = await getConfig()
-
-    const available = await Promise.all(
-      results.map(async (product) => {
-        if (product.variantCount <= 1) {
-          return isProductAvailable(config, product.id, undefined, excludeDiscountId)
-        }
-        const variants = await getProductVariantOptions(product.id)
-        return variants.some((v) => isProductAvailable(config, product.id, v.variantId, excludeDiscountId))
-      }),
-    )
-    return results.filter((_, i) => available[i])
+    return await keepAvailableProducts(await searchProducts(query), excludeDiscountId)
   } catch (err) {
     console.error('[searchProductsAction] search failed:', err)
+    return []
+  }
+}
+
+/** Backs the picker's Browse button: the shop's first products, with the same availability rule as the search. */
+export async function listProductsAction(excludeDiscountId?: string): Promise<ProductSearchResult[]> {
+  try {
+    return await keepAvailableProducts(await listProducts({ limit: BROWSE_LIMIT }), excludeDiscountId)
+  } catch (err) {
+    console.error('[listProductsAction] lookup failed:', err)
     return []
   }
 }
