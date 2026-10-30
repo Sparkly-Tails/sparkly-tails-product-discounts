@@ -1,0 +1,103 @@
+/* Design tokens of the redesigned tier discount form (the Stitch "Create Tier
+   Discount" screen). Everything is prefixed "form-" (colours, spacing, text
+   sizes), so Tailwind makes utilities such as bg-form-surface and no other page
+   changes. The names and values are the ones of the design's Tailwind config. */
+
+@theme {
+  --color-form-surface-tint: #5f5e5e;
+  --color-form-secondary-fixed: #d9e2ff;
+  --color-form-on-background: #1a1c1c;
+  --color-form-inverse-surface: #2f3131;
+  --color-form-on-primary: #ffffff;
+  --color-form-tertiary-fixed: #9cf5c2;
+  --color-form-secondary-container: #2c6fe7;
+  --color-form-secondary-fixed-dim: #b0c6ff;
+  --color-form-surface-container-highest: #e2e2e2;
+  --color-form-outline: #747878;
+  --color-form-surface-bright: #f9f9f9;
+  --color-form-surface-variant: #e2e2e2;
+  --color-form-on-tertiary-fixed: #002112;
+  --color-form-outline-variant: #c4c7c7;
+  --color-form-surface-container-low: #f3f3f3;
+  --color-form-on-primary-fixed-variant: #474747;
+  --color-form-surface: #f9f9f9;
+  --color-form-on-secondary-fixed-variant: #00419c;
+  --color-form-surface-container-lowest: #ffffff;
+  --color-form-on-tertiary-container: #51a87b;
+  --color-form-on-surface-variant: #444748;
+  --color-form-inverse-on-surface: #f1f1f1;
+  --color-form-on-secondary-container: #fefcff;
+  --color-form-surface-dim: #dadada;
+  --color-form-on-error-container: #93000a;
+  --color-form-surface-container-high: #e8e8e8;
+  --color-form-on-surface: #1a1c1c;
+  --color-form-primary-fixed-dim: #c8c6c6;
+  --color-form-on-secondary: #ffffff;
+  --color-form-error-container: #ffdad6;
+  --color-form-inverse-primary: #c8c6c6;
+  --color-form-on-primary-fixed: #1b1c1c;
+  --color-form-on-error: #ffffff;
+  --color-form-primary: #1b1b1b;
+  --color-form-primary-fixed: #e4e2e1;
+  --color-form-surface-container: #eeeeee;
+  --color-form-primary-container: #303030;
+  --color-form-secondary: #0055c7;
+  --color-form-tertiary-fixed-dim: #80d8a7;
+  --color-form-background: #f9f9f9;
+  --color-form-on-tertiary: #ffffff;
+  --color-form-error: #ba1a1a;
+  --color-form-on-secondary-fixed: #001945;
+  --color-form-tertiary-container: #003821;
+  --color-form-tertiary: #002011;
+  --color-form-on-primary-container: #999797;
+  --color-form-on-tertiary-fixed-variant: #005233;
+
+  --spacing-form-xs: 0.25rem;
+  --spacing-form-sm: 0.5rem;
+  --spacing-form-md: 1rem;
+  --spacing-form-lg: 1.5rem;
+  --spacing-form-xl: 2rem;
+
+  --text-form-headline-lg: 28px;
+  --text-form-headline-lg--line-height: 36px;
+  --text-form-headline-lg--font-weight: 600;
+  --text-form-headline-md: 20px;
+  --text-form-headline-md--line-height: 28px;
+  --text-form-headline-md--font-weight: 600;
+  --text-form-headline-sm: 16px;
+  --text-form-headline-sm--line-height: 24px;
+  --text-form-headline-sm--font-weight: 600;
+  --text-form-body-md: 14px;
+  --text-form-body-md--line-height: 20px;
+  --text-form-body-md--font-weight: 400;
+  --text-form-body-sm: 12px;
+  --text-form-body-sm--line-height: 16px;
+  --text-form-body-sm--font-weight: 400;
+  --text-form-label-md: 14px;
+  --text-form-label-md--line-height: 20px;
+  --text-form-label-md--font-weight: 600;
+  --text-form-label-sm: 12px;
+  --text-form-label-sm--line-height: 16px;
+  --text-form-label-sm--font-weight: 500;
+}
+
+/* inline: the font variable (set by next/font on the page wrapper) is read where
+   the class is used, not at the root where it does not exist. */
+@theme inline {
+  --font-form: var(--font-inter), sans-serif;
+}
+
+/* One icon box for every inline SVG icon of the form: it follows the text size
+   of the element (the design sizes its icons with text-* classes) and defaults
+   to 20px. In the components layer, so the size utilities still win. */
+@layer components {
+  .form-icon {
+    display: inline-block;
+    flex: none;
+    width: 1em;
+    height: 1em;
+    font-size: 20px;
+    line-height: 1;
+    vertical-align: middle;
+  }
+}
