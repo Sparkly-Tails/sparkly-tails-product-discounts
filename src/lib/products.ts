@@ -4,6 +4,23 @@ export interface ProductSearchResult {
   id: string
   title: string
   variantCount: number
+  imageUrl: string | null
+}
+
+type ProductSearchNode = {
+  id: string
+  title: string
+  featuredImage: { url: string } | null
+  variants: { edges: { node: object }[] }
+}
+
+function toSearchResult(node: ProductSearchNode): ProductSearchResult {
+  return {
+    id: node.id,
+    title: node.title,
+    variantCount: node.variants.edges.length,
+    imageUrl: node.featuredImage?.url ?? null,
+  }
 }
 
 /**
@@ -15,22 +32,30 @@ export interface ProductSearchResult {
 export async function searchProducts(query: string): Promise<ProductSearchResult[]> {
   if (!query.trim()) return []
 
-  const data = await shopifyQuery<{
-    products: { edges: { node: { id: string; title: string; variants: { edges: { node: object }[] } } }[] }
-  }>(
+  const data = await shopifyQuery<{ products: { edges: { node: ProductSearchNode }[] } }>(
     `query searchProducts($q: String!) {
       products(first: 8, query: $q) {
-        edges { node { id title variants(first: 250) { edges { node { id } } } } }
+        edges { node { id title featuredImage { url } variants(first: 250) { edges { node { id } } } } }
       }
     }`,
     { q: query },
   )
 
-  return data.products.edges.map((e) => ({
-    id: e.node.id,
-    title: e.node.title,
-    variantCount: e.node.variants.edges.length,
-  }))
+  return data.products.edges.map((e) => toSearchResult(e.node))
+}
+
+/** The shop's first products with no search term, for the picker's Browse button. */
+export async function listProducts({ limit }: { limit: number }): Promise<ProductSearchResult[]> {
+  const data = await shopifyQuery<{ products: { edges: { node: ProductSearchNode }[] } }>(
+    `query listProducts($limit: Int!) {
+      products(first: $limit) {
+        edges { node { id title featuredImage { url } variants(first: 250) { edges { node { id } } } } }
+      }
+    }`,
+    { limit },
+  )
+
+  return data.products.edges.map((e) => toSearchResult(e.node))
 }
 
 export interface ProductVariantOption {
@@ -74,6 +99,9 @@ export interface MemberInfo {
   productId: string
   variantId?: string
   title: string
+  /** The product's own title, and the variant's title (absent for a whole product), for the form's rows and preview. */
+  productTitle: string
+  variantTitle?: string
   price: number
   handle: string
   imageUrl: string | null
@@ -141,6 +169,8 @@ export async function getMemberInfo(
         productId: product.id,
         variantId: undefined,
         title: product.title,
+        productTitle: product.title,
+        variantTitle: undefined,
         price: parseFloat(firstVariant.price),
         handle: product.handle,
         imageUrl: product.featuredImage?.url ?? null,
@@ -154,6 +184,8 @@ export async function getMemberInfo(
       productId: product.id,
       variantId: variant.id,
       title: `${product.title} – ${variant.title}`,
+      productTitle: product.title,
+      variantTitle: variant.title,
       price: parseFloat(variant.price),
       handle: product.handle,
       imageUrl: product.featuredImage?.url ?? null,

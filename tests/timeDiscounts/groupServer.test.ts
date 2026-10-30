@@ -16,7 +16,7 @@ const BASE = 'https://shop.myshopify.com/admin/products/'
 const products = (...members: { productId: string; variantId?: string; title: string }[]): GroupSpec['selection'] => ({ mode: 'products', members })
 const group = (selection: GroupSpec['selection'], over: Partial<GroupSpec> = {}): GroupSpec => ({ pricingMode: 'percent', amount: 20, selection, ...over })
 const lowest = (productId: string, title: string, price: number) => ({ productId, title, price })
-const info = (productId: string, variantId: string, title: string, price: number) => ({ productId, variantId, title, price, handle: 'h', imageUrl: null })
+const info = (productId: string, variantId: string, title: string, price: number) => ({ productId, variantId, title, productTitle: title, price, handle: 'h', imageUrl: null })
 const otherDiscount = (productId: string): TimeDiscount => ({
   discountId: 'time_disc_9', shopifyDiscountId: 'gid://shopify/DiscountAutomaticApp/9', name: 'Other', title: 'Other', kind: 'perProduct',
   startsAt: '2026-01-01T00:00', endsAt: '2026-01-02T00:00', items: [{ productId, pricingMode: 'percent', amount: 10 }],
