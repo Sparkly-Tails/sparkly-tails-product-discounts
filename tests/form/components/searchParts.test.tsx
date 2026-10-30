@@ -37,6 +37,17 @@ describe('SearchBox', () => {
     expect(onBrowse).toHaveBeenCalledTimes(1)
   })
 
+  it('reports when the field gets and loses focus', () => {
+    const onFocus = vi.fn()
+    const onBlur = vi.fn()
+    render(<SearchBox value="" onChange={() => {}} onClear={() => {}} onBrowse={() => {}} onFocus={onFocus} onBlur={onBlur} />)
+    const input = screen.getByRole('textbox', { name: 'Search products or variants' })
+    fireEvent.focus(input)
+    fireEvent.blur(input)
+    expect(onFocus).toHaveBeenCalledTimes(1)
+    expect(onBlur).toHaveBeenCalledTimes(1)
+  })
+
   it('shows what it is given under the box, such as the results', () => {
     render(<SearchBox value="" onChange={() => {}} onClear={() => {}} onBrowse={() => {}}><p>below</p></SearchBox>)
     expect(screen.getByText('below')).toBeInTheDocument()
