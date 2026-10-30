@@ -54,6 +54,7 @@ export interface WidgetViewModel {
   dot: WidgetDot | null
   promoLine: string
   status: WidgetStatus | null
+  semantics: { valueNow: number; valueMin: number; valueMax: number; valueText: string } | null
 }
 
 export interface ComputeViewModelOptions {

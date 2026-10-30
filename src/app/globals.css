@@ -3,6 +3,8 @@
 @import "../home/home.css";
 /* The tier discount form design tokens: imported here for the same reason. */
 @import "../form/form.css";
+/* The storefront widget's stylesheet: the form's preview paints the widget with it (every selector starts with .sparkly-tier-pricing). */
+@import "../../extensions/product-tier-pricing/assets/tier-pricing.css";
 
 :root {
   --background: oklch(99% 0.003 145);
