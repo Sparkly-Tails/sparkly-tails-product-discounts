@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   isPercentRowComplete, isFixedRowComplete, parseAnchorPrice, buildPercentTiers, buildFixedTiers, describePercentTier, describeFixedTier,
+  buildPercentRows, buildFixedRows, updateRow, keepOtherRows, readCurrencySymbol,
   type PercentRowValues, type FixedRowValues,
 } from '@/form/tierRows'
 import { totalAtThreshold, clampedFixedPrice } from '@/lib/tier-math'
@@ -103,5 +104,51 @@ describe('describeFixedTier', () => {
 
   it('shows nothing until there is a price to work from', () => {
     expect(describeFixedTier({ basePrice: null, fixedPrice: 21, formatPrice, tools })).toEqual({ eachLabel: '', offLabel: '' })
+  })
+})
+
+describe('buildPercentRows', () => {
+  it('turns saved tiers into rows of text with their own keys', () => {
+    let count = 0
+    const rows = buildPercentRows({ tiers: [{ minQty: 2, percentOff: 10, anchorPrice: 600 }, { minQty: 4, percentOff: 15 }], makeKey: () => `key-${++count}` })
+    expect(rows).toEqual([
+      { key: 'key-1', minQty: '2', percentOff: '10', anchorPrice: '600' },
+      { key: 'key-2', minQty: '4', percentOff: '15', anchorPrice: '' },
+    ])
+  })
+
+  it('returns no rows for no tiers', () => {
+    expect(buildPercentRows({ tiers: [], makeKey: () => 'k' })).toEqual([])
+  })
+})
+
+describe('buildFixedRows', () => {
+  it('turns saved fixed-price tiers into rows of text', () => {
+    expect(buildFixedRows({ tiers: [{ minQty: 3, fixedPrice: 1.5 }], makeKey: () => 'k1' })).toEqual([{ key: 'k1', minQty: '3', fixedPrice: '1.5' }])
+  })
+})
+
+describe('updateRow', () => {
+  it('changes one field of the row with that key and nothing else', () => {
+    const rows = [percentRow('2', '10'), percentRow('4', '15')]
+    expect(updateRow({ rows, key: rows[1].key, field: 'percentOff', value: '20' })).toEqual([rows[0], { ...rows[1], percentOff: '20' }])
+  })
+
+  it('leaves the rows alone when no row has the key', () => {
+    const rows = [percentRow('2', '10')]
+    expect(updateRow({ rows, key: 'nope', field: 'minQty', value: '9' })).toEqual(rows)
+  })
+})
+
+describe('keepOtherRows', () => {
+  it('drops the row with that key', () => {
+    const rows = [percentRow('2', '10'), percentRow('4', '15')]
+    expect(keepOtherRows({ rows, key: rows[0].key })).toEqual([rows[1]])
+  })
+})
+
+describe('readCurrencySymbol', () => {
+  it.each([['USD', '$'], ['GBP', '£'], ['EUR', '€']])('reads the symbol of %s', (currencyCode, symbol) => {
+    expect(readCurrencySymbol({ currencyCode })).toBe(symbol)
   })
 })

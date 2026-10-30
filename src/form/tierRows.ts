@@ -90,3 +90,40 @@ export function describeFixedTier({ basePrice, fixedPrice, formatPrice, tools }:
   const unitPrice = tools.clampedFixedPrice(basePrice, fixedPrice)
   return { eachLabel: `${formatPrice(unitPrice)} ea`, offLabel: `${Math.round((1 - unitPrice / basePrice) * 1000) / 10}% off` }
 }
+
+/** Rows of text from the saved percentage tiers; `makeKey` gives each row its own key. */
+export function buildPercentRows({ tiers, makeKey }: {
+  tiers: { minQty: number; percentOff: number; anchorPrice?: number }[]
+  makeKey: () => string
+}): PercentRowValues[] {
+  const rows: PercentRowValues[] = []
+  for (const tier of tiers) {
+    rows.push({ key: makeKey(), minQty: String(tier.minQty), percentOff: String(tier.percentOff), anchorPrice: tier.anchorPrice === undefined ? '' : String(tier.anchorPrice) })
+  }
+  return rows
+}
+
+export function buildFixedRows({ tiers, makeKey }: { tiers: { minQty: number; fixedPrice: number }[]; makeKey: () => string }): FixedRowValues[] {
+  const rows: FixedRowValues[] = []
+  for (const tier of tiers) rows.push({ key: makeKey(), minQty: String(tier.minQty), fixedPrice: String(tier.fixedPrice) })
+  return rows
+}
+
+/** The rows with one field of the row that has this key replaced. */
+export function updateRow<Row extends { key: string }>({ rows, key, field, value }: { rows: Row[]; key: string; field: keyof Row; value: string }): Row[] {
+  const next: Row[] = []
+  for (const row of rows) next.push(row.key === key ? { ...row, [field]: value } : row)
+  return next
+}
+
+export function keepOtherRows<Row extends { key: string }>({ rows, key }: { rows: Row[]; key: string }): Row[] {
+  const kept: Row[] = []
+  for (const row of rows) if (row.key !== key) kept.push(row)
+  return kept
+}
+
+/** "$", "£", "€" for the shop's currency code. */
+export function readCurrencySymbol({ currencyCode }: { currencyCode: string }): string {
+  const parts = new Intl.NumberFormat('en', { style: 'currency', currency: currencyCode, currencyDisplay: 'narrowSymbol' }).formatToParts(0)
+  return parts.find((part) => part.type === 'currency')?.value ?? currencyCode
+}
