@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { isFormDirty, buildComparable, buildPreviewProducts, type FormValues } from '@/form/formValues'
+import { isFormDirty, buildComparable, buildPreviewProducts, canSaveValues, buildPreviewFlash, pickBasePrice, type FormValues } from '@/form/formValues'
 
 const SAVED: FormValues = {
   name: 'Salmon Oil Volume Discount',
@@ -67,5 +67,27 @@ describe('buildPreviewProducts', () => {
 
   it('has no products for no members', () => {
     expect(buildPreviewProducts({ members: [] })).toEqual([])
+  })
+})
+
+describe('canSaveValues', () => {
+  it('needs a product and a complete tier', () => {
+    expect(canSaveValues({ values: SAVED })).toBe(true)
+    expect(canSaveValues({ values: { ...SAVED, members: [] } })).toBe(false)
+    expect(canSaveValues({ values: { ...SAVED, tiers: [] } })).toBe(false)
+  })
+})
+
+describe('buildPreviewFlash', () => {
+  it('gives the window while the flash sale is on and nothing while it is off', () => {
+    expect(buildPreviewFlash({ flash: SAVED.flash })).toEqual({ startsAt: '2026-11-27T09:00', endsAt: '2026-11-30T23:59', showTeaser: true })
+    expect(buildPreviewFlash({ flash: { ...SAVED.flash, enabled: false } })).toBeNull()
+  })
+})
+
+describe('pickBasePrice', () => {
+  it('is the price of the first product, or nothing without a product', () => {
+    expect(pickBasePrice({ members: SAVED.members })).toBe(28)
+    expect(pickBasePrice({ members: [] })).toBeNull()
   })
 })
