@@ -137,3 +137,8 @@ export function findDiscountOrThrow(config: { discounts: Discount[] }, discountI
   if (!discount) throw new Error(`Discount ${discountId} not found`)
   return discount
 }
+
+/** The id of a new discount. */
+export function createDiscountId(): string {
+  return `disc_${crypto.randomUUID()}`
+}
