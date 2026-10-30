@@ -29,6 +29,7 @@ export default [
   'src/lib/pricesUniform.ts',
   'src/lib/product-tiers.ts',
   'src/lib/products.ts',
+  'src/lib/zonedTime.ts',
   'src/lib/proxyDecision.ts',
   'src/lib/requestShop.ts',
   'src/lib/sessionDecision.ts',
