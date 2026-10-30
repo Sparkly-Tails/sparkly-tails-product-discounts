@@ -106,7 +106,7 @@ describe('getMemberInfo', () => {
 
     const info = await getMemberInfo([{ productId: 'gid://shopify/Product/1' }])
     expect(info).toEqual([
-      { productId: 'gid://shopify/Product/1', variantId: undefined, title: 'Tuna Soup', price: 1.49, handle: 'tuna-soup', imageUrl: 'https://x/tuna.png' },
+      { productId: 'gid://shopify/Product/1', variantId: undefined, title: 'Tuna Soup', productTitle: 'Tuna Soup', variantTitle: undefined, price: 1.49, handle: 'tuna-soup', imageUrl: 'https://x/tuna.png' },
     ])
   })
 
@@ -127,7 +127,7 @@ describe('getMemberInfo', () => {
 
     const info = await getMemberInfo([{ productId: 'gid://shopify/Product/2', variantId: 'gid://shopify/ProductVariant/21' }])
     expect(info).toEqual([
-      { productId: 'gid://shopify/Product/2', variantId: 'gid://shopify/ProductVariant/21', title: 'Wet Cat Food – Salmon', price: 1.59, handle: 'wet-cat-food', imageUrl: null },
+      { productId: 'gid://shopify/Product/2', variantId: 'gid://shopify/ProductVariant/21', title: 'Wet Cat Food – Salmon', productTitle: 'Wet Cat Food', variantTitle: 'Salmon', price: 1.59, handle: 'wet-cat-food', imageUrl: null },
     ])
   })
 

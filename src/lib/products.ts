@@ -99,6 +99,9 @@ export interface MemberInfo {
   productId: string
   variantId?: string
   title: string
+  /** The product's own title, and the variant's title (absent for a whole product), for the form's rows and preview. */
+  productTitle: string
+  variantTitle?: string
   price: number
   handle: string
   imageUrl: string | null
@@ -166,6 +169,8 @@ export async function getMemberInfo(
         productId: product.id,
         variantId: undefined,
         title: product.title,
+        productTitle: product.title,
+        variantTitle: undefined,
         price: parseFloat(firstVariant.price),
         handle: product.handle,
         imageUrl: product.featuredImage?.url ?? null,
@@ -179,6 +184,8 @@ export async function getMemberInfo(
       productId: product.id,
       variantId: variant.id,
       title: `${product.title} – ${variant.title}`,
+      productTitle: product.title,
+      variantTitle: variant.title,
       price: parseFloat(variant.price),
       handle: product.handle,
       imageUrl: product.featuredImage?.url ?? null,
