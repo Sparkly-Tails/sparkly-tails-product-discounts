@@ -4,6 +4,7 @@ import type { FlashValues } from '@/form/components/FlashCard'
 import type { SelectedMember } from '@/form/memberSelection'
 import type { PreviewTier } from '@/form/tierRows'
 import type { PreviewProduct } from '@/form/preview/buildPreviewModel'
+import type { FlashInput } from '@/form/preview/previewModel'
 
 export interface FormValues {
   name: string
@@ -40,4 +41,19 @@ export function buildPreviewProducts({ members }: { members: SelectedMember[] })
     price: member.price,
     imageUrl: member.imageUrl,
   }))
+}
+
+/** A discount can be saved with a product and a complete tier (the server refuses it otherwise). */
+export function canSaveValues({ values }: { values: FormValues }): boolean {
+  return values.members.length > 0 && values.tiers.length > 0
+}
+
+/** The flash sale as the preview reads it: the window while the switch is on, else none. */
+export function buildPreviewFlash({ flash }: { flash: FlashValues }): FlashInput | null {
+  return flash.enabled ? { startsAt: flash.startsAt, endsAt: flash.endsAt, showTeaser: flash.showTeaser } : null
+}
+
+/** The price the tiers are worked out from: the first product's, or none while no product is chosen. */
+export function pickBasePrice({ members }: { members: SelectedMember[] }): number | null {
+  return members.length > 0 ? members[0].price : null
 }

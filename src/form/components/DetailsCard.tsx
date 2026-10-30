@@ -1,10 +1,13 @@
 'use client'
 
+import { useState } from 'react'
 import Card from '@/form/components/Card'
 
 // The "Details" card: the discount's name, which only the merchant sees. (The
 // design's customer-facing Title field is gone: a new discount's title is its name.)
 export default function DetailsCard({ initialName, onNameChange }: { initialName: string; onNameChange?: (name: string) => void }) {
+  // Held in state (not left to the browser) so a form that is sent and comes back with an error keeps what was typed.
+  const [name, setName] = useState(initialName)
   return (
     <Card>
       <div className="pb-1">
@@ -21,9 +24,9 @@ export default function DetailsCard({ initialName, onNameChange }: { initialName
             name="name"
             type="text"
             required
-            defaultValue={initialName}
+            value={name}
             placeholder="BFCM_2026_TIER_PROMO"
-            onChange={(event) => onNameChange?.(event.target.value)}
+            onChange={(event) => { setName(event.target.value); onNameChange?.(event.target.value) }}
             className="w-full h-10 px-3 rounded-lg bg-form-surface-container-lowest border border-form-outline-variant/60 text-form-on-surface text-form-body-md focus:outline-none focus:border-form-secondary transition-colors"
           />
           <p className="text-form-body-sm text-form-on-surface-variant">ID name of the discount, only visible in store admin</p>
