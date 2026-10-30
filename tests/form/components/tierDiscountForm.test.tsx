@@ -181,6 +181,14 @@ describe('TierDiscountForm: the preview follows the form', () => {
 })
 
 describe('TierDiscountForm: saving', () => {
+  it('names the discount being edited in the form, and says nothing for a new one', () => {
+    const { container } = renderForm({ excludeDiscountId: 'disc_1' })
+    expect(container.querySelector('input[name="discountId"]')).toHaveValue('disc_1')
+    cleanup()
+    const created = renderForm({ mode: 'create', initial: EMPTY, initialTiers: EMPTY_TIERS })
+    expect(created.container.querySelector('input[name="discountId"]')).toBeNull()
+  })
+
   it('sends the name, the products, the mode and the tiers to the save action', async () => {
     const { saveAction } = renderForm()
     await act(async () => { fireEvent.submit(screen.getByRole('button', { name: 'Save' }).closest('form')!) })

@@ -48,6 +48,7 @@ export default function TierDiscountForm({
 
   return (
     <form action={formAction}>
+      {excludeDiscountId ? <input type="hidden" name="discountId" value={excludeDiscountId} /> : null}
       <FormShell
         breadcrumbLabel={breadcrumbLabel}
         heading={heading}
