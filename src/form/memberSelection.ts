@@ -1,3 +1,5 @@
+import type { ProductSearchResult, ProductVariantOption } from '@/lib/products'
+
 // What the products card knows about the chosen products: one entry per
 // (product, variant) the discount applies to, and the text that sums a product up.
 
@@ -53,5 +55,58 @@ export function describeGroup({ group, currencyCode, formatPrice }: {
 export function removeProductMembers({ members, productId }: { members: SelectedMember[]; productId: string }): SelectedMember[] {
   const kept: SelectedMember[] = []
   for (const member of members) if (member.productId !== productId) kept.push(member)
+  return kept
+}
+
+export function isMemberSelected({ members, productId, variantId }: { members: SelectedMember[]; productId: string; variantId: string | undefined }): boolean {
+  const keys = members.map((member) => `${member.productId}|${member.variantId ?? ''}`)
+  return keys.includes(`${productId}|${variantId ?? ''}`)
+}
+
+/** The members with this one at the end, unless the same product and variant is already there. */
+export function addMemberOnce({ members, member }: { members: SelectedMember[]; member: SelectedMember }): SelectedMember[] {
+  const keys = members.map((chosen) => `${chosen.productId}|${chosen.variantId ?? ''}`)
+  return keys.includes(`${member.productId}|${member.variantId ?? ''}`) ? members : [...members, member]
+}
+
+export function countMembersOfProduct({ members, productId }: { members: SelectedMember[]; productId: string }): number {
+  let count = 0
+  for (const member of members) if (member.productId === productId) count += 1
+  return count
+}
+
+/** True when nothing of the product is left to choose (a product always has at least one variant). */
+export function isProductFullySelected({ variantCount, selectedCount }: { variantCount: number; selectedCount: number }): boolean {
+  return selectedCount >= Math.max(variantCount, 1)
+}
+
+interface UnselectedProductTools {
+  countMembersOfProduct: typeof countMembersOfProduct
+  isProductFullySelected: typeof isProductFullySelected
+}
+
+/** The search results the person can still add something from. */
+export function keepUnselectedProducts({ results, members, tools }: {
+  results: ProductSearchResult[]
+  members: SelectedMember[]
+  tools: UnselectedProductTools
+}): ProductSearchResult[] {
+  const kept: ProductSearchResult[] = []
+  for (const result of results) {
+    const selectedCount = tools.countMembersOfProduct({ members, productId: result.id })
+    if (!tools.isProductFullySelected({ variantCount: result.variantCount, selectedCount })) kept.push(result)
+  }
+  return kept
+}
+
+/** The variants of one product the person has not chosen yet. */
+export function keepUnselectedVariants({ options, members, productId, tools }: {
+  options: ProductVariantOption[]
+  members: SelectedMember[]
+  productId: string
+  tools: { isMemberSelected: typeof isMemberSelected }
+}): ProductVariantOption[] {
+  const kept: ProductVariantOption[] = []
+  for (const option of options) if (!tools.isMemberSelected({ members, productId, variantId: option.variantId })) kept.push(option)
   return kept
 }
