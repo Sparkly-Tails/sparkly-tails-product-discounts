@@ -21,7 +21,7 @@ describe('searchTimeDiscountProductsAction', () => {
   })
 
   it('drops a single-variant result already claimed by the existing tiered-discount system', async () => {
-    vi.spyOn(productsLib, 'searchProducts').mockResolvedValue([{ id: 'gid://shopify/Product/1', title: 'Tuna Soup', variantCount: 1 }])
+    vi.spyOn(productsLib, 'searchProducts').mockResolvedValue([{ id: 'gid://shopify/Product/1', title: 'Tuna Soup', variantCount: 1, imageUrl: null }])
     vi.spyOn(configLib, 'getConfig').mockResolvedValue({
       discounts: [{ discountId: 'disc_1', name: 'X', title: 'X', status: 'live', pricingMode: 'percent', members: [{ productId: 'gid://shopify/Product/1' }], tiers: [] }],
     })
@@ -29,7 +29,7 @@ describe('searchTimeDiscountProductsAction', () => {
   })
 
   it('drops a single-variant result already claimed by another time discount', async () => {
-    vi.spyOn(productsLib, 'searchProducts').mockResolvedValue([{ id: 'gid://shopify/Product/1', title: 'Tuna Soup', variantCount: 1 }])
+    vi.spyOn(productsLib, 'searchProducts').mockResolvedValue([{ id: 'gid://shopify/Product/1', title: 'Tuna Soup', variantCount: 1, imageUrl: null }])
     vi.spyOn(timeConfigLib, 'getTimeDiscountsConfig').mockResolvedValue({
       discounts: [{
         discountId: 'time_disc_1', shopifyDiscountId: 'gid://shopify/DiscountAutomaticApp/1', name: 'X', title: 'X',
@@ -41,7 +41,7 @@ describe('searchTimeDiscountProductsAction', () => {
   })
 
   it('keeps a result claimed only by the discount being edited', async () => {
-    vi.spyOn(productsLib, 'searchProducts').mockResolvedValue([{ id: 'gid://shopify/Product/1', title: 'Tuna Soup', variantCount: 1 }])
+    vi.spyOn(productsLib, 'searchProducts').mockResolvedValue([{ id: 'gid://shopify/Product/1', title: 'Tuna Soup', variantCount: 1, imageUrl: null }])
     vi.spyOn(timeConfigLib, 'getTimeDiscountsConfig').mockResolvedValue({
       discounts: [{
         discountId: 'time_disc_1', shopifyDiscountId: 'gid://shopify/DiscountAutomaticApp/1', name: 'X', title: 'X',
@@ -49,7 +49,7 @@ describe('searchTimeDiscountProductsAction', () => {
         items: [{ productId: 'gid://shopify/Product/1', pricingMode: 'percent', amount: 10 }],
       }],
     })
-    expect(await searchTimeDiscountProductsAction('tuna', 'time_disc_1')).toEqual([{ id: 'gid://shopify/Product/1', title: 'Tuna Soup', variantCount: 1 }])
+    expect(await searchTimeDiscountProductsAction('tuna', 'time_disc_1')).toEqual([{ id: 'gid://shopify/Product/1', title: 'Tuna Soup', variantCount: 1, imageUrl: null }])
   })
 })
 

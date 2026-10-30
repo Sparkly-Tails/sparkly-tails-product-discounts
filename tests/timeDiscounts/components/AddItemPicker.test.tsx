@@ -30,7 +30,7 @@ async function pick(user: ReturnType<typeof userEvent.setup>, name: string) {
 describe('AddItemPicker', () => {
   it('hands a single-variant product to onSelect with its price, and keeps no list of its own', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
-    vi.spyOn(pickerActions, 'searchTimeDiscountProductsAction').mockResolvedValue([{ id: 'gid://shopify/Product/1', title: 'Tuna Soup', variantCount: 1 }])
+    vi.spyOn(pickerActions, 'searchTimeDiscountProductsAction').mockResolvedValue([{ id: 'gid://shopify/Product/1', title: 'Tuna Soup', variantCount: 1, imageUrl: null }])
     vi.spyOn(pickerActions, 'getTimeDiscountProductVariantsAction').mockResolvedValue([{ variantId: 'gid://shopify/ProductVariant/900', title: 'Default', price: 4.5 }])
     vi.spyOn(pickerActions, 'validateTimeDiscountMemberAction').mockResolvedValue({ ok: true })
     const onSelect = vi.fn()
@@ -46,7 +46,7 @@ describe('AddItemPicker', () => {
 
   it('expands a multi-variant product and hands the chosen variant to onSelect', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
-    vi.spyOn(pickerActions, 'searchTimeDiscountProductsAction').mockResolvedValue([{ id: 'gid://shopify/Product/2', title: 'Salmon Bowl', variantCount: 2 }])
+    vi.spyOn(pickerActions, 'searchTimeDiscountProductsAction').mockResolvedValue([{ id: 'gid://shopify/Product/2', title: 'Salmon Bowl', variantCount: 2, imageUrl: null }])
     vi.spyOn(pickerActions, 'getTimeDiscountProductVariantsAction').mockResolvedValue([
       { variantId: 'gid://shopify/ProductVariant/901', title: 'Small', price: 3 },
       { variantId: 'gid://shopify/ProductVariant/902', title: 'Large', price: 5 },
@@ -67,8 +67,8 @@ describe('AddItemPicker', () => {
   it('leaves products already in the discount out of the results, and variants already added out of the variant list', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
     vi.spyOn(pickerActions, 'searchTimeDiscountProductsAction').mockResolvedValue([
-      { id: 'gid://shopify/Product/1', title: 'Tuna Soup', variantCount: 1 },
-      { id: 'gid://shopify/Product/2', title: 'Salmon Bowl', variantCount: 2 },
+      { id: 'gid://shopify/Product/1', title: 'Tuna Soup', variantCount: 1, imageUrl: null },
+      { id: 'gid://shopify/Product/2', title: 'Salmon Bowl', variantCount: 2, imageUrl: null },
     ])
     vi.spyOn(pickerActions, 'getTimeDiscountProductVariantsAction').mockResolvedValue([
       { variantId: 'gid://shopify/ProductVariant/901', title: 'Small', price: 3 },
@@ -91,7 +91,7 @@ describe('AddItemPicker', () => {
 
   it('shows the server\'s reason inline and does not select when the product belongs to another discount', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
-    vi.spyOn(pickerActions, 'searchTimeDiscountProductsAction').mockResolvedValue([{ id: 'gid://shopify/Product/1', title: 'Tuna Soup', variantCount: 1 }])
+    vi.spyOn(pickerActions, 'searchTimeDiscountProductsAction').mockResolvedValue([{ id: 'gid://shopify/Product/1', title: 'Tuna Soup', variantCount: 1, imageUrl: null }])
     vi.spyOn(pickerActions, 'validateTimeDiscountMemberAction').mockResolvedValue({ ok: false, error: 'This product already belongs to another discount' })
     const onSelect = vi.fn()
 
@@ -105,7 +105,7 @@ describe('AddItemPicker', () => {
 
   it('shows an error and does not select when a single-variant product\'s price lookup returns empty', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
-    vi.spyOn(pickerActions, 'searchTimeDiscountProductsAction').mockResolvedValue([{ id: 'gid://shopify/Product/1', title: 'Tuna Soup', variantCount: 1 }])
+    vi.spyOn(pickerActions, 'searchTimeDiscountProductsAction').mockResolvedValue([{ id: 'gid://shopify/Product/1', title: 'Tuna Soup', variantCount: 1, imageUrl: null }])
     vi.spyOn(pickerActions, 'getTimeDiscountProductVariantsAction').mockResolvedValue([])
     vi.spyOn(pickerActions, 'validateTimeDiscountMemberAction').mockResolvedValue({ ok: true })
     const onSelect = vi.fn()
@@ -120,7 +120,7 @@ describe('AddItemPicker', () => {
 
   it('shows an error and does not select when validateTimeDiscountMemberAction throws during single-variant selection', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
-    vi.spyOn(pickerActions, 'searchTimeDiscountProductsAction').mockResolvedValue([{ id: 'gid://shopify/Product/1', title: 'Tuna Soup', variantCount: 1 }])
+    vi.spyOn(pickerActions, 'searchTimeDiscountProductsAction').mockResolvedValue([{ id: 'gid://shopify/Product/1', title: 'Tuna Soup', variantCount: 1, imageUrl: null }])
     vi.spyOn(pickerActions, 'validateTimeDiscountMemberAction').mockRejectedValue(new Error('boom'))
     const onSelect = vi.fn()
 
@@ -134,7 +134,7 @@ describe('AddItemPicker', () => {
 
   it('shows an error and does not select when validateTimeDiscountMemberAction throws during multi-variant selection', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
-    vi.spyOn(pickerActions, 'searchTimeDiscountProductsAction').mockResolvedValue([{ id: 'gid://shopify/Product/2', title: 'Salmon Bowl', variantCount: 2 }])
+    vi.spyOn(pickerActions, 'searchTimeDiscountProductsAction').mockResolvedValue([{ id: 'gid://shopify/Product/2', title: 'Salmon Bowl', variantCount: 2, imageUrl: null }])
     vi.spyOn(pickerActions, 'getTimeDiscountProductVariantsAction').mockResolvedValue([
       { variantId: 'gid://shopify/ProductVariant/901', title: 'Small', price: 3 },
       { variantId: 'gid://shopify/ProductVariant/902', title: 'Large', price: 5 },
