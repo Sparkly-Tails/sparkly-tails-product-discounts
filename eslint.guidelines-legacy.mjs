@@ -30,6 +30,7 @@ export default [
   'src/lib/product-tiers.ts',
   'src/lib/products.ts',
   'src/lib/zonedTime.ts',
+  'src/actions/discountSteps.ts',
   'src/lib/proxyDecision.ts',
   'src/lib/requestShop.ts',
   'src/lib/sessionDecision.ts',
