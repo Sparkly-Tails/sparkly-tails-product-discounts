@@ -31,6 +31,11 @@ describe('the app stylesheet carries the form tokens', () => {
     expect(css).toContain('--color-form-secondary: #0055c7')
   })
 
+  it('carries the storefront widget stylesheet, which the form preview paints with', () => {
+    expect(css).toContain('.sparkly-tier-pricing__flash')
+    expect(css).toContain('.sparkly-tier-pricing__chip')
+  })
+
   it('gives a text size its line height and weight', () => {
     expect(css).toContain('--text-form-headline-lg--line-height: 36px')
     expect(css).toContain('--text-form-headline-lg--font-weight: 600')
