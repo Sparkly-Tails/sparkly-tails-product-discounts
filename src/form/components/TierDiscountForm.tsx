@@ -20,12 +20,14 @@ export type SaveState = { error: string } | null
 // card to show the preview, to say when something is unsaved, to allow saving
 // only with a product and a complete tier, and to take everything back on Discard.
 export default function TierDiscountForm({
-  breadcrumbLabel, heading, badge, mode, initial, initialTiers, currencyCode, shopTimezone, nowLocal, initialNowSeconds, excludeDiscountId, saveAction,
+  breadcrumbLabel, heading, badge, mode, status, initial, initialTiers, currencyCode, shopTimezone, nowLocal, initialNowSeconds, excludeDiscountId, saveAction, deleteAction,
 }: {
   breadcrumbLabel: string
   heading: string
   badge: string
   mode: 'create' | 'edit'
+  /** Whether the discount is live (the footer then offers Take offline instead of Go live). */
+  status: 'draft' | 'live'
   initial: FormValues
   initialTiers: TiersInitial
   currencyCode: string
@@ -35,6 +37,8 @@ export default function TierDiscountForm({
   initialNowSeconds: number
   excludeDiscountId?: string
   saveAction: (state: SaveState, formData: FormData) => Promise<SaveState>
+  /** Deletes the discount (Edit only); without it the footer has no Delete. */
+  deleteAction?: () => Promise<void>
 }) {
   const [values, setValues] = useState(initial)
   const [discardCount, setDiscardCount] = useState(0)
@@ -64,7 +68,7 @@ export default function TierDiscountForm({
             initialNowSeconds={initialNowSeconds}
           />
         }
-        footer={<FormActions mode={mode} isDirty={isDirty} canSave={canSaveValues({ values })} saveState={saveState} onDiscard={resetValues} />}
+        footer={<FormActions mode={mode} status={status} isDirty={isDirty} canSave={canSaveValues({ values })} saveState={saveState} deleteAction={deleteAction} onDiscard={resetValues} />}
       >
         <Fragment key={discardCount}>
           <DetailsCard initialName={initial.name} onNameChange={(name) => setValues((current) => ({ ...current, name }))} />

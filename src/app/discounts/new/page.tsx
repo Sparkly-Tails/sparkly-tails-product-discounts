@@ -15,6 +15,7 @@ export default async function NewDiscountPage() {
         heading="Create tier discount"
         badge="Draft"
         mode="create"
+        status="draft"
         initial={EMPTY_FORM_VALUES}
         initialTiers={EMPTY_TIERS}
         currencyCode={currencyCode}

@@ -32,7 +32,7 @@ function renderForm(overrides: Partial<Parameters<typeof TierDiscountForm>[0]> =
     <TierDiscountForm
       breadcrumbLabel="Edit tier discount" heading="Salmon Oil Volume Discount" badge="Draft" mode="edit"
       initial={SAVED} initialTiers={SAVED_TIERS} currencyCode="USD" shopTimezone="UTC" nowLocal="2026-10-30T12:00"
-      initialNowSeconds={NOW} saveAction={saveAction} {...overrides}
+      initialNowSeconds={NOW} status="draft" saveAction={saveAction} {...overrides}
     />,
   )
   return { saveAction, ...view }
@@ -110,6 +110,30 @@ describe('TierDiscountForm: the footer', () => {
     expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
     fireEvent.change(screen.getByLabelText('Tier 1 percent off'), { target: { value: '' } })
     expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+  })
+})
+
+describe('TierDiscountForm: the edit footer', () => {
+  it('has Delete first, then Discard, Go live and Save, for a draft', () => {
+    renderForm({ status: 'draft', deleteAction: async () => {} })
+    const names = screen.getAllByRole('button').map((button) => button.textContent).filter((text) => ['Delete', 'Discard', 'Go live', 'Take offline', 'Save'].includes(text ?? ''))
+    expect(names).toEqual(['Delete', 'Discard', 'Go live', 'Save'])
+  })
+
+  it('has Take offline instead of Go live for a live discount', () => {
+    renderForm({ status: 'live', deleteAction: async () => {} })
+    expect(screen.getByRole('button', { name: 'Take offline' })).toHaveAttribute('name', 'takeOffline')
+    expect(screen.queryByRole('button', { name: 'Go live' })).toBeNull()
+  })
+
+  it('has no Delete on the create page', () => {
+    renderForm({ mode: 'create', initial: EMPTY, initialTiers: EMPTY_TIERS })
+    expect(screen.queryByRole('button', { name: 'Delete' })).toBeNull()
+  })
+
+  it('can delete even when the form is not valid to save', () => {
+    renderForm({ initial: { ...SAVED, tiers: [] }, deleteAction: async () => {} })
+    expect(screen.getByRole('button', { name: 'Delete' })).toBeEnabled()
   })
 })
 
