@@ -2,9 +2,15 @@
 import type { Discount, DiscountMember, FlashSale } from '@/lib/config'
 import type { ParsedDiscount } from '@/form/parseDiscountForm'
 
-/** Go live makes the discount live; any other save leaves its status as it is. */
-export function pickStatus({ goLive, current }: { goLive: boolean; current: 'draft' | 'live' }): 'draft' | 'live' {
-  return goLive ? 'live' : current
+/** Go live makes the discount live, Take offline makes it a draft; any other save leaves its status as it is. */
+export function pickStatus({ goLive, takeOffline, current }: { goLive: boolean; takeOffline: boolean; current: 'draft' | 'live' }): 'draft' | 'live' {
+  if (goLive) return 'live'
+  return takeOffline ? 'draft' : current
+}
+
+/** What a discount has on the storefront: its members while it is live, nothing otherwise. */
+export function readLiveMembers({ discount }: { discount: Discount | undefined }): DiscountMember[] {
+  return discount && discount.status === 'live' ? discount.members : []
 }
 
 /** The parts of a discount the form decides (a flash sale or High Demand that is off is left out). */
@@ -32,7 +38,7 @@ export function buildNewDiscount({ values, discountId, tools }: {
     discountId,
     name: values.name,
     title: values.name,
-    status: tools.pickStatus({ goLive: values.goLive, current: 'draft' }),
+    status: tools.pickStatus({ goLive: values.goLive, takeOffline: values.takeOffline, current: 'draft' }),
     ...tools.buildDiscountFields({ values }),
   }
 }
@@ -46,7 +52,7 @@ export function mergeDiscount({ existing, values, tools }: {
   return {
     ...existing,
     name: values.name,
-    status: tools.pickStatus({ goLive: values.goLive, current: existing.status }),
+    status: tools.pickStatus({ goLive: values.goLive, takeOffline: values.takeOffline, current: existing.status }),
     ...tools.buildDiscountFields({ values }),
     flash: tools.keepRecordId({ flash: values.flash ?? undefined, previousRecordId: tools.readRecordId({ discount: existing }) }),
   }

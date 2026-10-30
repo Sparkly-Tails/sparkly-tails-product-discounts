@@ -11,7 +11,7 @@ import {
 } from '@/form/saveFlow'
 import {
   buildDiscountFields, buildNewDiscount, describeSaveError, isWindowChanged, isWindowCheckNeeded, keepRecordId, listRemovedProducts, mergeDiscount,
-  pickStatus, readRecordId, replaceDiscount,
+  pickStatus, readLiveMembers, readRecordId, replaceDiscount,
 } from '@/form/saveSteps'
 
 export const SAVE_TOOLS: SaveTools = {
@@ -30,6 +30,7 @@ export const SAVE_TOOLS: SaveTools = {
   findDiscountOrThrow,
   newDiscountId: createDiscountId,
   pickStatus,
+  readLiveMembers,
   buildDiscountFields,
   readRecordId,
   keepRecordId,

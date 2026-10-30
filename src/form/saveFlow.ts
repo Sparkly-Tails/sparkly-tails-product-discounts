@@ -6,7 +6,7 @@
 // changed (the flash sale's discount), then the config is saved, then the
 // storefront is updated. A refusal anywhere before the config is saved leaves
 // everything as it was.
-import type { Config, Discount, DiscountMember, FlashSale } from '@/lib/config'
+import type { Config, Discount, FlashSale } from '@/lib/config'
 import type { assertFlashWindow, assertMembersAvailable, assertMembersAvailableEverywhere, assertPricingAllowed, findDiscountOrThrow, needsRecordSync, syncRecordOf } from '@/actions/discountSteps'
 import type { ParsedDiscount } from '@/form/parseDiscountForm'
 import type * as Steps from '@/form/saveSteps'
@@ -40,6 +40,7 @@ export interface SaveTools {
   newDiscountId: () => string
   // the pure steps (saveSteps.ts)
   pickStatus: typeof Steps.pickStatus
+  readLiveMembers: typeof Steps.readLiveMembers
   buildDiscountFields: typeof Steps.buildDiscountFields
   readRecordId: typeof Steps.readRecordId
   keepRecordId: typeof Steps.keepRecordId
@@ -102,18 +103,19 @@ export function buildConfig({ plan, tools }: { plan: SavePlan; tools: SaveTools 
     : { discounts: [...plan.config.discounts, plan.next] }
 }
 
-/** The products the discount had that the save takes away. */
+/** The products that were on the storefront and no longer are: dropped from a live discount, or all of them when it is taken offline. */
 export function listPlanRemovals({ plan, tools }: { plan: SavePlan; tools: SaveTools }): { productId: string }[] {
-  const previousMembers: DiscountMember[] = plan.existing ? plan.existing.members : []
-  return tools.listRemovedProducts({ previousMembers, nextMembers: plan.next.members })
+  return tools.listRemovedProducts({
+    previousMembers: tools.readLiveMembers({ discount: plan.existing }),
+    nextMembers: tools.readLiveMembers({ discount: plan.next }),
+  })
 }
 
-/** A live discount puts its prices on the storefront (after clearing the products it no longer has). */
+/** The storefront follows the saved discount: what it no longer has is cleared, and a live one puts its prices on. */
 export async function syncStorefront({ plan, tools }: { plan: SavePlan; tools: SaveTools }): Promise<void> {
-  if (plan.next.status !== 'live') return
   const removed = tools.listPlanRemovals({ plan, tools })
   if (removed.length > 0) await tools.clearDiscountMetafields(removed)
-  await tools.syncDiscountMetafields(plan.next)
+  if (plan.next.status === 'live') await tools.syncDiscountMetafields(plan.next)
 }
 
 /** Shopify first (so a refusal leaves nothing saved), then the config, then the storefront. */

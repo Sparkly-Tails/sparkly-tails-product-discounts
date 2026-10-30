@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  pickStatus, buildDiscountFields, readRecordId, keepRecordId, buildNewDiscount, mergeDiscount, replaceDiscount, listRemovedProducts,
+  pickStatus, readLiveMembers, buildDiscountFields, readRecordId, keepRecordId, buildNewDiscount, mergeDiscount, replaceDiscount, listRemovedProducts,
   isWindowChanged, isWindowCheckNeeded, describeSaveError,
 } from '@/form/saveSteps'
 import type { ParsedDiscount } from '@/form/parseDiscountForm'
@@ -14,6 +14,7 @@ const VALUES: ParsedDiscount = {
   flash: null,
   highDemand: false,
   goLive: false,
+  takeOffline: false,
 }
 const EXISTING: Discount = {
   discountId: 'disc_1', name: 'Old name', title: 'Old customer title', status: 'live', pricingMode: 'percent',
@@ -22,10 +23,19 @@ const EXISTING: Discount = {
 }
 
 describe('pickStatus', () => {
-  it('goes live when Go live was used, else keeps the status', () => {
-    expect(pickStatus({ goLive: true, current: 'draft' })).toBe('live')
-    expect(pickStatus({ goLive: false, current: 'draft' })).toBe('draft')
-    expect(pickStatus({ goLive: false, current: 'live' })).toBe('live')
+  it('goes live with Go live, goes offline with Take offline, and otherwise keeps the status', () => {
+    expect(pickStatus({ goLive: true, takeOffline: false, current: 'draft' })).toBe('live')
+    expect(pickStatus({ goLive: false, takeOffline: true, current: 'live' })).toBe('draft')
+    expect(pickStatus({ goLive: false, takeOffline: false, current: 'draft' })).toBe('draft')
+    expect(pickStatus({ goLive: false, takeOffline: false, current: 'live' })).toBe('live')
+  })
+})
+
+describe('readLiveMembers', () => {
+  it('is what a live discount has on the storefront, and nothing for a draft or no discount', () => {
+    expect(readLiveMembers({ discount: EXISTING })).toEqual(EXISTING.members)
+    expect(readLiveMembers({ discount: { ...EXISTING, status: 'draft' } })).toEqual([])
+    expect(readLiveMembers({ discount: undefined })).toEqual([])
   })
 })
 
@@ -79,9 +89,10 @@ describe('mergeDiscount', () => {
     expect(merged.flash).toEqual({ startsAt: '2026-12-01T09:00', endsAt: '2026-12-02T09:00', showTeaser: false, shopifyDiscountId: 'gid://shopify/DiscountAutomaticNode/9' })
   })
 
-  it('drops the flash sale when the switch is off, and goes live from a draft with Go live', () => {
+  it('drops the flash sale when the switch is off, goes live from a draft with Go live and offline with Take offline', () => {
     expect(mergeDiscount({ existing: EXISTING, values: VALUES, tools }).flash).toBeUndefined()
     expect(mergeDiscount({ existing: { ...EXISTING, status: 'draft' }, values: { ...VALUES, goLive: true }, tools }).status).toBe('live')
+    expect(mergeDiscount({ existing: EXISTING, values: { ...VALUES, takeOffline: true }, tools }).status).toBe('draft')
   })
 })
 

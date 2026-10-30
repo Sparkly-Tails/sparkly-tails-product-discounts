@@ -8,7 +8,7 @@ import type { SaveTools } from '@/form/saveFlow'
 
 const FLASH = { startsAt: '2026-11-27T09:00', endsAt: '2026-11-30T23:59', showTeaser: true }
 const VALUES: ParsedDiscount = {
-  name: 'Black Friday', members: [{ productId: 'p1' }], pricingMode: 'percent', tiers: [{ minQty: 3, percentOff: 10 }], flash: null, highDemand: false, goLive: false,
+  name: 'Black Friday', members: [{ productId: 'p1' }], pricingMode: 'percent', tiers: [{ minQty: 3, percentOff: 10 }], flash: null, highDemand: false, goLive: false, takeOffline: false,
 }
 const OTHER: Discount = { discountId: 'disc_other', name: 'Other', title: 'Other', status: 'draft', pricingMode: 'percent', members: [{ productId: 'p9' }], tiers: [{ minQty: 2, percentOff: 5 }] }
 const EXISTING: Discount = {
@@ -103,6 +103,14 @@ describe('saveDiscountFlow: an existing discount', () => {
     const { tools } = buildTools({ discounts: [EXISTING] })
     await flow.saveDiscountFlow({ discountId: 'disc_1', values: { ...VALUES, flash: FLASH }, tools })
     expect(tools.assertFlashWindow).not.toHaveBeenCalled()
+  })
+
+  it('takes a live discount offline: saved as a draft, its Shopify discount deleted and all its products cleared from the storefront', async () => {
+    const { tools, calls, saved } = buildTools({ discounts: [EXISTING] })
+    await flow.saveDiscountFlow({ discountId: 'disc_1', values: { ...VALUES, members: EXISTING.members, takeOffline: true }, tools })
+    expect(saved[0].discounts[0].status).toBe('draft')
+    expect(calls).toEqual(['assertMembersAvailable', 'assertPricingAllowed', 'syncRecordOf', 'saveConfig', 'clearDiscountMetafields'])
+    expect((tools.clearDiscountMetafields as ReturnType<typeof vi.fn>).mock.calls[0][0]).toEqual([{ productId: 'p1' }, { productId: 'p2' }])
   })
 
   it('does not touch the storefront for a draft', async () => {

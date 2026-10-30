@@ -12,6 +12,8 @@ export interface ParsedDiscount {
   highDemand: boolean
   /** The Go live button was used. */
   goLive: boolean
+  /** The Take offline button was used. */
+  takeOffline: boolean
 }
 
 export type ParseResult = { values: ParsedDiscount } | { error: string }
@@ -56,6 +58,7 @@ export function parseDiscountForm({ formData, tools }: { formData: FormData; too
     flash: tools.parseFlashFromForm({ formData }),
     highDemand: tools.parseHighDemandFromForm({ formData }),
     goLive: formData.get('goLive') === 'on',
+    takeOffline: formData.get('takeOffline') === 'on',
   }
   const problem = tools.findFormProblem({ values })
   return problem ? { error: problem } : { values }

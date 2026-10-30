@@ -34,6 +34,7 @@ describe('parseDiscountForm: a good form', () => {
         flash: null,
         highDemand: false,
         goLive: false,
+        takeOffline: false,
       },
     })
   })
@@ -50,9 +51,11 @@ describe('parseDiscountForm: a good form', () => {
     expect('values' in on && on.values.flash).toEqual({ startsAt: '2026-11-27T09:00', endsAt: '2026-11-30T23:59', showTeaser: true })
   })
 
-  it('reads High Demand and Go live from their boxes and buttons', () => {
+  it('reads High Demand, Go live and Take offline from their boxes and buttons', () => {
     const result = parse({ ...VALID, highDemand: 'on', goLive: 'on' })
-    expect('values' in result && [result.values.highDemand, result.values.goLive]).toEqual([true, true])
+    expect('values' in result && [result.values.highDemand, result.values.goLive, result.values.takeOffline]).toEqual([true, true, false])
+    const offline = parse({ ...VALID, takeOffline: 'on' })
+    expect('values' in offline && [offline.values.goLive, offline.values.takeOffline]).toEqual([false, true])
   })
 
   it('leaves a tier out of the product fields that is not complete', () => {
@@ -93,6 +96,6 @@ describe('the small steps', () => {
   })
 
   it('findFormProblem finds nothing wrong with good values', () => {
-    expect(findFormProblem({ values: { name: 'x', members: [{ productId: 'p' }], pricingMode: 'percent', tiers: [{ minQty: 1, percentOff: 5 }], flash: null, highDemand: false, goLive: false } })).toBeNull()
+    expect(findFormProblem({ values: { name: 'x', members: [{ productId: 'p' }], pricingMode: 'percent', tiers: [{ minQty: 1, percentOff: 5 }], flash: null, highDemand: false, goLive: false, takeOffline: false } })).toBeNull()
   })
 })
