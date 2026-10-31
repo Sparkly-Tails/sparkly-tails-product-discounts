@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import fs from 'node:fs'
-import path from 'node:path'
+import { clearWidgetRegistry, readBuiltWidget, runWidgetScripts, WIDGET_COMPONENTS, WIDGET_CORE } from '../helpers/builtWidget'
 
 /**
  * Both storefront scripts are plain browser scripts that share ONE global
@@ -9,9 +8,7 @@ import path from 'node:path'
  * loads them. The markup mirrors what tier-pricing.liquid and
  * time-based-discount.liquid render.
  */
-const assets = path.resolve(__dirname, '../../extensions/product-tier-pricing/assets')
-const tierScript = fs.readFileSync(path.join(assets, 'tier-pricing.js'), 'utf8')
-const countdownScript = fs.readFileSync(path.join(assets, 'time-based-discount.js'), 'utf8')
+const built = readBuiltWidget()
 
 const NOW = new Date('2026-10-05T12:00:00.000Z')
 const iso = (offsetMs: number) => new Date(NOW.getTime() + offsetMs).toISOString()
@@ -20,7 +17,7 @@ const V11 = 'gid://shopify/ProductVariant/11'
 
 type Item = { variantId: string | null; pricingMode: 'percent' | 'fixed'; amount: number }
 
-function mount(discount: Record<string, unknown>, opts: { selectedVariantId?: number; basePrice?: number; variantPrices?: Record<string, number> } = {}) {
+async function mount(discount: Record<string, unknown>, opts: { selectedVariantId?: number; basePrice?: number; variantPrices?: Record<string, number> } = {}) {
   const { selectedVariantId = 10, basePrice = 49.99, variantPrices = { '10': 4999, '11': 6000, '12': 3000 } } = opts
   const timeDiscount = JSON.stringify({ startsAt: discount.startsAt, endsAt: discount.endsAt, items: discount.items, pricingMode: discount.pricingMode, amount: discount.amount, variantIds: discount.variantIds })
   const countdownData = JSON.stringify({ ...discount, selectedVariantId, variantPrices })
@@ -53,8 +50,9 @@ function mount(discount: Record<string, unknown>, opts: { selectedVariantId?: nu
       </div>
     </div>`
   // Same global scope for both, as on the storefront.
-  ;(0, eval)(countdownScript)
-  ;(0, eval)(tierScript)
+  ;(0, eval)(built['time-based-discount.js'])
+  runWidgetScripts({ built })
+  await vi.advanceTimersByTimeAsync(0)
 }
 
 function view() {
@@ -69,10 +67,11 @@ function view() {
   }
 }
 
-function changeVariant(id: number, price: number) {
+async function changeVariant(id: number, price: number) {
   const el = document.querySelector('product-variants') as HTMLElement & { currentVariant?: unknown }
   el.currentVariant = { id, price }
   el.dispatchEvent(new Event('VARIANT_CHANGE'))
+  await vi.advanceTimersByTimeAsync(0)
 }
 
 const live = { title: 'Summer Sale', startsAt: iso(-3_600_000), endsAt: iso(86_400_000) }
@@ -83,78 +82,73 @@ describe('time-based discount storefront scripts', () => {
   beforeEach(() => { vi.useFakeTimers({ now: NOW }) })
   afterEach(() => { vi.clearAllTimers(); vi.useRealTimers(); document.body.innerHTML = '' })
 
-  it('shows the sale price with the regular price struck, and the countdown, for a whole-product row', () => {
-    mount({ ...live, items: [fixed(22)] })
+  it('shows the sale price with the regular price struck, and the countdown, for a whole-product row', async () => {
+    await mount({ ...live, items: [fixed(22)] })
     expect(view()).toEqual({ sale: '£22.00', regularStruck: true, countdownVisible: true, countdownLabel: 'Summer Sale ends in:' })
   })
 
-  it('uses the selected variant from first paint, not only after a variant change', () => {
-    mount({ ...live, items: [fixed(22, V10), percent(50, V11)] }, { selectedVariantId: 10 })
+  it('uses the selected variant from first paint, not only after a variant change', async () => {
+    await mount({ ...live, items: [fixed(22, V10), percent(50, V11)] }, { selectedVariantId: 10 })
     expect(view().sale).toBe('£22.00')
   })
 
-  it('gives each variant its own price as the customer switches variants', () => {
-    mount({ ...live, items: [fixed(22, V10), percent(50, V11)] }, { selectedVariantId: 10 })
-    changeVariant(11, 6000)
+  it('gives each variant its own price as the customer switches variants', async () => {
+    await mount({ ...live, items: [fixed(22, V10), percent(50, V11)] }, { selectedVariantId: 10 })
+    await changeVariant(11, 6000)
     expect(view().sale).toBe('£30.00')
-    changeVariant(12, 3000) // no row for variant 12
+    await changeVariant(12, 3000) // no row for variant 12
     expect(view()).toMatchObject({ sale: null, regularStruck: false, countdownVisible: false })
-    changeVariant(10, 4999)
+    await changeVariant(10, 4999)
     expect(view().sale).toBe('£22.00')
   })
 
-  it('lets a variant row beat the whole-product row', () => {
-    mount({ ...live, items: [percent(10), fixed(5, V10)] }, { selectedVariantId: 10 })
+  it('lets a variant row beat the whole-product row', async () => {
+    await mount({ ...live, items: [percent(10), fixed(5, V10)] }, { selectedVariantId: 10 })
     expect(view().sale).toBe('£5.00')
-    changeVariant(11, 6000)
+    await changeVariant(11, 6000)
     expect(view().sale).toBe('£54.00')
   })
 
-  it('shows nothing when the fixed price is not lower than the variant price', () => {
-    mount({ ...live, items: [fixed(60)] })
+  it('shows nothing when the fixed price is not lower than the variant price', async () => {
+    await mount({ ...live, items: [fixed(60)] })
     expect(view()).toMatchObject({ sale: null, regularStruck: false, countdownVisible: false })
   })
 
-  it('resets the price and hides the countdown when the discount ends, with no refresh', () => {
-    mount({ ...live, endsAt: iso(3_000), items: [fixed(22)] })
+  it('resets the price and hides the countdown when the discount ends, with no refresh', async () => {
+    await mount({ ...live, endsAt: iso(3_000), items: [fixed(22)] })
     expect(view().sale).toBe('£22.00')
-    vi.advanceTimersByTime(4_000)
+    await vi.advanceTimersByTimeAsync(4_000)
     expect(view()).toMatchObject({ sale: null, regularStruck: false, countdownVisible: false })
   })
 
-  it('shows the price and countdown when the discount starts after the page was opened', () => {
-    mount({ ...live, startsAt: iso(3_000), items: [fixed(22)] })
+  it('shows the price and countdown when the discount starts after the page was opened', async () => {
+    await mount({ ...live, startsAt: iso(3_000), items: [fixed(22)] })
     expect(view()).toMatchObject({ sale: null, countdownVisible: false })
-    vi.advanceTimersByTime(4_000)
+    await vi.advanceTimersByTimeAsync(4_000)
     expect(view()).toMatchObject({ sale: '£22.00', regularStruck: true, countdownVisible: true })
   })
 
-  it('still understands a metafield written before per-row pricing', () => {
-    mount({ ...live, pricingMode: 'fixed', amount: 22, variantIds: [V10] }, { selectedVariantId: 10 })
+  it('still understands a metafield written before per-row pricing', async () => {
+    await mount({ ...live, pricingMode: 'fixed', amount: 22, variantIds: [V10] }, { selectedVariantId: 10 })
     expect(view().sale).toBe('£22.00')
-    changeVariant(12, 3000)
+    await changeVariant(12, 3000)
     expect(view()).toMatchObject({ sale: null, countdownVisible: false })
   })
 
-  it('shows the countdown alone when a metafield has no pricing data', () => {
-    mount({ ...live })
+  it('shows the countdown alone when a metafield has no pricing data', async () => {
+    await mount({ ...live })
     expect(view()).toMatchObject({ sale: null, regularStruck: false, countdownVisible: true })
   })
 })
 
-describe('storefront scripts share one global scope', () => {
-  // Names declared at column 0 of a line. Indented declarations (inside the
-  // `if (typeof document ...) { ... }` blocks) are not top-level and are skipped.
-  const topLevelNames = (source: string): string[] =>
-    [...source.matchAll(/^(?:async\s+function|function|const|let|var|class)\s+([A-Za-z_$][\w$]*)/gm)].map((m) => m[1])
+describe('the built storefront scripts', () => {
+  it('leave nothing on the page but the one object the components share', () => {
+    clearWidgetRegistry()
+    const before = new Set(Object.getOwnPropertyNames(window))
 
-  it('declares no top-level name in both scripts', () => {
-    const tierNames = topLevelNames(tierScript)
-    const countdownNames = topLevelNames(countdownScript)
-    // The extraction itself must keep working, or the intersection check below proves nothing.
-    expect(tierNames.length).toBeGreaterThan(0)
-    expect(countdownNames.length).toBeGreaterThan(0)
-    expect(tierNames.filter((name) => countdownNames.includes(name))).toEqual([])
+    for (const name of [...WIDGET_COMPONENTS, WIDGET_CORE, 'time-based-discount.js']) (0, eval)(built[name])
+
+    expect(Object.getOwnPropertyNames(window).filter((name) => !before.has(name))).toEqual(['SparklyTierPricing'])
   })
 })
 
@@ -237,7 +231,7 @@ describe('tier widget painting (redesign)', () => {
           </div>
         </div>
       </div>`
-    ;(0, eval)(tierScript)
+    runWidgetScripts({ built })
     await vi.advanceTimersByTimeAsync(0)
   }
 

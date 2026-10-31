@@ -7,10 +7,11 @@
 # itself, with no redirect through this app. The admin logs in with an App Bridge
 # ID token exchanged for an access token (see docs/superpowers/specs/2026-10-15-dev-managed-install-auth-design.md).
 #
-# Always pass --config explicitly so the right app is targeted:
-#   SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk \
-#     shopify app deploy --config shopify.app.dev.toml    # dev app only
-#   shopify app deploy --config shopify.app.toml          # production app
+# Deploy with the npm scripts: each one builds the extension's scripts first (the built files are not in
+# git) and then deploys with the right --config:
+#   SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk npm run deploy:dev   # dev app only
+#   npm run deploy:prod                                                                  # production app
+# A bare `shopify app deploy` skips the build and ships whatever is in extensions/product-tier-pricing/assets.
 #
 # Only public values live here. The dev app's client secret, the database URLs and
 # every token are environment variables on the dev Vercel project, never in git.

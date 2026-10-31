@@ -1,7 +1,7 @@
 // The Stitch widget design: chips with totals, the price tag / tier pill, and the status copy.
 const test = require('node:test')
 const assert = require('node:assert/strict')
-const { buildTierChips, buildPriceTag, buildStatusCopy, computeProgressState, computeWidgetViewModel, totalAtQuantity, computeTierState } = require('../product-tier-pricing/assets/tier-pricing.js')
+const { buildTierChips, buildPriceTag, buildStatusCopy, computeProgressState, computeWidgetViewModel, totalAtQuantity, computeTierState } = require('../product-tier-pricing/src/widgetFunctions.js')
 
 const fmt = (n) => '£' + n.toFixed(2)
 // The design's worked example: base £1.69; 8 units for £13.00 and 16 for £24.80, extra units at the tier's percent.

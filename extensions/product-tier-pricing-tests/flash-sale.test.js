@@ -1,7 +1,7 @@
 // The flash sale bar, teaser and countdown of the tier widget (pure functions).
 const test = require('node:test')
 const assert = require('node:assert/strict')
-const { flashPhase, flashCountdownParts, formatFlashCountdown, formatFlashChip, buildFlashBar, computeWidgetViewModel } = require('../product-tier-pricing/assets/tier-pricing.js')
+const { flashPhase, flashCountdownParts, formatFlashCountdown, formatFlashChip, buildFlashBar, computeWidgetViewModel } = require('../product-tier-pricing/src/widgetFunctions.js')
 
 const fmt = (n) => '£' + n.toFixed(2)
 const START = 1_800_000_000

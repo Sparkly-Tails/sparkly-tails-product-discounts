@@ -1,20 +1,19 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import fs from 'node:fs'
-import path from 'node:path'
 import { render, cleanup } from '@testing-library/react'
 import WidgetView from '@/form/preview/components/WidgetView'
 import { buildPreviewModel } from '@/form/preview/buildPreviewModel'
 import { PREVIEW_TOOLS } from '@/form/preview/previewTools'
 import { WIDGET_FUNCTIONS } from '@/form/preview/widgetFunctions'
 import type { PreviewTier } from '@/form/tierRows'
+import { readBuiltWidget, runWidgetScripts } from '../../helpers/builtWidget'
 
 /**
  * The preview paints what the widget's functions decide. This runs the real
  * storefront script on markup that mirrors tier-pricing.liquid, paints the same
  * inputs with the preview, and compares what each one prints, element by element.
  */
-const script = fs.readFileSync(path.resolve(__dirname, '../../../extensions/product-tier-pricing/assets/tier-pricing.js'), 'utf8')
+const built = readBuiltWidget()
 
 const START = 1_800_000_000
 const END = START + 3 * 86400
@@ -58,7 +57,7 @@ function mountScript({ nowSeconds, quantity, tiers, flash, highDemand }: Scenari
         </div>
       </div>
     </div>`
-  ;(0, eval)(script)
+  runWidgetScripts({ built })
   return document.getElementById('script-widget') as HTMLElement
 }
 
