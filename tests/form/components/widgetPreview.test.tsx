@@ -88,6 +88,12 @@ describe('WidgetPreview', () => {
     expect(document.querySelector('[data-tier-pricing-price]')).toHaveTextContent('$25.20')
   })
 
+  it('shows no "Quantity" word, and still names the field for screen readers', () => {
+    renderPreview()
+    expect(screen.queryByText('Quantity')).toBeNull()
+    expect(screen.getByLabelText('Quantity')).toBeInTheDocument()
+  })
+
   it('puts the quantity picker below the widget', () => {
     renderPreview()
     const widget = document.querySelector('.sparkly-tier-pricing') as Element
