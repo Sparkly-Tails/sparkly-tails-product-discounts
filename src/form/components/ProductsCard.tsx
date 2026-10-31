@@ -15,7 +15,7 @@ const SEARCH_DELAY_MS = 300
 export default function ProductsCard({ initialMembers, currencyCode, excludeDiscountId, onMembersChange }: {
   initialMembers: SelectedMember[]
   currencyCode: string
-  /** The discount being edited, so its own products still count as free to choose. */
+  /** The discount being edited, so its own products are never refused as already taken. */
   excludeDiscountId?: string
   onMembersChange: (members: SelectedMember[]) => void
 }) {
@@ -28,9 +28,9 @@ export default function ProductsCard({ initialMembers, currencyCode, excludeDisc
   }, [members])
 
   const tools = {
-    findProducts: ({ query, excludeDiscountId: excluded }: { query: string; excludeDiscountId?: string }) => searchProductsAction(query, excluded),
-    listProducts: ({ excludeDiscountId: excluded }: { excludeDiscountId?: string }) => listProductsAction(excluded),
-    findVariants: ({ productId, excludeDiscountId: excluded }: { productId: string; excludeDiscountId?: string }) => getProductVariantsAction(productId, excluded),
+    findProducts: ({ query }: { query: string }) => searchProductsAction(query),
+    listProducts: () => listProductsAction(),
+    findVariants: ({ productId }: { productId: string }) => getProductVariantsAction(productId),
     checkMember: ({ productId, variantId, excludeDiscountId: excluded }: { productId: string; variantId?: string; excludeDiscountId?: string }) => validateMemberAction(productId, variantId, excluded),
   }
   const productCount = new Set(members.map((member) => member.productId)).size

@@ -1,10 +1,9 @@
 // The steps the discount actions are made of (reading the form, checking, bringing Shopify in step),
 // moved out of discountActions.ts unchanged so the form's single save action can use them too.
-import { getConfig, isProductAvailable, pricesUniform, type Tier, type Discount, type DiscountMember } from '@/lib/config'
+import { pricesUniform, type Tier, type Discount, type DiscountMember } from '@/lib/config'
 import { getMemberInfo } from '@/lib/products'
 import { shopifyQuery } from '@/lib/shopify-client'
 import { getShopTimezone, zonedTimeToUtc } from '@/lib/shop'
-import { fetchAvailabilityConfigs, isAvailableEverywhere } from '@/lib/discount-availability'
 import { SCHEDULE_CHECKS, describeMissingTime, describeScheduleProblem, formatShopLocalNow } from '@/flash/schedule'
 import { DISCOUNT_RECORD_TOOLS, syncDiscountRecord } from '@/flash/discountRecord'
 
@@ -71,15 +70,6 @@ export async function assertPricingAllowed(members: DiscountMember[], pricingMod
   }
 }
 
-export async function assertMembersAvailable(members: DiscountMember[], excludeDiscountId?: string): Promise<void> {
-  const config = await getConfig()
-  for (const member of members) {
-    if (!isProductAvailable(config, member.productId, member.variantId, excludeDiscountId)) {
-      throw new Error(`${member.productId}${member.variantId ? ` (variant ${member.variantId})` : ''} already belongs to another discount`)
-    }
-  }
-}
-
 /** The shop's current local time (YYYY-MM-DDTHH:mm) in its own timezone. */
 export async function readShopNow(): Promise<{ timeZone: string; nowLocal: string }> {
   const timeZone = await getShopTimezone()
@@ -90,16 +80,6 @@ export async function readShopNow(): Promise<{ timeZone: string; nowLocal: strin
 export function assertFlashWindow(flash: { startsAt: string; endsAt: string }, nowLocal: string): void {
   const problem = describeMissingTime(flash) ?? describeScheduleProblem({ ...flash, nowLocal, checks: SCHEDULE_CHECKS })
   if (problem) throw new Error(problem)
-}
-
-/** Like assertMembersAvailable, but across both kinds of discount (a time-based discount may have taken a product since). */
-export async function assertMembersAvailableEverywhere(members: DiscountMember[], discountId: string): Promise<void> {
-  const { productConfig, timeConfig } = await fetchAvailabilityConfigs()
-  for (const member of members) {
-    if (!isAvailableEverywhere(productConfig, timeConfig, member.productId, member.variantId, discountId)) {
-      throw new Error(`${member.productId}${member.variantId ? ` (variant ${member.variantId})` : ''} already belongs to another discount`)
-    }
-  }
 }
 
 /** A live flash sale, or any discount that still has a Shopify discount to delete, needs its Shopify discount brought in step. */

@@ -51,11 +51,11 @@ beforeEach(() => vi.useFakeTimers())
 afterEach(() => { cleanup(); vi.useRealTimers() })
 
 describe('ProductSearch: searching', () => {
-  it('searches after a pause in typing, passing the discount being edited, and lists the results', async () => {
+  it('searches after a pause in typing and lists the results', async () => {
     const tools = buildTools()
     render(<Harness tools={tools} onAdd={() => {}} />)
     await type('tu')
-    expect(tools.findProducts).toHaveBeenCalledWith({ query: 'tu', excludeDiscountId: 'disc_1' })
+    expect(tools.findProducts).toHaveBeenCalledWith({ query: 'tu' })
     expect(screen.getByRole('button', { name: 'Tuna Soup' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Joint Chews (2 variants)' })).toBeInTheDocument()
   })
@@ -76,7 +76,7 @@ describe('ProductSearch: searching', () => {
     fireEvent.change(input, { target: { value: 'tuna' } })
     await act(async () => { await vi.advanceTimersByTimeAsync(300) })
     expect(tools.findProducts).toHaveBeenCalledTimes(1)
-    expect(tools.findProducts).toHaveBeenCalledWith({ query: 'tuna', excludeDiscountId: 'disc_1' })
+    expect(tools.findProducts).toHaveBeenCalledWith({ query: 'tuna' })
   })
 
   it('lists the shop products from Browse, and clears the field', async () => {
@@ -84,7 +84,7 @@ describe('ProductSearch: searching', () => {
     render(<Harness tools={tools} onAdd={() => {}} />)
     fireEvent.click(screen.getByRole('button', { name: 'Browse' }))
     await settle()
-    expect(tools.listProducts).toHaveBeenCalledWith({ excludeDiscountId: 'disc_1' })
+    expect(tools.listProducts).toHaveBeenCalledTimes(1)
     expect(screen.getByRole('button', { name: 'Tuna Soup' })).toBeInTheDocument()
   })
 

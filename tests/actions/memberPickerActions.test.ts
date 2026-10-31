@@ -1,7 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { searchProductsAction, listProductsAction, getProductVariantsAction, validateMemberAction } from '@/actions/memberPickerActions'
 import * as products from '@/lib/products'
-import * as configLib from '@/lib/config'
+import { getConfig, type Discount } from '@/lib/config'
+
+vi.mock('@/lib/config', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/config')>()), getConfig: vi.fn() }))
+
+const TUNA = { id: 'gid://shopify/Product/1', title: 'Tuna Soup', variantCount: 1, imageUrl: null }
+
+function tierDiscount(overrides: Partial<Discount>): Discount {
+  return { discountId: 'disc_x', name: 'Spring', title: 'Spring', status: 'live', pricingMode: 'percent', members: [{ productId: TUNA.id }], tiers: [], ...overrides }
+}
 
 describe('searchProductsAction', () => {
   beforeEach(() => vi.restoreAllMocks())
@@ -11,61 +19,10 @@ describe('searchProductsAction', () => {
     expect(await searchProductsAction('tuna')).toEqual([])
   })
 
-  it('passes through a single-variant result that belongs to no discount', async () => {
-    vi.spyOn(products, 'searchProducts').mockResolvedValue([{ id: 'gid://shopify/Product/1', title: 'Tuna Soup', variantCount: 1, imageUrl: null }])
-    vi.spyOn(configLib, 'getConfig').mockResolvedValue({ discounts: [] })
-    expect(await searchProductsAction('tuna')).toEqual([{ id: 'gid://shopify/Product/1', title: 'Tuna Soup', variantCount: 1, imageUrl: null }])
-  })
-
-  it('drops a single-variant result already claimed by another discount', async () => {
-    vi.spyOn(products, 'searchProducts').mockResolvedValue([{ id: 'gid://shopify/Product/1', title: 'Tuna Soup', variantCount: 1, imageUrl: null }])
-    vi.spyOn(configLib, 'getConfig').mockResolvedValue({
-      discounts: [{ discountId: 'disc_x', name: 'X', title: 'X', status: 'live', pricingMode: 'percent', members: [{ productId: 'gid://shopify/Product/1' }], tiers: [] }],
-    })
-    expect(await searchProductsAction('tuna')).toEqual([])
-  })
-
-  it('keeps a single-variant result claimed only by the discount being edited', async () => {
-    vi.spyOn(products, 'searchProducts').mockResolvedValue([{ id: 'gid://shopify/Product/1', title: 'Tuna Soup', variantCount: 1, imageUrl: null }])
-    vi.spyOn(configLib, 'getConfig').mockResolvedValue({
-      discounts: [{ discountId: 'disc_1', name: 'X', title: 'X', status: 'live', pricingMode: 'percent', members: [{ productId: 'gid://shopify/Product/1' }], tiers: [] }],
-    })
-    expect(await searchProductsAction('tuna', 'disc_1')).toEqual([{ id: 'gid://shopify/Product/1', title: 'Tuna Soup', variantCount: 1, imageUrl: null }])
-  })
-
-  it('drops a multi-variant result once every one of its variants is claimed by another discount', async () => {
-    vi.spyOn(products, 'searchProducts').mockResolvedValue([{ id: 'gid://shopify/Product/2', title: 'Wet Cat Food', variantCount: 2, imageUrl: null }])
-    vi.spyOn(products, 'getProductVariantOptions').mockResolvedValue([
-      { variantId: 'gid://shopify/ProductVariant/20', title: 'Chicken', price: 1.49 },
-      { variantId: 'gid://shopify/ProductVariant/21', title: 'Salmon', price: 1.49 },
-    ])
-    vi.spyOn(configLib, 'getConfig').mockResolvedValue({
-      discounts: [{
-        discountId: 'disc_x', name: 'X', title: 'X', status: 'live', pricingMode: 'percent',
-        members: [
-          { productId: 'gid://shopify/Product/2', variantId: 'gid://shopify/ProductVariant/20' },
-          { productId: 'gid://shopify/Product/2', variantId: 'gid://shopify/ProductVariant/21' },
-        ],
-        tiers: [],
-      }],
-    })
-    expect(await searchProductsAction('cat')).toEqual([])
-  })
-
-  it('keeps a multi-variant result when at least one of its variants is still free', async () => {
-    vi.spyOn(products, 'searchProducts').mockResolvedValue([{ id: 'gid://shopify/Product/2', title: 'Wet Cat Food', variantCount: 2, imageUrl: null }])
-    vi.spyOn(products, 'getProductVariantOptions').mockResolvedValue([
-      { variantId: 'gid://shopify/ProductVariant/20', title: 'Chicken', price: 1.49 },
-      { variantId: 'gid://shopify/ProductVariant/21', title: 'Salmon', price: 1.49 },
-    ])
-    vi.spyOn(configLib, 'getConfig').mockResolvedValue({
-      discounts: [{
-        discountId: 'disc_x', name: 'X', title: 'X', status: 'live', pricingMode: 'percent',
-        members: [{ productId: 'gid://shopify/Product/2', variantId: 'gid://shopify/ProductVariant/20' }],
-        tiers: [],
-      }],
-    })
-    expect(await searchProductsAction('cat')).toEqual([{ id: 'gid://shopify/Product/2', title: 'Wet Cat Food', variantCount: 2, imageUrl: null }])
+  it('lists every product the search finds, whatever discount holds it', async () => {
+    vi.spyOn(products, 'searchProducts').mockResolvedValue([TUNA, { id: 'gid://shopify/Product/2', title: 'Wet Cat Food', variantCount: 2, imageUrl: null }])
+    expect(await searchProductsAction('food')).toHaveLength(2)
+    expect(getConfig).not.toHaveBeenCalled()
   })
 })
 
@@ -73,19 +30,9 @@ describe('listProductsAction', () => {
   beforeEach(() => vi.restoreAllMocks())
 
   it('lists the first products without a search term', async () => {
-    const spy = vi.spyOn(products, 'listProducts').mockResolvedValue([{ id: 'gid://shopify/Product/1', title: 'Tuna Soup', variantCount: 1, imageUrl: null }])
-    vi.spyOn(configLib, 'getConfig').mockResolvedValue({ discounts: [] })
-    expect(await listProductsAction()).toEqual([{ id: 'gid://shopify/Product/1', title: 'Tuna Soup', variantCount: 1, imageUrl: null }])
+    const spy = vi.spyOn(products, 'listProducts').mockResolvedValue([TUNA])
+    expect(await listProductsAction()).toEqual([TUNA])
     expect(spy).toHaveBeenCalledWith({ limit: 8 })
-  })
-
-  it('drops a product already claimed by another discount but keeps one claimed by the discount being edited', async () => {
-    vi.spyOn(products, 'listProducts').mockResolvedValue([{ id: 'gid://shopify/Product/1', title: 'Tuna Soup', variantCount: 1, imageUrl: null }])
-    vi.spyOn(configLib, 'getConfig').mockResolvedValue({
-      discounts: [{ discountId: 'disc_1', name: 'X', title: 'X', status: 'live', pricingMode: 'percent', members: [{ productId: 'gid://shopify/Product/1' }], tiers: [] }],
-    })
-    expect(await listProductsAction()).toEqual([])
-    expect(await listProductsAction('disc_1')).toHaveLength(1)
   })
 
   it('returns [] instead of throwing when the lookup fails', async () => {
@@ -97,68 +44,48 @@ describe('listProductsAction', () => {
 describe('getProductVariantsAction', () => {
   beforeEach(() => vi.restoreAllMocks())
 
+  const VARIANTS = [
+    { variantId: 'gid://shopify/ProductVariant/20', title: 'Chicken', price: 1.49 },
+    { variantId: 'gid://shopify/ProductVariant/21', title: 'Salmon', price: 1.49 },
+  ]
+
   it('returns [] instead of throwing when the lookup fails', async () => {
     vi.spyOn(products, 'getProductVariantOptions').mockRejectedValue(new Error('boom'))
     expect(await getProductVariantsAction('gid://shopify/Product/1')).toEqual([])
   })
 
-  it('drops a variant already claimed by another discount, keeps the free one', async () => {
-    vi.spyOn(products, 'getProductVariantOptions').mockResolvedValue([
-      { variantId: 'gid://shopify/ProductVariant/20', title: 'Chicken', price: 1.49 },
-      { variantId: 'gid://shopify/ProductVariant/21', title: 'Salmon', price: 1.49 },
-    ])
-    vi.spyOn(configLib, 'getConfig').mockResolvedValue({
-      discounts: [{
-        discountId: 'disc_x', name: 'X', title: 'X', status: 'live', pricingMode: 'percent',
-        members: [{ productId: 'gid://shopify/Product/2', variantId: 'gid://shopify/ProductVariant/20' }],
-        tiers: [],
-      }],
-    })
-    expect(await getProductVariantsAction('gid://shopify/Product/2')).toEqual([
-      { variantId: 'gid://shopify/ProductVariant/21', title: 'Salmon', price: 1.49 },
-    ])
-  })
-
-  it('keeps a variant claimed only by the discount being edited', async () => {
-    vi.spyOn(products, 'getProductVariantOptions').mockResolvedValue([
-      { variantId: 'gid://shopify/ProductVariant/20', title: 'Chicken', price: 1.49 },
-    ])
-    vi.spyOn(configLib, 'getConfig').mockResolvedValue({
-      discounts: [{
-        discountId: 'disc_1', name: 'X', title: 'X', status: 'live', pricingMode: 'percent',
-        members: [{ productId: 'gid://shopify/Product/2', variantId: 'gid://shopify/ProductVariant/20' }],
-        tiers: [],
-      }],
-    })
-    expect(await getProductVariantsAction('gid://shopify/Product/2', 'disc_1')).toEqual([
-      { variantId: 'gid://shopify/ProductVariant/20', title: 'Chicken', price: 1.49 },
-    ])
+  it('lists every variant, even one that another discount holds', async () => {
+    vi.spyOn(products, 'getProductVariantOptions').mockResolvedValue(VARIANTS)
+    expect(await getProductVariantsAction('gid://shopify/Product/2')).toEqual(VARIANTS)
   })
 })
 
 describe('validateMemberAction', () => {
-  beforeEach(() => vi.restoreAllMocks())
+  beforeEach(() => vi.mocked(getConfig).mockReset())
 
-  it('rejects a product/variant already claimed by another discount', async () => {
-    vi.spyOn(configLib, 'getConfig').mockResolvedValue({
-      discounts: [{ discountId: 'disc_x', name: 'X', title: 'X', status: 'live', pricingMode: 'percent', members: [{ productId: 'gid://shopify/Product/1' }], tiers: [] }],
-    })
-
-    const result = await validateMemberAction('gid://shopify/Product/1', undefined)
-    expect(result).toEqual({ ok: false, error: 'This product already belongs to another discount' })
+  it('refuses a product that another live discount has, naming that discount', async () => {
+    vi.mocked(getConfig).mockResolvedValue({ discounts: [tierDiscount({})] })
+    expect(await validateMemberAction(TUNA.id, undefined)).toEqual({ ok: false, error: 'Product already in discount "Spring"' })
   })
 
-  it('allows a product/variant that is free', async () => {
-    vi.spyOn(configLib, 'getConfig').mockResolvedValue({ discounts: [] })
-
-    expect(await validateMemberAction('gid://shopify/Product/1', undefined)).toEqual({ ok: true })
+  it('refuses a variant that another live discount has', async () => {
+    vi.mocked(getConfig).mockResolvedValue({ discounts: [tierDiscount({ members: [{ productId: 'gid://shopify/Product/2', variantId: 'gid://shopify/ProductVariant/20' }] })] })
+    expect(await validateMemberAction('gid://shopify/Product/2', 'gid://shopify/ProductVariant/20')).toEqual({ ok: false, error: 'Variant already in discount "Spring"' })
+    expect(await validateMemberAction('gid://shopify/Product/2', 'gid://shopify/ProductVariant/21')).toEqual({ ok: true })
   })
 
-  it('excludes the discount being edited', async () => {
-    vi.spyOn(configLib, 'getConfig').mockResolvedValue({
-      discounts: [{ discountId: 'disc_1', name: 'X', title: 'X', status: 'live', pricingMode: 'percent', members: [{ productId: 'gid://shopify/Product/1' }], tiers: [] }],
-    })
+  it('allows a product that only a draft discount has', async () => {
+    vi.mocked(getConfig).mockResolvedValue({ discounts: [tierDiscount({ status: 'draft' })] })
+    expect(await validateMemberAction(TUNA.id, undefined)).toEqual({ ok: true })
+  })
 
-    expect(await validateMemberAction('gid://shopify/Product/1', undefined, 'disc_1')).toEqual({ ok: true })
+  it('allows a product that no discount has', async () => {
+    vi.mocked(getConfig).mockResolvedValue({ discounts: [] })
+    expect(await validateMemberAction(TUNA.id, undefined)).toEqual({ ok: true })
+  })
+
+  it('does not count the discount being edited against itself', async () => {
+    vi.mocked(getConfig).mockResolvedValue({ discounts: [tierDiscount({ discountId: 'disc_1' })] })
+    expect(await validateMemberAction(TUNA.id, undefined, 'disc_1')).toEqual({ ok: true })
   })
 })

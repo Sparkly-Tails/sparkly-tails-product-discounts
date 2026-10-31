@@ -1,7 +1,7 @@
 // Which discounts keep a product to themselves. A tier discount does while it is live; a time-based discount does
 // from the moment it exists until it ends. A draft, an offline discount and an expired one claim nothing.
 import type { Discount } from '@/lib/config'
-import type { TimeDiscount } from '@/timeDiscounts/config'
+import type { TimeDiscount, computeTimeDiscountStatusLabel } from '@/timeDiscounts/config'
 
 /** One product (or one variant of it) held by one active discount. */
 export interface Claim {
@@ -48,14 +48,14 @@ export function listLiveTierClaims({ discounts, tools }: { discounts: Discount[]
   return claims
 }
 
-/** The items of every time-based discount that `isOpen` says is upcoming or running, under the title its customers see. */
-export function listOpenTimeClaims({ discounts, isOpen, tools }: {
+/** The items of every time-based discount that is upcoming or running (not expired) in the shop's time zone, under the title its customers see. */
+export function listOpenTimeClaims({ discounts, timeZone, tools }: {
   discounts: TimeDiscount[]
-  isOpen: (window: { startsAt: string; endsAt: string }) => boolean
-  tools: { buildClaims: typeof buildClaims }
+  timeZone: string
+  tools: { buildClaims: typeof buildClaims; readStatus: typeof computeTimeDiscountStatusLabel }
 }): Claim[] {
   const claims: Claim[] = []
-  for (const discount of discounts) if (isOpen({ startsAt: discount.startsAt, endsAt: discount.endsAt })) claims.push(...tools.buildClaims({ owner: { kind: 'time', discountId: discount.discountId, discountName: discount.title }, members: discount.items }))
+  for (const discount of discounts) if (tools.readStatus(discount.startsAt, discount.endsAt, timeZone) !== 'Expired') claims.push(...tools.buildClaims({ owner: { kind: 'time', discountId: discount.discountId, discountName: discount.title }, members: discount.items }))
   return claims
 }
 
