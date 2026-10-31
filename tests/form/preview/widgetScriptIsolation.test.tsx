@@ -1,12 +1,11 @@
 // @vitest-environment jsdom
 import { describe, it, expect, afterEach, vi } from 'vitest'
-import fs from 'node:fs'
-import path from 'node:path'
 import { renderToString } from 'react-dom/server'
 import WidgetView from '@/form/preview/components/WidgetView'
 import { buildPreviewModel } from '@/form/preview/buildPreviewModel'
 import { PREVIEW_TOOLS } from '@/form/preview/previewTools'
 import { WIDGET_FUNCTIONS } from '@/form/preview/widgetFunctions'
+import { readBuiltWidget, runWidgetScripts } from '../../helpers/builtWidget'
 
 /**
  * The admin imports the storefront widget script for its functions, and that script also starts itself
@@ -14,7 +13,7 @@ import { WIDGET_FUNCTIONS } from '@/form/preview/widgetFunctions'
  * attributes from each hit. The preview's markup must therefore never carry that marker, or the admin
  * page dies with `"undefined" is not valid JSON` as soon as it loads with a product in the preview.
  */
-const script = fs.readFileSync(path.resolve(__dirname, '../../../extensions/product-tier-pricing/assets/tier-pricing.js'), 'utf8')
+const built = readBuiltWidget()
 
 function renderPreviewMarkup(): string {
   const { viewModel } = buildPreviewModel({
@@ -33,7 +32,7 @@ describe('the preview next to the storefront script', () => {
 
   it('lets the script load on a page whose server markup already holds the preview', () => {
     document.body.innerHTML = renderPreviewMarkup()
-    expect(() => (0, eval)(script)).not.toThrow()
+    expect(() => runWidgetScripts({ built })).not.toThrow()
   })
 
   it('still looks like the widget (the stylesheet and the painted parts are all there)', () => {

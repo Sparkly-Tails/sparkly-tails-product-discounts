@@ -1,6 +1,6 @@
 {
   "name": "sparkly-tails-product-discounts",
-  "version": "0.23.112",
+  "version": "0.23.113",
   "private": true,
   "engines": {
     "node": ">=20.9.0"
@@ -10,10 +10,12 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint && npm run lint:extensions",
-    "lint:extensions": "eslint -c eslint.extensions.config.mjs extensions/product-tier-pricing/assets",
+    "lint:extensions": "eslint -c eslint.extensions.config.mjs extensions/product-tier-pricing/src",
     "test": "vitest run",
     "test:watch": "vitest",
     "check:isolation": "node scripts/check-store-isolation.mjs",
+    "deploy:dev": "node scripts/build-extension.mjs && shopify app deploy --config shopify.app.dev.toml",
+    "deploy:prod": "node scripts/build-extension.mjs && shopify app deploy --config shopify.app.toml",
     "postinstall": "prisma generate"
   },
   "dependencies": {

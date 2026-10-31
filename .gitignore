@@ -12,3 +12,6 @@ tsconfig.tsbuildinfo
 
 # Local environment (database URLs, secrets)
 .env
+
+# Built from extensions/product-tier-pricing/src by scripts/build-extension.mjs at deploy time
+extensions/product-tier-pricing/assets/*
