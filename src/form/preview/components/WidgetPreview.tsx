@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import PreviewFrame from '@/form/preview/components/PreviewFrame'
+import QuantityPicker from '@/form/preview/components/QuantityPicker'
 import WidgetView from '@/form/preview/components/WidgetView'
 import { buildPreviewModel, type PreviewProduct } from '@/form/preview/buildPreviewModel'
 import type { FlashInput } from '@/form/preview/previewModel'
@@ -40,7 +41,7 @@ export default function WidgetPreview({ products, tiers, flash, highDemand, time
   const shownIndex = Math.min(selectedIndex, Math.max(products.length - 1, 0))
 
   return (
-    <PreviewFrame labels={products.map((product) => product.title)} selectedIndex={shownIndex} onSelectProduct={setSelectedIndex}>
+    <PreviewFrame labels={products.map((product) => product.title)} selectedIndex={shownIndex} onSelectProduct={setSelectedIndex} controls={model.viewModel ? <QuantityPicker quantity={quantity} onChange={setQuantity} /> : null}>
       {model.viewModel
         ? <WidgetView viewModel={model.viewModel} hasTiers={tiers.length > 0} onPickQuantity={setQuantity} />
         : <p className="p-form-lg text-center text-form-body-md text-form-on-surface-variant">Add a product to see the preview</p>}

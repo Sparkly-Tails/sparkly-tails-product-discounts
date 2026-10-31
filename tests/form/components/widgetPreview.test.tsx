@@ -75,4 +75,43 @@ describe('WidgetPreview', () => {
     renderPreview({ flash: { startsAt: '2030-01-01T09:00', endsAt: '2030-01-02T09:00', showTeaser: true } })
     expect(screen.getByText('Flash sale starts in')).toBeInTheDocument()
   })
+
+  it('has a quantity picker that starts at 1 and raises or lowers the quantity, never below 1', () => {
+    renderPreview()
+    const input = screen.getByLabelText('Quantity') as HTMLInputElement
+    expect(input.value).toBe('1')
+    fireEvent.click(screen.getByRole('button', { name: 'Decrease quantity' }))
+    expect(input.value).toBe('1')
+    fireEvent.click(screen.getByRole('button', { name: 'Increase quantity' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Increase quantity' }))
+    expect(input.value).toBe('3')
+    expect(document.querySelector('[data-tier-pricing-price]')).toHaveTextContent('$25.20')
+  })
+
+  it('takes a quantity typed in the picker, and ignores an empty field', () => {
+    renderPreview()
+    const input = screen.getByLabelText('Quantity') as HTMLInputElement
+    fireEvent.change(input, { target: { value: '5' } })
+    expect(input.value).toBe('5')
+    expect(document.querySelector('[data-tier-pricing-price]')).toHaveTextContent('$23.80')
+    fireEvent.change(input, { target: { value: '' } })
+    expect(input.value).toBe('5')
+  })
+
+  it('shows the quantity of a tier chip that is clicked in the picker too', () => {
+    renderPreview()
+    fireEvent.click(screen.getByRole('button', { name: /5 ×/ }))
+    expect((screen.getByLabelText('Quantity') as HTMLInputElement).value).toBe('5')
+  })
+
+  it('has no quantity picker when there is no product', () => {
+    renderPreview({ products: [] })
+    expect(screen.queryByLabelText('Quantity')).toBeNull()
+  })
+
+  it('shows the tiers under a Flash sale ended bar for a sale that has ended', () => {
+    renderPreview({ flash: { startsAt: '2027-01-14T07:00', endsAt: '2027-01-15T08:00', showTeaser: true }, initialNowSeconds: Date.parse('2027-01-16T00:00:00Z') / 1000 })
+    expect(screen.getByText('Flash sale ended')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /5 ×/ })).toBeInTheDocument()
+  })
 })

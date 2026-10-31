@@ -1,5 +1,5 @@
 import type { PreviewTier } from '@/form/tierRows'
-import type { FlashInput, buildFlashWindow, clampIndex, isFlashFilled } from '@/form/preview/previewModel'
+import type { FlashInput, buildFlashWindow, clampIndex, isFlashEnded, isFlashFilled, pickWidgetFlash, showEndedFlash } from '@/form/preview/previewModel'
 import type { WidgetFunctions, WidgetViewModel } from '@/form/preview/widgetTypes'
 
 export interface PreviewProduct {
@@ -13,6 +13,9 @@ export interface PreviewTools extends Pick<WidgetFunctions, 'computeWidgetViewMo
   isFlashFilled: typeof isFlashFilled
   buildFlashWindow: typeof buildFlashWindow
   clampIndex: typeof clampIndex
+  isFlashEnded: typeof isFlashEnded
+  pickWidgetFlash: typeof pickWidgetFlash
+  showEndedFlash: typeof showEndedFlash
 }
 
 export interface PreviewModel {
@@ -24,7 +27,9 @@ export interface PreviewModel {
 /**
  * What the storefront widget would show for the product being previewed, the
  * tiers and the flash sale in the form, with `quantity` units chosen. The
- * widget's own functions decide it; nothing is worked out here.
+ * widget's own functions decide it; nothing is worked out here, except that a
+ * sale that has ended keeps its tier card under a "Flash sale ended" bar (the
+ * storefront shows only the plain price then) so the tiers can still be tried.
  */
 export function buildPreviewModel({ products, selectedIndex, tiers, flash, highDemand, quantity, timeZone, nowSeconds, formatMoney, tools }: {
   products: PreviewProduct[]
@@ -50,9 +55,9 @@ export function buildPreviewModel({ products, selectedIndex, tiers, flash, highD
     addingQty: quantity,
     isGroup: false,
     highDemand,
-    flash: flashWindow,
+    flash: tools.pickWidgetFlash({ flashWindow, nowSeconds, tools }),
     nowSeconds,
     formatMoney,
   })
-  return { isEmpty: false, viewModel }
+  return { isEmpty: false, viewModel: tools.showEndedFlash({ viewModel, flashWindow, nowSeconds, tools }) }
 }
