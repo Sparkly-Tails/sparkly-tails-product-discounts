@@ -1,15 +1,16 @@
 import { describe, it, expect } from 'vitest'
-import { THEME_COLORS, BACKGROUND_COLORS, DEFAULT_THEME_HEX, DEFAULT_BACKGROUND_HEX, isHexColor, formatHexColor } from '@/form/designOptions'
+import { DEFAULT_WIDGET_STYLE } from '@/lib/widgetStyle'
+import { THEME_COLORS, BACKGROUND_COLORS, isHexColor, formatHexColor } from '@/form/designOptions'
 
 describe('the colour choices of the design', () => {
   it('offers the nine theme colours, Blue among them, in the design order', () => {
     expect(THEME_COLORS.map((color) => color.label)).toEqual(['Black', 'Red', 'Orange', 'Yellow', 'Green', 'Cyan', 'Blue', 'Purple', 'Magenta'])
-    expect(THEME_COLORS.find((color) => color.hex === DEFAULT_THEME_HEX)?.label).toBe('Blue')
+    expect(THEME_COLORS.find((color) => color.hex === DEFAULT_WIDGET_STYLE.themeColor)?.label).toBe('Blue')
   })
 
   it('offers the seven background colours, Warm Sand among them', () => {
     expect(BACKGROUND_COLORS.map((color) => color.label)).toEqual(['Off White', 'Soft Gray', 'Warm Sand', 'Light Beige', 'Muted Slate', 'White', 'Dark Graphite'])
-    expect(BACKGROUND_COLORS.find((color) => color.hex === DEFAULT_BACKGROUND_HEX)?.label).toBe('Warm Sand')
+    expect(BACKGROUND_COLORS.find((color) => color.hex === DEFAULT_WIDGET_STYLE.backgroundColor)?.label).toBe('Warm Sand')
   })
 
   it('writes every colour as seven characters in capitals', () => {

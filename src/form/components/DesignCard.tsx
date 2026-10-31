@@ -1,32 +1,32 @@
-'use client'
-
 import { useState } from 'react'
-import { BackgroundColors, CornerRadius, ThemeColors } from '@/form/components/DesignControls'
+import { BackgroundColors, CornerRadius, PriceSize, ThemeColors } from '@/form/components/DesignControls'
 import { ExpandLessIcon, ExpandMoreIcon, PaletteIcon } from '@/form/components/icons'
-import { DEFAULT_BACKGROUND_HEX, DEFAULT_CORNER_RADIUS, DEFAULT_THEME_HEX, isHexColor } from '@/form/designOptions'
+import { isHexColor } from '@/form/designOptions'
+import type { WidgetStyle } from '@/lib/widgetStyle'
 
-// The "Design" card: colour theme, background colour and round corners for the
-// storefront widget. Only the controls for now: nothing is saved, sent with
-// the form or shown in the preview, so no field has a name.
-export default function DesignCard() {
+// The "Design" card: colour theme, background colour, round corners and price size of
+// this discount's storefront widget. The form holds the four values (`style`) and hears
+// every change; they travel with the form in four hidden fields and paint the preview.
+export default function DesignCard({ style, onChange }: { style: WidgetStyle; onChange: (style: WidgetStyle) => void }) {
   const [isOpen, setIsOpen] = useState(true)
-  const [themeHex, setThemeHex] = useState(DEFAULT_THEME_HEX)
-  const [backgroundHex, setBackgroundHex] = useState(DEFAULT_BACKGROUND_HEX)
-  const [backgroundText, setBackgroundText] = useState(DEFAULT_BACKGROUND_HEX)
-  const [cornerRadius, setCornerRadius] = useState(DEFAULT_CORNER_RADIUS)
+  const [backgroundText, setBackgroundText] = useState(style.backgroundColor)
 
   function updateBackgroundText(text: string) {
     setBackgroundText(text)
-    if (isHexColor({ text })) setBackgroundHex(text)
+    if (isHexColor({ text })) onChange({ ...style, backgroundColor: text })
   }
 
   function pickBackground(hex: string) {
     setBackgroundText(hex)
-    setBackgroundHex(hex)
+    onChange({ ...style, backgroundColor: hex })
   }
 
   return (
     <div className="bg-form-surface-container-lowest rounded-lg shadow-xs border border-form-outline-variant/20 overflow-hidden">
+      <input type="hidden" name="style-themeColor" value={style.themeColor} />
+      <input type="hidden" name="style-backgroundColor" value={style.backgroundColor} />
+      <input type="hidden" name="style-cornerRadius" value={style.cornerRadius} />
+      <input type="hidden" name="style-priceSize" value={style.priceSize} />
       <div className="p-form-lg space-y-form-md">
         {/* The whole row opens and closes the card; the title is the button, so keys and screen readers can too. */}
         <div onClick={() => setIsOpen(!isOpen)} className="flex items-center justify-between cursor-pointer">
@@ -42,9 +42,10 @@ export default function DesignCard() {
           {isOpen ? <ExpandLessIcon className="text-[20px] text-form-on-surface-variant" /> : <ExpandMoreIcon className="text-[20px] text-form-on-surface-variant" />}
         </div>
         <div hidden={!isOpen} className="pt-2 space-y-3">
-          <ThemeColors hex={themeHex} onChange={setThemeHex} />
-          <BackgroundColors hex={backgroundHex} text={backgroundText} onTextChange={updateBackgroundText} onPick={pickBackground} />
-          <CornerRadius value={cornerRadius} onChange={setCornerRadius} />
+          <ThemeColors hex={style.themeColor} onChange={(themeColor) => onChange({ ...style, themeColor })} />
+          <BackgroundColors hex={style.backgroundColor} text={backgroundText} onTextChange={updateBackgroundText} onPick={pickBackground} />
+          <CornerRadius value={style.cornerRadius} onChange={(cornerRadius) => onChange({ ...style, cornerRadius })} />
+          <PriceSize value={style.priceSize} onChange={(priceSize) => onChange({ ...style, priceSize })} />
         </div>
       </div>
     </div>

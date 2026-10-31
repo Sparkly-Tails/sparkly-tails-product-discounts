@@ -63,6 +63,7 @@ export default function TierDiscountForm({
             tiers={values.tiers}
             flash={buildPreviewFlash({ flash: values.flash })}
             highDemand={values.flash.highDemand}
+            style={values.style}
             timeZone={shopTimezone}
             currencyCode={currencyCode}
             initialNowSeconds={initialNowSeconds}
@@ -81,7 +82,7 @@ export default function TierDiscountForm({
             initial={initialTiers}
             onTiersChange={({ mode: pricingMode, tiers }) => setValues((current) => ({ ...current, pricingMode, tiers }))}
           />
-          <DesignCard />
+          <DesignCard style={values.style} onChange={(style) => setValues((current) => ({ ...current, style }))} />
         </Fragment>
       </FormShell>
     </form>

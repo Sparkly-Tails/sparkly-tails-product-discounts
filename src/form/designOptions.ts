@@ -1,5 +1,5 @@
-// The colours and the corner sizes the Design card offers, as in the design.
-// Nothing here is saved yet: the card only shows the choices.
+// The colours the Design card offers, as in the design. The values the card starts with are
+// DEFAULT_WIDGET_STYLE (src/lib/widgetStyle.ts).
 
 export interface ColorChoice {
   label: string
@@ -29,10 +29,6 @@ export const BACKGROUND_COLORS: ColorChoice[] = [
   { label: 'White', hex: '#FFFFFF', edgeClass: 'border-form-outline-variant/60' },
   { label: 'Dark Graphite', hex: '#191C16' },
 ]
-
-export const DEFAULT_THEME_HEX = '#0055C7'
-export const DEFAULT_BACKGROUND_HEX = '#F5EFE1'
-export const DEFAULT_CORNER_RADIUS = 12
 
 /** True for a whole colour code such as #F5EFE1. */
 export function isHexColor({ text }: { text: string }): boolean {
