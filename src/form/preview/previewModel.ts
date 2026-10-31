@@ -1,5 +1,6 @@
 // Small steps of the preview model, gathered in PREVIEW_TOOLS (see previewTools.ts).
 import type { WidgetFlash, WidgetFlashBar, WidgetViewModel } from '@/form/preview/widgetTypes'
+import type { WidgetStyle } from '@/lib/widgetStyle'
 
 /** The flash sale as typed in the form: the shop's wall-clock times. */
 export interface FlashInput {
@@ -67,4 +68,15 @@ export function clampQuantity({ value }: { value: number }): number {
 export function readQuantity({ text, tools }: { text: string; tools: { clampQuantity: typeof clampQuantity } }): number | null {
   const value = Number(text)
   return text.trim() === '' || Number.isNaN(value) ? null : tools.clampQuantity({ value })
+}
+
+/** The CSS variables the storefront block sets on the widget for a discount's style (the same names, so the same stylesheet paints it). */
+export function buildWidgetStyleVars({ style }: { style: WidgetStyle }): Record<string, string> {
+  return {
+    '--sparkly-tier-price-font-size': `${style.priceSize}px`,
+    '--sparkly-tier-moss': style.themeColor,
+    '--sparkly-tier-cream': style.backgroundColor,
+    '--sparkly-tier-sun': '#ffdc4c',
+    '--sparkly-tier-radius': `${style.cornerRadius}px`,
+  }
 }

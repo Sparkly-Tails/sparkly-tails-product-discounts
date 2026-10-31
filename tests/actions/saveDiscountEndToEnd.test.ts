@@ -82,6 +82,26 @@ beforeEach(() => {
 })
 afterEach(() => vi.useRealTimers())
 
+describe('the style of a discount', () => {
+  it('is saved with the discount from the four fields of the Design card', async () => {
+    const { saveSpy } = setup()
+    await save(form({ 'style-themeColor': '#e63946', 'style-backgroundColor': '#ffffff', 'style-cornerRadius': '4', 'style-priceSize': '30' }))
+    expect(saveSpy.mock.calls[0][0].discounts[0].style).toEqual({ themeColor: '#E63946', backgroundColor: '#FFFFFF', cornerRadius: 4, priceSize: 30 })
+  })
+
+  it('is saved with the Design card\'s defaults when the card was left alone (or the fields are missing)', async () => {
+    const { saveSpy } = setup()
+    await save(form())
+    expect(saveSpy.mock.calls[0][0].discounts[0].style).toEqual({ themeColor: '#0055C7', backgroundColor: '#F5EFE1', cornerRadius: 12, priceSize: 24 })
+  })
+
+  it('replaces a value that is not a colour or a number by its default instead of storing it', async () => {
+    const { saveSpy } = setup()
+    await save(form({ 'style-themeColor': 'red;}</style>', 'style-priceSize': 'huge' }))
+    expect(saveSpy.mock.calls[0][0].discounts[0].style).toMatchObject({ themeColor: '#0055C7', priceSize: 24 })
+  })
+})
+
 describe('saving a new discount', () => {
   it('makes sure the checkout discount exists first and, when it cannot, shows why and saves nothing', async () => {
     const { saveSpy } = setup()
@@ -95,7 +115,7 @@ describe('saving a new discount', () => {
     const { saveSpy } = setup()
     await save(form())
     expect(saveSpy).toHaveBeenCalledWith({
-      discounts: [{ discountId: expect.stringMatching(/^disc_/), name: 'Soup', title: 'Soup', status: 'draft', pricingMode: 'percent', members: [{ productId: P1 }], tiers: [{ minQty: 5, percentOff: 10 }] }],
+      discounts: [{ discountId: expect.stringMatching(/^disc_/), name: 'Soup', title: 'Soup', status: 'draft', pricingMode: 'percent', members: [{ productId: P1 }], tiers: [{ minQty: 5, percentOff: 10 }], style: { themeColor: '#0055C7', backgroundColor: '#F5EFE1', cornerRadius: 12, priceSize: 24 } }],
     })
     expect(redirect).toHaveBeenCalledWith(expect.stringMatching(/^\/discounts\/disc_/))
   })

@@ -163,6 +163,29 @@
   {{ 'tier-pricing-time-sale.js' | asset_url | preload_tag: as: 'script' }}
 {%- endif -%}
 
+{%- comment -%}
+  The look of this widget. A discount's own style (saved with the discount, see src/lib/widgetStyle.ts) wins;
+  where it has no usable value the theme editor's block setting applies, and below that the stylesheet's default.
+  A colour must pass the hex snippet and a number is kept inside the ranges the admin form allows.
+{%- endcomment -%}
+{%- assign style_value = discount_metafield.value.style -%}
+{%- assign style_theme = block.settings.moss_color -%}
+{%- assign style_background = block.settings.cream_color -%}
+{%- assign style_price_size = block.settings.price_font_size -%}
+{%- assign style_radius = nil -%}
+{%- if discount_metafield != blank and style_value != blank -%}
+  {%- capture safe_theme -%}{%- render 'sparkly-safe-hex', hex: style_value.themeColor -%}{%- endcapture -%}
+  {%- capture safe_background -%}{%- render 'sparkly-safe-hex', hex: style_value.backgroundColor -%}{%- endcapture -%}
+  {%- if safe_theme != blank -%}{%- assign style_theme = safe_theme -%}{%- endif -%}
+  {%- if safe_background != blank -%}{%- assign style_background = safe_background -%}{%- endif -%}
+  {%- if style_value.priceSize != blank -%}{%- assign style_price_size = style_value.priceSize | plus: 0 | at_least: 12 | at_most: 48 -%}{%- endif -%}
+  {%- if style_value.cornerRadius != blank -%}{%- assign style_radius = style_value.cornerRadius | plus: 0 | at_least: 0 | at_most: 24 -%}{%- endif -%}
+{%- endif -%}
+{%- capture style_vars -%}
+  --sparkly-tier-price-font-size: {{ style_price_size }}px; --sparkly-tier-moss: {{ style_theme }}; --sparkly-tier-cream: {{ style_background }}; --sparkly-tier-sun: {{ block.settings.sun_color }};
+  {%- if style_radius != nil %} --sparkly-tier-radius: {{ style_radius }}px;{% endif -%}
+{%- endcapture -%}
+
 <div
   id="sparkly-tier-pricing-{{ block.id }}"
   class="sparkly-tier-pricing{% if discount_metafield != blank %} sparkly-tier-pricing--card{% endif %}"
@@ -177,7 +200,7 @@
   data-high-demand="{{ discount_metafield.value.highDemand | default: false }}"
   data-flash='{{ discount_metafield.value.flash | json | escape }}'
   data-component-urls='{{ component_urls_json }}'
-  style="--sparkly-tier-price-font-size: {{ block.settings.price_font_size }}px; --sparkly-tier-moss: {{ block.settings.moss_color }}; --sparkly-tier-cream: {{ block.settings.cream_color }}; --sparkly-tier-sun: {{ block.settings.sun_color }};"
+  style="{{ style_vars | strip | escape }}"
 >
   <div class="sparkly-tier-pricing__flash" data-tier-pricing-flash data-variant="hidden" hidden>
     <div class="sparkly-tier-pricing__flash-main">

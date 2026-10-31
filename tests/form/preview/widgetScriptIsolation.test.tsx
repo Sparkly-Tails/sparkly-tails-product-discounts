@@ -2,6 +2,7 @@
 import { describe, it, expect, afterEach, vi } from 'vitest'
 import { renderToString } from 'react-dom/server'
 import WidgetView from '@/form/preview/components/WidgetView'
+import { DEFAULT_WIDGET_STYLE } from '@/lib/widgetStyle'
 import { buildPreviewModel } from '@/form/preview/buildPreviewModel'
 import { PREVIEW_TOOLS } from '@/form/preview/previewTools'
 import { WIDGET_FUNCTIONS } from '@/form/preview/widgetFunctions'
@@ -20,7 +21,7 @@ function renderPreviewMarkup(): string {
     products: [{ title: 'Tuna Soup', price: 20, imageUrl: null }], selectedIndex: 0, tiers: [{ minQty: 5, percentOff: 10 }], flash: null,
     highDemand: false, quantity: 1, timeZone: 'UTC', nowSeconds: 1_800_000_000, formatMoney: (amount) => WIDGET_FUNCTIONS.formatMoney(amount, '${{amount}}'), tools: PREVIEW_TOOLS,
   })
-  return renderToString(<WidgetView viewModel={viewModel!} hasTiers onPickQuantity={() => {}} />)
+  return renderToString(<WidgetView viewModel={viewModel!} hasTiers widgetStyle={DEFAULT_WIDGET_STYLE} onPickQuantity={() => {}} />)
 }
 
 afterEach(() => { document.body.innerHTML = ''; vi.clearAllTimers(); vi.useRealTimers() })
