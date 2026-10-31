@@ -4,7 +4,6 @@ import { render, screen, cleanup } from '@testing-library/react'
 import '@testing-library/jest-dom/vitest'
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }))
-vi.mock('@/home/homeFont', () => ({ homeFont: { variable: 'inter-variable' } }))
 
 import HomeView from '@/home/components/HomeView'
 import { DEFAULT_QUERY, TABLE_TOOLS, applyTableQuery } from '@/home/tableQuery'
@@ -35,9 +34,9 @@ describe('HomeView', () => {
     expect(screen.getByRole('link', { name: 'Salmon Oil' })).toHaveAttribute('href', '/discounts/a')
   })
 
-  it('puts the font variable and the light palette on the page wrapper', () => {
+  it('puts the Inter typeface and the light palette on the page wrapper', () => {
     const { container } = show()
     const wrapper = container.firstElementChild as HTMLElement
-    expect(wrapper).toHaveClass('inter-variable', 'font-home', 'bg-home-surface', 'text-home-on-surface')
+    expect(wrapper).toHaveClass('font-home', 'bg-home-surface', 'text-home-on-surface')
   })
 })

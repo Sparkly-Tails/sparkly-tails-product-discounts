@@ -15,7 +15,6 @@ vi.mock('@/timeDiscounts/config', () => ({
 }))
 vi.mock('@/lib/shop', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/shop')>()), getShopTimezone: vi.fn(async () => 'UTC'), getShopCurrencyCode: vi.fn(async () => 'GBP') }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }))
-vi.mock('@/home/homeFont', () => ({ homeFont: { variable: 'inter-variable' } }))
 
 const noSearch = Promise.resolve({})
 const liveDiscount = { discountId: 'd1', name: 'Salmon Oil', title: '', status: 'live' as const, pricingMode: 'percent' as const, members: [], tiers: [{ minQty: 3, percentOff: 10 }] }

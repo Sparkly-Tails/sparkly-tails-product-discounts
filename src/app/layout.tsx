@@ -23,6 +23,11 @@ export default async function RootLayout({
     <html lang="en">
       <head>
         <meta name="shopify-api-key" content={process.env.NEXT_PUBLIC_SHOPIFY_API_KEY} />
+        {/* Inter, straight from Google Fonts: Next's own Google font loader fetches the font while Next builds, which Turbopack could not do on Vercel. */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        {/* eslint-disable-next-line @next/next/no-page-custom-font -- loaded for the whole app from the root layout, on purpose. */}
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" />
         {/* Plain <script>, not next/script — Shopify requires App Bridge to be
             the literal first <script> tag with no async/defer/type=module.
             next/script's beforeInteractive strategy doesn't guarantee that. */}

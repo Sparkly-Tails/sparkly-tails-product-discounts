@@ -20,7 +20,6 @@ vi.mock('@/actions/memberPickerActions', () => ({
   searchProductsAction: vi.fn(async () => []), listProductsAction: vi.fn(async () => []),
   getProductVariantsAction: vi.fn(async () => []), validateMemberAction: vi.fn(async () => ({ ok: true })),
 }))
-vi.mock('@/home/homeFont', () => ({ homeFont: { variable: 'font-var' } }))
 vi.mock('next/navigation', () => ({ notFound: vi.fn(() => { throw new Error('NEXT_NOT_FOUND') }) }))
 
 import DiscountPage from '../../../src/app/discounts/[discountId]/page'
