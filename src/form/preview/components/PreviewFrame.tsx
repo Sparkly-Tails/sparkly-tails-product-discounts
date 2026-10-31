@@ -26,7 +26,7 @@ export default function PreviewFrame({ labels, selectedIndex, onSelectProduct, c
   labels: string[]
   selectedIndex: number
   onSelectProduct: (index: number) => void
-  /** What the person can set for the preview, between the product list and the widget. */
+  /** What the person can set for the preview, below the widget. */
   controls?: ReactNode
   children: ReactNode
 }) {
@@ -43,8 +43,8 @@ export default function PreviewFrame({ labels, selectedIndex, onSelectProduct, c
         </span>
       </div>
       {labels.length > 0 ? <ProductSelect labels={labels} selectedIndex={selectedIndex} onSelect={onSelectProduct} /> : null}
-      {controls}
       <div className="rounded-2xl bg-form-surface-container-lowest overflow-hidden">{children}</div>
+      {controls}
       <div className="flex items-center gap-2 text-[12px] text-form-on-surface-variant pt-1">
         <TouchAppIcon className="text-[16px] text-form-outline" />
         <span>Tapping options changes preview state in real-time</span>
