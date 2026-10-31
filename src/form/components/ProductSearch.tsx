@@ -12,9 +12,9 @@ import type { ProductSearchResult, ProductVariantOption } from '@/lib/products'
 
 /** The server lookups the search needs, handed in so the component can be tried with others. */
 export interface ProductSearchTools {
-  findProducts: (options: { query: string; excludeDiscountId?: string }) => Promise<ProductSearchResult[]>
-  listProducts: (options: { excludeDiscountId?: string }) => Promise<ProductSearchResult[]>
-  findVariants: (options: { productId: string; excludeDiscountId?: string }) => Promise<ProductVariantOption[]>
+  findProducts: (options: { query: string }) => Promise<ProductSearchResult[]>
+  listProducts: () => Promise<ProductSearchResult[]>
+  findVariants: (options: { productId: string }) => Promise<ProductVariantOption[]>
   checkMember: (options: { productId: string; variantId?: string; excludeDiscountId?: string }) => Promise<{ ok: true } | { ok: false; error: string }>
 }
 
@@ -59,7 +59,7 @@ export default function ProductSearch({ members, currencyCode, excludeDiscountId
     const generation = stopTimer()
     if (value.trim().length < 2) return clearResults()
     setIsSearching(true)
-    timerRef.current = setTimeout(async () => showResults(await tools.findProducts({ query: value, excludeDiscountId }), generation), delayMs)
+    timerRef.current = setTimeout(async () => showResults(await tools.findProducts({ query: value }), generation), delayMs)
   }
 
   function clearResults() {
@@ -79,7 +79,7 @@ export default function ProductSearch({ members, currencyCode, excludeDiscountId
     setQuery('')
     setError(null)
     setIsSearching(true)
-    showResults(await tools.listProducts({ excludeDiscountId }), generation)
+    showResults(await tools.listProducts(), generation)
   }
 
   async function addWholeProduct(result: ProductSearchResult) {
@@ -90,7 +90,7 @@ export default function ProductSearch({ members, currencyCode, excludeDiscountId
   }
 
   async function openVariants(result: ProductSearchResult) {
-    setVariants(await tools.findVariants({ productId: result.id, excludeDiscountId }))
+    setVariants(await tools.findVariants({ productId: result.id }))
     setExpanding(result)
   }
 
