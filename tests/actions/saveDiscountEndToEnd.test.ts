@@ -3,7 +3,7 @@ import { saveDiscount } from '@/actions/saveDiscount'
 import { redirect } from 'next/navigation'
 import { ensureTierDiscount } from '@/lib/tierDiscount'
 import { syncDiscountRecord } from '@/flash/discountRecord'
-import { fetchAvailabilityConfigs, isAvailableEverywhere } from '@/lib/discount-availability'
+import { getTimeDiscountsConfig, type TimeDiscount } from '@/timeDiscounts/config'
 import type { Config, Discount } from '@/lib/config'
 
 /**
@@ -24,7 +24,7 @@ vi.mock('next/navigation', () => ({ redirect: vi.fn() }))
 vi.mock('@/lib/tierDiscount', () => ({ ensureTierDiscount: vi.fn() }))
 vi.mock('@/lib/shop', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/shop')>()), getShopTimezone: vi.fn(async () => 'Europe/London') }))
 vi.mock('@/lib/shopify-client', () => ({ shopifyQuery: vi.fn() }))
-vi.mock('@/lib/discount-availability', () => ({ fetchAvailabilityConfigs: vi.fn(), isAvailableEverywhere: vi.fn() }))
+vi.mock('@/timeDiscounts/config', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/timeDiscounts/config')>()), getTimeDiscountsConfig: vi.fn() }))
 vi.mock('@/flash/discountRecord', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/flash/discountRecord')>()), syncDiscountRecord: vi.fn() }))
 
 const P1 = 'gid://shopify/Product/1'
@@ -36,6 +36,13 @@ const info = (productId: string, price: number, variantId?: string) => ({ produc
 
 function discountOf(over: Partial<Discount> = {}): Discount {
   return { discountId: 'disc_1', name: 'Soup', title: 'Soup Sale', status: 'draft', pricingMode: 'percent', members: [{ productId: P1 }], tiers: [{ minQty: 5, percentOff: 10 }], ...over }
+}
+
+function timeDiscountOf(over: Partial<TimeDiscount> = {}): TimeDiscount {
+  return {
+    discountId: 'time_1', shopifyDiscountId: 'gid://shopify/DiscountAutomaticNode/3', name: 'Weekend', title: 'Weekend sale', startsAt: '2026-11-10T09:00', endsAt: '2026-11-11T09:00',
+    kind: 'perProduct', items: [{ productId: P1, pricingMode: 'percent', amount: 10 }], ...over,
+  }
 }
 
 function form(fields: Record<string, string> = {}, members: { productId: string; variantId?: string }[] = [{ productId: P1 }]): FormData {
@@ -69,8 +76,7 @@ beforeEach(() => {
   vi.mocked(ensureTierDiscount).mockResolvedValue('exists')
   vi.mocked(syncDiscountRecord).mockReset()
   vi.mocked(syncDiscountRecord).mockResolvedValue(RECORD_ID)
-  vi.mocked(fetchAvailabilityConfigs).mockResolvedValue({ productConfig: { discounts: [] }, timeConfig: { discounts: [] } } as never)
-  vi.mocked(isAvailableEverywhere).mockReturnValue(true)
+  vi.mocked(getTimeDiscountsConfig).mockResolvedValue({ discounts: [] })
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(new Date('2026-11-01T10:00:00Z')) // 10:00 in London (summer time ended on 25 October)
 })
@@ -110,10 +116,35 @@ describe('saving a new discount', () => {
     expect(saveSpy).toHaveBeenCalledTimes(1)
   })
 
-  it('refuses a product that already belongs to another discount', async () => {
+  it('saves a draft that holds a product another live discount has, since only a live discount keeps a product', async () => {
     const { saveSpy } = setup([discountOf({ discountId: 'disc_x', name: 'X', status: 'live' })])
-    expect(await save(form())).toEqual({ error: expect.stringMatching(/already belongs to another discount/) })
+    await save(form())
+    expect(saveSpy).toHaveBeenCalledTimes(1)
+    expect(saveSpy.mock.calls[0][0].discounts[1].status).toBe('draft')
+  })
+
+  it('refuses Go live when another live discount has the product, naming the product and that discount, and saves nothing', async () => {
+    const { saveSpy, syncSpy } = setup([discountOf({ discountId: 'disc_x', name: 'Spring', status: 'live' })])
+    expect(await save(form({ goLive: 'on' }))).toEqual({
+      error: `"${P1}" is already in live discount "Spring". A product can only be in one live discount: take "Spring" offline or remove the product here.`,
+    })
     expect(saveSpy).not.toHaveBeenCalled()
+    expect(syncSpy).not.toHaveBeenCalled()
+  })
+
+  it('goes live when the only other discount with the product is a draft or offline', async () => {
+    const { saveSpy } = setup([discountOf({ discountId: 'disc_x', name: 'Autumn', status: 'draft' })])
+    await save(form({ goLive: 'on' }))
+    expect(saveSpy.mock.calls[0][0].discounts[1].status).toBe('live')
+  })
+
+  it('refuses to save a live discount that shares a product with another live one, but not a live discount that is only itself', async () => {
+    const { saveSpy } = setup([discountOf({ discountId: 'disc_x', name: 'Spring', status: 'live' }), discountOf({ discountId: 'disc_1', name: 'Soup', status: 'live' })])
+    expect(await save(form({ discountId: 'disc_1' }))).toEqual({ error: expect.stringMatching(/already in live discount "Spring"/) })
+    expect(saveSpy).not.toHaveBeenCalled()
+    const alone = setup([discountOf({ discountId: 'disc_1', name: 'Soup', status: 'live' })])
+    await save(form({ discountId: 'disc_1' }))
+    expect(alone.saveSpy).toHaveBeenCalledTimes(1)
   })
 
   it('is live with Go live, and puts the prices on the storefront', async () => {
@@ -199,12 +230,21 @@ describe('saving a flash sale', () => {
     expect(convertToUtc('2026-11-27T09:00')).toBe('2026-11-27T09:00:00.000Z')
   })
 
-  it('refuses to go live when a product now belongs to another discount, saving and creating nothing', async () => {
+  it('refuses to go live as a flash sale while a time-based discount that is upcoming or running has the product, saving and creating nothing', async () => {
     const { saveSpy } = setup()
-    vi.mocked(isAvailableEverywhere).mockReturnValue(false)
-    expect(await save(form(flash({ goLive: 'on' })))).toEqual({ error: expect.stringMatching(/already belongs to another discount/) })
+    vi.mocked(getTimeDiscountsConfig).mockResolvedValue({ discounts: [timeDiscountOf()] })
+    expect(await save(form(flash({ goLive: 'on' })))).toEqual({
+      error: `"${P1}" is already in time-based discount "Weekend sale", which is upcoming or running. A flash sale cannot share a product with it.`,
+    })
     expect(syncDiscountRecord).not.toHaveBeenCalled()
     expect(saveSpy).not.toHaveBeenCalled()
+  })
+
+  it('goes live as a flash sale when the time-based discount with the product has expired', async () => {
+    const { saveSpy } = setup()
+    vi.mocked(getTimeDiscountsConfig).mockResolvedValue({ discounts: [timeDiscountOf({ startsAt: '2026-10-01T09:00', endsAt: '2026-10-02T09:00' })] })
+    await save(form(flash({ goLive: 'on' })))
+    expect(saveSpy).toHaveBeenCalledTimes(1)
   })
 
   it('shows Shopify\'s message and leaves everything as it was when the record is refused', async () => {

@@ -7,7 +7,8 @@
 // storefront is updated. A refusal anywhere before the config is saved leaves
 // everything as it was.
 import type { Config, Discount, FlashSale } from '@/lib/config'
-import type { assertFlashWindow, assertMembersAvailable, assertMembersAvailableEverywhere, assertPricingAllowed, findDiscountOrThrow, needsRecordSync, syncRecordOf } from '@/actions/discountSteps'
+import type { assertFlashWindow, assertPricingAllowed, findDiscountOrThrow, needsRecordSync, syncRecordOf } from '@/actions/discountSteps'
+import type { ShopClaimTools } from '@/form/claimTools'
 import type { ParsedDiscount } from '@/form/parseDiscountForm'
 import type * as Steps from '@/form/saveSteps'
 
@@ -22,14 +23,12 @@ export interface SavePlan {
   next: Discount
 }
 
-export interface SaveTools {
+export interface SaveTools extends ShopClaimTools {
   // the shop
   loadConfig: () => Promise<Config>
   saveConfig: (config: Config) => Promise<void>
   readShopNow: () => Promise<{ timeZone: string; nowLocal: string }>
   assertFlashWindow: typeof assertFlashWindow
-  assertMembersAvailable: typeof assertMembersAvailable
-  assertMembersAvailableEverywhere: typeof assertMembersAvailableEverywhere
   assertPricingAllowed: typeof assertPricingAllowed
   ensureTierDiscount: () => Promise<unknown>
   needsRecordSync: typeof needsRecordSync
@@ -53,6 +52,7 @@ export interface SaveTools {
   describeSaveError: typeof Steps.describeSaveError
   // the steps of this file
   checkWindow: typeof checkWindow
+  checkLiveClaims: typeof checkLiveClaims
   checkLiveAvailability: typeof checkLiveAvailability
   checkAvailability: typeof checkAvailability
   chooseDiscount: typeof chooseDiscount
@@ -70,13 +70,18 @@ export async function checkWindow({ existing, values, tools }: { existing: Disco
   tools.assertFlashWindow(values.flash as FlashSale, (await tools.readShopNow()).nowLocal)
 }
 
-/** A live flash sale also needs its products free of the time-based discounts. */
-export async function checkLiveAvailability({ next, tools }: { next: Discount; tools: SaveTools }): Promise<void> {
-  if (next.status === 'live' && next.flash) await tools.assertMembersAvailableEverywhere(next.members, next.discountId)
+/** A discount that is live needs its products free of every other live tier discount; a draft is not asked. */
+export async function checkLiveClaims({ next, tools }: { next: Discount; tools: SaveTools }): Promise<void> {
+  if (next.status === 'live') await tools.assertFreeOfLiveDiscounts({ members: next.members, discountId: next.discountId, tools })
 }
 
-export async function checkAvailability({ existing, values, next, tools }: { existing: Discount | undefined; values: ParsedDiscount; next: Discount; tools: SaveTools }): Promise<void> {
-  await tools.assertMembersAvailable(values.members, existing ? existing.discountId : undefined)
+/** A live flash sale also needs its products free of the time-based discounts that are upcoming or running. */
+export async function checkLiveAvailability({ next, tools }: { next: Discount; tools: SaveTools }): Promise<void> {
+  if (next.status === 'live' && next.flash) await tools.assertFreeOfOpenTimeDiscounts({ members: next.members, discountId: next.discountId, tools })
+}
+
+export async function checkAvailability({ values, next, tools }: { values: ParsedDiscount; next: Discount; tools: SaveTools }): Promise<void> {
+  await tools.checkLiveClaims({ next, tools })
   await tools.assertPricingAllowed(values.members, values.pricingMode, values.tiers)
   await tools.checkLiveAvailability({ next, tools })
 }
@@ -93,7 +98,7 @@ export async function buildSavePlan({ discountId, values, tools }: { discountId:
   const existing = discountId === undefined ? undefined : tools.findDiscountOrThrow(config, discountId)
   await tools.checkWindow({ existing, values, tools })
   const next = tools.chooseDiscount({ existing, values, tools })
-  await tools.checkAvailability({ existing, values, next, tools })
+  await tools.checkAvailability({ values, next, tools })
   return { config, existing, next }
 }
 
