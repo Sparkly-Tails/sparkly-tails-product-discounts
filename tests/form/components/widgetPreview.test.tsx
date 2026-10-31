@@ -88,6 +88,13 @@ describe('WidgetPreview', () => {
     expect(document.querySelector('[data-tier-pricing-price]')).toHaveTextContent('$25.20')
   })
 
+  it('puts the quantity picker below the widget', () => {
+    renderPreview()
+    const widget = document.querySelector('.sparkly-tier-pricing') as Element
+    const position = widget.compareDocumentPosition(screen.getByLabelText('Quantity'))
+    expect(position & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
   it('takes a quantity typed in the picker, and ignores an empty field', () => {
     renderPreview()
     const input = screen.getByLabelText('Quantity') as HTMLInputElement
