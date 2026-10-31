@@ -1,6 +1,6 @@
 # The widget script: small readable modules, minified and split when built
 
-Date: 2026-10-31. Status: draft, waiting for the owner's approval (all decisions made).
+Date: 2026-10-31. Status: approved by the owner on 2026-10-31 and built (plan: `docs/superpowers/plans/2026-10-31-widget-script-split-and-minify.md`). The sections "What was built" and "Differences from the first draft" at the end say where the build differs from the draft below.
 
 ## Why
 
@@ -51,3 +51,21 @@ Measured on 2026-10-31 (esbuild, gzip): the script is 59,680 B raw, 26,241 B min
 ## What is left to the builder
 
 The exact module boundaries (which functions belong to the core, the flash and the siblings components), how `computeWidgetViewModel` gets the flash functions when only the flash component has them (the admin preview must still decide the flash bar with the same function), and the tests: each built file under 10,000 B; the core runs a plain discount on its own; the flash and siblings components load only when needed; the parity test and the existing storefront tests pass against the readable source.
+
+## What was built
+
+Built files (all minified, all under 10,000 bytes; sizes of the first build): `tier-pricing.js` (core, 8,121), `tier-pricing-model.js` (7,578), `tier-pricing-paint.js` (3,687), `tier-pricing-flash.js` (2,664), `tier-pricing-siblings.js` (3,779), `tier-pricing-time-sale.js` (2,253), `time-based-discount.js` (2,611); stylesheets `tier-pricing.css` (18,279) and `time-based-discount.css` (871).
+
+- **Source**: `extensions/product-tier-pricing/src/`, the old scripts moved into modules (`tierMath`, `progress`, `copy`, `flash`, `viewModel`, `siblings`, `timeSale`, `paint`, `dom`, `config`, `core/*`, `timeBasedDiscount*`), plus the new `loader/` and one entry file per built script in `entries/`. `widgetFunctions.js` gathers the pure functions for the admin preview and the node tests.
+- **Loading**: the block hands the core script the address of each component (`data-component-urls`, from `asset_url`) and preloads `model` and `paint` (and `flash` or `time-sale` when the product has one). The core always loads `model` and `paint`, loads `flash` for a flash sale and `time-sale` for a time-based discount, and loads `siblings` the first time the list is opened.
+- **A part that cannot load**: the page keeps the plain price the block rendered and nothing throws. A failed load can be tried again on the next request (opening the list again).
+- **Upload**: `extensions/product-tier-pricing/.shopifyignore` holds `src/**`. The Shopify CLI collects every file one level inside each folder of an extension (it ignores only what it lists and what `.shopifyignore` names), so without it the readable source would be uploaded next to the built files.
+- **Tests** run the built files: a Vitest global setup builds them once per run into a temporary folder (esbuild cannot run inside the jsdom environment), and the storefront suites run them in page order. The node suites run the source.
+
+## Differences from the first draft
+
+1. **Components are classic scripts that register on `window.SparklyTierPricing`, not ES modules loaded with `import()`.** A module loaded from Shopify's CDN needs CORS headers on that CDN, and the storefront tests run the scripts with `eval`, which cannot `import()`. A classic script needs neither.
+2. **A plain tier discount loads three scripts (core, `model`, `paint`), not one.** A plain discount is about 19 KB minified, so no single file under 10,000 bytes can hold it. The flash sale, the time-based sale and the siblings list stay on demand. The three are fetched in parallel (two are preloaded).
+3. **`computeWidgetViewModel` takes the flash functions as `flashTools`**, which the flash component provides; the admin preview and the node tests get them through `widgetFunctions.js`.
+4. **Legacy lint list**: the two legacy entries for the old scripts became the 16 moved source files that still carry the old code (moved, not rewritten). The loader, the entries and the build are new and follow the guidelines.
+5. **Dev and production builds are the same**: `deploy:dev` and `deploy:prod` both build first and differ only in the app config they deploy to.
