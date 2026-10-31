@@ -31,8 +31,8 @@ function buildTools(config: Config, overrides: Partial<Record<keyof SaveTools, u
     saveConfig: async (next: Config) => { note('saveConfig'); saved.push(next) },
     readShopNow: async () => ({ timeZone: 'UTC', nowLocal: '2026-10-30T12:00' }),
     assertFlashWindow: vi.fn(() => note('assertFlashWindow')),
-    assertMembersAvailable: vi.fn(async () => note('assertMembersAvailable')),
-    assertMembersAvailableEverywhere: vi.fn(async () => note('assertMembersAvailableEverywhere')),
+    assertFreeOfLiveDiscounts: vi.fn(async () => note('assertFreeOfLiveDiscounts')),
+    assertFreeOfOpenTimeDiscounts: vi.fn(async () => note('assertFreeOfOpenTimeDiscounts')),
     assertPricingAllowed: vi.fn(async () => note('assertPricingAllowed')),
     ensureTierDiscount: vi.fn(async () => note('ensureTierDiscount')),
     syncRecordOf: vi.fn(async (discount: Discount) => { note('syncRecordOf'); if (discount.flash) discount.flash.shopifyDiscountId = 'gid://shopify/DiscountAutomaticNode/NEW' }),
@@ -67,10 +67,10 @@ describe('saveDiscountFlow: a new discount', () => {
     expect(calls).toContain('syncDiscountMetafields')
   })
 
-  it('checks the window, the products everywhere and Shopify, and only then saves, when it goes live as a flash sale', async () => {
+  it('checks the window, the live discounts, the time-based discounts and Shopify, and only then saves, when it goes live as a flash sale', async () => {
     const { tools, calls, saved } = buildTools({ discounts: [] })
     await flow.saveDiscountFlow({ discountId: undefined, values: { ...VALUES, goLive: true, flash: FLASH }, tools })
-    expect(calls).toEqual(['assertFlashWindow', 'assertMembersAvailable', 'assertPricingAllowed', 'assertMembersAvailableEverywhere', 'ensureTierDiscount', 'syncRecordOf', 'saveConfig', 'syncDiscountMetafields'])
+    expect(calls).toEqual(['assertFlashWindow', 'assertFreeOfLiveDiscounts', 'assertPricingAllowed', 'assertFreeOfOpenTimeDiscounts', 'ensureTierDiscount', 'syncRecordOf', 'saveConfig', 'syncDiscountMetafields'])
     expect(saved[0].discounts[0].flash?.shopifyDiscountId).toBe('gid://shopify/DiscountAutomaticNode/NEW')
   })
 })
@@ -87,7 +87,7 @@ describe('saveDiscountFlow: an existing discount', () => {
   it('updates the Shopify discount, then the config, then the storefront, and clears the products that were removed', async () => {
     const { tools, calls } = buildTools({ discounts: [EXISTING] })
     await flow.saveDiscountFlow({ discountId: 'disc_1', values: { ...VALUES, flash: { ...FLASH, endsAt: '2026-12-05T23:59' } }, tools })
-    expect(calls).toEqual(['assertFlashWindow', 'assertMembersAvailable', 'assertPricingAllowed', 'assertMembersAvailableEverywhere', 'syncRecordOf', 'saveConfig', 'clearDiscountMetafields', 'syncDiscountMetafields'])
+    expect(calls).toEqual(['assertFlashWindow', 'assertFreeOfLiveDiscounts', 'assertPricingAllowed', 'assertFreeOfOpenTimeDiscounts', 'syncRecordOf', 'saveConfig', 'clearDiscountMetafields', 'syncDiscountMetafields'])
     expect((tools.clearDiscountMetafields as ReturnType<typeof vi.fn>).mock.calls[0][0]).toEqual([{ productId: 'p2' }])
   })
 
@@ -109,7 +109,7 @@ describe('saveDiscountFlow: an existing discount', () => {
     const { tools, calls, saved } = buildTools({ discounts: [EXISTING] })
     await flow.saveDiscountFlow({ discountId: 'disc_1', values: { ...VALUES, members: EXISTING.members, takeOffline: true }, tools })
     expect(saved[0].discounts[0].status).toBe('draft')
-    expect(calls).toEqual(['assertMembersAvailable', 'assertPricingAllowed', 'syncRecordOf', 'saveConfig', 'clearDiscountMetafields'])
+    expect(calls).toEqual(['assertPricingAllowed', 'syncRecordOf', 'saveConfig', 'clearDiscountMetafields'])
     expect((tools.clearDiscountMetafields as ReturnType<typeof vi.fn>).mock.calls[0][0]).toEqual([{ productId: 'p1' }, { productId: 'p2' }])
   })
 
@@ -145,10 +145,26 @@ describe('saveDiscountFlow: a save that cannot go through changes nothing', () =
     expect(saved).toEqual([])
   })
 
-  it('stops when a product already belongs to another discount', async () => {
-    const { tools, saved } = buildTools({ discounts: [] }, { assertMembersAvailable: vi.fn(async () => { throw new Error('p1 already belongs to another discount') }) })
-    expect(await flow.saveDiscountFlow({ discountId: undefined, values: VALUES, tools })).toEqual({ ok: false, error: 'p1 already belongs to another discount' })
+  it('stops when a discount that goes live has a product that another live discount has', async () => {
+    const { tools, saved } = buildTools({ discounts: [] }, { assertFreeOfLiveDiscounts: vi.fn(async () => { throw new Error('"Tuna Soup" is already in live discount "Spring".') }) })
+    expect(await flow.saveDiscountFlow({ discountId: undefined, values: { ...VALUES, goLive: true }, tools })).toEqual({ ok: false, error: '"Tuna Soup" is already in live discount "Spring".' })
     expect(saved).toEqual([])
+  })
+
+  it('checks a live discount that is edited, but not one that is a draft', async () => {
+    const live = buildTools({ discounts: [EXISTING] })
+    await flow.saveDiscountFlow({ discountId: 'disc_1', values: { ...VALUES, flash: null }, tools: live.tools })
+    expect(live.tools.assertFreeOfLiveDiscounts).toHaveBeenCalledWith(expect.objectContaining({ members: [{ productId: 'p1' }], discountId: 'disc_1' }))
+    const draft = buildTools({ discounts: [] })
+    await flow.saveDiscountFlow({ discountId: undefined, values: VALUES, tools: draft.tools })
+    expect(draft.tools.assertFreeOfLiveDiscounts).not.toHaveBeenCalled()
+    expect(draft.saved).toHaveLength(1)
+  })
+
+  it('does not ask the time-based discounts about a live discount that is not a flash sale', async () => {
+    const { tools } = buildTools({ discounts: [] })
+    await flow.saveDiscountFlow({ discountId: undefined, values: { ...VALUES, goLive: true }, tools })
+    expect(tools.assertFreeOfOpenTimeDiscounts).not.toHaveBeenCalled()
   })
 
   it('stops when a fixed price needs products at one price', async () => {
