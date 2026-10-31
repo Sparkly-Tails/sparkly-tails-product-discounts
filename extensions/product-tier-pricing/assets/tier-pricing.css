@@ -12,6 +12,11 @@
 }
 
 .sparkly-tier-pricing {
+  /* The card's corner radius; a discount's style sets it on the element (see the block). The boxes and chips
+     inside get 3/4 and 1/2 of it, which is the old 12px and 8px at the default 16px. */
+  --sparkly-tier-radius: 16px;
+  --sparkly-tier-radius-md: calc(var(--sparkly-tier-radius) * 0.75);
+  --sparkly-tier-radius-sm: calc(var(--sparkly-tier-radius) * 0.5);
   --sparkly-tier-ink: var(--color-text-main, #2a2a22);
   --sparkly-tier-text-secondary: var(--color-secondary-text-main, #5b5c4e);
   --sparkly-tier-border: var(--color-borders-main, #ddd6c2);
@@ -42,7 +47,7 @@
   margin: 16px 0;
   overflow: hidden;
   border: 1px solid var(--sparkly-tier-border);
-  border-radius: 16px;
+  border-radius: var(--sparkly-tier-radius);
   background: var(--sparkly-tier-track);
   box-shadow: 0 8px 24px -4px rgba(35, 38, 28, 0.08), 0 2px 6px -1px rgba(35, 38, 28, 0.04);
 }
@@ -227,7 +232,7 @@
   margin: 0;
   padding: 6px 12px;
   border: 1px solid var(--sparkly-tier-border);
-  border-radius: 8px;
+  border-radius: var(--sparkly-tier-radius-sm);
   background: var(--sparkly-tier-track);
   color: var(--sparkly-tier-text-secondary);
   font-family: var(--font-stack-body);
@@ -293,7 +298,7 @@
   gap: 8px;
   padding: 12px;
   border: 1px solid var(--sparkly-tier-border);
-  border-radius: 12px;
+  border-radius: var(--sparkly-tier-radius-md);
   background: var(--sparkly-tier-surface);
 }
 
@@ -454,7 +459,7 @@
 /* The drawer: a trigger when closed, the list with a header when open. */
 .sparkly-tier-pricing__drawer {
   border: 1px solid var(--sparkly-tier-border);
-  border-radius: 12px;
+  border-radius: var(--sparkly-tier-radius-md);
   background: var(--sparkly-tier-surface);
 }
 
@@ -481,7 +486,7 @@
   font-weight: 600;
   text-align: left;
   cursor: pointer;
-  border-radius: 12px;
+  border-radius: var(--sparkly-tier-radius-md);
 }
 
 .sparkly-tier-pricing__toggle[hidden] {
@@ -570,7 +575,7 @@
   gap: 8px 12px;
   padding: 10px;
   border: 1px solid var(--sparkly-tier-border);
-  border-radius: 12px;
+  border-radius: var(--sparkly-tier-radius-md);
   background: var(--sparkly-tier-track);
   box-shadow: var(--sparkly-tier-shadow-sm);
 }
@@ -598,7 +603,7 @@
   width: 40px;
   height: 40px;
   flex: none;
-  border-radius: 8px;
+  border-radius: var(--sparkly-tier-radius-sm);
   border: 1px solid var(--sparkly-tier-border);
   object-fit: cover;
   background: var(--sparkly-tier-surface);
