@@ -28,7 +28,7 @@ describe('WidgetPreview', () => {
     renderPreview({ products: [] })
     expect(screen.getByText('Add a product to see the preview')).toBeInTheDocument()
     expect(screen.queryByLabelText('Product previewing:')).toBeNull()
-    expect(document.querySelector('[data-sparkly-tier-pricing]')).toBeNull()
+    expect(document.querySelector('.sparkly-tier-pricing')).toBeNull()
   })
 
   it('shows the widget for the first product, with a list of the products to preview', () => {

@@ -14,7 +14,10 @@ const WIDGET_STYLE = {
 
 // The storefront widget, painted from what the widget's own functions decided,
 // in the markup of tier-pricing.liquid and with its stylesheet. The Mix & match
-// list is not part of the preview.
+// list is not part of the preview. The container deliberately does not carry the
+// data-sparkly-tier-pricing marker: the widget script, which the admin imports for
+// its functions, starts itself on every element with that marker (see
+// tests/form/preview/widgetScriptIsolation.test.tsx).
 export default function WidgetView({ viewModel, hasTiers, onPickQuantity }: {
   viewModel: WidgetViewModel
   hasTiers: boolean
@@ -22,7 +25,7 @@ export default function WidgetView({ viewModel, hasTiers, onPickQuantity }: {
 }) {
   const hasChrome = hasTiers && viewModel.showChrome
   return (
-    <div className={hasChrome ? 'sparkly-tier-pricing sparkly-tier-pricing--card' : 'sparkly-tier-pricing'} style={WIDGET_STYLE} data-sparkly-tier-pricing>
+    <div className={hasChrome ? 'sparkly-tier-pricing sparkly-tier-pricing--card' : 'sparkly-tier-pricing'} style={WIDGET_STYLE}>
       <FlashBarView bar={viewModel.flashBar} />
       <div className="sparkly-tier-pricing__body">
         <PriceRowView viewModel={viewModel} />

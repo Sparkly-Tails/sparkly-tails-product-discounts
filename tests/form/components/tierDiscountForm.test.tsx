@@ -171,9 +171,9 @@ describe('TierDiscountForm: the preview follows the form', () => {
 
   it('does not change with the name', () => {
     renderForm()
-    const before = document.querySelector('[data-sparkly-tier-pricing]')!.innerHTML
+    const before = document.querySelector('.sparkly-tier-pricing')!.innerHTML
     fireEvent.change(nameField(), { target: { value: 'Black Friday' } })
-    expect(document.querySelector('[data-sparkly-tier-pricing]')!.innerHTML).toBe(before)
+    expect(document.querySelector('.sparkly-tier-pricing')!.innerHTML).toBe(before)
   })
 
   it('changes with the tiers', () => {

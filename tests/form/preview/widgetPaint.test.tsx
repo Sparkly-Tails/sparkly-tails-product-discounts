@@ -72,7 +72,7 @@ function renderPreview({ nowSeconds, quantity, tiers, flash, highDemand }: Scena
     },
   })
   const { container } = render(<WidgetView viewModel={viewModel!} hasTiers={tiers.length > 0} onPickQuantity={() => {}} />)
-  return container.querySelector('[data-sparkly-tier-pricing]') as HTMLElement
+  return container.querySelector('.sparkly-tier-pricing') as HTMLElement
 }
 
 // What the person reads and what changes how it looks, from either markup.
