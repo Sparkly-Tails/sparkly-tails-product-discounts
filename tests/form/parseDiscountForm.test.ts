@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { parseDiscountForm, findFormProblem, readName, readPricingMode } from '@/form/parseDiscountForm'
 import { PARSE_TOOLS } from '@/form/parseTools'
+import { DEFAULT_WIDGET_STYLE } from '@/lib/widgetStyle'
 
 function formWith(fields: Record<string, string | string[]>): FormData {
   const formData = new FormData()
@@ -33,10 +34,19 @@ describe('parseDiscountForm: a good form', () => {
         tiers: [{ minQty: 3, percentOff: 10, anchorPrice: 75.5 }, { minQty: 5, percentOff: 15 }],
         flash: null,
         highDemand: false,
+        style: DEFAULT_WIDGET_STYLE,
         goLive: false,
         takeOffline: false,
       },
     })
+  })
+
+  it('reads the four style fields, and replaces bad ones by the defaults', () => {
+    const style = { 'style-themeColor': '#e63946', 'style-backgroundColor': '#ffffff', 'style-cornerRadius': '0', 'style-priceSize': '36' }
+    const good = parse({ ...VALID, ...style })
+    expect('values' in good && good.values.style).toEqual({ themeColor: '#E63946', backgroundColor: '#FFFFFF', cornerRadius: 0, priceSize: 36 })
+    const bad = parse({ ...VALID, 'style-themeColor': 'red;}', 'style-backgroundColor': '', 'style-cornerRadius': '99', 'style-priceSize': 'big' })
+    expect('values' in bad && bad.values.style).toEqual({ ...DEFAULT_WIDGET_STYLE, cornerRadius: 24 })
   })
 
   it('reads fixed prices when the mode is fixed', () => {
@@ -96,6 +106,6 @@ describe('the small steps', () => {
   })
 
   it('findFormProblem finds nothing wrong with good values', () => {
-    expect(findFormProblem({ values: { name: 'x', members: [{ productId: 'p' }], pricingMode: 'percent', tiers: [{ minQty: 1, percentOff: 5 }], flash: null, highDemand: false, goLive: false, takeOffline: false } })).toBeNull()
+    expect(findFormProblem({ values: { name: 'x', members: [{ productId: 'p' }], pricingMode: 'percent', tiers: [{ minQty: 1, percentOff: 5 }], flash: null, highDemand: false, style: DEFAULT_WIDGET_STYLE, goLive: false, takeOffline: false } })).toBeNull()
   })
 })

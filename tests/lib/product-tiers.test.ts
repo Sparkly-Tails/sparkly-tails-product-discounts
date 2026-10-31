@@ -41,6 +41,7 @@ describe('buildProductMetafields', () => {
       ],
       flash: null,
       highDemand: false,
+      style: null,
     })
     expect(built.productRefs).toEqual([])
     expect(built.variantRefs).toEqual([V20, V21])
@@ -129,6 +130,12 @@ describe('buildProductMetafields: flash sale and High Demand', () => {
   it('carries the High Demand flag, on a flash and on a regular discount', () => {
     expect(buildProductMetafields({ ...mix, highDemand: true }, P1, SIBLING_REFERENCE_LIMIT).value.highDemand).toBe(true)
     expect(buildProductMetafields(flashDiscount, P1, SIBLING_REFERENCE_LIMIT, undefined, window).value.highDemand).toBe(true)
+  })
+
+  it('carries the style of the discount as plain values, and null for a discount that has none', () => {
+    const style = { themeColor: '#E63946', backgroundColor: '#FFFFFF', cornerRadius: 4, priceSize: 30 }
+    expect(buildProductMetafields({ ...mix, style }, P1, SIBLING_REFERENCE_LIMIT).value.style).toEqual(style)
+    expect(buildProductMetafields(mix, P1, SIBLING_REFERENCE_LIMIT).value.style).toBeNull()
   })
 
   it('a flash discount without a window (not computed) carries no flash object', () => {

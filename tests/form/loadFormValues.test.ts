@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { buildFormValues, buildSelectedMembers, buildFlashValues, buildTiersInitial } from '@/form/loadFormValues'
 import type { Discount } from '@/lib/config'
+import { DEFAULT_WIDGET_STYLE } from '@/lib/widgetStyle'
 import type { MemberInfo } from '@/lib/products'
 
 const SALMON: MemberInfo = { productId: 'p1', variantId: 'v1', title: 'Salmon Oil – 16 fl oz', productTitle: 'Salmon Oil', variantTitle: '16 fl oz', price: 28, handle: 'salmon', imageUrl: 'https://cdn.example/s.png' }
@@ -61,6 +62,12 @@ describe('buildFormValues', () => {
     expect(values.members).toHaveLength(1)
     expect(values.flash.enabled).toBe(false)
     expect(initialTiers.mode).toBe('percent')
+  })
+
+  it('fills the Design card from the saved style, or with its defaults for a discount saved before styles existed', () => {
+    const style = { themeColor: '#E63946', backgroundColor: '#FFFFFF', cornerRadius: 4, priceSize: 30 }
+    expect(buildFormValues({ discount: { ...PERCENT, style }, memberInfo: [SALMON], tools }).values.style).toEqual(style)
+    expect(buildFormValues({ discount: PERCENT, memberInfo: [SALMON], tools }).values.style).toEqual(DEFAULT_WIDGET_STYLE)
   })
 
   it('skips a product that no longer exists in the shop, as the old page did', () => {

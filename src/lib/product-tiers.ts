@@ -1,5 +1,6 @@
 import { shopifyQuery } from '@/lib/shopify-client'
 import type { Discount } from '@/lib/config'
+import type { WidgetStyle } from '@/lib/widgetStyle'
 import { computeFlashWindowUnix, type FlashWindowUnix } from '@/flash/window'
 import { getShopTimezone, zonedTimeToUtc } from '@/lib/shop'
 import { METAFIELD_NAMESPACE, METAFIELD_KEYS } from '@/lib/metafieldNames'
@@ -33,6 +34,8 @@ interface DiscountMetafieldValue {
   flash: (FlashWindowUnix & { showTeaser: boolean }) | null
   /** Show the "High Demand" tag in the widget. */
   highDemand: boolean
+  /** The widget's look for this discount (plain values: two colours and two numbers); null for a discount saved before styles existed. */
+  style: WidgetStyle | null
 }
 
 export interface ProductMetafields {
@@ -95,6 +98,7 @@ export function buildProductMetafields(
       siblings: others.map((m) => (m.variantId == null ? { productId: m.productId } : { productId: m.productId, variantId: m.variantId })),
       flash: discount.flash && flashWindow ? { ...flashWindow, showTeaser: discount.flash.showTeaser } : null,
       highDemand: discount.highDemand === true,
+      style: discount.style ?? null,
     },
     productRefs: others.filter((m) => m.variantId == null).map((m) => m.productId).filter(exists).slice(0, limit),
     variantRefs: others.filter((m) => m.variantId != null).map((m) => m.variantId!).filter(exists).slice(0, limit),

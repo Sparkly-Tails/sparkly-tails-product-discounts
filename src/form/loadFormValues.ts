@@ -5,6 +5,7 @@ import type { FormValues } from '@/form/formValues'
 import type { SelectedMember } from '@/form/memberSelection'
 import type { Discount } from '@/lib/config'
 import type { MemberInfo } from '@/lib/products'
+import { DEFAULT_WIDGET_STYLE } from '@/lib/widgetStyle'
 
 const NO_FLASH: FlashValues = { enabled: false, startsAt: '', endsAt: '', showTeaser: true, highDemand: false }
 
@@ -51,6 +52,7 @@ export function buildFormValues({ discount, memberInfo, tools }: {
       pricingMode: discount.pricingMode,
       tiers: discount.tiers,
       flash: tools.buildFlashValues({ discount }),
+      style: discount.style ?? DEFAULT_WIDGET_STYLE,
     },
     initialTiers: tools.buildTiersInitial({ discount }),
   }

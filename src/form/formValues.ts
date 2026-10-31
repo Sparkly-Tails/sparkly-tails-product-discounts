@@ -5,6 +5,7 @@ import type { SelectedMember } from '@/form/memberSelection'
 import type { PreviewTier } from '@/form/tierRows'
 import type { PreviewProduct } from '@/form/preview/buildPreviewModel'
 import type { FlashInput } from '@/form/preview/previewModel'
+import type { WidgetStyle } from '@/lib/widgetStyle'
 
 export interface FormValues {
   name: string
@@ -13,6 +14,8 @@ export interface FormValues {
   /** The complete tiers of the chosen mode. */
   tiers: PreviewTier[]
   flash: FlashValues
+  /** The Design card's four values. */
+  style: WidgetStyle
 }
 
 /** The values reduced to what is saved, in a fixed order, as text: two forms are the same when this is the same. */
@@ -23,6 +26,7 @@ export function buildComparable({ values }: { values: FormValues }): string {
     pricingMode: values.pricingMode,
     tiers: values.tiers.map((tier) => ({ minQty: tier.minQty, percentOff: tier.percentOff, fixedPrice: tier.fixedPrice, anchorPrice: tier.anchorPrice })),
     flash: values.flash.enabled ? values.flash : { enabled: false, highDemand: values.flash.highDemand },
+    style: values.style,
   })
 }
 

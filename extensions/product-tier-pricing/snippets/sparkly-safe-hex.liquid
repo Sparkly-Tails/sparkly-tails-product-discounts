@@ -1,0 +1,11 @@
+{%- comment -%}
+  Prints `hex` in capitals when it is "#" and exactly six hexadecimal digits, and nothing otherwise, so a
+  colour of a discount's style can never put anything else into the widget's style attribute.
+  Use: {% capture colour %}{% render 'sparkly-safe-hex', hex: value %}{% endcapture %}
+{%- endcomment -%}
+{%- assign candidate = hex | strip | upcase -%}
+{%- assign first_character = candidate | slice: 0, 1 -%}
+{%- if candidate.size == 7 and first_character == '#' -%}
+  {%- assign leftover = candidate | slice: 1, 6 | remove: '0' | remove: '1' | remove: '2' | remove: '3' | remove: '4' | remove: '5' | remove: '6' | remove: '7' | remove: '8' | remove: '9' | remove: 'A' | remove: 'B' | remove: 'C' | remove: 'D' | remove: 'E' | remove: 'F' -%}
+  {%- if leftover == blank -%}{{- candidate -}}{%- endif -%}
+{%- endif -%}
