@@ -17,12 +17,12 @@ Measured on 2026-10-31 (esbuild, gzip): the script is 59,680 B raw, 26,241 B min
 ## Behaviour
 
 - **Readable source** lives in `extensions/product-tier-pricing/src/`: the core (tier maths, view model, painting), the flash sale component, the siblings (Mix & match) component, and the stylesheet. The time-based discount script and stylesheet move there too, so everything served is built the same way. Edits happen only here.
-- **A build step** (`npm run build:extension`) writes the minified files into `extensions/product-tier-pricing/assets/`, which is the only folder Shopify uploads. Those built files are git-ignored. The build fails if any built JavaScript file is over 10,000 bytes.
+- **A build step** (`scripts/build-extension.mjs`, run by both deploy scripts) writes the minified files into `extensions/product-tier-pricing/assets/`, which is the only folder Shopify uploads. Those built files are git-ignored. The build fails if any built JavaScript file is over 10,000 bytes.
 - **The core** is the one script the block loads (`"javascript"` in the block's schema). It is under 10,000 bytes minified, and does everything a plain discount needs.
 - **The flash sale component** loads only for a discount that has a flash sale. **The siblings component** loads only for a discount with siblings, when its list is first opened. Each is a separate minified file. The block's Liquid passes their addresses to the core (the script cannot know Shopify's CDN addresses), and preloads the flash component so the bar does not appear late.
 - **What customers see does not change**: the same prices, bar, chips, rail and list, with the same wording. A page whose discount has no flash sale and no siblings loads one file.
 - **The admin form and the tests** read the readable source directly (not the built files), so the preview keeps deciding what to show with the widget's own functions, and the parity test against the script keeps passing.
-- **Deploying (so the build is never forgotten):** `npm run deploy:dev` runs `npm run build:extension && npm run check:extension-built && shopify app deploy --config shopify.app.dev.toml`, so one command builds, checks and deploys the dev app (the Shopify CLI still asks for its own confirmation; no `--force`). `npm run build:extension` only builds, because `shopify app dev` and local checks need the built files without deploying. There is no production deploy script: a production deploy stays a command the owner types, with the same build and check in front of it. The owner runs every deploy; I never do.
+- **Deploying (two scripts, one per environment, so the build is never forgotten):** `npm run deploy:dev` builds the extension and then runs `shopify app deploy --config shopify.app.dev.toml` (the dev app, "demo"). `npm run deploy:prod` builds the extension and then runs `shopify app deploy --config shopify.app.toml` (the production app, "st-product-discounts"). These are the only two npm scripts for this: each builds first, every time, and the build fails if a built JavaScript file is over 10,000 bytes. The Shopify CLI still asks for its own confirmation (no `--force`). Dev and production are built the same way (both minified), so what is tried on dev is what production ships; they differ only in the app they deploy to. The owner runs every deploy; I never do.
 
 ## Non-goals
 
@@ -33,7 +33,7 @@ Measured on 2026-10-31 (esbuild, gzip): the script is 59,680 B raw, 26,241 B min
 
 ## Anti-goals
 
-- A deploy that ships an old, missing or unminified file.
+- A deploy through the scripts that ships an old, missing or unminified file.
 - The flash bar or the siblings list appearing late or flickering because their component loads after the page.
 - Two copies of the same logic (the admin and the storefront must run the same functions).
 
@@ -44,9 +44,10 @@ Measured on 2026-10-31 (esbuild, gzip): the script is 59,680 B raw, 26,241 B min
 - The flash component is preloaded from Liquid whenever the discount has a flash sale; the siblings component is loaded on the first open of the list, with the list showing nothing until it arrives.
 - `lint:extensions` checks the readable source folder instead of `assets`.
 - The file names of the built files stay `tier-pricing.js`, `tier-pricing.css`, `time-based-discount.js`, `time-based-discount.css`, plus `tier-pricing-flash.js` and `tier-pricing-siblings.js`.
-- The deploy script targets the dev app only (`shopify.app.dev.toml`), as every deploy so far has; the owner can add a production one.
+- A deploy typed by hand (`shopify app deploy` without the script) skips the build; that is the one way to ship an old or missing widget, and the two scripts are how it is avoided. `shopify app dev` also needs the built files: `node scripts/build-extension.mjs` builds them (there is no separate npm script for it, as the owner asked for only two).
+- There is no staleness check: each deploy script rebuilds, so a check is not needed.
 - The cart-nudge document that mentions the asset path is updated to point at the new build.
 
 ## What is left to the builder
 
-The exact module boundaries (which functions belong to the core, the flash and the siblings components), how `computeWidgetViewModel` gets the flash functions when only the flash component has them (the admin preview must still decide the flash bar with the same function), the staleness check's method (hashes or times), and the tests: each built file under 10,000 B; the core runs a plain discount on its own; the flash and siblings components load only when needed; the parity test and the existing storefront tests pass against the readable source.
+The exact module boundaries (which functions belong to the core, the flash and the siblings components), how `computeWidgetViewModel` gets the flash functions when only the flash component has them (the admin preview must still decide the flash bar with the same function), and the tests: each built file under 10,000 B; the core runs a plain discount on its own; the flash and siblings components load only when needed; the parity test and the existing storefront tests pass against the readable source.
