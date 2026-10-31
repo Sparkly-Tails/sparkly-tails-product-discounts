@@ -16,7 +16,6 @@ const liquidRead = (key: string) => `product.metafields['${METAFIELD_NAMESPACE}'
 const LIQUID_READERS = [
   { path: 'extensions/product-tier-pricing/blocks/tier-pricing.liquid', keys: [METAFIELD_KEYS.tierDiscount, METAFIELD_KEYS.tierSiblingProducts, METAFIELD_KEYS.tierSiblingVariants, METAFIELD_KEYS.timeDiscount] },
   { path: 'extensions/product-tier-pricing/blocks/time-based-discount.liquid', keys: [METAFIELD_KEYS.timeDiscount] },
-  { path: 'extensions/product-tier-pricing/snippets/product-card-with-discount.liquid', keys: [METAFIELD_KEYS.timeDiscount] },
 ]
 
 const OLD_NAMESPACES = ['sparkly_product_discounts', 'sparkly_time_discounts', 'sparkly_tiers']
