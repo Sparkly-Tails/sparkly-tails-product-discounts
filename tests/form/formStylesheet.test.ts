@@ -36,6 +36,11 @@ describe('the app stylesheet carries the form tokens', () => {
     expect(css).toContain('.sparkly-tier-pricing__chip')
   })
 
+  it('uses the Inter typeface that the layout loads from Google Fonts', () => {
+    expect(css).toMatch(/--font-form: 'Inter', sans-serif/)
+    expect(css).not.toContain('--font-inter')
+  })
+
   it('gives a text size its line height and weight', () => {
     expect(css).toContain('--text-form-headline-lg--line-height: 36px')
     expect(css).toContain('--text-form-headline-lg--font-weight: 600')

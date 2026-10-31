@@ -52,10 +52,9 @@
   --color-home-on-background: #1b1c19;
 }
 
-/* inline: the font variable (set by next/font on the page wrapper) is read where
-   the class is used, not at the root where it does not exist. */
-@theme inline {
-  --font-home: var(--font-inter), sans-serif;
+/* The typeface of the design: Inter, linked from Google Fonts in the root layout. */
+@theme {
+  --font-home: 'Inter', sans-serif;
 }
 
 /* One icon box for every inline SVG icon: it follows the text size of the

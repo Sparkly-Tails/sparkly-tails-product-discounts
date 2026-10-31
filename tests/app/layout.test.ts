@@ -47,4 +47,25 @@ describe('root layout', () => {
 
     expect(found).toHaveLength(1)
   })
+
+  // Loaded straight from Google (not through next/font/google, which Turbopack could not resolve on Vercel).
+  it('loads the Inter typeface from Google Fonts with a plain stylesheet link and preconnects', async () => {
+    vi.mocked(ensureFreshInstall).mockResolvedValue('fresh')
+
+    const page = await layout.default({ children: null })
+
+    const links: { rel?: string; href?: string; crossOrigin?: string }[] = []
+    const walk = (node: unknown): void => {
+      if (!node || typeof node !== 'object') return
+      const element = node as { type?: unknown; props?: { children?: unknown; rel?: string; href?: string; crossOrigin?: string } }
+      if (element.type === 'link' && element.props) links.push(element.props)
+      const children = element.props?.children
+      for (const child of Array.isArray(children) ? children : [children]) walk(child)
+    }
+    walk(page)
+
+    expect(links).toContainEqual(expect.objectContaining({ rel: 'preconnect', href: 'https://fonts.googleapis.com' }))
+    expect(links).toContainEqual(expect.objectContaining({ rel: 'preconnect', href: 'https://fonts.gstatic.com', crossOrigin: 'anonymous' }))
+    expect(links).toContainEqual(expect.objectContaining({ rel: 'stylesheet', href: 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap' }))
+  })
 })

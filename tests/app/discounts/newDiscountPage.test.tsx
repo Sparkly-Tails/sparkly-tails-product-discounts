@@ -3,7 +3,6 @@ import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest'
 import { render, screen, cleanup, fireEvent, act } from '@testing-library/react'
 import '@testing-library/jest-dom/vitest'
 
-vi.mock('@/home/homeFont', () => ({ homeFont: { variable: 'font-var' } }))
 vi.mock('@/lib/shop', () => ({ getShopTimezone: vi.fn(async () => 'Europe/London'), getShopCurrencyCode: vi.fn(async () => 'GBP') }))
 vi.mock('@/actions/saveDiscount', () => ({ saveDiscount: vi.fn(async () => ({ error: 'Shopify allows only 25 active discounts.' })) }))
 vi.mock('@/actions/memberPickerActions', () => ({

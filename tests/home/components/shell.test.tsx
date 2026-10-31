@@ -67,8 +67,9 @@ describe('home.css', () => {
     expect(css).toContain(token + ': ' + value)
   })
 
-  it('reads the font variable where the font class is used (a plain @theme value would be resolved at the root, where next/font has not set it)', () => {
-    expect(css).toMatch(/@theme inline \{[^}]*--font-home: var\(--font-inter\)/)
+  it('uses the Inter typeface that the layout loads from Google Fonts', () => {
+    expect(css).toMatch(/--font-home: 'Inter', sans-serif/)
+    expect(css).not.toContain('--font-inter')
   })
 
   it('does not change the colours of any other page (tokens are all prefixed home-)', () => {
