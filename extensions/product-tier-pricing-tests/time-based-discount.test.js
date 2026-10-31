@@ -9,7 +9,7 @@ const {
   countdownDiscountItemFor,
   discountReducesPrice,
   timeDiscountNumericId
-} = require('../product-tier-pricing/assets/time-based-discount.js')
+} = require('../product-tier-pricing/src/timeBasedDiscount.js')
 
 test('computeCountdown: inactive before the window starts', () => {
   const result = computeCountdown('2026-06-01T00:00:00', '2026-06-02T00:00:00', new Date('2026-05-31T23:59:59'))

@@ -138,6 +138,30 @@
   {%- endcapture -%}
   {%- assign time_discount_json = time_discount_data | strip | escape -%}
 {%- endif -%}
+{%- comment -%}
+  The widget script (tier-pricing.js) loads its parts as separate small scripts when a page needs them: the
+  model and the paint always, the flash sale only with a flash sale, the time-based sale only with a time
+  discount, the siblings list the first time it is opened. The script cannot know the addresses of the files
+  Shopify serves, so they are handed over here; the ones every page needs are preloaded.
+{%- endcomment -%}
+{%- capture component_urls_raw -%}
+  {
+    "model": {{ 'tier-pricing-model.js' | asset_url | json }},
+    "paint": {{ 'tier-pricing-paint.js' | asset_url | json }},
+    "flash": {{ 'tier-pricing-flash.js' | asset_url | json }},
+    "timeSale": {{ 'tier-pricing-time-sale.js' | asset_url | json }},
+    "siblings": {{ 'tier-pricing-siblings.js' | asset_url | json }}
+  }
+{%- endcapture -%}
+{%- assign component_urls_json = component_urls_raw | strip | escape -%}
+{{ 'tier-pricing-model.js' | asset_url | preload_tag: as: 'script' }}
+{{ 'tier-pricing-paint.js' | asset_url | preload_tag: as: 'script' }}
+{%- if discount_metafield != blank and discount_metafield.value.flash != blank -%}
+  {{ 'tier-pricing-flash.js' | asset_url | preload_tag: as: 'script' }}
+{%- endif -%}
+{%- if time_discount_metafield != blank -%}
+  {{ 'tier-pricing-time-sale.js' | asset_url | preload_tag: as: 'script' }}
+{%- endif -%}
 
 {%- comment -%}
   The look of this widget. A discount's own style (saved with the discount, see src/lib/widgetStyle.ts) wins;
@@ -175,6 +199,7 @@
   data-money-format='{{ shop.money_format | json | escape }}'
   data-high-demand="{{ discount_metafield.value.highDemand | default: false }}"
   data-flash='{{ discount_metafield.value.flash | json | escape }}'
+  data-component-urls='{{ component_urls_json }}'
   style="{{ style_vars | strip | escape }}"
 >
   <div class="sparkly-tier-pricing__flash" data-tier-pricing-flash data-variant="hidden" hidden>
