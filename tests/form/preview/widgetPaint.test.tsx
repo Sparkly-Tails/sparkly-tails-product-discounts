@@ -100,6 +100,8 @@ function fingerprint(root: HTMLElement) {
   }
 }
 
+// An ended flash sale is left out on purpose: the storefront shows only the plain price, the preview keeps
+// the tier card with a "Flash sale ended" bar (see buildPreviewModel.test.ts).
 describe('the preview prints what the storefront script prints', () => {
   beforeEach(() => {
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({ items: [] }) })))
@@ -121,7 +123,6 @@ describe('the preview prints what the storefront script prints', () => {
     ['a running flash sale below the first tier', { nowSeconds: END - (4 * 3600 + 18 * 60 + 49), quantity: 1, tiers: PERCENT, flash: { startsAtUnix: START, endsAtUnix: END, showTeaser: true }, highDemand: false }],
     ['a running flash sale at the first tier', { nowSeconds: END - 3700, quantity: 3, tiers: PERCENT, flash: { startsAtUnix: START, endsAtUnix: END, showTeaser: true }, highDemand: false }],
     ['a running flash sale at a higher tier', { nowSeconds: END - 90, quantity: 5, tiers: PERCENT, flash: { startsAtUnix: START, endsAtUnix: END, showTeaser: true }, highDemand: true }],
-    ['a flash sale that has ended', { nowSeconds: END + 5, quantity: 3, tiers: PERCENT, flash: { startsAtUnix: START, endsAtUnix: END, showTeaser: true }, highDemand: false }],
   ]
 
   it.each(cases)('%s', async (_name, scenario) => {

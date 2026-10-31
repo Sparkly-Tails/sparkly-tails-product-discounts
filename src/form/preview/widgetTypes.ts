@@ -8,8 +8,9 @@ export interface WidgetFlash {
   showTeaser: boolean
 }
 
+/** `ended` is the preview's own bar for a sale that is over (the storefront shows no bar then). */
 export interface WidgetFlashBar {
-  variant: 'hidden' | 'teaser' | 'ends' | 'tier-first' | 'tier-higher'
+  variant: 'hidden' | 'teaser' | 'ends' | 'tier-first' | 'tier-higher' | 'ended'
   text: string
   label: string
   timerParts: string[]

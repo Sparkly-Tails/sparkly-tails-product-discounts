@@ -22,10 +22,12 @@ function ProductSelect({ labels, selectedIndex, onSelect }: { labels: string[]; 
 
 // The card around the preview, as in the design: the heading with a "live" chip, the
 // list of products to preview (when there are any), the widget, and a note.
-export default function PreviewFrame({ labels, selectedIndex, onSelectProduct, children }: {
+export default function PreviewFrame({ labels, selectedIndex, onSelectProduct, controls, children }: {
   labels: string[]
   selectedIndex: number
   onSelectProduct: (index: number) => void
+  /** What the person can set for the preview, between the product list and the widget. */
+  controls?: ReactNode
   children: ReactNode
 }) {
   return (
@@ -41,6 +43,7 @@ export default function PreviewFrame({ labels, selectedIndex, onSelectProduct, c
         </span>
       </div>
       {labels.length > 0 ? <ProductSelect labels={labels} selectedIndex={selectedIndex} onSelect={onSelectProduct} /> : null}
+      {controls}
       <div className="rounded-2xl bg-form-surface-container-lowest overflow-hidden">{children}</div>
       <div className="flex items-center gap-2 text-[12px] text-form-on-surface-variant pt-1">
         <TouchAppIcon className="text-[16px] text-form-outline" />

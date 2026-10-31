@@ -98,10 +98,21 @@ describe('buildPreviewModel: flash sale', () => {
     expect(inNewYork?.flashBar?.timerParts).toEqual(['12', '00', '00'])
   })
 
-  it('shows only the plain price once the sale has ended', () => {
-    const viewModel = build({ flash: sale('2026-10-29T09:00', '2026-10-30T09:00') }).viewModel
-    expect(viewModel?.showCard).toBe(false)
-    expect(viewModel?.flashBar?.variant).toBe('hidden')
+  it('shows the tier card with a "Flash sale ended" bar once the sale has ended, so the tiers can still be tried', () => {
+    const viewModel = build({ flash: sale('2026-10-29T09:00', '2026-10-30T09:00'), quantity: 3 }).viewModel
+    expect(viewModel?.showCard).toBe(true)
+    expect(viewModel?.showChrome).toBe(true)
+    expect(viewModel?.flashBar).toEqual({ variant: 'ended', text: 'Flash sale ended', label: 'Flash sale ended', timerParts: [], aside: '', chip: '' })
+    expect(viewModel?.discountedPrice).toBe('$25.20')
+  })
+
+  it('counts the minute the sale ends as ended, and the minute before it as running', () => {
+    expect(build({ flash: sale('2026-10-29T09:00', '2026-10-30T12:00') }).viewModel?.flashBar?.variant).toBe('ended')
+    expect(build({ flash: sale('2026-10-29T09:00', '2026-10-30T12:01') }).viewModel?.flashBar?.variant).toBe('ends')
+  })
+
+  it('shows no ended bar when the ended sale has no complete tier to show', () => {
+    expect(build({ flash: sale('2026-10-29T09:00', '2026-10-30T09:00'), tiers: [] }).viewModel?.flashBar).toBeNull()
   })
 
   it('treats an unfinished or impossible window as no flash sale', () => {

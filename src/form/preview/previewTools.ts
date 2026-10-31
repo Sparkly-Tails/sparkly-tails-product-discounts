@@ -1,5 +1,5 @@
 import { zonedTimeToUnixSeconds } from '@/lib/zonedTime'
-import { buildFlashWindow, clampIndex, isFlashFilled } from '@/form/preview/previewModel'
+import { buildFlashWindow, clampIndex, isFlashEnded, isFlashFilled, pickWidgetFlash, showEndedFlash } from '@/form/preview/previewModel'
 import type { PreviewTools } from '@/form/preview/buildPreviewModel'
 import { WIDGET_FUNCTIONS } from '@/form/preview/widgetFunctions'
 
@@ -10,4 +10,7 @@ export const PREVIEW_TOOLS: PreviewTools = {
   isFlashFilled,
   buildFlashWindow,
   clampIndex,
+  isFlashEnded,
+  pickWidgetFlash,
+  showEndedFlash,
 }
