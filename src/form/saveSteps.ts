@@ -14,8 +14,8 @@ export function readLiveMembers({ discount }: { discount: Discount | undefined }
 }
 
 /** The parts of a discount the form decides (a flash sale or High Demand that is off is left out). */
-export function buildDiscountFields({ values }: { values: ParsedDiscount }): Pick<Discount, 'pricingMode' | 'members' | 'tiers' | 'flash' | 'highDemand'> {
-  return { pricingMode: values.pricingMode, members: values.members, tiers: values.tiers, flash: values.flash ?? undefined, highDemand: values.highDemand || undefined }
+export function buildDiscountFields({ values }: { values: ParsedDiscount }): Pick<Discount, 'pricingMode' | 'members' | 'tiers' | 'flash' | 'highDemand' | 'style'> {
+  return { pricingMode: values.pricingMode, members: values.members, tiers: values.tiers, flash: values.flash ?? undefined, highDemand: values.highDemand || undefined, style: values.style }
 }
 
 /** The id of the Shopify discount that stands for the flash sale, if the discount has one. */

@@ -3,12 +3,13 @@ import * as steps from '@/form/saveSteps'
 import * as flow from '@/form/saveFlow'
 import { findDiscountOrThrow, needsRecordSync } from '@/actions/discountSteps'
 import type { Config, Discount } from '@/lib/config'
+import { DEFAULT_WIDGET_STYLE } from '@/lib/widgetStyle'
 import type { ParsedDiscount } from '@/form/parseDiscountForm'
 import type { SaveTools } from '@/form/saveFlow'
 
 const FLASH = { startsAt: '2026-11-27T09:00', endsAt: '2026-11-30T23:59', showTeaser: true }
 const VALUES: ParsedDiscount = {
-  name: 'Black Friday', members: [{ productId: 'p1' }], pricingMode: 'percent', tiers: [{ minQty: 3, percentOff: 10 }], flash: null, highDemand: false, goLive: false, takeOffline: false,
+  name: 'Black Friday', members: [{ productId: 'p1' }], pricingMode: 'percent', tiers: [{ minQty: 3, percentOff: 10 }], flash: null, highDemand: false, style: DEFAULT_WIDGET_STYLE, goLive: false, takeOffline: false,
 }
 const OTHER: Discount = { discountId: 'disc_other', name: 'Other', title: 'Other', status: 'draft', pricingMode: 'percent', members: [{ productId: 'p9' }], tiers: [{ minQty: 2, percentOff: 5 }] }
 const EXISTING: Discount = {

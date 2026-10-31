@@ -1,5 +1,6 @@
 import { shopifyQuery } from '@/lib/shopify-client'
 import { METAFIELD_NAMESPACE, METAFIELD_KEYS } from '@/lib/metafieldNames'
+import type { WidgetStyle } from '@/lib/widgetStyle'
 
 export interface Tier {
   minQty: number
@@ -62,6 +63,8 @@ export interface Discount {
   flash?: FlashSale
   /** Show the "High Demand" tag in the storefront widget (switched on by hand). */
   highDemand?: boolean
+  /** The widget's look for this discount; absent on a discount saved before styles existed. */
+  style?: WidgetStyle
 }
 
 export interface Config {
