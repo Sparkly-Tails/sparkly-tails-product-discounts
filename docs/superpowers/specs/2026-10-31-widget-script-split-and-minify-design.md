@@ -22,7 +22,7 @@ Measured on 2026-10-31 (esbuild, gzip): the script is 59,680 B raw, 26,241 B min
 - **The flash sale component** loads only for a discount that has a flash sale. **The siblings component** loads only for a discount with siblings, when its list is first opened. Each is a separate minified file. The block's Liquid passes their addresses to the core (the script cannot know Shopify's CDN addresses), and preloads the flash component so the bar does not appear late.
 - **What customers see does not change**: the same prices, bar, chips, rail and list, with the same wording. A page whose discount has no flash sale and no siblings loads one file.
 - **The admin form and the tests** read the readable source directly (not the built files), so the preview keeps deciding what to show with the widget's own functions, and the parity test against the script keeps passing.
-- **Deploying:** `npm run build:extension` must run before `shopify app deploy` and `shopify app dev`. A check (`npm run check:extension-built`) fails when the built files are missing or older than the source, so a deploy without a build is caught. The owner runs deploys; the exact command line is `npm run build:extension && npm run check:extension-built && shopify app deploy …`.
+- **Deploying (so the build is never forgotten):** `npm run deploy:dev` runs `npm run build:extension && npm run check:extension-built && shopify app deploy --config shopify.app.dev.toml`, so one command builds, checks and deploys the dev app (the Shopify CLI still asks for its own confirmation; no `--force`). `npm run build:extension` only builds, because `shopify app dev` and local checks need the built files without deploying. There is no production deploy script: a production deploy stays a command the owner types, with the same build and check in front of it. The owner runs every deploy; I never do.
 
 ## Non-goals
 
@@ -44,6 +44,7 @@ Measured on 2026-10-31 (esbuild, gzip): the script is 59,680 B raw, 26,241 B min
 - The flash component is preloaded from Liquid whenever the discount has a flash sale; the siblings component is loaded on the first open of the list, with the list showing nothing until it arrives.
 - `lint:extensions` checks the readable source folder instead of `assets`.
 - The file names of the built files stay `tier-pricing.js`, `tier-pricing.css`, `time-based-discount.js`, `time-based-discount.css`, plus `tier-pricing-flash.js` and `tier-pricing-siblings.js`.
+- The deploy script targets the dev app only (`shopify.app.dev.toml`), as every deploy so far has; the owner can add a production one.
 - The cart-nudge document that mentions the asset path is updated to point at the new build.
 
 ## What is left to the builder
