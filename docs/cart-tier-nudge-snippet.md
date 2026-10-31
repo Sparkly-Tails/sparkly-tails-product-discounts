@@ -46,7 +46,7 @@ Paste the snippet below **immediately after** that block, in **both** files
 ```liquid
 {%- comment -%}
   Sparkly Tails Product Discounts — cart-line tier nudge ("Add N (more) for X% Off").
-  Mirrors computeTierState() in extensions/product-tier-pricing/assets/tier-pricing.js
+  Mirrors computeTierState() in extensions/product-tier-pricing/src/tierMath.js
   (sparkly-tails-product-discounts app). The line_level_discount_allocations block
   above already shows the currently-applied discount, if any — this only adds a
   nudge toward tiers not yet reached.

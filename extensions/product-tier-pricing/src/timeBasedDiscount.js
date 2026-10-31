@@ -1,13 +1,4 @@
-// extensions/product-tier-pricing/assets/time-based-discount.js
-// Independent widget, no imports from or edits to tier-pricing.js. Pure
-// math first, DOM last — mirrors that file's own structure without
-// sharing code with it.
-
-// Pure countdown math
-//
-// Theme-extension scripts share one global scope with tier-pricing.js, which
-// already declares top-level formatMoney()/extractNumericId() with different
-// semantics — every top-level name here must stay distinct from that file's.
+// The time-based discount widget's pure parts: the countdown, the discounted price, the rows of a discount. No DOM.
 
 /**
  * startsAt/endsAt arrive here as real UTC ISO instants (with the `Z`
@@ -30,7 +21,7 @@
  * any client-side countdown has, not the timezone bug this comment warns
  * against reintroducing.
  */
-function computeCountdown(startsAt, endsAt, now) {
+export function computeCountdown(startsAt, endsAt, now) {
   const start = new Date(startsAt).getTime()
   const end = new Date(endsAt).getTime()
   const nowMs = now.getTime()
@@ -52,17 +43,17 @@ function computeCountdown(startsAt, endsAt, now) {
   return { active: true, days, hours, minutes, seconds }
 }
 
-function formatCountdownUnit(n) {
+export function formatCountdownUnit(n) {
   return String(n).padStart(2, '0')
 }
 
-function timeDiscountNumericId(gid) {
+export function timeDiscountNumericId(gid) {
   return String(gid).split('/').pop()
 }
 
 // Shopify money amounts here are minor units (pence/cents) — what
 // variant.price and the Liquid `money` filter both use.
-function computeDiscountedPriceCents(priceCents, pricingMode, amount) {
+export function computeDiscountedPriceCents(priceCents, pricingMode, amount) {
   if (pricingMode === 'fixed') return Math.round(amount * 100)
   const percent = Math.min(Math.max(amount, 0), 100)
   return Math.round((priceCents * (100 - percent)) / 100)
@@ -73,7 +64,7 @@ function computeDiscountedPriceCents(priceCents, pricingMode, amount) {
 // before per-row pricing carry one rule at the top level (pricingMode/amount)
 // plus `variantIds` (null/empty = every variant). Named with a countdown
 // prefix because this file shares one global scope with tier-pricing.js.
-function countdownDiscountItems(discount) {
+export function countdownDiscountItems(discount) {
   if (Array.isArray(discount.items)) return discount.items
   if (discount.pricingMode !== 'percent' && discount.pricingMode !== 'fixed') return []
   const rule = { pricingMode: discount.pricingMode, amount: discount.amount }
@@ -83,7 +74,7 @@ function countdownDiscountItems(discount) {
 }
 
 // The variant's own row wins; otherwise the whole-product row (variantId null).
-function countdownDiscountItemFor(items, variantId) {
+export function countdownDiscountItemFor(items, variantId) {
   const own = items.find((item) => item.variantId != null && timeDiscountNumericId(item.variantId) === String(variantId))
   return own || items.find((item) => item.variantId == null) || null
 }
@@ -93,7 +84,7 @@ function countdownDiscountItemFor(items, variantId) {
 // variant's price applies no discount at checkout (the Function clamps it), so
 // the widget must not advertise one. The sale price itself is shown by the
 // tier-pricing price block.
-function discountReducesPrice({ priceCents, discount, variantId }) {
+export function discountReducesPrice({ priceCents, discount, variantId }) {
   const item = countdownDiscountItemFor(countdownDiscountItems(discount), variantId)
   if (!item) return false
   return computeDiscountedPriceCents(priceCents, item.pricingMode, item.amount) < priceCents
@@ -101,7 +92,7 @@ function discountReducesPrice({ priceCents, discount, variantId }) {
 
 // `applies` is optional: null means "no pricing data" (older metafield) and
 // the widget shows the countdown alone; false hides the whole widget.
-function paintCountdown({ active, days, hours, minutes, seconds, title, applies }) {
+export function paintCountdown({ active, days, hours, minutes, seconds, title, applies }) {
   if (!active || applies === false) {
     return { hidden: true }
   }
@@ -112,97 +103,5 @@ function paintCountdown({ active, days, hours, minutes, seconds, title, applies 
     hours: formatCountdownUnit(hours),
     minutes: formatCountdownUnit(minutes),
     seconds: formatCountdownUnit(seconds)
-  }
-}
-
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = {
-    computeCountdown,
-    formatCountdownUnit,
-    paintCountdown,
-    computeDiscountedPriceCents,
-    countdownDiscountItems,
-    countdownDiscountItemFor,
-    discountReducesPrice,
-    timeDiscountNumericId
-  }
-}
-
-// DOM: element painting and per-widget setup
-
-if (typeof document !== 'undefined') {
-  function applyCountdownState(elements, state) {
-    elements.container.hidden = state.hidden
-    if (!state.hidden) {
-      elements.label.textContent = state.label
-      elements.days.textContent = state.days
-      elements.hours.textContent = state.hours
-      elements.minutes.textContent = state.minutes
-      elements.seconds.textContent = state.seconds
-    }
-  }
-
-  function queryWidgetElements(container) {
-    return {
-      container,
-      label: container.querySelector('[data-time-discount-label]'),
-      days: container.querySelector('[data-time-discount-days]'),
-      hours: container.querySelector('[data-time-discount-hours]'),
-      minutes: container.querySelector('[data-time-discount-minutes]'),
-      seconds: container.querySelector('[data-time-discount-seconds]'),
-    }
-  }
-
-  function initTimeDiscountWidget() {
-    document.querySelectorAll('[data-sparkly-time-discount]').forEach((container) => {
-      const discount = JSON.parse(container.dataset.discount)
-      if (!discount || !discount.startsAt || !discount.endsAt) return // no time discount or missing dates — leave hidden
-
-      const elements = queryWidgetElements(container)
-      let variantId = String(discount.selectedVariantId)
-
-      // null = no pricing data (older metafield): countdown only.
-      function discountApplies() {
-        const priceCents = discount.variantPrices && discount.variantPrices[variantId]
-        if (countdownDiscountItems(discount).length === 0 || typeof priceCents !== 'number') return null
-        return discountReducesPrice({ priceCents, discount, variantId })
-      }
-
-      function tick() {
-        const countdown = computeCountdown(discount.startsAt, discount.endsAt, new Date())
-        const state = paintCountdown({
-          active: countdown.active,
-          days: countdown.days,
-          hours: countdown.hours,
-          minutes: countdown.minutes,
-          seconds: countdown.seconds,
-          title: discount.title,
-          applies: discountApplies()
-        })
-        applyCountdownState(elements, state)
-      }
-
-      const productVariantsEl = document.querySelector('product-variants')
-      if (productVariantsEl) {
-        productVariantsEl.addEventListener('VARIANT_CHANGE', (event) => {
-          const variant = event.target.currentVariant
-          if (!variant || variant.id == null) return
-          variantId = timeDiscountNumericId(variant.id)
-          if (typeof variant.price === 'number' && discount.variantPrices) {
-            discount.variantPrices[variantId] = variant.price
-          }
-          tick()
-        })
-      }
-
-      tick()
-      setInterval(tick, 1000)
-    })
-  }
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initTimeDiscountWidget)
-  } else {
-    initTimeDiscountWidget()
   }
 }

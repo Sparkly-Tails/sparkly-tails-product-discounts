@@ -6,7 +6,7 @@ import { CORNER_RADIUS_RANGE, PRICE_SIZE_RANGE } from '@/lib/widgetStyle'
 const extension = (path: string) => readFileSync(join(process.cwd(), 'extensions/product-tier-pricing', path), 'utf8')
 const block = extension('blocks/tier-pricing.liquid')
 const hexSnippet = extension('snippets/sparkly-safe-hex.liquid')
-const css = extension('assets/tier-pricing.css')
+const css = extension('src/tier-pricing.css')
 
 describe('tier-pricing.liquid: the style of a discount', () => {
   it('reads the four values from the discount in the product metafield', () => {

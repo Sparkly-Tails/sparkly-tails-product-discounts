@@ -1,0 +1,2 @@
+# The readable source: only the built files in assets/ are uploaded to Shopify.
+src/**

@@ -1,14 +1,12 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import fs from 'node:fs'
-import path from 'node:path'
+import { readBuiltWidget, runWidgetScripts } from '../helpers/builtWidget'
 
 /**
  * The flash sale bar, teaser, countdown and end of the tier widget, painted
  * into markup that mirrors tier-pricing.liquid, with a fake clock.
  */
-const assets = path.resolve(__dirname, '../../extensions/product-tier-pricing/assets')
-const tierScript = fs.readFileSync(path.join(assets, 'tier-pricing.js'), 'utf8')
+const built = readBuiltWidget()
 
 const START = 1_800_000_000
 const END = START + 3 * 86400
@@ -70,7 +68,7 @@ describe('flash sale in the tier widget', () => {
           </div>
         </div>
       </div>`
-    ;(0, eval)(tierScript)
+    runWidgetScripts({ built })
     await vi.advanceTimersByTimeAsync(0)
   }
 
