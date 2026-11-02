@@ -1,18 +1,21 @@
-import { CalendarIcon, InfoIcon } from '@/home/components/icons'
+import DateRangePicker from '@/home/components/DateRangePicker'
+import { InfoIcon } from '@/home/components/icons'
+import type { RangePreset } from '@/home/rangeDays'
 
 import type { MetricCard } from '@/home/buildMetricCards'
 
-export default function StatCards({ cards }: { cards: MetricCard[] }) {
+export interface RangeButton {
+  label: string
+  today: string
+  presets: RangePreset[]
+  keep: string
+}
+
+export default function StatCards({ cards, range }: { cards: MetricCard[]; range: RangeButton }) {
   return (
     <section className="flex flex-col gap-3">
       <div className="flex items-center justify-between">
-        <button
-          type="button"
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-home-surface-container-lowest border border-home-outline-variant/70 rounded-lg text-xs font-medium text-home-on-surface hover:bg-home-surface-container transition-colors"
-        >
-          <CalendarIcon className="text-sm h-5 text-home-on-surface-variant" />
-          <span>Last 30d</span>
-        </button>
+        <DateRangePicker label={range.label} today={range.today} presets={range.presets} keep={range.keep} />
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {cards.map((stat) => (

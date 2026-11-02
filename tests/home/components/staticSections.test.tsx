@@ -4,6 +4,7 @@ import { render, screen, cleanup, within } from '@testing-library/react'
 import '@testing-library/jest-dom/vitest'
 import StatCards from '@/home/components/StatCards'
 import type { MetricCard } from '@/home/buildMetricCards'
+import { listRangePresets } from '@/home/rangeDays'
 import CreateCards from '@/home/components/CreateCards'
 import TipBanner from '@/home/components/TipBanner'
 
@@ -16,17 +17,19 @@ const CARDS: MetricCard[] = [
   { label: 'Added revenue', value: '£4.00', hint: 'Added hint' },
 ]
 
+const RANGE = { label: 'Last 30 days', today: '2026-11-02', presets: listRangePresets({ today: '2026-11-02' }), keep: '' }
+
 describe('StatCards', () => {
-  it('shows the label and value of each card it is given, in order, and the "Last 30d" button', () => {
-    render(<StatCards cards={CARDS} />)
-    expect(screen.getByRole('button', { name: /Last 30d/ })).toBeInTheDocument()
+  it('shows the label and value of each card it is given, in order, and the date button with the label of the range', () => {
+    render(<StatCards cards={CARDS} range={RANGE} />)
+    expect(screen.getByRole('button', { name: /Last 30 days/ })).toBeInTheDocument()
     const cards = screen.getAllByTestId('stat-card')
     const shown = cards.map((card) => [within(card).getByTestId('stat-label').textContent, within(card).getByTestId('stat-value').textContent])
     expect(shown).toEqual([['Visitors', '16'], ['Bundle orders', '3'], ['AOV', '£21.50'], ['Added revenue', '£4.00']])
   })
 
   it('gives each info icon the hint of its card', () => {
-    render(<StatCards cards={CARDS} />)
+    render(<StatCards cards={CARDS} range={RANGE} />)
     for (const card of CARDS) expect(screen.getByTitle(card.hint)).toBeInTheDocument()
   })
 })

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, cleanup, within } from '@testing-library/react'
+import { render, screen, cleanup, within, fireEvent } from '@testing-library/react'
 import '@testing-library/jest-dom/vitest'
 import Home from '@/app/page'
 import { ensureTierDiscountSafely } from '@/lib/tierDiscount'
@@ -139,5 +139,28 @@ describe('Home', () => {
     expect(screen.getAllByTestId('stat-value').map((value) => value.textContent)).toEqual(Array(4).fill('-'))
     expect(screen.getAllByTitle('Could not load')).toHaveLength(4)
     expect(screen.getByRole('link', { name: /Create tier discount/ })).toBeInTheDocument()
+  })
+
+  it('loads the numbers for the range in the address and puts its label on the date button', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-11-02T12:00:00Z'))
+
+    render(await Home({ searchParams: Promise.resolve({ range: 'last7' }) }))
+
+    const args = vi.mocked(loadMetrics).mock.calls[0][0]
+    expect([args.fromDay, args.toDay]).toEqual(['2026-10-27', '2026-11-02'])
+    expect(screen.getByRole('button', { name: /Last 7 days/ })).toBeInTheDocument()
+  })
+
+  it('carries the range in the table links, and the table settings in the date links', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-11-02T12:00:00Z'))
+    vi.mocked(getConfig).mockResolvedValue({ discounts: [liveDiscount, draftDiscount] })
+
+    render(await Home({ searchParams: Promise.resolve({ range: 'last7', tab: 'inactive' }) }))
+
+    expect(screen.getByRole('link', { name: /^Active/ }).getAttribute('href')).toBe('/?tab=active&range=last7')
+    fireEvent.click(screen.getByRole('button', { name: /Last 7 days/ }))
+    expect(screen.getByRole('link', { name: 'Today' }).getAttribute('href')).toBe('/?tab=inactive&range=today')
   })
 })

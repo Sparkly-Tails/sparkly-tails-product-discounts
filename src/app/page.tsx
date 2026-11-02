@@ -1,7 +1,7 @@
 import HomeView from '@/home/components/HomeView'
 import { loadDiscountRows } from '@/home/loadDiscountRows'
 import { ROW_TOOLS } from '@/home/rowTools'
-import { TABLE_TOOLS, applyTableQuery, parseTableQuery } from '@/home/tableQuery'
+import { TABLE_TOOLS, applyTableQuery, buildTableHref, parseTableQuery } from '@/home/tableQuery'
 import { getConfig } from '@/lib/config'
 import { getShopCurrencyCode, getShopTimezone, zonedTimeToUtc } from '@/lib/shop'
 import { computeLocalFlashStatus, DISCOUNT_STATE_TOOLS } from '@/flash/discountState'
@@ -16,7 +16,8 @@ import { readStoredScopes } from '@/lib/sessions'
 import { formatMoneyAmount } from '@/home/formatMoney'
 import { loadMetrics } from '@/home/loadMetrics'
 import { buildMetricCards, buildFailedCards } from '@/home/buildMetricCards'
-import { addDays, pickShopDay } from '@/home/rangeDays'
+import { addDays, listRangePresets, pickShopDay } from '@/home/rangeDays'
+import { buildMetricsParams, parseMetricsQuery } from '@/home/metricsQuery'
 import { sumTotals } from '@/metrics/sumTotals'
 import { syncOrders, SYNC_TOOLS } from '@/metrics/syncOrders'
 import { queryOrders } from '@/metrics/queryOrders'
@@ -38,28 +39,31 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
     tools: PIXEL_TOOLS,
   })
 
+  const timeZone = await getShopTimezone()
+  const nowIso = new Date().toISOString()
+  const today = pickShopDay({ nowIso, timeZone })
+  const rawQuery = await searchParams
+  const range = parseMetricsQuery({ raw: rawQuery, today })
+
   const rows = await loadDiscountRows({
     loadTierDiscounts: async () => (await getConfig()).discounts,
-    loadTimezone: getShopTimezone,
+    loadTimezone: async () => timeZone,
     loadCurrencyCode: getShopCurrencyCode,
     getFlashStatus: ({ startsAt, endsAt, timezone }) =>
       computeLocalFlashStatus({ startsAt, endsAt, timeZone: timezone, nowMs: new Date().getTime(), convertToUtc: zonedTimeToUtc, tools: DISCOUNT_STATE_TOOLS }),
     tools: ROW_TOOLS,
   })
-  // The four metric cards for the last 30 days; the page loads even when the numbers cannot be read.
+  // The four metric cards for the chosen days; the page loads even when the numbers cannot be read.
   let cards = buildFailedCards()
   try {
       const database = getDb()
       const shop = await getRequestShop()
-      const timeZone = await getShopTimezone()
       const currencyCode = await getShopCurrencyCode()
-      const nowIso = new Date().toISOString()
-      const today = pickShopDay({ nowIso, timeZone })
       const { totals, hasPermission } = await loadMetrics({
         shop,
         nowIso,
-        fromDay: addDays({ day: today, count: -29 }),
-        toDay: today,
+        fromDay: range.fromDay,
+        toDay: range.toDay,
         timeZone,
         readScopes: ({ shop: shopName }) => readStoredScopes(shopName),
         syncOrders: ({ shop: shopName, nowIso: now }) =>
@@ -97,8 +101,10 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
   } catch (error) {
     console.log(`Could not load the homepage metrics: ${error instanceof Error ? error.message : 'unknown error'}`)
   }
-  const query = parseTableQuery({ raw: await searchParams, tools: TABLE_TOOLS })
+  const query = { ...parseTableQuery({ raw: rawQuery, tools: TABLE_TOOLS }), keep: buildMetricsParams({ raw: rawQuery, today }) }
   const view = applyTableQuery({ rows, query, tools: TABLE_TOOLS })
 
-  return <HomeView view={view} query={query} version={packageJson.version} cards={cards} />
+  // The date button keeps the table settings, and the table links keep the range (the query's `keep`).
+  const tableParams = buildTableHref({ query: { ...query, keep: '' }, changes: { page: query.page } }).replace(/^\/\??/, '')
+  return <HomeView view={view} query={query} version={packageJson.version} cards={cards} range={{ label: range.label, today, presets: listRangePresets({ today }), keep: tableParams }} />
 }
