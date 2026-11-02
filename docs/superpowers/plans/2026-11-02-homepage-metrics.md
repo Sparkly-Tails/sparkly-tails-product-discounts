@@ -4,7 +4,7 @@
 
 **Goal:** The four homepage cards (Visitors, Bundle orders, AOV, Added revenue) show real numbers read from the app's own database, kept per discount.
 
-**Architecture:** A web pixel reports product views and an `orders/paid` webhook reports orders; both write to four new Prisma tables. An Admin API orders query fills in the last 90 days and catches up missed webhooks. The homepage reads sums from the tables for a period and an optional discount. All logic is in small pure functions in `src/metrics/`; routes only wire them.
+**Architecture:** A web pixel reports product views and an `orders/paid` webhook reports orders; both write to four new Prisma tables. An Admin API orders query fills in the last 90 days and catches up missed webhooks. The homepage reads sums from the tables for a date range the owner picks with a calendar and presets. All logic is in small pure functions in `src/metrics/`; routes only wire them.
 
 **Tech Stack:** Next.js 16 App Router, Prisma 6 on Postgres (Supabase), Vitest, a Shopify web pixel app extension.
 
@@ -17,6 +17,7 @@
 - Every code commit bumps the version in `package.json` and `package-lock.json` (lines 3 and 9). The latest is read from `package.json` at the start (0.23.134 today).
 - No AI attribution in commits or PR descriptions.
 - Run `npx vitest run`, `npx tsc --noEmit` and `npm run lint` (0 errors) before each commit; `node scripts/build-extension.mjs` must keep every script at or under 10,000 bytes.
+- Nothing is specific to one merchant: the shop always comes from the verified request, the webhook headers or the pixel event. No shop domain, shop id, app address or per-merchant setting is written in code or in an environment variable. The only environment value used is `SHOPIFY_API_SECRET_KEY`, which already exists and is the same for every merchant.
 - Money: shop-currency (`shop_money`) amounts, two decimals. Days: the shop's time zone.
 - Stored data holds no names, e-mails, addresses or readable visitor ids.
 - Tests follow the layout under `tests/` (`tests/lib`, `tests/home`, `tests/webhooks/routes.test.ts` for routes).
@@ -106,10 +107,10 @@ Tested in the task shown in brackets.
 
 **Interfaces:**
 - Consumes: `BundleOrderRow` (Task 4).
-- Produces in `store.ts` (each takes `db` as part of one object; `db` is the Prisma client or a fake with the same methods): `saveBundleRows({ db, shop, rows }): Promise<void>` (one `upsert` per row on the unique key), `readOrderRows({ db, shop, fromIso, discountId }): Promise<BundleOrderRow[]>`, `readVisitorSum({ db, shop, fromDay, discountId }): Promise<number>`.
+- Produces in `store.ts` (each takes `db` as part of one object; `db` is the Prisma client or a fake with the same methods): `saveBundleRows({ db, shop, rows }): Promise<void>` (one `upsert` per row on the unique key), `readOrderRows({ db, shop, fromIso, toIso }): Promise<BundleOrderRow[]>` (orders whose `orderedAt` is from `fromIso` up to but not including `toIso`), `readVisitorSum({ db, shop, fromDay, toDay }): Promise<number>` (days from `fromDay` to `toDay`, both included, over all discounts).
 - Produces `sumTotals({ rows, visitors }): { visitors: number; orders: number; averageOrderValue: number; addedRevenue: number }`: `orders` counts distinct `orderId`; `averageOrderValue` = sum of the distinct orders' `orderSubtotal` divided by `orders` (0 when none), rounded to cents; `addedRevenue` sums every row.
 
-- [ ] **Step 1: Write failing tests.** `sumTotals`: one order in two discounts' rows counts as 1 order, its subtotal once in AOV, and both rows' added revenue (Review Focus 1); no rows gives zeros; rows of a discount that no longer exists still count (Review Focus 5). `saveBundleRows`: saving the same rows twice calls `upsert` with the same `where` key each time and creates no second record in a fake keyed store (Review Focus 2). `readVisitorSum` filters by `discountId` when given.
+- [ ] **Step 1: Write failing tests.** `sumTotals`: one order in two discounts' rows counts as 1 order, its subtotal once in AOV, and both rows' added revenue (Review Focus 1); no rows gives zeros; rows of a discount that no longer exists still count (Review Focus 5). `saveBundleRows`: saving the same rows twice calls `upsert` with the same `where` key each time and creates no second record in a fake keyed store (Review Focus 2). `readVisitorSum` adds up only the days from `fromDay` to `toDay`, both included, over every discount.
 - [ ] **Step 2: Run them.** Expected: FAIL.
 - [ ] **Step 3: Implement.** Convert Prisma `Decimal` to number in `readOrderRows`.
 - [ ] **Step 4: Run the tests.** Expected: PASS.
@@ -155,7 +156,7 @@ Tested in the task shown in brackets.
 
 **Interfaces:**
 - Produces `pickShopDay({ nowMs, timeZone }): string` (`YYYY-MM-DD` in that zone; check `src/lib/zonedTime.ts` first and reuse what it offers).
-- Produces `buildVisitorKey({ clientId, shop, day, secret }): Promise<string>`: SHA-256 hex (Web Crypto) of the four joined values.
+- Produces `buildVisitorKey({ clientId, shop, day, secret }): Promise<string>`: HMAC-SHA-256 hex (Web Crypto) with `secret` as the key over the text `visitor-key|shop|day|clientId` (the fixed first word keeps this use of the secret apart from any other).
 - Produces in `store.ts`: `addVisit({ db, shop, discountId, day, visitorKey }): Promise<'counted' | 'duplicate'>` (create the `VisitorSeen` row; a unique-key error means `'duplicate'` and no increment; otherwise increment `DiscountDailyStat.visitors` by an `upsert` with `increment`) and `purgeOldVisits({ db, shop, beforeDay }): Promise<void>`.
 - Produces `recordView({ shop, productId, clientId, nowMs, secret, readSettings, addVisit, purgeVisits, buildKey, pickDay }): Promise<'counted' | 'duplicate' | 'ignored'>`; `readSettings` returns `{ timeZone, liveProducts }` from `MetricsSync`. A product not in `liveProducts` gives `'ignored'`; the purge removes visits older than 2 days before today.
 
@@ -177,7 +178,7 @@ Tested in the task shown in brackets.
 
 - [ ] **Step 1: Write failing tests.** `mapLiveProducts`: draft discounts are left out; a product in a live discount maps to its id. Route: a body over 2,048 bytes, a non-JSON body, a `shop` that is not a shop host, a shop with no `MetricsSync` row, and a product in no live discount each answer 204 and store nothing (Review Focus 4); a valid view answers 204 and calls the recorder once; `OPTIONS` answers with the CORS headers. `proxyDecision`: a `/collect/view` request passes with no token (`{ kind: 'next' }`) while `/` still needs one. `saveConfig`: after a save, the settings writer is called with the live product map.
 - [ ] **Step 2: Run them.** Expected: FAIL.
-- [ ] **Step 3: Implement.** In `saveConfig`, read the shop time zone with the existing `getShopTimezone`. The route builds its dependencies from `getDb()` and `process.env.METRICS_VISITOR_SECRET` (a new environment variable the owner sets on both Vercel projects; the route answers 204 and stores nothing when it is missing).
+- [ ] **Step 3: Implement.** In `saveConfig`, read the shop time zone with the existing `getShopTimezone`. The route builds its dependencies from `getDb()` and passes `process.env.SHOPIFY_API_SECRET_KEY` (already set on every deployment) as the hashing secret; it answers 204 and stores nothing when that is missing.
 - [ ] **Step 4: Run the tests.** Expected: PASS.
 - [ ] **Step 5: Commit.**
 
@@ -190,9 +191,9 @@ Tested in the task shown in brackets.
 **Interfaces:**
 - Produces the extension: `type = "web_pixel_extension"`, `runtime_context = "strict"`, `[customer_privacy] analytics = true, marketing = false, preferences = false, sale_of_data = "disabled"`, one setting `collectUrl` (single line text). `index.js` registers a `product_viewed` subscriber that posts the payload with `keepalive` to the setting's URL.
 - Produces `buildViewPayload({ shop, productId, clientId }): string` (JSON `{ shop, productId: "gid://shopify/Product/<n>", clientId }`), taking the plain id from the event.
-- Produces `ensureMetricsPixel({ shop, collectUrl, queryShop }): Promise<'created' | 'exists'>` (query `webPixel`; if none, run `webPixelCreate` with settings `{"collectUrl": ...}`), and `ensureMetricsPixelSafely({ collectUrl })`, which never throws, like `ensureTierDiscountSafely`. `collectUrl` is `${APP_URL}/collect/view`; `APP_URL` is a new environment variable the owner sets (the app does not know its own address in code today).
+- Produces `ensureMetricsPixel({ shop, collectUrl, queryShop }): Promise<'created' | 'updated' | 'exists'>` (query `webPixel`; if none, run `webPixelCreate` with settings `{"collectUrl": ...}`), and `ensureMetricsPixelSafely({ collectUrl })`, which never throws, like `ensureTierDiscountSafely`. `collectUrl` is built by `readAppOrigin({ host, protocol }): string | null` from the host of the verified homepage request (`x-forwarded-host` or `host`, protocol `https`), so every deployment uses its own address and no variable is needed; it returns `null` for a host that is empty or has a path or credentials in it, and then the pixel is not created. If a pixel exists with another `collectUrl`, `ensureMetricsPixel` updates it (`webPixelUpdate`).
 
-- [ ] **Step 1: Write failing tests.** `buildViewPayload` makes the gid from a numeric id and keeps the other values. `ensureMetricsPixel`: existing pixel gives `'exists'` and no mutation; none gives `'created'` with the right settings; a user error from the mutation is thrown, and the Safely wrapper turns it into `'failed'`.
+- [ ] **Step 1: Write failing tests.** `buildViewPayload` makes the gid from a numeric id and keeps the other values. `readAppOrigin`: `my-app.vercel.app` gives `https://my-app.vercel.app`; an empty host, `a.com/x` and `user@a.com` give `null`. `ensureMetricsPixel`: existing pixel with the same address gives `'exists'` and no mutation; one with another address gives `'updated'`; none gives `'created'` with the right settings; a user error from the mutation is thrown, and the Safely wrapper turns it into `'failed'`.
 - [ ] **Step 2: Run them.** Expected: FAIL.
 - [ ] **Step 3: Implement.** Scaffold the extension files by the shape in Shopify's "Build web pixels" page; add its `package.json` dependency `@shopify/web-pixels-extension`. Confirm the exact `webPixel` query and `webPixelCreate` input shape against the 2025-10 schema (the version `shopify-client.ts` uses) with the Shopify GraphQL tool before writing the strings.
 - [ ] **Step 4: Run the tests,** `npx tsc --noEmit` and lint. Expected: PASS.
@@ -206,7 +207,7 @@ Tested in the task shown in brackets.
 
 **Interfaces:**
 - Produces `buildMetricCards({ totals, currencyCode, hasPermission, formatMoney }): { label: string; value: string; hint: string }[]` in the existing order. Values: visitors and orders as integers, AOV and Added revenue through `formatMoney`; with `hasPermission` false every value is `Needs permission`. The Visitors hint says it is an estimate.
-- Produces `loadMetrics({ shop, nowIso, days, discountId, readScopes, syncOrders, refresh, readRows, readVisitors, sumTotals }): Promise<{ totals; hasPermission }>`: reads the stored scopes (permission is `read_orders` present), runs `syncOrders` (ignoring its result except to set permission false on `'needs-permission'`), refreshes the settings cache from the current config, then reads rows since `days` ago and the visitor sum.
+- Produces `loadMetrics({ shop, nowIso, fromDay, toDay, timeZone, readScopes, syncOrders, refresh, readRows, readVisitors, sumTotals }): Promise<{ totals; hasPermission }>`: reads the stored scopes (permission is `read_orders` present), runs `syncOrders` (ignoring its result except to set permission false on `'needs-permission'`), refreshes the settings cache from the current config, then reads the order rows between the instants where `fromDay` starts and the day after `toDay` starts in the shop's time zone (`zonedTimeToUtc` from `src/lib/zonedTime.ts`) and the visitor sum for the same days.
 - `StatCards` becomes a presentation component taking `cards` as a prop.
 
 - [ ] **Step 1: Write failing tests.** `buildMetricCards`: sample totals give the four formatted values in order; zero orders gives AOV `formatMoney(0)`; no permission gives four `Needs permission`; the Visitors hint contains "estimate". `loadMetrics`: missing scope gives `hasPermission: false` without reading rows; `'needs-permission'` from the sync does the same; the sync runs before the rows are read. Update the two existing component tests that expect the placeholder values (`16`, `0`, `0.00`).
@@ -215,19 +216,20 @@ Tested in the task shown in brackets.
 - [ ] **Step 4: Run the tests.** Expected: PASS.
 - [ ] **Step 5: Commit** on branch `feat/metrics-homepage` (version bump).
 
-### Task 12: Period and discount picker
+### Task 12: Date range picker
 
 **Files:**
-- Create: `src/home/metricsQuery.ts`, `src/home/components/MetricsFilters.tsx`, `tests/home/metricsQuery.test.ts`, `tests/home/components/metricsFilters.test.tsx`
+- Create: `src/home/rangeDays.ts`, `src/home/metricsQuery.ts`, `src/home/components/DateRangePicker.tsx`, `tests/home/rangeDays.test.ts`, `tests/home/metricsQuery.test.ts`, `tests/home/components/dateRangePicker.test.tsx`
 - Modify: `src/home/components/StatCards.tsx`, `src/app/page.tsx`
 
 **Interfaces:**
-- Produces `parseMetricsQuery({ raw }): { days: 7 | 30 | 90; discountId: string | null }` reading `?period=7|30|90` (default 30) and `?discount=<id>` (absent or `all` gives `null`); anything else falls back to the defaults.
-- Produces `MetricsFilters` (props: `days`, `discountId`, `discounts: { discountId: string; name: string }[]`) built the way `SortMenu`/`ToolbarMenu` already work, so it needs no new client-side approach; it replaces the dead "Last 30d" button.
+- Produces in `rangeDays.ts` (days are `YYYY-MM-DD` strings, no time zone inside): `addDays({ day, count }): string`, `listRangePresets({ today }): { key: string; label: string; fromDay: string; toDay: string }[]` with these presets in this order (my call, the owner can change them): `today` "Today", `yesterday` "Yesterday", `last7` "Last 7 days", `lastWeek` "Last week" (the previous Monday to Sunday), `last30` "Last 30 days", `last90` "Last 90 days", `thisMonth` "This month", `lastMonth` "Last month".
+- Produces `parseMetricsQuery({ raw, today }): { fromDay: string; toDay: string; label: string }`: `?range=<preset key>` or `?from=YYYY-MM-DD&to=YYYY-MM-DD`; the default is `last30`; a malformed day, a day after `today`, or a range longer than 366 days falls back to the default; `from` after `to` are swapped; a custom range's label reads `12 Oct – 2 Nov`.
+- Produces `DateRangePicker({ label, fromDay, toDay, today, presets })`, a client component: the button shows `label` and opens a panel with a month calendar (previous and next month arrows, days after `today` disabled) and the preset list below it. A preset is a link to `?range=<key>`. Picking two days on the calendar and pressing Apply goes to `?from=...&to=...`. Escape and a click outside close it. No new dependency: the calendar is built by hand.
 
-- [ ] **Step 1: Write failing tests.** `parseMetricsQuery`: defaults, each valid period, `period=5` falls back to 30, `discount=all` gives null, an unknown discount id passes through (the page filters nothing wrongly: it reads zero). `MetricsFilters`: shows the current period, lists the discounts by name plus "All discounts", and the links keep the other query values.
+- [ ] **Step 1: Write failing tests.** `rangeDays`: `addDays` across a month and a year end; with `today` = `2026-11-02` (a Monday) `lastWeek` is `2026-10-26` to `2026-11-01`, `last7` is `2026-10-27` to `2026-11-02`, `lastMonth` is `2026-10-01` to `2026-10-31`. `parseMetricsQuery`: no query gives the last 30 days; `range=today` gives today to today; `from` after `to` are swapped; `from=2026-13-40`, a future `to` and a 400-day range fall back to the default. `DateRangePicker`: the button shows the label; clicking it shows the calendar and the eight presets; each preset is a link with the right `href`; choosing two days and pressing Apply produces the custom link; a day after `today` is disabled; Escape closes it.
 - [ ] **Step 2: Run them.** Expected: FAIL.
-- [ ] **Step 3: Implement,** reading `SortMenu.tsx` and `ToolbarMenu.tsx` first and reusing their approach and `home.css` classes.
+- [ ] **Step 3: Implement,** reading `ToolbarMenu.tsx` and `home.css` first and reusing their menu and popover styling. `page.tsx` takes `today` from `pickShopDay` with the shop time zone and passes `fromDay`/`toDay` to `loadMetrics`.
 - [ ] **Step 4: Run the tests.** Expected: PASS.
 - [ ] **Step 5: Commit and open the PR** for the Homepage group (version bump).
 
@@ -235,9 +237,9 @@ Tested in the task shown in brackets.
 
 **Files:** none; the result goes in `.session-log`.
 
-- [ ] **Step 1: Owner:** merge the four PRs, set `APP_URL` and `METRICS_VISITOR_SECRET` on the dev Vercel project, apply the migration to the dev database, run `npm run deploy:dev`, approve the new scopes.
+- [ ] **Step 1: Owner:** merge the four PRs, apply the migration to the dev database, run `npm run deploy:dev`, approve the new scopes. No new environment variable is needed.
 - [ ] **Step 2: Open the homepage.** Expected: the cards load, the sync runs once, no error in the Vercel runtime logs.
 - [ ] **Step 3: Visit a discounted product page from a private window with analytics allowed, twice.** Expected: Visitors goes up by 1, not 2.
 - [ ] **Step 4: Place a test order with 3 or more discounted units.** Expected: a `BundleOrder` row appears from the webhook within a minute; Bundle orders, AOV and Added revenue match a hand calculation from the order.
 - [ ] **Step 5: Cross-check with ShopifyQL** (`FROM sales SHOW orders, total_sales SINCE -30d`, through the Shopify GraphQL tool) against the stored totals, and record whether ShopifyQL can split by discount.
-- [ ] **Step 6: Report** results and any difference to the owner; production steps (migration, `deploy:prod`, the two environment variables) are the owner's.
+- [ ] **Step 6: Report** results and any difference to the owner; production steps (migration, `deploy:prod`) are the owner's.

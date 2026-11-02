@@ -13,7 +13,7 @@ The app homepage shows four cards (Visitors, Bundle orders, AOV, Added revenue) 
 - **Added revenue** is the extra money the bundle brought in, not the whole revenue of bundle orders (formula below is my proposal, to be confirmed).
 - The app asks for the new permissions now: orders, all-order history, reports, pixels and customer events, plus the protected customer data approval where Shopify requires it.
 - Added revenue formula confirmed (below).
-- The four cards add up all discounts by default, and a picker on the homepage narrows them to one discount (my reading of the owner's "yes" to question 3; to be corrected if wrong).
+- The four cards add up all discounts. The date button ("Last 30d") opens a calendar with a list of presets (today, last week, last 30 days, ...) and a custom range. No discount picker. Nothing is specific to one merchant: no shop, address or per-merchant setting in code or environment.
 - Sources: Shopify checkout/storefront events (a web pixel) and an orders webhook feed the database; Shopify's reports (ShopifyQL) may be used to bootstrap.
 
 ## Goals
@@ -48,7 +48,7 @@ Money is in the shop currency (`shop_money` amounts) and shown with the existing
 ## Data model (new Prisma tables, one migration)
 
 - `DiscountDailyStat`: `shop`, `discountId`, `day` (date), `visitors` (int). Unique on `shop, discountId, day`.
-- `VisitorSeen`: `shop`, `discountId`, `day`, `visitorKey` (hash). Unique on all four. Rows older than 2 days are deleted whenever a view is counted. `visitorKey` = hash of the pixel's client id with the shop, the day and a server secret, so it cannot be turned back into an id or followed across days.
+- `VisitorSeen`: `shop`, `discountId`, `day`, `visitorKey` (hash). Unique on all four. Rows older than 2 days are deleted whenever a view is counted. `visitorKey` = HMAC of the pixel's client id with the shop and the day, keyed with the app's existing API secret, so it cannot be turned back into an id or followed across days.
 - `BundleOrder`: `shop`, `orderId`, `discountId`, `orderedAt`, `currency`, `units`, `orderSubtotal`, `discountAmount`, `addedRevenue`. Unique on `shop, orderId, discountId`. Amounts as decimals.
 - `MetricsSync`: `shop`, `lastOrderSyncAt`, `backfilledUntil`, `timeZone`, `liveProducts` (json: product id to the id of the live discount it belongs to). One row per shop. `liveProducts` and `timeZone` are a cache kept fresh by `saveConfig` and by every homepage load, so the visit route and the orders webhook read only the database and never call Shopify per request.
 
@@ -60,7 +60,7 @@ A discount that is later deleted keeps its rows. They count in the totals; the h
 2. **Orders going forward: `orders/paid` webhook** at `/webhooks/orders/paid`, using the existing `handleWebhook` (HMAC check, topic check). A pure function takes the order payload (plain values) and the live discounts and returns the `BundleOrder` rows; the route writes them with an upsert on the unique key.
 3. **Orders before today (bootstrap): Admin API orders query**, last 90 days, run once per shop on the first homepage load after the permission is granted, through the same pure function as the webhook. Reasoning: the reports API returns totals, while this app needs one row per order tied to a discount.
 4. **Catch-up:** on a homepage load, if `lastOrderSyncAt` is older than one hour, fetch orders since then and run them through the same function. This covers webhooks that never arrive.
-5. **Reading:** the homepage loads sums for the selected period (7, 30 or 90 days; the "Last 30d" button starts working) from the three tables.
+5. **Reading:** the homepage loads sums for the selected date range from the tables. The "Last 30d" button opens a calendar and a preset list (Today, Yesterday, Last 7 days, Last week, Last 30 days, Last 90 days, This month, Last month) and accepts a custom range; the default is the last 30 days.
 
 ## Tying an order to a discount (to verify before building)
 
@@ -92,4 +92,4 @@ Table indexes, the exact CORS headers, the hashing function, the period selector
 
 1. Added revenue = amount paid for a bundle line minus one unit at its regular price, never below 0: confirmed.
 2. Request `read_reports` and the protected customer data approval now: yes.
-3. Cards add up all discounts, with a picker to narrow to one discount: yes (reading above).
+3. Cards add up all discounts. The owner corrected my reading: the date button opens a calendar and a preset list; there is no discount picker.
