@@ -154,6 +154,32 @@ describe('the product page price while a tier applies', () => {
   })
 })
 
+/** Dawn on a sale variant: the amount is printed twice, once in a block the theme's CSS hides and once in the one it shows. */
+const dawnSalePriceHtml = () => `
+  <style>.price--on-sale .price__regular { display: none; }</style>
+  <div id="price-main" role="status">
+    <div class="price price--large price--on-sale"><div class="price__container">
+      <div class="price__regular"><span class="visually-hidden">Regular price</span><span class="price-item price-item--regular">£1.69</span></div>
+      <div class="price__sale"><span><s class="price-item price-item--regular">£2.10</s></span><span class="price-item price-item--sale">£1.69</span></div>
+    </div></div>
+  </div>`
+
+describe('a theme that prints the price twice, one of them hidden', () => {
+  it('changes the price that is shown, not the hidden copy that comes first in the page', async () => {
+    await mountProductPage({ quantity: 10, priceHtml: dawnSalePriceHtml() })
+    expect(squash(document.querySelector('.price-item--sale')!.textContent)).toBe('£1.69 £1.63 each')
+    expect(document.querySelector('.price__regular .price-item')!.innerHTML).toBe('£1.69')
+    expect(document.querySelector('s.price-item')!.innerHTML.trim()).toBe('£2.10')
+  })
+
+  it('puts the shown price back below the first tier', async () => {
+    await mountProductPage({ quantity: 10, priceHtml: dawnSalePriceHtml() })
+    await setQuantity(1)
+    expect(painted()).toHaveLength(0)
+    expect(document.querySelector('.price-item--sale')!.innerHTML).toBe('£1.69')
+  })
+})
+
 describe('the widget itself', () => {
   it('no longer draws a price of its own: the tag stays in its row', async () => {
     await mountProductPage({ quantity: 10 })
