@@ -1,7 +1,8 @@
 // The product page's own price, changed in place while a tier discount applies. The theme's markup and look are not
 // assumed: the price is found by what it says (the product's plain price and nothing else but a currency code), nearest
 // to the widget, never by a class name or a section element. Its text is replaced inside the same element, so the theme's
-// own type, colour and size carry on; below the first tier, or when no price is found, the theme's price is left as it was.
+// own type, colour and size carry on. It shows the unit price and "each" and draws no struck price: a compare-at price that
+// the theme shows stays the theme's own. Below the first tier, or when no price is found, the theme's price is left as it was.
 // Every step comes in through `tools`, so each one can be tried alone.
 
 const WAS_ATTRIBUTE = 'data-smooth-discounts-was'
@@ -86,9 +87,9 @@ export function findThemePrice({ rootEl, plainPrice, tools }) {
   return entries.length > 0 ? entries[0].element : null
 }
 
-/** Still holding the two parts this script wrote: a theme that sets the price's text itself (a variant change) leaves only the marks. */
+/** Still holding the "each" label this script wrote: a theme that sets the price's text itself (a variant change) leaves only the marks. */
 export function isPaintedPrice(priceEl) {
-  return priceEl.hasAttribute(WAS_ATTRIBUTE) && priceEl.children.length === 2
+  return priceEl.hasAttribute(WAS_ATTRIBUTE) && priceEl.children.length === 1
 }
 
 export function removeMarks(priceEl) {
@@ -110,15 +111,13 @@ export function isCurrentPaint({ priceEl, nowText, tools }) {
   return tools.isPaintedPrice(priceEl) && priceEl.getAttribute(NOW_ATTRIBUTE) === nowText
 }
 
-/** The plain price struck, the unit price, then "each", all in the theme's own element. */
+/** The unit price, then "each", in the theme's own element. */
 export function writeUnitPrice({ priceEl, originalText, nowText }) {
   const doc = priceEl.ownerDocument
-  const struck = doc.createElement('s')
-  struck.textContent = originalText
   const each = doc.createElement('small')
   each.textContent = EACH_LABEL
   priceEl.textContent = ''
-  priceEl.append(struck, doc.createTextNode(' ' + nowText + ' '), each)
+  priceEl.append(doc.createTextNode(nowText + ' '), each)
   priceEl.setAttribute(WAS_ATTRIBUTE, originalText)
   priceEl.setAttribute(NOW_ATTRIBUTE, nowText)
 }

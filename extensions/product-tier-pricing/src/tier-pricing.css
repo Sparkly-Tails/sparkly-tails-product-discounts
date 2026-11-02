@@ -92,26 +92,8 @@
   display: none;
 }
 
-/* The theme's own price while a tier applies: the plain price struck, then the unit price in the theme's own type, then
-   "each". Everything is relative to the theme's price (em, inherited colour), so nothing here depends on its classes. */
-[data-smooth-discounts-was] s {
-  margin-inline-end: 0.35em;
-  font-weight: 400;
-  text-decoration: line-through;
-  opacity: 0.7;
-}
-
-/* Read out after the struck price, hidden from sight: a screen reader would otherwise read two bare numbers. */
-[data-smooth-discounts-was] s::after {
-  content: ' (original price)';
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-}
-
+/* The theme's own price while a tier applies: the unit price in the theme's own type, then "each". Everything is relative
+   to the theme's price (em), so nothing here depends on its classes. */
 [data-smooth-discounts-was] small {
   margin-inline-start: 0.25em;
   font-size: 0.6em;
