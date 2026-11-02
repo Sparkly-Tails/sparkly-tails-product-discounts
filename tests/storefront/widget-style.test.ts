@@ -9,9 +9,10 @@ const hexSnippet = extension('snippets/sparkly-safe-hex.liquid')
 const css = extension('src/tier-pricing.css')
 
 describe('tier-pricing.liquid: the style of a discount', () => {
-  it('reads the four values from the discount in the product metafield', () => {
-    for (const key of ['themeColor', 'backgroundColor', 'cornerRadius', 'priceSize']) expect(block).toContain(`style_value.${key}`)
+  it('reads the three values from the discount in the product metafield, and no theme colour', () => {
+    for (const key of ['backgroundColor', 'cornerRadius', 'priceSize']) expect(block).toContain(`style_value.${key}`)
     expect(block).toContain('discount_metafield.value.style')
+    expect(block).not.toContain('themeColor')
   })
 
   it('falls back to the block settings of the theme editor when the discount has no usable value', () => {
@@ -20,12 +21,16 @@ describe('tier-pricing.liquid: the style of a discount', () => {
 
   it('lets a colour through only after the hex snippet has checked it', () => {
     expect(block).toContain("render 'sparkly-safe-hex'")
-    expect(block).toContain('style_value.themeColor')
+    expect(block).toContain("hex: style_value.backgroundColor")
   })
 
   it('keeps the numbers inside the ranges the form allows', () => {
     expect(block).toContain(`at_least: ${PRICE_SIZE_RANGE.min} | at_most: ${PRICE_SIZE_RANGE.max}`)
     expect(block).toContain(`at_least: ${CORNER_RADIUS_RANGE.min} | at_most: ${CORNER_RADIUS_RANGE.max}`)
+  })
+
+  it('takes the accent colour from the block setting alone', () => {
+    expect(block).toContain('--sparkly-tier-moss: {{ block.settings.moss_color }};')
   })
 
   it('sets the radius variable only when the discount has a radius, and escapes the whole style attribute', () => {
@@ -35,9 +40,10 @@ describe('tier-pricing.liquid: the style of a discount', () => {
 })
 
 describe('the sparkly-safe-hex snippet', () => {
-  it('prints a colour only when it is # and exactly six hexadecimal digits', () => {
-    expect(hexSnippet).toContain('candidate.size == 7')
+  it('prints a colour only when it is # and exactly six or eight hexadecimal digits', () => {
+    expect(hexSnippet).toContain("first_character == '#' and candidate.size == 7 or first_character == '#' and candidate.size == 9")
     expect(hexSnippet).toContain("slice: 0, 1")
+    expect(hexSnippet).toContain('slice: 1, 8')
     for (const digit of '0123456789ABCDEF') expect(hexSnippet).toContain(`remove: '${digit}'`)
   })
 })

@@ -74,7 +74,6 @@ export function readQuantity({ text, tools }: { text: string; tools: { clampQuan
 export function buildWidgetStyleVars({ style }: { style: WidgetStyle }): Record<string, string> {
   return {
     '--sparkly-tier-price-font-size': `${style.priceSize}px`,
-    '--sparkly-tier-moss': style.themeColor,
     '--sparkly-tier-cream': style.backgroundColor,
     '--sparkly-tier-sun': '#ffdc4c',
     '--sparkly-tier-radius': `${style.cornerRadius}px`,

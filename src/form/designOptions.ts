@@ -8,7 +8,8 @@ export interface ColorChoice {
   edgeClass?: string
 }
 
-export const THEME_COLORS: ColorChoice[] = [
+/** The colour picker's palette (the hues the design offered as theme colours). */
+export const PALETTE_COLORS: ColorChoice[] = [
   { label: 'Black', hex: '#1E2022' },
   { label: 'Red', hex: '#E63946' },
   { label: 'Orange', hex: '#F77F00' },
@@ -30,9 +31,9 @@ export const BACKGROUND_COLORS: ColorChoice[] = [
   { label: 'Dark Graphite', hex: '#191C16' },
 ]
 
-/** True for a whole colour code such as #F5EFE1. */
+/** True for a whole colour code such as #F5EFE1, or one with transparency such as #F5EFE1CC. */
 export function isHexColor({ text }: { text: string }): boolean {
-  return /^#[0-9a-f]{6}$/i.test(text)
+  return /^#[0-9a-f]{6}([0-9a-f]{2})?$/i.test(text)
 }
 
 export function formatHexColor({ text }: { text: string }): string {

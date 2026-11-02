@@ -206,34 +206,44 @@ describe('TierDiscountForm: the preview follows the form', () => {
   })
 })
 
+describe('TierDiscountForm: the order of the cards', () => {
+  it('has Details, the products, the flash sale, the tiers and the design, in that order', () => {
+    renderForm()
+    const cards = ['Details', 'Products & variants', 'Flash sale', 'Tiers', 'Design']
+    const shown = screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent ?? '').filter((name) => cards.includes(name))
+    expect(shown).toEqual(cards)
+  })
+})
+
 describe('TierDiscountForm: the style', () => {
-  it('sends the four style values of the Design card to the save action, the defaults when it was left alone', async () => {
+  it('sends the three style values of the Design card to the save action, the defaults when it was left alone', async () => {
     const { saveAction } = renderForm()
     await act(async () => { fireEvent.submit(screen.getByRole('button', { name: 'Save' }).closest('form')!) })
     const formData = (saveAction.mock.calls[0] as unknown as [unknown, FormData])[1]
-    expect([formData.get('style-themeColor'), formData.get('style-backgroundColor'), formData.get('style-cornerRadius'), formData.get('style-priceSize')]).toEqual(['#0055C7', '#F5EFE1', '12', '24'])
+    expect([formData.get('style-backgroundColor'), formData.get('style-cornerRadius'), formData.get('style-priceSize')]).toEqual(['#F5EFE1', '12', '24'])
+    expect(formData.has('style-themeColor')).toBe(false)
   })
 
   it('paints the preview with the chosen style at once, and sends it', async () => {
     const { saveAction } = renderForm()
-    fireEvent.click(screen.getByRole('button', { name: 'Red' }))
+    fireEvent.click(screen.getByRole('button', { name: 'White' }))
     fireEvent.change(screen.getByRole('slider', { name: 'Price size' }), { target: { value: '36' } })
     const widget = document.querySelector('.sparkly-tier-pricing') as HTMLElement
-    expect(widget.style.getPropertyValue('--sparkly-tier-moss')).toBe('#E63946')
+    expect(widget.style.getPropertyValue('--sparkly-tier-cream')).toBe('#FFFFFF')
     expect(widget.style.getPropertyValue('--sparkly-tier-price-font-size')).toBe('36px')
     await act(async () => { fireEvent.submit(screen.getByRole('button', { name: 'Save' }).closest('form')!) })
     const formData = (saveAction.mock.calls[0] as unknown as [unknown, FormData])[1]
-    expect(formData.get('style-themeColor')).toBe('#E63946')
+    expect(formData.get('style-backgroundColor')).toBe('#FFFFFF')
     expect(formData.get('style-priceSize')).toBe('36')
   })
 
   it('counts a changed style as an unsaved change, and Discard takes it back', () => {
     renderForm()
     expect(screen.queryByText(STATUS)).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'Red' }))
+    fireEvent.click(screen.getByRole('button', { name: 'White' }))
     expect(screen.getByText(STATUS)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Discard' }))
-    expect(screen.getByRole('button', { name: 'Blue' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'Warm Sand' })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.queryByText(STATUS)).toBeNull()
   })
 })

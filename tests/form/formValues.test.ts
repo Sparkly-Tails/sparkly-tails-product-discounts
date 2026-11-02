@@ -45,7 +45,7 @@ describe('isFormDirty', () => {
   })
 
   it('is dirty when any of the four style values changes', () => {
-    expect(dirty({ style: { ...SAVED.style, themeColor: '#E63946' } })).toBe(true)
+    expect(dirty({ style: { ...SAVED.style, backgroundColor: '#FFFFFF80' } })).toBe(true)
     expect(dirty({ style: { ...SAVED.style, backgroundColor: '#FFFFFF' } })).toBe(true)
     expect(dirty({ style: { ...SAVED.style, cornerRadius: 0 } })).toBe(true)
     expect(dirty({ style: { ...SAVED.style, priceSize: 30 } })).toBe(true)
