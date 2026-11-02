@@ -15,12 +15,6 @@ export const METAFIELD_KEYS = {
   tierSiblingProducts: 'tier_sibling_products',
   /** Product. */
   tierSiblingVariants: 'tier_sibling_variants',
-  /** Product. */
-  timeDiscount: 'time_discount',
-  /** Shop. */
-  timeConfig: 'time_config',
-  /** Discount. */
-  timeFunctionConfig: 'time_function_config',
   /** Discount (the Shopify discount of a flash sale): which tier discount that record applies. */
   flashRecord: 'flash_record',
 } as const

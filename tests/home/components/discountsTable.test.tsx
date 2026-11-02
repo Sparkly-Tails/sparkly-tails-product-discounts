@@ -14,20 +14,19 @@ import type { DiscountRow } from '@/home/discountRows'
 beforeEach(() => router.push.mockReset())
 afterEach(cleanup)
 
-function makeRow({ id, kind, title, isActive, subtitle = '', rules = '' }: { id: string; kind: 'tier' | 'time'; title: string; isActive: boolean; subtitle?: string; rules?: string }): DiscountRow {
-  const base = kind === 'tier' ? '/discounts/' : '/time-discounts/'
-  return { key: kind + ':' + id, kind, title, subtitle, rules, isActive, href: base + id }
+function makeRow({ id, title, isActive, subtitle = '', rules = '' }: { id: string; title: string; isActive: boolean; subtitle?: string; rules?: string }): DiscountRow {
+  return { key: 'tier:' + id, title, subtitle, rules, isActive, href: '/discounts/' + id }
 }
 
 const SIX: DiscountRow[] = [
-  makeRow({ id: 'a1', kind: 'tier', title: 'Buy more, save more - Salmon Oil', isActive: true, subtitle: 'Save on salmon', rules: '3+ units (10% off), 5+ units (20% off)' }),
-  makeRow({ id: 'a2', kind: 'tier', title: 'Joint Support 3-pack', isActive: true, rules: '3+ units (£64.00 each)' }),
-  makeRow({ id: 'a3', kind: 'tier', title: 'Calming Chews bulk', isActive: false }),
-  makeRow({ id: 'b1', kind: 'time', title: 'Black Friday 2026 weekend', isActive: false, rules: 'Nov 27, 2026 - Nov 30, 2026 (Scheduled)' }),
-  makeRow({ id: 'b2', kind: 'time', title: 'Spring Probiotic Sale', isActive: true, rules: 'Ends Nov 30, 2026' }),
-  makeRow({ id: 'b3', kind: 'time', title: 'Summer Sale', isActive: false, rules: 'Ended Aug 31, 2025' }),
+  makeRow({ id: 'a1', title: 'Buy more, save more - Salmon Oil', isActive: true, subtitle: 'Save on salmon', rules: '3+ units (10% off), 5+ units (20% off)' }),
+  makeRow({ id: 'a2', title: 'Joint Support 3-pack', isActive: true, rules: '3+ units (£64.00 each)' }),
+  makeRow({ id: 'a3', title: 'Calming Chews bulk', isActive: false }),
+  makeRow({ id: 'b1', title: 'Black Friday 2026 weekend', isActive: false, rules: 'Flash sale: Nov 27, 2026 - Nov 30, 2026 (Upcoming)' }),
+  makeRow({ id: 'b2', title: 'Spring Probiotic Sale', isActive: true, rules: 'Flash sale: Nov 1, 2026 - Nov 30, 2026 (Active)' }),
+  makeRow({ id: 'b3', title: 'Summer Sale', isActive: false, rules: 'Flash sale: Aug 1, 2025 - Aug 31, 2025 (Ended)' }),
 ]
-const TWELVE: DiscountRow[] = Array.from({ length: 12 }, (_value, index) => makeRow({ id: 'x' + index, kind: 'tier', title: 'Discount ' + String(index + 1).padStart(2, '0'), isActive: true }))
+const TWELVE: DiscountRow[] = Array.from({ length: 12 }, (_value, index) => makeRow({ id: 'x' + index, title: 'Discount ' + String(index + 1).padStart(2, '0'), isActive: true }))
 
 function show({ rows = SIX, changes = {} }: { rows?: DiscountRow[]; changes?: Partial<TableQuery> } = {}) {
   const query = { ...DEFAULT_QUERY, ...changes }
@@ -39,17 +38,17 @@ describe('DiscountsTable header and tabs', () => {
   it('has the title and description of the design', () => {
     show()
     expect(screen.getByRole('heading', { name: 'All discounts' })).toBeInTheDocument()
-    expect(screen.getByText('Manage active tier quantity breaks and scheduled promotional pricing.')).toBeInTheDocument()
+    expect(screen.getByText('Manage your tier quantity breaks and flash sales.')).toBeInTheDocument()
   })
 
   it('shows the tabs with the counts of all discounts, as links that keep the other settings', () => {
-    show({ changes: { type: 'time' } })
+    show({ changes: { sort: 'status' } })
     const all = screen.getByRole('link', { name: /^All\s*6$/ })
     const active = screen.getByRole('link', { name: /^Active\s*3$/ })
     const inactive = screen.getByRole('link', { name: /^Inactive\s*3$/ })
-    expect(all).toHaveAttribute('href', '/?type=time')
-    expect(active).toHaveAttribute('href', '/?tab=active&type=time')
-    expect(inactive).toHaveAttribute('href', '/?tab=inactive&type=time')
+    expect(all).toHaveAttribute('href', '/?sort=status')
+    expect(active).toHaveAttribute('href', '/?tab=active&sort=status')
+    expect(inactive).toHaveAttribute('href', '/?tab=inactive&sort=status')
     expect(all).toHaveAttribute('aria-current', 'page')
     expect(active).not.toHaveAttribute('aria-current')
   })
@@ -60,7 +59,7 @@ describe('DiscountsTable header and tabs', () => {
   })
 })
 
-describe('DiscountsTable search, filter and sort controls', () => {
+describe('DiscountsTable search and sort controls', () => {
   it('has a search box with the current text and the placeholder of the design', () => {
     show({ changes: { search: 'salmon' } })
     const input = screen.getByLabelText('Search discounts') as HTMLInputElement
@@ -68,12 +67,12 @@ describe('DiscountsTable search, filter and sort controls', () => {
     expect(input).toHaveAttribute('placeholder', 'Search discounts...')
   })
 
-  it('searches without a page load: submitting goes to the address with the text and keeps the tab, type and sort', async () => {
+  it('searches without a page load: submitting goes to the address with the text and keeps the tab and sort', async () => {
     const user = userEvent.setup()
-    show({ changes: { tab: 'active', type: 'tier', sort: 'status' } })
+    show({ changes: { tab: 'active', sort: 'status' } })
     await user.type(screen.getByLabelText('Search discounts'), '  Salmon Oil {enter}')
     expect(router.push).toHaveBeenCalledTimes(1)
-    expect(router.push).toHaveBeenCalledWith('/?tab=active&type=tier&search=Salmon+Oil&sort=status')
+    expect(router.push).toHaveBeenCalledWith('/?tab=active&search=Salmon+Oil&sort=status')
   })
 
   it('clears the search by submitting an empty box, and goes back to the first page', async () => {
@@ -84,50 +83,14 @@ describe('DiscountsTable search, filter and sort controls', () => {
     expect(router.push).toHaveBeenCalledWith('/')
   })
 
-  it('keeps the Filters panel closed until the button is pressed', async () => {
+  it('opens the Sort menu with four links, marking the current order', async () => {
     const user = userEvent.setup()
-    show()
-    const button = screen.getByRole('button', { name: 'Filters' })
-    expect(button).toHaveAttribute('aria-expanded', 'false')
-    expect(screen.queryByLabelText('Time-based')).toBeNull()
-    await user.click(button)
-    expect(button).toHaveAttribute('aria-expanded', 'true')
-    expect(screen.getByLabelText('All types')).toBeChecked()
-  })
-
-  it('shows the current type as checked in the Filters panel', async () => {
-    const user = userEvent.setup()
-    show({ changes: { type: 'time' } })
-    await user.click(screen.getByRole('button', { name: 'Filters' }))
-    expect(screen.getByLabelText('Time-based')).toBeChecked()
-    expect(screen.getByLabelText('Tier-based')).not.toBeChecked()
-  })
-
-  it('applies a type without a page load and keeps the tab, search and sort', async () => {
-    const user = userEvent.setup()
-    show({ changes: { tab: 'active', search: 'sale', sort: 'type' } })
-    await user.click(screen.getByRole('button', { name: 'Filters' }))
-    await user.click(screen.getByLabelText('Time-based'))
-    await user.click(screen.getByRole('button', { name: 'Apply' }))
-    expect(router.push).toHaveBeenCalledWith('/?tab=active&type=time&search=sale&sort=type')
-  })
-
-  it('closes the Filters panel with Escape', async () => {
-    const user = userEvent.setup()
-    show()
-    await user.click(screen.getByRole('button', { name: 'Filters' }))
-    await user.keyboard('{Escape}')
-    expect(screen.queryByLabelText('All types')).toBeNull()
-  })
-
-  it('opens the Sort menu with five links, marking the current order', async () => {
-    const user = userEvent.setup()
-    show({ changes: { sort: 'type' } })
+    show({ changes: { sort: 'status' } })
     const button = screen.getByRole('button', { name: 'Sort' })
     expect(screen.queryByRole('link', { name: 'Title A-Z' })).toBeNull()
     await user.click(button)
-    const links = ['Default order', 'Title A-Z', 'Title Z-A', 'Type', 'Status'].map((name) => screen.getByRole('link', { name }))
-    expect(links.map((link) => link.getAttribute('href'))).toEqual(['/', '/?sort=title-asc', '/?sort=title-desc', '/?sort=type', '/?sort=status'])
+    const links = ['Default order', 'Title A-Z', 'Title Z-A', 'Status'].map((name) => screen.getByRole('link', { name }))
+    expect(links.map((link) => link.getAttribute('href'))).toEqual(['/', '/?sort=title-asc', '/?sort=title-desc', '/?sort=status'])
     expect(links[3]).toHaveAttribute('aria-current', 'true')
     expect(links[0]).not.toHaveAttribute('aria-current')
   })
@@ -143,7 +106,7 @@ describe('DiscountsTable search, filter and sort controls', () => {
 })
 
 describe('DiscountsTable rows', () => {
-  it('shows one row per discount with title, type, status and rules', () => {
+  it('shows one row per discount with title, status and rules', () => {
     show()
     const rows = screen.getAllByTestId('discount-row')
     expect(rows).toHaveLength(6)
@@ -152,11 +115,9 @@ describe('DiscountsTable rows', () => {
     expect(first.getByText('Save on salmon')).toBeInTheDocument()
     expect(first.getByText('Active')).toBeInTheDocument()
     expect(first.getByText('3+ units (10% off), 5+ units (20% off)')).toBeInTheDocument()
-    expect(rows[0].querySelector('[data-kind="tier"]')).not.toBeNull()
     const fourth = within(rows[3])
-    expect(fourth.getByRole('link', { name: /Black Friday 2026 weekend/ })).toHaveAttribute('href', '/time-discounts/b1')
+    expect(fourth.getByRole('link', { name: /Black Friday 2026 weekend/ })).toHaveAttribute('href', '/discounts/b1')
     expect(fourth.getByText('Inactive')).toBeInTheDocument()
-    expect(rows[3].querySelector('[data-kind="time"]')).not.toBeNull()
   })
 
   it('shows no second line for a discount without a subtitle', () => {
@@ -168,7 +129,7 @@ describe('DiscountsTable rows', () => {
   it('has the column headings of the design', () => {
     show()
     const headings = screen.getAllByRole('columnheader').map((cell) => cell.textContent)
-    expect(headings).toEqual(['Discount title', 'Type', 'Status', 'Schedule / Rules', ''])
+    expect(headings).toEqual(['Discount title', 'Status', 'Schedule / Rules', ''])
   })
 })
 
@@ -224,10 +185,10 @@ describe('DiscountsTable empty states', () => {
     expect(screen.queryByRole('table')).toBeNull()
   })
 
-  it('says nothing matches, with a link that clears the search and filters, and keeps the real tab counts', () => {
+  it('says nothing matches, with a link that clears the search, and keeps the real tab counts', () => {
     show({ changes: { search: 'no such thing' } })
-    expect(screen.getByText('No discounts match your search or filters.')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Clear filters' })).toHaveAttribute('href', '/')
+    expect(screen.getByText('No discounts match your search.')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Clear search' })).toHaveAttribute('href', '/')
     expect(screen.getByRole('link', { name: /^All\s*6$/ })).toBeInTheDocument()
     expect(screen.queryByTestId('showing')).toBeNull()
   })

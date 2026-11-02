@@ -7,7 +7,6 @@ export * from './tierMath.js'
 export * from './progress.js'
 export * from './copy.js'
 export * from './flash.js'
-export * from './timeSale.js'
 export { buildMixMatchRows, buildDisplayMixMatchItems, formatItemsChosen } from './siblings.js'
 export { listedMixMatchItems } from './config.js'
 

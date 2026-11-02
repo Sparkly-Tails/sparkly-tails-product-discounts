@@ -10,7 +10,7 @@ vi.mock('@/lib/shopify-client', () => ({ shopifyQuery: vi.fn() }))
 const SHOP = 'demo.myshopify.com'
 const NOW = new Date('2026-10-18T12:00:00.000Z')
 const TIER_FUNCTION_ID = 'fn-tier'
-const TIME_FUNCTION_ID = 'fn-time'
+const OTHER_FUNCTION_ID = 'fn-other'
 
 /** A small stateful stand-in for the parts of the Admin API this feature touches. */
 interface FakeShopify {
@@ -30,7 +30,7 @@ interface FakeShopify {
 
 function newFake(over: Partial<FakeShopify> = {}): FakeShopify {
   return {
-    functions: [{ id: TIER_FUNCTION_ID, handle: TIER_FUNCTION_HANDLE }, { id: TIME_FUNCTION_ID, handle: 'time-based-discount' }],
+    functions: [{ id: TIER_FUNCTION_ID, handle: TIER_FUNCTION_HANDLE }, { id: OTHER_FUNCTION_ID, handle: 'other-discount' }],
     discounts: [], claim: null, created: [], queries: [], pageSize: 100, createErrors: [], claimErrors: [], lookupOverrides: {}, lookups: 0, nextDigest: 1,
     ...over,
   }
@@ -136,8 +136,8 @@ describe('ensureTierDiscount', () => {
     expect(ofKind(fake, 'discountAutomaticApp')).toBe(0)
   })
 
-  it('a discount of the time-based Function does not count', async () => {
-    const fake = newFake({ discounts: [{ functionId: TIME_FUNCTION_ID, status: 'ACTIVE' }] })
+  it('a discount of another Function does not count', async () => {
+    const fake = newFake({ discounts: [{ functionId: OTHER_FUNCTION_ID, status: 'ACTIVE' }] })
     install(fake)
 
     expect(await ensureTierDiscount(SHOP)).toBe('created')
@@ -236,7 +236,7 @@ describe('ensureTierDiscount', () => {
   })
 
   it('throws a clear error when the tier Function is not deployed, and claims nothing', async () => {
-    const fake = newFake({ functions: [{ id: TIME_FUNCTION_ID, handle: 'time-based-discount' }] })
+    const fake = newFake({ functions: [{ id: OTHER_FUNCTION_ID, handle: 'other-discount' }] })
     install(fake)
 
     await expect(ensureTierDiscount(SHOP)).rejects.toThrow(/product-discount.*not deployed/)

@@ -44,9 +44,8 @@ export function parseWidgetConfig(container) {
     hasTiers: !!(tiers && tiers.length > 0),
     ownVariantIds,
     ownVariantOptions,
-    // A product with only a time-based discount has no tier discount blob
-    // (so no selfVariantId); the block still renders the selected variant's
-    // id on the container, and the sale price depends on it from first paint.
+    // A product without a tier discount has no discount blob (so no
+    // selfVariantId); the block still renders the selected variant's id on the container.
     initialVariantId: discount.selfVariantId
       ? extractNumericId(discount.selfVariantId)
       : container.dataset.selectedVariantId || null,

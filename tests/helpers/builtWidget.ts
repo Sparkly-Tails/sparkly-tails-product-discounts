@@ -3,7 +3,7 @@ import path from 'node:path'
 import { inject } from 'vitest'
 
 /** Every component of the tier widget; the core script finds the ones already on the page and adds none. */
-export const WIDGET_COMPONENTS = ['tier-pricing-model.js', 'tier-pricing-paint.js', 'tier-pricing-flash.js', 'tier-pricing-time-sale.js', 'tier-pricing-siblings.js']
+export const WIDGET_COMPONENTS = ['tier-pricing-model.js', 'tier-pricing-paint.js', 'tier-pricing-flash.js', 'tier-pricing-siblings.js']
 export const WIDGET_CORE = 'tier-pricing.js'
 
 export type BuiltWidget = Record<string, string>

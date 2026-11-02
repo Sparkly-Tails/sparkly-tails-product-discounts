@@ -36,7 +36,7 @@ describe('flash sale in the tier widget', () => {
     document.body.innerHTML = `
       <input name="quantity" value="${quantity}">
       <div id="smooth-discounts-f1" class="smooth-discounts smooth-discounts--card" data-smooth-discounts
-        data-discount='${JSON.stringify({ ...discount, ...(tiers ? { tiers } : {}) })}' data-time-discount="{}"
+        data-discount='${JSON.stringify({ ...discount, ...(tiers ? { tiers } : {}) })}'
         data-product-id='"gid://shopify/Product/9"' data-selected-variant-id="10"
         data-base-price="1.69" data-compare-at-price="0" data-money-format='"£{{amount}}"' data-high-demand="false"
         data-flash='${JSON.stringify(flash)}'>
@@ -49,8 +49,7 @@ describe('flash sale in the tier widget', () => {
             <div class="smooth-discounts__price-row">
               <div class="smooth-discounts__price-group">
                 <span data-tier-pricing-now-label hidden></span>
-                <span data-tier-pricing-price data-original-price="true">£1.69</span>
-                <span data-discounted-price hidden>£1.69</span>
+                <span data-tier-pricing-price>£1.69</span>
                 <span data-tier-pricing-each-label>each</span>
                 <s data-tier-pricing-struck hidden></s>
               </div>

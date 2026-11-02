@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { findComponent, loadComponent, registerComponent } from '../../extensions/product-tier-pricing/src/loader/registry.js'
-import { isTimeSaleData, listNeededComponents, loadComponentSet, parseComponentUrls } from '../../extensions/product-tier-pricing/src/loader/components.js'
+import { listNeededComponents, loadComponentSet, parseComponentUrls } from '../../extensions/product-tier-pricing/src/loader/components.js'
 
 /** One page: a shared object standing in for the window, and the test's own document for the script tags. */
 let root: Record<string, unknown>
@@ -87,24 +87,15 @@ describe('loadComponent', () => {
 })
 
 describe('what a widget needs', () => {
-  it('always needs the model and the paint, the flash sale and the time-based sale only when it has one', () => {
-    expect(listNeededComponents({ hasFlash: false, hasTimeSale: false })).toEqual(['model', 'paint'])
-    expect(listNeededComponents({ hasFlash: true, hasTimeSale: false })).toEqual(['model', 'paint', 'flash'])
-    expect(listNeededComponents({ hasFlash: false, hasTimeSale: true })).toEqual(['model', 'paint', 'timeSale'])
-    expect(listNeededComponents({ hasFlash: true, hasTimeSale: true })).toEqual(['model', 'paint', 'flash', 'timeSale'])
+  it('always needs the model and the paint, and the flash sale only when it has one', () => {
+    expect(listNeededComponents({ hasFlash: false })).toEqual(['model', 'paint'])
+    expect(listNeededComponents({ hasFlash: true })).toEqual(['model', 'paint', 'flash'])
   })
 
   it('reads the addresses the block wrote, and none when they are missing or broken', () => {
     expect(parseComponentUrls('{"model":"https://cdn.example/model.js"}')).toEqual({ model: 'https://cdn.example/model.js' })
     expect(parseComponentUrls(undefined)).toEqual({})
     expect(parseComponentUrls('not json')).toEqual({})
-  })
-
-  it('sees a time-based discount in the block data, and none in the empty object the block writes', () => {
-    expect(isTimeSaleData('{"startsAt":"2026-10-05T12:00:00.000Z"}')).toBe(true)
-    expect(isTimeSaleData('{}')).toBe(false)
-    expect(isTimeSaleData('')).toBe(false)
-    expect(isTimeSaleData(undefined)).toBe(false)
   })
 })
 

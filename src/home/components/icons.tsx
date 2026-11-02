@@ -28,14 +28,6 @@ export function LayersIcon({ className }: IconProps) {
   return <SvgIcon className={className} path="M11.99 18.54l-7.37-5.73L3 14.07l9 7 9-7-1.63-1.27-7.38 5.74zM12 16l7.36-5.73L21 9l-9-7-9 7 1.63 1.27L12 16zm0-11.47L17.74 9 12 13.47 6.26 9 12 4.53z" />
 }
 
-export function ScheduleIcon({ className }: IconProps) {
-  return <SvgIcon className={className} path="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z" />
-}
-
-export function FilterListIcon({ className }: IconProps) {
-  return <SvgIcon className={className} path="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z" />
-}
-
 export function SwapVertIcon({ className }: IconProps) {
   return <SvgIcon className={className} path="M16 17.01V10h-2v7.01h-3L15 21l4-3.99h-3zM9 3L5 6.99h3V14h2V6.99h3L9 3z" />
 }
@@ -60,12 +52,3 @@ export function LightbulbIcon({ className }: IconProps) {
   return <SvgIcon className={className} path="M9 21c0 .55.45 1 1 1h4c.55 0 1-.45 1-1v-1H9v1zm3-19C8.14 2 5 5.14 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.86-3.14-7-7-7zm2.85 11.1l-.85.6V16h-4v-2.3l-.85-.6A4.997 4.997 0 0 1 7 9c0-2.76 2.24-5 5-5s5 2.24 5 5c0 1.63-.8 3.16-2.15 4.1z" />
 }
 
-// The "stacked lines" mark of a tier-based discount and the clock of a
-// time-based one, as drawn in the table rows of the design.
-export function TierTypeIcon({ className }: IconProps) {
-  return <SvgIcon className={className} path="M4 6h16v2H4zm2 5h12v2H6zm3 5h6v2H9z" />
-}
-
-export function TimeTypeIcon({ className }: IconProps) {
-  return <SvgIcon className={className} path="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm4.2 14.2L11 13V7h1.5v5.2l4.5 2.7-.8 1.3z" />
-}

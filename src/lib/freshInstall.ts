@@ -1,8 +1,6 @@
 import { shopifyQuery } from '@/lib/shopify-client'
 import { getConfig } from '@/lib/config'
-import { getTimeDiscountsConfig } from '@/timeDiscounts/config'
 import { clearDiscountMetafields, findExistingIds } from '@/lib/product-tiers'
-import { clearTimeDiscountMetafields } from '@/timeDiscounts/metafieldSync'
 import { METAFIELD_NAMESPACE, METAFIELD_KEYS } from '@/lib/metafieldNames'
 
 /**
@@ -56,23 +54,19 @@ export async function ensureFreshInstall(): Promise<'fresh' | 'known'> {
 }
 
 async function purgeRetainedData(shopId: string): Promise<void> {
-  const [tier, time] = await Promise.all([getConfig(), getTimeDiscountsConfig()])
-  const listed = [
-    ...tier.discounts.flatMap((discount) => discount.members.map((member) => member.productId)),
-    ...time.discounts.flatMap((discount) => discount.items.map((item) => item.productId)),
-  ]
+  const tier = await getConfig()
+  const listed = tier.discounts.flatMap((discount) => discount.members.map((member) => member.productId))
   const existing = await findExistingIds([...new Set(listed)])
   const products = [...new Set(listed)].filter((id) => existing.has(id)).map((productId) => ({ productId }))
 
   await clearDiscountMetafields(products)
-  await clearTimeDiscountMetafields(products)
 
   const deleted = await shopifyQuery<{ metafieldsDelete: { userErrors: UserError[] } }>(
     `mutation deleteRetainedSettings($metafields: [MetafieldIdentifierInput!]!) {
       metafieldsDelete(metafields: $metafields) { userErrors { message } }
     }`,
     {
-      metafields: [METAFIELD_KEYS.tierConfig, METAFIELD_KEYS.timeConfig].map((key) => ({ ownerId: shopId, namespace: METAFIELD_NAMESPACE, key })),
+      metafields: [METAFIELD_KEYS.tierConfig].map((key) => ({ ownerId: shopId, namespace: METAFIELD_NAMESPACE, key })),
     },
   )
   if (deleted.metafieldsDelete.userErrors.length > 0) throw new Error(messages(deleted.metafieldsDelete.userErrors))

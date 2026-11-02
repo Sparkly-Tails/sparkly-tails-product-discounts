@@ -11,7 +11,7 @@ export function createMoneyFormatter(moneyFormat) {
 // every other listener is wired from initTierPricing against it.
 //
 // `loading` ({ components, loadSiblings }) holds the components the widget needs: `components` resolves
-// with { model, paint, flash?, timeSale? } (or null when one could not be loaded, which leaves the plain
+// with { model, paint, flash? } (or null when one could not be loaded, which leaves the plain
 // price the block rendered), `loadSiblings` loads the list's component the first time the list is opened.
 export function createRenderer(container, config, elements, loading) {
   const tierButtonsSignatureRef = { value: null }
@@ -70,11 +70,6 @@ export function createRenderer(container, config, elements, loading) {
     lastPricing = viewModel.progressState
       ? { combinedQty: viewModel.progressState.combinedQty, tierState: viewModel.progressState.tierState, formatMoney: formatMoneyFn }
       : null
-
-    const timeDiscountJson = container.dataset.timeDiscount
-    if (parts.timeSale && timeDiscountJson) {
-      parts.timeSale.updateTimeDiscountDisplay(container, timeDiscountJson, basePrice, variantStateRef.value, formatMoneyFn)
-    }
 
     paintList()
   }

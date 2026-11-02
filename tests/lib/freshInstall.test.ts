@@ -2,16 +2,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { ensureFreshInstall } from '@/lib/freshInstall'
 import { shopifyQuery } from '@/lib/shopify-client'
 import { getConfig } from '@/lib/config'
-import { getTimeDiscountsConfig } from '@/timeDiscounts/config'
 import { clearDiscountMetafields, findExistingIds } from '@/lib/product-tiers'
-import { clearTimeDiscountMetafields } from '@/timeDiscounts/metafieldSync'
 import { METAFIELD_NAMESPACE, METAFIELD_KEYS } from '@/lib/metafieldNames'
 
 vi.mock('@/lib/shopify-client', () => ({ shopifyQuery: vi.fn() }))
 vi.mock('@/lib/config', () => ({ getConfig: vi.fn() }))
-vi.mock('@/timeDiscounts/config', () => ({ getTimeDiscountsConfig: vi.fn() }))
 vi.mock('@/lib/product-tiers', () => ({ clearDiscountMetafields: vi.fn(), findExistingIds: vi.fn() }))
-vi.mock('@/timeDiscounts/metafieldSync', () => ({ clearTimeDiscountMetafields: vi.fn() }))
 
 const INSTALLATION = 'gid://shopify/AppInstallation/1'
 const SHOP_ID = 'gid://shopify/Shop/1'
@@ -50,13 +46,11 @@ describe('ensureFreshInstall', () => {
     marker = null
     deleteErrors = []
     setErrors = []
-    for (const fn of [shopifyQuery, getConfig, getTimeDiscountsConfig, clearDiscountMetafields, findExistingIds, clearTimeDiscountMetafields]) vi.mocked(fn as never as ReturnType<typeof vi.fn>).mockReset()
+    for (const fn of [shopifyQuery, getConfig, clearDiscountMetafields, findExistingIds]) vi.mocked(fn as never as ReturnType<typeof vi.fn>).mockReset()
     installFakeShopify()
     vi.mocked(getConfig).mockResolvedValue({ discounts: [] })
-    vi.mocked(getTimeDiscountsConfig).mockResolvedValue({ discounts: [] })
     vi.mocked(findExistingIds).mockImplementation(async (ids: string[]) => new Set(ids))
     vi.mocked(clearDiscountMetafields).mockImplementation(async () => { events.push('clear-tier-products') })
-    vi.mocked(clearTimeDiscountMetafields).mockImplementation(async () => { events.push('clear-time-products') })
   })
 
   it('does nothing when the installation already has its marker', async () => {
@@ -73,21 +67,16 @@ describe('ensureFreshInstall', () => {
     vi.mocked(getConfig).mockResolvedValue({
       discounts: [{ discountId: 'd1', name: 'A', title: 'A', status: 'live', pricingMode: 'percent', members: [{ productId: P1 }, { productId: P2, variantId: 'gid://shopify/ProductVariant/20' }], tiers: [] }],
     } as never)
-    vi.mocked(getTimeDiscountsConfig).mockResolvedValue({
-      discounts: [{ discountId: 't1', items: [{ productId: P2 }, { productId: P3 }] }],
-    } as never)
 
     expect(await ensureFreshInstall()).toBe('fresh')
 
     expect(events).toEqual([
       'read-marker',
       'clear-tier-products',
-      'clear-time-products',
-      `delete-shop-settings:shop/${METAFIELD_KEYS.tierConfig},shop/${METAFIELD_KEYS.timeConfig}`,
+      `delete-shop-settings:shop/${METAFIELD_KEYS.tierConfig}`,
       `write-marker:installation/${METAFIELD_NAMESPACE}/install_marker`,
     ])
-    expect(clearDiscountMetafields).toHaveBeenCalledWith([{ productId: P1 }, { productId: P2 }, { productId: P3 }])
-    expect(clearTimeDiscountMetafields).toHaveBeenCalledWith([{ productId: P1 }, { productId: P2 }, { productId: P3 }])
+    expect(clearDiscountMetafields).toHaveBeenCalledWith([{ productId: P1 }, { productId: P2 }])
   })
 
   it('skips products that no longer exist in the store', async () => {
@@ -97,7 +86,6 @@ describe('ensureFreshInstall', () => {
     await ensureFreshInstall()
 
     expect(clearDiscountMetafields).toHaveBeenCalledWith([{ productId: P1 }])
-    expect(clearTimeDiscountMetafields).toHaveBeenCalledWith([{ productId: P1 }])
   })
 
   it('on a brand-new store with nothing retained, only writes the marker (and removes nothing that exists)', async () => {

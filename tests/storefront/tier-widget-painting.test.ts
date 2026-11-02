@@ -2,151 +2,18 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { clearWidgetRegistry, readBuiltWidget, runWidgetScripts, WIDGET_COMPONENTS, WIDGET_CORE } from '../helpers/builtWidget'
 
-/**
- * Both storefront scripts are plain browser scripts that share ONE global
- * scope on the page, so they are evaluated together here the way the theme
- * loads them. The markup mirrors what tier-pricing.liquid and
- * time-based-discount.liquid render.
- */
+/** The tier widget's built scripts, run in the page the way the theme loads them, on markup like tier-pricing.liquid renders. */
 const built = readBuiltWidget()
 
 const NOW = new Date('2026-10-05T12:00:00.000Z')
-const iso = (offsetMs: number) => new Date(NOW.getTime() + offsetMs).toISOString()
 const V10 = 'gid://shopify/ProductVariant/10'
-const V11 = 'gid://shopify/ProductVariant/11'
-
-type Item = { variantId: string | null; pricingMode: 'percent' | 'fixed'; amount: number }
-
-async function mount(discount: Record<string, unknown>, opts: { selectedVariantId?: number; basePrice?: number; variantPrices?: Record<string, number> } = {}) {
-  const { selectedVariantId = 10, basePrice = 49.99, variantPrices = { '10': 4999, '11': 6000, '12': 3000 } } = opts
-  const timeDiscount = JSON.stringify({ startsAt: discount.startsAt, endsAt: discount.endsAt, items: discount.items, pricingMode: discount.pricingMode, amount: discount.amount, variantIds: discount.variantIds })
-  const countdownData = JSON.stringify({ ...discount, selectedVariantId, variantPrices })
-  document.body.innerHTML = `
-    <product-variants></product-variants>
-    <input name="quantity" value="1">
-    <div id="smooth-discounts-b1" class="smooth-discounts" data-smooth-discounts
-      data-discount='{"tiers":[]}' data-time-discount='${timeDiscount}'
-      data-product-id='"gid://shopify/Product/9"'
-      data-selected-variant-id="${selectedVariantId}"
-      data-base-price="${basePrice}" data-compare-at-price="0" data-money-format='"£{{amount}}"'>
-      <div class="smooth-discounts__price-row">
-        <span class="smooth-discounts__price smooth-discounts__original-price" data-tier-pricing-price data-original-price="true">£${basePrice}</span>
-        <span class="smooth-discounts__price smooth-discounts__discounted-price" data-discounted-price hidden>£${basePrice}</span>
-        <span class="smooth-discounts__each-label" data-tier-pricing-each-label>each</span>
-      </div>
-      <div class="smooth-discounts__card" data-tier-pricing-card hidden>
-        <div class="smooth-discounts__status-row"><span data-tier-pricing-status></span><span data-tier-pricing-aside></span></div>
-        <div class="smooth-discounts__bar-wrap"><div class="smooth-discounts__track"><div data-tier-pricing-fill></div></div><div data-tier-pricing-markers></div><span data-tier-pricing-dot></span></div>
-        <div data-tier-pricing-tiers></div>
-      </div>
-    </div>
-    <div id="sparkly-time-discount-b1" class="sparkly-time-discount" data-sparkly-time-discount data-discount='${countdownData}' hidden>
-      <p class="sparkly-time-discount__label" data-time-discount-label></p>
-      <div class="sparkly-time-discount__boxes">
-        <div class="sparkly-time-discount__box"><span class="sparkly-time-discount__value" data-time-discount-days>00</span><span class="sparkly-time-discount__unit">DAY</span></div>
-        <div class="sparkly-time-discount__box"><span class="sparkly-time-discount__value" data-time-discount-hours>00</span><span class="sparkly-time-discount__unit">HRS</span></div>
-        <div class="sparkly-time-discount__box"><span class="sparkly-time-discount__value" data-time-discount-minutes>00</span><span class="sparkly-time-discount__unit">MINS</span></div>
-        <div class="sparkly-time-discount__box"><span class="sparkly-time-discount__value" data-time-discount-seconds>00</span><span class="sparkly-time-discount__unit">SECS</span></div>
-      </div>
-    </div>`
-  // Same global scope for both, as on the storefront.
-  ;(0, eval)(built['time-based-discount.js'])
-  runWidgetScripts({ built })
-  await vi.advanceTimersByTimeAsync(0)
-}
-
-function view() {
-  const q = (selector: string) => document.querySelector(selector) as HTMLElement
-  const sale = q('[data-discounted-price]')
-  const regular = q('[data-original-price]')
-  return {
-    sale: sale.hidden ? null : sale.textContent!.trim(),
-    regularStruck: regular.getAttribute('data-strike') === 'true',
-    countdownVisible: !q('[data-sparkly-time-discount]').hidden,
-    countdownLabel: q('[data-time-discount-label]').textContent,
-  }
-}
-
-async function changeVariant(id: number, price: number) {
-  const el = document.querySelector('product-variants') as HTMLElement & { currentVariant?: unknown }
-  el.currentVariant = { id, price }
-  el.dispatchEvent(new Event('VARIANT_CHANGE'))
-  await vi.advanceTimersByTimeAsync(0)
-}
-
-const live = { title: 'Summer Sale', startsAt: iso(-3_600_000), endsAt: iso(86_400_000) }
-const fixed = (amount: number, variantId: string | null = null): Item => ({ variantId, pricingMode: 'fixed', amount })
-const percent = (amount: number, variantId: string | null = null): Item => ({ variantId, pricingMode: 'percent', amount })
-
-describe('time-based discount storefront scripts', () => {
-  beforeEach(() => { vi.useFakeTimers({ now: NOW }) })
-  afterEach(() => { vi.clearAllTimers(); vi.useRealTimers(); document.body.innerHTML = '' })
-
-  it('shows the sale price with the regular price struck, and the countdown, for a whole-product row', async () => {
-    await mount({ ...live, items: [fixed(22)] })
-    expect(view()).toEqual({ sale: '£22.00', regularStruck: true, countdownVisible: true, countdownLabel: 'Summer Sale ends in:' })
-  })
-
-  it('uses the selected variant from first paint, not only after a variant change', async () => {
-    await mount({ ...live, items: [fixed(22, V10), percent(50, V11)] }, { selectedVariantId: 10 })
-    expect(view().sale).toBe('£22.00')
-  })
-
-  it('gives each variant its own price as the customer switches variants', async () => {
-    await mount({ ...live, items: [fixed(22, V10), percent(50, V11)] }, { selectedVariantId: 10 })
-    await changeVariant(11, 6000)
-    expect(view().sale).toBe('£30.00')
-    await changeVariant(12, 3000) // no row for variant 12
-    expect(view()).toMatchObject({ sale: null, regularStruck: false, countdownVisible: false })
-    await changeVariant(10, 4999)
-    expect(view().sale).toBe('£22.00')
-  })
-
-  it('lets a variant row beat the whole-product row', async () => {
-    await mount({ ...live, items: [percent(10), fixed(5, V10)] }, { selectedVariantId: 10 })
-    expect(view().sale).toBe('£5.00')
-    await changeVariant(11, 6000)
-    expect(view().sale).toBe('£54.00')
-  })
-
-  it('shows nothing when the fixed price is not lower than the variant price', async () => {
-    await mount({ ...live, items: [fixed(60)] })
-    expect(view()).toMatchObject({ sale: null, regularStruck: false, countdownVisible: false })
-  })
-
-  it('resets the price and hides the countdown when the discount ends, with no refresh', async () => {
-    await mount({ ...live, endsAt: iso(3_000), items: [fixed(22)] })
-    expect(view().sale).toBe('£22.00')
-    await vi.advanceTimersByTimeAsync(4_000)
-    expect(view()).toMatchObject({ sale: null, regularStruck: false, countdownVisible: false })
-  })
-
-  it('shows the price and countdown when the discount starts after the page was opened', async () => {
-    await mount({ ...live, startsAt: iso(3_000), items: [fixed(22)] })
-    expect(view()).toMatchObject({ sale: null, countdownVisible: false })
-    await vi.advanceTimersByTimeAsync(4_000)
-    expect(view()).toMatchObject({ sale: '£22.00', regularStruck: true, countdownVisible: true })
-  })
-
-  it('still understands a metafield written before per-row pricing', async () => {
-    await mount({ ...live, pricingMode: 'fixed', amount: 22, variantIds: [V10] }, { selectedVariantId: 10 })
-    expect(view().sale).toBe('£22.00')
-    await changeVariant(12, 3000)
-    expect(view()).toMatchObject({ sale: null, countdownVisible: false })
-  })
-
-  it('shows the countdown alone when a metafield has no pricing data', async () => {
-    await mount({ ...live })
-    expect(view()).toMatchObject({ sale: null, regularStruck: false, countdownVisible: true })
-  })
-})
 
 describe('the built storefront scripts', () => {
   it('leave nothing on the page but the one object the components share', () => {
     clearWidgetRegistry()
     const before = new Set(Object.getOwnPropertyNames(window))
 
-    for (const name of [...WIDGET_COMPONENTS, WIDGET_CORE, 'time-based-discount.js']) (0, eval)(built[name])
+    for (const name of [...WIDGET_COMPONENTS, WIDGET_CORE]) (0, eval)(built[name])
 
     expect(Object.getOwnPropertyNames(window).filter((name) => !before.has(name))).toEqual(['SmoothDiscounts'])
   })
@@ -201,15 +68,14 @@ describe('tier widget painting (redesign)', () => {
     document.body.innerHTML = `
       <input name="quantity" value="${quantity}">
       <div id="smooth-discounts-t1" class="smooth-discounts smooth-discounts--card" data-smooth-discounts
-        data-discount='${JSON.stringify({ ...discount, ...extra, highDemand: undefined })}' data-time-discount="{}"
+        data-discount='${JSON.stringify({ ...discount, ...extra, highDemand: undefined })}'
         data-product-id='"gid://shopify/Product/9"' data-selected-variant-id="10"
         data-base-price="1.69" data-compare-at-price="0" data-money-format='"£{{amount}}"' data-high-demand="${extra.highDemand ? 'true' : 'false'}">
         <div class="smooth-discounts__body">
           <div class="smooth-discounts__summary">
             <div class="smooth-discounts__price-row">
               <div class="smooth-discounts__price-group">
-                <span data-tier-pricing-price data-original-price="true">£1.69</span>
-                <span data-discounted-price hidden>£1.69</span>
+                <span data-tier-pricing-price>£1.69</span>
                 <span data-tier-pricing-each-label>each</span>
                 <s data-tier-pricing-struck hidden></s>
               </div>

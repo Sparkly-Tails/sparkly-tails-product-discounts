@@ -1,18 +1,16 @@
-// Which discounts keep a product to themselves. A tier discount does while it is live; a time-based discount does
-// from the moment it exists until it ends. A draft, an offline discount and an expired one claim nothing.
+// Which discounts keep a product to themselves. A tier discount does while it is live; a draft or an offline
+// discount claims nothing.
 import type { Discount } from '@/lib/config'
-import type { TimeDiscount, computeTimeDiscountStatusLabel } from '@/timeDiscounts/config'
 
 /** One product (or one variant of it) held by one active discount. */
 export interface Claim {
-  kind: 'tier' | 'time'
   discountId: string
   discountName: string
   productId: string
   variantId?: string
 }
 
-type ClaimOwner = Pick<Claim, 'kind' | 'discountId' | 'discountName'>
+type ClaimOwner = Pick<Claim, 'discountId' | 'discountName'>
 type ClaimedProduct = { productId: string; variantId?: string }
 
 /** One claim for each product the owner holds. */
@@ -44,18 +42,7 @@ export const CLAIM_TOOLS = { buildClaims, isVariantMatch, isClaimOn }
 /** The members of every live tier discount. */
 export function listLiveTierClaims({ discounts, tools }: { discounts: Discount[]; tools: { buildClaims: typeof buildClaims } }): Claim[] {
   const claims: Claim[] = []
-  for (const discount of discounts) if (discount.status === 'live') claims.push(...tools.buildClaims({ owner: { kind: 'tier', discountId: discount.discountId, discountName: discount.name }, members: discount.members }))
-  return claims
-}
-
-/** The items of every time-based discount that is upcoming or running (not expired) in the shop's time zone, under the title its customers see. */
-export function listOpenTimeClaims({ discounts, timeZone, tools }: {
-  discounts: TimeDiscount[]
-  timeZone: string
-  tools: { buildClaims: typeof buildClaims; readStatus: typeof computeTimeDiscountStatusLabel }
-}): Claim[] {
-  const claims: Claim[] = []
-  for (const discount of discounts) if (tools.readStatus(discount.startsAt, discount.endsAt, timeZone) !== 'Expired') claims.push(...tools.buildClaims({ owner: { kind: 'time', discountId: discount.discountId, discountName: discount.title }, members: discount.items }))
+  for (const discount of discounts) if (discount.status === 'live') claims.push(...tools.buildClaims({ owner: { discountId: discount.discountId, discountName: discount.name }, members: discount.members }))
   return claims
 }
 
@@ -82,7 +69,5 @@ export function describePickRefusal({ claim, isVariant }: { claim: Claim; isVari
 /** What a save says when a member is held by another discount: which one, and what to do about it. */
 export function describeSaveRefusal({ claim, memberTitle }: { claim: Claim; memberTitle: string }): string {
   const name = claim.discountName
-  return claim.kind === 'tier'
-    ? `"${memberTitle}" is already in live discount "${name}". A product can only be in one live discount: take "${name}" offline or remove the product here.`
-    : `"${memberTitle}" is already in time-based discount "${name}", which is upcoming or running. A flash sale cannot share a product with it.`
+  return `"${memberTitle}" is already in live discount "${name}". A product can only be in one live discount: take "${name}" offline or remove the product here.`
 }

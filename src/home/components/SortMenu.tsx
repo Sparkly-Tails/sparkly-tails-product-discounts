@@ -7,7 +7,6 @@ const SORT_OPTIONS: { value: SortKey; label: string }[] = [
   { value: 'default', label: 'Default order' },
   { value: 'title-asc', label: 'Title A-Z' },
   { value: 'title-desc', label: 'Title Z-A' },
-  { value: 'type', label: 'Type' },
   { value: 'status', label: 'Status' },
 ]
 

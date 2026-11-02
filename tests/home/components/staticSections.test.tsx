@@ -27,25 +27,22 @@ describe('StatCards', () => {
 })
 
 describe('CreateCards', () => {
-  it('links the two create buttons to the existing new-discount pages', () => {
+  it('links the create button to the new-discount page', () => {
     render(<CreateCards />)
     expect(screen.getByRole('link', { name: /Create tier discount/ })).toHaveAttribute('href', '/discounts/new')
-    expect(screen.getByRole('link', { name: /Create tier time discount/ })).toHaveAttribute('href', '/time-discounts/new')
   })
 
-  it('leaves both "More information" links without a destination', () => {
+  it('leaves the "More information" link without a destination', () => {
     render(<CreateCards />)
     const links = screen.getAllByRole('link', { name: 'More information' })
-    expect(links).toHaveLength(2)
-    for (const link of links) expect(link).toHaveAttribute('href', '#')
+    expect(links).toHaveLength(1)
+    expect(links[0]).toHaveAttribute('href', '#')
   })
 
-  it('uses the two illustrations of the design as they are, at their real size', () => {
+  it('uses the illustration of the design as it is, at its real size', () => {
     render(<CreateCards />)
     const tier = screen.getByAltText('Tier-based discount concept illustration')
-    const time = screen.getByAltText('Time-based discount concept illustration')
     expect(tier).toHaveAttribute('src', '/assets/home/tier-illustration.jpg')
-    expect(time).toHaveAttribute('src', '/assets/home/time-illustration.jpg')
     expect(tier).toHaveAttribute('width', '512')
     expect(tier).toHaveAttribute('height', '286')
   })
@@ -53,8 +50,6 @@ describe('CreateCards', () => {
   it('has the copy of the design', () => {
     render(<CreateCards />)
     expect(screen.getByText('Reward bigger orders. Offer percentage off or a fixed price as customers add more units of a product.')).toBeInTheDocument()
-    expect(screen.getByText('Tier discount with time limit')).toBeInTheDocument()
-    expect(screen.getByText(/Run a tier discounts on a schedule/)).toBeInTheDocument()
   })
 })
 

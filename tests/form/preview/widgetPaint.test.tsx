@@ -28,7 +28,7 @@ function mountScript({ nowSeconds, quantity, tiers, flash, highDemand }: Scenari
   document.body.innerHTML = `
     <input name="quantity" value="${quantity}">
     <div id="script-widget" class="smooth-discounts${tiers.length ? ' smooth-discounts--card' : ''}" data-smooth-discounts
-      data-discount='${JSON.stringify({ title: 'T', tiers, siblings: [], ownVariantIds: null, ownVariantOptions: [], selfVariantId: 'gid://shopify/ProductVariant/10' })}' data-time-discount="{}"
+      data-discount='${JSON.stringify({ title: 'T', tiers, siblings: [], ownVariantIds: null, ownVariantOptions: [], selfVariantId: 'gid://shopify/ProductVariant/10' })}'
       data-product-id='"gid://shopify/Product/9"' data-selected-variant-id="10" data-base-price="28" data-compare-at-price="0" data-money-format='"\${{amount}}"'
       data-high-demand="${highDemand}" data-flash='${JSON.stringify(flash)}'>
       <div data-tier-pricing-flash data-variant="hidden" hidden>
@@ -40,8 +40,7 @@ function mountScript({ nowSeconds, quantity, tiers, flash, highDemand }: Scenari
           <div class="smooth-discounts__price-row">
             <div class="smooth-discounts__price-group">
               <span data-tier-pricing-now-label hidden></span>
-              <span data-tier-pricing-price data-original-price="true">$28.00</span>
-              <span data-discounted-price hidden>$28.00</span>
+              <span data-tier-pricing-price>$28.00</span>
               <span data-tier-pricing-each-label>each</span>
               <s data-tier-pricing-struck hidden></s>
             </div>

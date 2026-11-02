@@ -10,24 +10,24 @@ import {
 } from '@/home/tableQuery'
 import type { DiscountRow } from '@/home/discountRows'
 
-function makeRow({ id, kind, title, isActive }: { id: string; kind: 'tier' | 'time'; title: string; isActive: boolean }): DiscountRow {
-  return { key: kind + ':' + id, kind, title, subtitle: '', rules: '', isActive, href: '/x/' + id }
+function makeRow({ id, title, isActive }: { id: string; title: string; isActive: boolean }): DiscountRow {
+  return { key: 'tier:' + id, title, subtitle: '', rules: '', isActive, href: '/x/' + id }
 }
 
-// 12 rows in stored order: tier rows first, then time rows; mixed activity, case, accents and a repeated title.
+// 12 rows in stored order; mixed activity, case, accents and a repeated title.
 const ROWS: DiscountRow[] = [
-  makeRow({ id: 't1', kind: 'tier', title: 'Salmon Oil', isActive: true }),
-  makeRow({ id: 't2', kind: 'tier', title: 'joint support', isActive: true }),
-  makeRow({ id: 't3', kind: 'tier', title: 'Calming Chews', isActive: false }),
-  makeRow({ id: 't4', kind: 'tier', title: 'Café Bundle', isActive: true }),
-  makeRow({ id: 't5', kind: 'tier', title: 'Calming Chews', isActive: true }),
-  makeRow({ id: 't6', kind: 'tier', title: 'Zinc Tabs', isActive: false }),
-  makeRow({ id: 'm1', kind: 'time', title: 'Black Friday', isActive: false }),
-  makeRow({ id: 'm2', kind: 'time', title: 'Spring Sale', isActive: true }),
-  makeRow({ id: 'm3', kind: 'time', title: 'Summer Sale', isActive: false }),
-  makeRow({ id: 'm4', kind: 'time', title: 'Winter Sale', isActive: true }),
-  makeRow({ id: 'm5', kind: 'time', title: 'Easter', isActive: false }),
-  makeRow({ id: 'm6', kind: 'time', title: '100% & more', isActive: true }),
+  makeRow({ id: 't1', title: 'Salmon Oil', isActive: true }),
+  makeRow({ id: 't2', title: 'joint support', isActive: true }),
+  makeRow({ id: 't3', title: 'Calming Chews', isActive: false }),
+  makeRow({ id: 't4', title: 'Café Bundle', isActive: true }),
+  makeRow({ id: 't5', title: 'Calming Chews', isActive: true }),
+  makeRow({ id: 't6', title: 'Zinc Tabs', isActive: false }),
+  makeRow({ id: 'm1', title: 'Black Friday', isActive: false }),
+  makeRow({ id: 'm2', title: 'Spring Sale', isActive: true }),
+  makeRow({ id: 'm3', title: 'Summer Sale', isActive: false }),
+  makeRow({ id: 'm4', title: 'Winter Sale', isActive: true }),
+  makeRow({ id: 'm5', title: 'Easter', isActive: false }),
+  makeRow({ id: 'm6', title: '100% & more', isActive: true }),
 ]
 
 const run = (changes: Partial<TableQuery>) => applyTableQuery({ rows: ROWS, query: { ...DEFAULT_QUERY, ...changes }, tools: TABLE_TOOLS })
@@ -41,8 +41,8 @@ describe('parseTableQuery', () => {
   })
 
   it('reads valid values', () => {
-    expect(parse({ tab: 'inactive', type: 'time', search: '  Sale ', sort: 'title-desc', page: '3' })).toEqual({
-      tab: 'inactive', type: 'time', search: 'Sale', sort: 'title-desc', page: 3,
+    expect(parse({ tab: 'inactive', search: '  Sale ', sort: 'title-desc', page: '3' })).toEqual({
+      tab: 'inactive', search: 'Sale', sort: 'title-desc', page: 3,
     })
   })
 
@@ -56,8 +56,8 @@ describe('parseTableQuery', () => {
     expect(parse(raw).page).toBe(1)
   })
 
-  it('falls back to the default for unknown tab, type and sort values', () => {
-    expect(parse({ tab: 'bogus', type: 'x', sort: 'newest' })).toEqual(DEFAULT_QUERY)
+  it('falls back to the default for unknown tab and sort values', () => {
+    expect(parse({ tab: 'bogus', sort: 'newest' })).toEqual(DEFAULT_QUERY)
   })
 
   it('uses the last value of a repeated parameter', () => {
@@ -70,7 +70,7 @@ describe('applyTableQuery', () => {
   it('counts all discounts whatever the search, tab or filter is', () => {
     const counts = { all: 12, active: 7, inactive: 5 }
     expect(run({}).counts).toEqual(counts)
-    expect(run({ search: 'sale', tab: 'active', type: 'tier' }).counts).toEqual(counts)
+    expect(run({ search: 'sale', tab: 'active' }).counts).toEqual(counts)
   })
 
   it('keeps the stored order by default and shows only the first page', () => {
@@ -84,13 +84,8 @@ describe('applyTableQuery', () => {
     expect(run({ tab: 'inactive' }).matchCount).toBe(5)
   })
 
-  it('filters by type', () => {
-    expect(run({ type: 'time' }).matchCount).toBe(6)
-    expect(run({ type: 'tier' }).visibleRows.every((row) => row.kind === 'tier')).toBe(true)
-  })
-
-  it('combines tab, type and search', () => {
-    expect(keys(run({ tab: 'active', type: 'time', search: 'sale' }).visibleRows)).toEqual(['m2', 'm4'])
+  it('combines tab and search', () => {
+    expect(keys(run({ tab: 'active', search: 'sale' }).visibleRows)).toEqual(['m2', 'm4'])
   })
 
   it('matches the search ignoring case and surrounding spaces, and reads the text literally', () => {
@@ -104,10 +99,6 @@ describe('applyTableQuery', () => {
     expect(ascending.slice(0, 5)).toEqual(['m6', 'm1', 't4', 't3', 't5'])
     const descending = keys(run({ sort: 'title-desc', page: 1 }).visibleRows)
     expect(descending.slice(0, 3)).toEqual(['t6', 'm4', 'm3'])
-  })
-
-  it('sorts by type with tier-based discounts first, then by title', () => {
-    expect(keys(run({ sort: 'type', type: 'all' }).visibleRows).slice(0, 6)).toEqual(['t4', 't3', 't5', 't2', 't1', 't6'])
   })
 
   it('sorts by status with Active first, then by title', () => {
@@ -166,7 +157,7 @@ describe('buildTableHref', () => {
   })
 
   it('keeps the other values when only the page changes', () => {
-    expect(href({ page: 2 }, { ...DEFAULT_QUERY, tab: 'active', sort: 'type' })).toBe('/?tab=active&sort=type&page=2')
+    expect(href({ page: 2 }, { ...DEFAULT_QUERY, tab: 'active', sort: 'status' })).toBe('/?tab=active&sort=status&page=2')
   })
 
   it.each(['100% & more', 'a+b', "'quote'", 'café', 'two words'])('round-trips the search text %s through the address', (text) => {

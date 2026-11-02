@@ -5,14 +5,9 @@ import '@testing-library/jest-dom/vitest'
 import Home from '@/app/page'
 import { ensureTierDiscountSafely } from '@/lib/tierDiscount'
 import { getConfig } from '@/lib/config'
-import { getTimeDiscountsConfig } from '@/timeDiscounts/config'
 
 vi.mock('@/lib/tierDiscount', () => ({ ensureTierDiscountSafely: vi.fn() }))
 vi.mock('@/lib/config', () => ({ getConfig: vi.fn() }))
-vi.mock('@/timeDiscounts/config', () => ({
-  getTimeDiscountsConfig: vi.fn(async () => ({ discounts: [] })),
-  computeTimeDiscountStatusLabel: vi.fn(() => 'Active'),
-}))
 vi.mock('@/lib/shop', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/shop')>()), getShopTimezone: vi.fn(async () => 'UTC'), getShopCurrencyCode: vi.fn(async () => 'GBP') }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }))
 
@@ -27,8 +22,6 @@ describe('Home', () => {
     vi.mocked(ensureTierDiscountSafely).mockReset()
     vi.mocked(getConfig).mockReset()
     vi.mocked(getConfig).mockResolvedValue({ discounts: [] })
-    vi.mocked(getTimeDiscountsConfig).mockReset()
-    vi.mocked(getTimeDiscountsConfig).mockResolvedValue({ discounts: [] })
   })
 
   it('calls ensureTierDiscountSafely before it reads anything else', async () => {
@@ -47,15 +40,13 @@ describe('Home', () => {
     await expect(Home({ searchParams: noSearch })).resolves.toBeTruthy()
   })
 
-  it('shows the discounts of the shop in the table, tier discounts first', async () => {
+  it('shows the discounts of the shop in the table, in the order stored', async () => {
     vi.mocked(getConfig).mockResolvedValue({ discounts: [liveDiscount, draftDiscount] })
-    vi.mocked(getTimeDiscountsConfig).mockResolvedValue({ discounts: [{ discountId: 'm1', shopifyDiscountId: 'g', name: 'Spring', title: 'Spring Sale', startsAt: '2026-03-01T09:00', endsAt: '2026-03-31T23:59', kind: 'perProduct', items: [] }] })
 
     render(await Home({ searchParams: noSearch }))
 
     const rows = screen.getAllByTestId('discount-row')
-    expect(rows.map((row) => within(row).getAllByRole('link')[0].textContent)).toEqual(['Salmon Oil', 'Calming Chews', 'Spring Sale'])
-    expect(within(rows[2]).getByRole('link')).toHaveAttribute('href', '/time-discounts/m1')
+    expect(rows.map((row) => within(row).getAllByRole('link')[0].textContent)).toEqual(['Salmon Oil', 'Calming Chews'])
   })
 
   it('lists a flash sale with its window and counts it as inactive until the sale is Active', async () => {

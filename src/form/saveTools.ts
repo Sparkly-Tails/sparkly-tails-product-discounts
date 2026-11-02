@@ -8,7 +8,7 @@ import { getConfig, saveConfig } from '@/lib/config'
 import { clearDiscountMetafields, syncDiscountMetafields } from '@/lib/product-tiers'
 import { ensureTierDiscount } from '@/lib/tierDiscount'
 import {
-  applySave, buildConfig, buildSavePlan, checkAvailability, checkLiveAvailability, checkLiveClaims, checkWindow, chooseDiscount, listPlanRemovals, syncStorefront, type SaveTools,
+  applySave, buildConfig, buildSavePlan, checkAvailability, checkLiveClaims, checkWindow, chooseDiscount, listPlanRemovals, syncStorefront, type SaveTools,
 } from '@/form/saveFlow'
 import {
   buildDiscountFields, buildNewDiscount, describeSaveError, isWindowChanged, isWindowCheckNeeded, keepRecordId, listRemovedProducts, mergeDiscount,
@@ -43,7 +43,6 @@ export const SAVE_TOOLS: SaveTools = {
   describeSaveError,
   checkWindow,
   checkLiveClaims,
-  checkLiveAvailability,
   checkAvailability,
   chooseDiscount,
   buildSavePlan,
