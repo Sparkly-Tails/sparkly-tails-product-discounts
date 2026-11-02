@@ -1,5 +1,6 @@
 // The only place the homepage metrics tables are read and written. Every function gets the database as a parameter
 // (the Prisma client, or a fake with the same methods in a test).
+import type { BundleOrderRow } from '@/metrics/types'
 
 interface ShopDeleter {
   deleteMany: (args: { where: { shop: string } }) => Promise<unknown>
@@ -93,4 +94,67 @@ export async function saveLiveProducts({ db, shop, liveProducts }: { db: Setting
 /** Saves the shop's time zone, creating the shop's row if it has none. */
 export async function saveTimeZone({ db, shop, timeZone }: { db: SettingsUpsertDb; shop: string; timeZone: string }): Promise<void> {
   await db.metricsSync.upsert({ where: { shop }, create: { shop, timeZone }, update: { timeZone } })
+}
+
+interface BundleOrderData {
+  orderedAt: Date
+  currency: string
+  units: number
+  orderSubtotal: number
+  discountAmount: number
+  addedRevenue: number
+}
+
+interface BundleOrderUpsertDb {
+  bundleOrder: {
+    upsert: (args: {
+      where: { shop_orderId_discountId: { shop: string; orderId: string; discountId: string } }
+      create: BundleOrderData & { shop: string; orderId: string; discountId: string }
+      update: BundleOrderData
+    }) => Promise<unknown>
+  }
+}
+
+/** Saves the rows one by one, each on the shop, order and discount key: saving the same order again changes nothing but its values. */
+export async function saveBundleRows({ db, shop, rows }: { db: BundleOrderUpsertDb; shop: string; rows: BundleOrderRow[] }): Promise<void> {
+  for (const { discountId, orderId, orderedAt, ...values } of rows) {
+    const data = { ...values, orderedAt: new Date(orderedAt) }
+    await db.bundleOrder.upsert({ where: { shop_orderId_discountId: { shop, orderId, discountId } }, create: { shop, orderId, discountId, ...data }, update: data })
+  }
+}
+
+interface StoredBundleOrder {
+  discountId: string
+  orderId: string
+  orderedAt: Date
+  currency: string
+  units: number
+  orderSubtotal: unknown
+  discountAmount: unknown
+  addedRevenue: unknown
+}
+
+function convertStoredOrder(stored: StoredBundleOrder): BundleOrderRow {
+  return {
+    discountId: stored.discountId,
+    orderId: stored.orderId,
+    orderedAt: stored.orderedAt.toISOString(),
+    currency: stored.currency,
+    units: stored.units,
+    orderSubtotal: Number(stored.orderSubtotal),
+    discountAmount: Number(stored.discountAmount),
+    addedRevenue: Number(stored.addedRevenue),
+  }
+}
+
+/** The rows of the orders placed from `fromIso` up to, but not including, `toIso`. */
+export async function readOrderRows({ db, shop, fromIso, toIso }: { db: { bundleOrder: { findMany: (args: { where: { shop: string; orderedAt: { gte: Date; lt: Date } } }) => Promise<StoredBundleOrder[]> } }; shop: string; fromIso: string; toIso: string }): Promise<BundleOrderRow[]> {
+  const stored = await db.bundleOrder.findMany({ where: { shop, orderedAt: { gte: new Date(fromIso), lt: new Date(toIso) } } })
+  return stored.map(convertStoredOrder)
+}
+
+/** The visitors of every discount over the days from `fromDay` to `toDay`, both included (days are `YYYY-MM-DD`, which sort as text). */
+export async function readVisitorSum({ db, shop, fromDay, toDay }: { db: { discountDailyStat: { aggregate: (args: { where: { shop: string; day: { gte: string; lte: string } }; _sum: { visitors: true } }) => Promise<{ _sum: { visitors: number | null } }> } }; shop: string; fromDay: string; toDay: string }): Promise<number> {
+  const result = await db.discountDailyStat.aggregate({ where: { shop, day: { gte: fromDay, lte: toDay } }, _sum: { visitors: true } })
+  return result._sum.visitors ?? 0
 }
