@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { deleteShopMetrics, addVisit, purgeOldVisits, readSettings, saveLiveProducts, saveTimeZone, saveBundleRows, readOrderRows, readVisitorSum, readLiveProducts, STORE_TOOLS } from '@/metrics/store'
+import { deleteShopMetrics, addVisit, purgeOldVisits, readSettings, saveLiveProducts, saveTimeZone, saveBundleRows, readOrderRows, readVisitorSum, readLiveProducts, readSyncMarker, writeSyncMarker, STORE_TOOLS } from '@/metrics/store'
 
 const SHOP = 'demo.myshopify.com'
 const makeDb = () => ({
@@ -152,5 +152,20 @@ describe('readLiveProducts', () => {
 
   it('gives an empty map for a shop with no row', async () => {
     expect(await readLiveProducts({ db: { metricsSync: { findUnique: vi.fn(async () => null) } }, shop: SHOP, tools: STORE_TOOLS })).toEqual({})
+  })
+})
+
+describe('the sync marker', () => {
+  it('reads the two times as text, and null for both when the shop has no row', async () => {
+    const findUnique = vi.fn(async () => ({ lastOrderSyncAt: new Date('2026-11-02T10:00:00.000Z'), backfilledUntil: null }))
+    expect(await readSyncMarker({ db: { metricsSync: { findUnique } }, shop: SHOP })).toEqual({ lastOrderSyncAt: '2026-11-02T10:00:00.000Z', backfilledUntil: null })
+    expect(await readSyncMarker({ db: { metricsSync: { findUnique: vi.fn(async () => null) } }, shop: SHOP })).toEqual({ lastOrderSyncAt: null, backfilledUntil: null })
+  })
+
+  it('writes the two times as dates, creating the shop\'s row if it has none', async () => {
+    const upsert = vi.fn(async () => ({}))
+    await writeSyncMarker({ db: { metricsSync: { upsert } }, shop: SHOP, lastOrderSyncAt: '2026-11-02T12:00:00.000Z', backfilledUntil: '2026-08-04T12:00:00.000Z' })
+    const data = { lastOrderSyncAt: new Date('2026-11-02T12:00:00.000Z'), backfilledUntil: new Date('2026-08-04T12:00:00.000Z') }
+    expect(upsert).toHaveBeenCalledExactlyOnceWith({ where: { shop: SHOP }, create: { shop: SHOP, ...data }, update: data })
   })
 })

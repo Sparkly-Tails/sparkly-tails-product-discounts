@@ -164,3 +164,41 @@ export async function readLiveProducts({ db, shop, tools }: { db: { metricsSync:
   const row = await db.metricsSync.findUnique({ where: { shop }, select: { liveProducts: true } })
   return tools.keepTextValues({ value: row?.liveProducts, tools })
 }
+
+export interface SyncMarker {
+  lastOrderSyncAt: string | null
+  backfilledUntil: string | null
+}
+
+interface MarkerRow {
+  lastOrderSyncAt: Date | null
+  backfilledUntil: Date | null
+}
+
+const EMPTY_MARKER_ROW: MarkerRow = { lastOrderSyncAt: null, backfilledUntil: null }
+
+export function formatTime({ value }: { value: Date | null }): string | null {
+  return value ? value.toISOString() : null
+}
+
+export function buildMarker({ row, tools }: { row: MarkerRow; tools: Pick<MarkerTools, 'formatTime'> }): SyncMarker {
+  return { lastOrderSyncAt: tools.formatTime({ value: row.lastOrderSyncAt }), backfilledUntil: tools.formatTime({ value: row.backfilledUntil }) }
+}
+
+interface MarkerTools {
+  formatTime: typeof formatTime
+  buildMarker: typeof buildMarker
+}
+
+export const MARKER_TOOLS: MarkerTools = { formatTime, buildMarker }
+
+/** How far the orders have been read: the time of the last sync, and the oldest time the first read went back to. Both null for a shop with no row. */
+export async function readSyncMarker({ db, shop, tools = MARKER_TOOLS }: { db: { metricsSync: { findUnique: (args: { where: { shop: string }; select: { lastOrderSyncAt: true; backfilledUntil: true } }) => Promise<MarkerRow | null> } }; shop: string; tools?: MarkerTools }): Promise<SyncMarker> {
+  const row = await db.metricsSync.findUnique({ where: { shop }, select: { lastOrderSyncAt: true, backfilledUntil: true } })
+  return tools.buildMarker({ row: row ?? EMPTY_MARKER_ROW, tools })
+}
+
+export async function writeSyncMarker({ db, shop, lastOrderSyncAt, backfilledUntil }: { db: { metricsSync: { upsert: (args: { where: { shop: string }; create: { shop: string; lastOrderSyncAt: Date; backfilledUntil: Date }; update: { lastOrderSyncAt: Date; backfilledUntil: Date } }) => Promise<unknown> } }; shop: string; lastOrderSyncAt: string; backfilledUntil: string }): Promise<void> {
+  const data = { lastOrderSyncAt: new Date(lastOrderSyncAt), backfilledUntil: new Date(backfilledUntil) }
+  await db.metricsSync.upsert({ where: { shop }, create: { shop, ...data }, update: data })
+}
