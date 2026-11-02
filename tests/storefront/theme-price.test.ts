@@ -60,7 +60,7 @@ async function mountProductPage({ quantity, priceHtml = dawnPriceHtml(), wrapper
         ${widgetHtml}
       </div>
     </${wrapper}>
-    <div id="far"><div class="x2"><span id="far-price">£1.69</span></div></div>`
+    <div id="far"><div class="x2"><span id="far-price">£1.69</span><span id="far-sale">Sale</span></div></div>`
   runWidgetScripts({ built })
   await vi.advanceTimersByTimeAsync(0)
 }
@@ -162,6 +162,7 @@ const dawnSalePriceHtml = () => `
     <div class="price price--large price--on-sale"><div class="price__container">
       <div class="price__regular"><span class="visually-hidden">Regular price</span><span class="price-item price-item--regular">£1.69</span></div>
       <div class="price__sale"><span><s class="price-item price-item--regular">£2.10</s></span><span class="price-item price-item--sale">£1.69</span></div>
+      <div class="price__badges"><span class="badge price__badge-sale" id="sale-badge">Sale</span><span class="badge price__badge-sold-out" id="sold-badge">Sold out</span></div>
     </div></div>
   </div>`
 
@@ -183,6 +184,47 @@ describe('a theme that prints the price twice, one of them hidden', () => {
     await setQuantity(1)
     expect(painted()).toHaveLength(0)
     expect(document.querySelector('.price-item--sale')!.innerHTML).toBe('£1.69')
+  })
+})
+
+describe('the theme\'s "Sale" badge while the tier price shows', () => {
+  const badge = () => document.getElementById('sale-badge') as HTMLElement
+
+  it('is hidden while a tier applies, and no other badge is', async () => {
+    await mountProductPage({ quantity: 10, priceHtml: dawnSalePriceHtml() })
+    expect(badge().style.display).toBe('none')
+    expect((document.getElementById('sold-badge') as HTMLElement).style.display).toBe('')
+  })
+
+  it('comes back as the theme drew it below the first tier, with its own inline display kept', async () => {
+    await mountProductPage({ quantity: 10, priceHtml: dawnSalePriceHtml().replace('id="sale-badge"', 'id="sale-badge" style="display:inline-flex"') })
+    expect(badge().style.display).toBe('none')
+    await setQuantity(1)
+    expect(badge().style.display).toBe('inline-flex')
+    expect(badge().hasAttribute('data-smooth-discounts-hid')).toBe(false)
+  })
+
+  it('is found by its word in any letter case, not by a class', async () => {
+    await mountProductPage({ quantity: 10, priceHtml: dawnSalePriceHtml().replace('class="badge price__badge-sale"', 'class="x9"').replace('>Sale<', '> SALE <') })
+    expect(badge().style.display).toBe('none')
+  })
+
+  it('is left alone when it is away from the price, and when it is not the word alone', async () => {
+    await mountProductPage({ quantity: 10, priceHtml: dawnSalePriceHtml().replace('>Sold out<', '>Sale ends soon<') })
+    expect((document.getElementById('far-sale') as HTMLElement).style.display).toBe('')
+    expect((document.getElementById('sold-badge') as HTMLElement).style.display).toBe('')
+  })
+
+  it('is hidden again after the theme redraws its price, once', async () => {
+    await mountProductPage({ quantity: 10, priceHtml: dawnSalePriceHtml() })
+    document.getElementById('price-main')!.innerHTML = '<div class="price"><div class="price__container"><span class="price-item">£1.69</span><span class="badge" id="sale-badge">Sale</span></div></div>'
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(badge().style.display).toBe('none')
+  })
+
+  it('stays when there is no price to change', async () => {
+    await mountProductPage({ quantity: 10, priceHtml: '<span class="badge" id="sale-badge">Sale</span>' })
+    expect(badge().style.display).toBe('')
   })
 })
 

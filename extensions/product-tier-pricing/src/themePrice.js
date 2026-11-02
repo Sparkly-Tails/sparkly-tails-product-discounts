@@ -5,6 +5,9 @@
 // the theme shows stays the theme's own. Below the first tier, or when no price is found, the theme's price is left as it was.
 // Every step comes in through `tools`, so each one can be tried alone.
 
+import { PAGE_ELEMENT_TOOLS } from './pageElements.js'
+import { SALE_BADGE_TOOLS } from './themeSaleBadge.js'
+
 const WAS_ATTRIBUTE = 'data-smooth-discounts-was'
 const NOW_ATTRIBUTE = 'data-smooth-discounts-now'
 const CURRENCY_CODE = /^[A-Z]{3}$/
@@ -19,25 +22,10 @@ export function isAmountText({ text, plainPrice }) {
   return rest === '' || CURRENCY_CODE.test(rest)
 }
 
-/** The element and every ancestor above it, nearest first. */
-export function listAncestors({ element }) {
-  const ancestors = []
-  for (let node = element; node; node = node.parentElement) ancestors.push(node)
-  return ancestors
-}
-
-export function isBelowBody(element) {
-  return element !== element.ownerDocument.body && element.ownerDocument.body.contains(element)
-}
-
 /** The highest ancestor looked in: a few levels above the widget, never the page's body (the widget's own parent at least). */
 export function findSearchRoot({ rootEl, tools }) {
   const levels = tools.listAncestors({ element: rootEl }).slice(1, MAX_LEVELS + 1).filter(tools.isBelowBody)
   return levels[levels.length - 1] || rootEl.parentElement
-}
-
-export function hasDescendant(element, ancestor) {
-  return ancestor.contains(element)
 }
 
 /** How many levels up from the widget until an ancestor holds the element: the smaller, the nearer. */
@@ -63,16 +51,6 @@ export function isAmountElement({ plainPrice, tools }, element) {
 
 export function isPriceMatch({ plainPrice, tools }, element) {
   return tools.isMarkedPrice(element) || tools.isAmountElement({ plainPrice, tools }, element)
-}
-
-/** The element is drawn: neither it nor an ancestor has `display: none`, and it is not `visibility: hidden`. A theme can print the same price twice and hide one copy. */
-export function isDisplayed(element) {
-  const style = element.ownerDocument.defaultView.getComputedStyle(element)
-  return style.display !== 'none' && style.visibility !== 'hidden'
-}
-
-export function isVisible({ element, tools }) {
-  return tools.listAncestors({ element }).every(tools.isDisplayed)
 }
 
 /** A price outside the widget that the page shows: the one this script changed, or an element with nothing in it but the plain price. The cheap checks come first. */
@@ -129,20 +107,22 @@ export function paintUnitPrice({ priceEl, plainPrice, discountedPrice, tools }) 
   tools.writeUnitPrice({ priceEl, originalText, nowText })
 }
 
-export function paintFoundPrice({ priceEl, viewModel, tools }) {
+export function paintFoundPrice({ priceEl, rootEl, viewModel, tools }) {
   if (!priceEl) return
   if (viewModel.discountedPrice) tools.paintUnitPrice({ priceEl, plainPrice: viewModel.plainPrice, discountedPrice: viewModel.discountedPrice, tools })
   else tools.restorePrice({ priceEl, tools })
+  tools.paintSaleBadge({ priceEl, rootEl, isDiscounted: Boolean(viewModel.discountedPrice), tools })
 }
 
 export function paintThemePrice({ elements, viewModel, tools }) {
   if (!viewModel.plainPrice) return
   const priceEl = tools.findThemePrice({ rootEl: elements.rootEl, plainPrice: viewModel.plainPrice, tools })
-  tools.paintFoundPrice({ priceEl, viewModel, tools })
+  tools.paintFoundPrice({ priceEl, rootEl: elements.rootEl, viewModel, tools })
 }
 
 export const THEME_PRICE_TOOLS = {
-  isAmountText, listAncestors, isBelowBody, findSearchRoot, hasDescendant, measureDistance, buildDistanceEntry, compareSteps,
-  isMarkedPrice, isAmountElement, isPriceMatch, isDisplayed, isVisible, isPriceElement, findThemePrice, isPaintedPrice, removeMarks, restorePrice, readOriginalText,
+  ...PAGE_ELEMENT_TOOLS, ...SALE_BADGE_TOOLS,
+  isAmountText, findSearchRoot, measureDistance, buildDistanceEntry, compareSteps,
+  isMarkedPrice, isAmountElement, isPriceMatch, isPriceElement, findThemePrice, isPaintedPrice, removeMarks, restorePrice, readOriginalText,
   isCurrentPaint, writeUnitPrice, paintUnitPrice, paintFoundPrice,
 }

@@ -49,7 +49,7 @@ export interface WidgetViewModel {
   plainPrice: string
   progressState: { combinedQty: number } | null
   chips: WidgetChip[]
-  tag: { kind: 'tier' | 'high-demand'; text: string } | null
+  tag: { kind: 'high-demand'; text: string } | null
   offerState: string | null
   dot: WidgetDot | null
   promoLine: string
