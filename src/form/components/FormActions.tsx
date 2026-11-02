@@ -1,29 +1,23 @@
 import DeleteButton from '@/form/components/DeleteButton'
-import DiscardButton from '@/form/components/DiscardButton'
 import FormFooter from '@/form/components/FormFooter'
 import SaveMessage from '@/form/components/SaveMessage'
 import StatusButton from '@/form/components/StatusButton'
-import SubmitButton from '@/form/components/SubmitButton'
 import type { SaveState } from '@/form/components/TierDiscountForm'
 
-// The bottom of the form: why the last save did not go through, what is unsaved, and the buttons
-// (Delete, far left, only when the discount can be deleted; Discard; Go live or Take offline; Save).
-export default function FormActions({ mode, status, isDirty, canSave, saveState, deleteAction, onDiscard }: {
-  mode: 'create' | 'edit'
+// The bottom of the form: why the last save did not go through, and the buttons (Delete, far left, only when the
+// discount can be deleted; Go live or Take offline). Save and Discard are in Shopify's save bar (SaveBar), which
+// also tells that there are unsaved changes.
+export default function FormActions({ status, canSave, saveState, deleteAction }: {
   status: 'draft' | 'live'
-  isDirty: boolean
   canSave: boolean
   saveState: SaveState
   deleteAction?: () => Promise<void>
-  onDiscard: () => void
 }) {
   return (
     <>
       <SaveMessage state={saveState} />
-      <FormFooter statusText={isDirty ? 'Unsaved changes on this discount tier' : ''} leading={deleteAction ? <DeleteButton deleteAction={deleteAction} /> : null}>
-        <DiscardButton mode={mode} onDiscard={onDiscard} />
+      <FormFooter leading={deleteAction ? <DeleteButton deleteAction={deleteAction} /> : null}>
         <StatusButton status={status} isDisabled={!canSave} />
-        <SubmitButton label="Save" tone="primary" isDisabled={!canSave} />
       </FormFooter>
     </>
   )

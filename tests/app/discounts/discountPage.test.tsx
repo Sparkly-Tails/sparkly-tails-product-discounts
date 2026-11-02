@@ -20,7 +20,7 @@ vi.mock('@/actions/memberPickerActions', () => ({
   searchProductsAction: vi.fn(async () => []), listProductsAction: vi.fn(async () => []),
   getProductVariantsAction: vi.fn(async () => []), validateMemberAction: vi.fn(async () => ({ ok: true })),
 }))
-vi.mock('next/navigation', () => ({ notFound: vi.fn(() => { throw new Error('NEXT_NOT_FOUND') }) }))
+vi.mock('next/navigation', () => ({ notFound: vi.fn(() => { throw new Error('NEXT_NOT_FOUND') }), useRouter: () => ({ push: vi.fn() }) }))
 
 import DiscountPage from '../../../src/app/discounts/[discountId]/page'
 import { saveDiscount } from '@/actions/saveDiscount'

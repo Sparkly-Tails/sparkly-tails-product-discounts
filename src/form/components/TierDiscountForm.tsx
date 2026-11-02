@@ -1,11 +1,13 @@
 'use client'
 
-import { Fragment, useActionState, useState } from 'react'
+import { Fragment, useActionState, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import DetailsCard from '@/form/components/DetailsCard'
 import DesignCard from '@/form/components/DesignCard'
 import FlashCard from '@/form/components/FlashCard'
 import FormActions from '@/form/components/FormActions'
 import FormShell from '@/form/components/FormShell'
+import SaveBar from '@/form/components/SaveBar'
 import ProductsCard from '@/form/components/ProductsCard'
 import TiersCard, { type TiersInitial } from '@/form/components/TiersCard'
 import WidgetPreview from '@/form/preview/components/WidgetPreview'
@@ -42,49 +44,61 @@ export default function TierDiscountForm({
 }) {
   const [values, setValues] = useState(initial)
   const [discardCount, setDiscardCount] = useState(0)
-  const [saveState, formAction] = useActionState(saveAction, null)
+  const [saveState, formAction, isSaving] = useActionState(saveAction, null)
   const isDirty = isFormDirty({ initial, current: values, tools: { buildComparable } })
+  const formRef = useRef<HTMLFormElement>(null)
+  const router = useRouter()
+  const canSave = canSaveValues({ values })
 
   function resetValues() {
     setValues(initial)
     setDiscardCount((count) => count + 1)
   }
 
+  // Creating: nothing is saved yet, so Discard leaves for the discounts. Editing: Discard takes back what was changed.
+  function cancelChanges() {
+    if (mode === 'create') router.push('/')
+    else resetValues()
+  }
+
   return (
-    <form action={formAction}>
-      {excludeDiscountId ? <input type="hidden" name="discountId" value={excludeDiscountId} /> : null}
-      <FormShell
-        breadcrumbLabel={breadcrumbLabel}
-        heading={heading}
-        badge={badge}
-        preview={
-          <WidgetPreview
-            products={buildPreviewProducts({ members: values.members })}
-            tiers={values.tiers}
-            flash={buildPreviewFlash({ flash: values.flash })}
-            highDemand={values.flash.highDemand}
-            style={values.style}
-            timeZone={shopTimezone}
-            currencyCode={currencyCode}
-            initialNowSeconds={initialNowSeconds}
-          />
-        }
-        footer={<FormActions mode={mode} status={status} isDirty={isDirty} canSave={canSaveValues({ values })} saveState={saveState} deleteAction={deleteAction} onDiscard={resetValues} />}
-      >
-        <Fragment key={discardCount}>
-          <DetailsCard initialName={initial.name} onNameChange={(name) => setValues((current) => ({ ...current, name }))} />
-          <ProductsCard initialMembers={initial.members} currencyCode={currencyCode} excludeDiscountId={excludeDiscountId} onMembersChange={(members) => setValues((current) => ({ ...current, members }))} />
-          <TiersCard
-            allowPriceBasedModes={pricesUniform(values.members.map((member) => member.price))}
-            basePrice={pickBasePrice({ members: values.members })}
-            currencyCode={currencyCode}
-            initial={initialTiers}
-            onTiersChange={({ mode: pricingMode, tiers }) => setValues((current) => ({ ...current, pricingMode, tiers }))}
-          />
-          <FlashCard shopTimezone={shopTimezone} nowLocal={nowLocal} initial={initial.flash} onChange={(flashValues) => setValues((current) => ({ ...current, flash: flashValues }))} />
-          <DesignCard style={values.style} onChange={(style) => setValues((current) => ({ ...current, style }))} />
-        </Fragment>
-      </FormShell>
-    </form>
+    <>
+      <SaveBar id="discount-save-bar" isVisible={isDirty} canSave={canSave && !isSaving} onSave={() => formRef.current?.requestSubmit()} onDiscard={cancelChanges} />
+      <form ref={formRef} action={formAction}>
+        {excludeDiscountId ? <input type="hidden" name="discountId" value={excludeDiscountId} /> : null}
+        <FormShell
+          breadcrumbLabel={breadcrumbLabel}
+          heading={heading}
+          badge={badge}
+          preview={
+            <WidgetPreview
+              products={buildPreviewProducts({ members: values.members })}
+              tiers={values.tiers}
+              flash={buildPreviewFlash({ flash: values.flash })}
+              highDemand={values.flash.highDemand}
+              style={values.style}
+              timeZone={shopTimezone}
+              currencyCode={currencyCode}
+              initialNowSeconds={initialNowSeconds}
+            />
+          }
+          footer={<FormActions status={status} canSave={canSave} saveState={saveState} deleteAction={deleteAction} />}
+        >
+          <Fragment key={discardCount}>
+            <DetailsCard initialName={initial.name} onNameChange={(name) => setValues((current) => ({ ...current, name }))} />
+            <ProductsCard initialMembers={initial.members} currencyCode={currencyCode} excludeDiscountId={excludeDiscountId} onMembersChange={(members) => setValues((current) => ({ ...current, members }))} />
+            <TiersCard
+              allowPriceBasedModes={pricesUniform(values.members.map((member) => member.price))}
+              basePrice={pickBasePrice({ members: values.members })}
+              currencyCode={currencyCode}
+              initial={initialTiers}
+              onTiersChange={({ mode: pricingMode, tiers }) => setValues((current) => ({ ...current, pricingMode, tiers }))}
+            />
+            <FlashCard shopTimezone={shopTimezone} nowLocal={nowLocal} initial={initial.flash} onChange={(flashValues) => setValues((current) => ({ ...current, flash: flashValues }))} />
+            <DesignCard style={values.style} onChange={(style) => setValues((current) => ({ ...current, style }))} />
+          </Fragment>
+        </FormShell>
+      </form>
+    </>
   )
 }

@@ -57,19 +57,16 @@ describe('FormShell', () => {
 })
 
 describe('FormFooter', () => {
-  it('shows the status text with a decorative check icon on the left', () => {
-    const { container } = render(<FormFooter statusText="Unsaved changes on this discount tier"><button type="button">Save</button></FormFooter>)
-    expect(screen.getByText('Unsaved changes on this discount tier')).toBeInTheDocument()
-    expect(container.querySelector('svg')).toHaveAttribute('aria-hidden', 'true')
+  it('shows its children on the right and the leading button on the left', () => {
+    render(<FormFooter leading={<button type="button">Delete</button>}><button type="button">Go live</button></FormFooter>)
+    const leading = screen.getByRole('button', { name: 'Delete' })
+    const child = screen.getByRole('button', { name: 'Go live' })
+    expect(leading.compareDocumentPosition(child) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
-  it('shows its children on the right', () => {
-    render(<FormFooter statusText="x"><button type="button">Save</button></FormFooter>)
-    expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument()
-  })
-
-  it('shows no status text when it is empty', () => {
-    const { container } = render(<FormFooter statusText=""><button type="button">Save</button></FormFooter>)
+  it('has no status line and no icon: Shopify\'s save bar says there are unsaved changes', () => {
+    const { container } = render(<FormFooter><button type="button">Go live</button></FormFooter>)
     expect(container.querySelector('svg')).toBeNull()
+    expect(container.textContent).toBe('Go live')
   })
 })
