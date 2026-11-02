@@ -11,6 +11,19 @@ import { getRequestShop } from '@/lib/requestShop'
 import { headers } from 'next/headers'
 import { getRequestHost, REQUEST_HOST_TOOLS } from '@/lib/requestHost'
 import { ensureMetricsPixelSafely, buildCollectUrl, readAppOrigin, PIXEL_TOOLS } from '@/metrics/ensurePixel'
+import { getDb } from '@/lib/db'
+import { readStoredScopes } from '@/lib/sessions'
+import { formatMoneyAmount } from '@/home/formatMoney'
+import { loadMetrics } from '@/home/loadMetrics'
+import { buildMetricCards, buildFailedCards } from '@/home/buildMetricCards'
+import { addDays, pickShopDay } from '@/home/rangeDays'
+import { sumTotals } from '@/metrics/sumTotals'
+import { syncOrders, SYNC_TOOLS } from '@/metrics/syncOrders'
+import { queryOrders } from '@/metrics/queryOrders'
+import { readGraphqlOrder, READ_ORDER_TOOLS } from '@/metrics/readOrder'
+import { listBundleRows, LIST_ROWS_TOOLS } from '@/metrics/listBundleRows'
+import { refreshLiveProductsSafely, REFRESH_TOOLS } from '@/metrics/refreshSettings'
+import { readLiveProducts, readOrderRows, readSyncMarker, readVisitorSum, saveBundleRows, saveLiveProducts, saveTimeZone, writeSyncMarker, STORE_TOOLS } from '@/metrics/store'
 import packageJson from '../../package.json'
 
 export default async function Home({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
@@ -33,8 +46,59 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
       computeLocalFlashStatus({ startsAt, endsAt, timeZone: timezone, nowMs: new Date().getTime(), convertToUtc: zonedTimeToUtc, tools: DISCOUNT_STATE_TOOLS }),
     tools: ROW_TOOLS,
   })
+  // The four metric cards for the last 30 days; the page loads even when the numbers cannot be read.
+  let cards = buildFailedCards()
+  try {
+      const database = getDb()
+      const shop = await getRequestShop()
+      const timeZone = await getShopTimezone()
+      const currencyCode = await getShopCurrencyCode()
+      const nowIso = new Date().toISOString()
+      const today = pickShopDay({ nowIso, timeZone })
+      const { totals, hasPermission } = await loadMetrics({
+        shop,
+        nowIso,
+        fromDay: addDays({ day: today, count: -29 }),
+        toDay: today,
+        timeZone,
+        readScopes: ({ shop: shopName }) => readStoredScopes(shopName),
+        syncOrders: ({ shop: shopName, nowIso: now }) =>
+          syncOrders({
+            shop: shopName,
+            nowIso: now,
+            tools: {
+              readMarker: ({ shop: name }) => readSyncMarker({ db: database, shop: name }),
+              writeMarker: ({ shop: name, lastOrderSyncAt, backfilledUntil }) => writeSyncMarker({ db: database, shop: name, lastOrderSyncAt, backfilledUntil }),
+              queryOrders: ({ shop: name, sinceIso, afterCursor }) => queryOrders({ shop: name, sinceIso, afterCursor, queryShop: ({ query, variables, shop: target }) => shopifyQuery(query, variables, target) }),
+              readLiveProducts: ({ shop: name }) => readLiveProducts({ db: database, shop: name, tools: STORE_TOOLS }),
+              saveRows: ({ shop: name, rows }) => saveBundleRows({ db: database, shop: name, rows }),
+              readOrder: ({ node }) => readGraphqlOrder({ node, tools: READ_ORDER_TOOLS }),
+              listRows: ({ order, productDiscounts }) => listBundleRows({ order, productDiscounts, tools: LIST_ROWS_TOOLS }),
+              ...SYNC_TOOLS,
+            },
+          }),
+        refresh: async ({ shop: shopName, timeZone: zone }) => {
+          await saveTimeZone({ db: database, shop: shopName, timeZone: zone })
+          await refreshLiveProductsSafely({
+            discounts: (await getConfig()).discounts,
+            getShop: async () => shopName,
+            saveLiveProducts: ({ shop: name, liveProducts }) => saveLiveProducts({ db: database, shop: name, liveProducts }),
+            report: (message) => console.log(message),
+            tools: REFRESH_TOOLS,
+          })
+        },
+        readRows: ({ shop: shopName, fromIso, toIso }) => readOrderRows({ db: database, shop: shopName, fromIso, toIso }),
+        readVisitors: ({ shop: shopName, fromDay, toDay }) => readVisitorSum({ db: database, shop: shopName, fromDay, toDay }),
+        sumTotals,
+        convertToUtc: zonedTimeToUtc,
+        addDays,
+      })
+      cards = buildMetricCards({ totals, currencyCode, hasPermission, formatMoney: formatMoneyAmount })
+  } catch (error) {
+    console.log(`Could not load the homepage metrics: ${error instanceof Error ? error.message : 'unknown error'}`)
+  }
   const query = parseTableQuery({ raw: await searchParams, tools: TABLE_TOOLS })
   const view = applyTableQuery({ rows, query, tools: TABLE_TOOLS })
 
-  return <HomeView view={view} query={query} version={packageJson.version} />
+  return <HomeView view={view} query={query} version={packageJson.version} cards={cards} />
 }

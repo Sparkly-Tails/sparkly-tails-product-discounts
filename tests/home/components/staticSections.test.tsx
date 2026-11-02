@@ -3,26 +3,31 @@ import { describe, it, expect, afterEach } from 'vitest'
 import { render, screen, cleanup, within } from '@testing-library/react'
 import '@testing-library/jest-dom/vitest'
 import StatCards from '@/home/components/StatCards'
+import type { MetricCard } from '@/home/buildMetricCards'
 import CreateCards from '@/home/components/CreateCards'
 import TipBanner from '@/home/components/TipBanner'
 
 afterEach(cleanup)
 
+const CARDS: MetricCard[] = [
+  { label: 'Visitors', value: '16', hint: 'Estimate of visitors' },
+  { label: 'Bundle orders', value: '3', hint: 'Orders hint' },
+  { label: 'AOV', value: '£21.50', hint: 'AOV hint' },
+  { label: 'Added revenue', value: '£4.00', hint: 'Added hint' },
+]
+
 describe('StatCards', () => {
-  it('shows the four labels with the sample values of the design, in order, and the "Last 30d" button', () => {
-    render(<StatCards />)
+  it('shows the label and value of each card it is given, in order, and the "Last 30d" button', () => {
+    render(<StatCards cards={CARDS} />)
     expect(screen.getByRole('button', { name: /Last 30d/ })).toBeInTheDocument()
     const cards = screen.getAllByTestId('stat-card')
     const shown = cards.map((card) => [within(card).getByTestId('stat-label').textContent, within(card).getByTestId('stat-value').textContent])
-    expect(shown).toEqual([['Visitors', '16'], ['Bundle orders', '0'], ['AOV', '0.00'], ['Added revenue', '0.00']])
+    expect(shown).toEqual([['Visitors', '16'], ['Bundle orders', '3'], ['AOV', '£21.50'], ['Added revenue', '£4.00']])
   })
 
-  it('gives each info icon the hint text of the design', () => {
-    render(<StatCards />)
-    expect(screen.getByTitle('Total visitors in period')).toBeInTheDocument()
-    expect(screen.getByTitle('Total bundle orders placed')).toBeInTheDocument()
-    expect(screen.getByTitle('Average order value with discount')).toBeInTheDocument()
-    expect(screen.getByTitle('Incremental revenue generated')).toBeInTheDocument()
+  it('gives each info icon the hint of its card', () => {
+    render(<StatCards cards={CARDS} />)
+    for (const card of CARDS) expect(screen.getByTitle(card.hint)).toBeInTheDocument()
   })
 })
 

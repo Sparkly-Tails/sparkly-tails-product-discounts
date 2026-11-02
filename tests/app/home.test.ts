@@ -7,12 +7,16 @@ import { ensureTierDiscountSafely } from '@/lib/tierDiscount'
 import { getConfig } from '@/lib/config'
 import { ensureMetricsPixelSafely } from '@/metrics/ensurePixel'
 import { getRequestHost } from '@/lib/requestHost'
+import { loadMetrics } from '@/home/loadMetrics'
 
 vi.mock('@/lib/tierDiscount', () => ({ ensureTierDiscountSafely: vi.fn() }))
 vi.mock('@/lib/config', () => ({ getConfig: vi.fn() }))
 vi.mock('@/lib/requestHost', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/requestHost')>()), getRequestHost: vi.fn(async () => 'my-app.vercel.app') }))
 vi.mock('@/metrics/ensurePixel', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/metrics/ensurePixel')>()), ensureMetricsPixelSafely: vi.fn(async () => 'created') }))
 vi.mock('@/lib/shop', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/shop')>()), getShopTimezone: vi.fn(async () => 'UTC'), getShopCurrencyCode: vi.fn(async () => 'GBP') }))
+vi.mock('@/lib/requestShop', () => ({ getRequestShop: vi.fn(async () => 'demo.myshopify.com') }))
+vi.mock('@/lib/db', () => ({ getDb: vi.fn(() => ({})) }))
+vi.mock('@/home/loadMetrics', () => ({ loadMetrics: vi.fn() }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }))
 
 const noSearch = Promise.resolve({})
@@ -27,6 +31,8 @@ describe('Home', () => {
     vi.mocked(getConfig).mockReset()
     vi.mocked(getConfig).mockResolvedValue({ discounts: [] })
     vi.mocked(ensureMetricsPixelSafely).mockClear()
+    vi.mocked(loadMetrics).mockReset()
+    vi.mocked(loadMetrics).mockResolvedValue({ totals: { visitors: 40, orders: 3, averageOrderValue: 21.5, addedRevenue: 4 }, hasPermission: true })
   })
 
   it('makes sure the metrics pixel points at the address the page was opened on, after the tier discount', async () => {
@@ -104,5 +110,34 @@ describe('Home', () => {
     vi.mocked(getConfig).mockRejectedValue(new Error('Shopify is down'))
 
     await expect(Home({ searchParams: noSearch })).rejects.toThrow('Shopify is down')
+  })
+
+  it('shows the numbers loaded for the last 30 days of the shop on the cards', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-11-02T12:00:00Z'))
+
+    render(await Home({ searchParams: noSearch }))
+
+    expect(screen.getAllByTestId('stat-value').map((value) => value.textContent)).toEqual(['40', '3', '£21.50', '£4.00'])
+    const args = vi.mocked(loadMetrics).mock.calls[0][0]
+    expect([args.shop, args.fromDay, args.toDay, args.timeZone]).toEqual(['demo.myshopify.com', '2026-10-04', '2026-11-02', 'UTC'])
+  })
+
+  it('asks for the permission on the cards when the shop has not approved the scopes', async () => {
+    vi.mocked(loadMetrics).mockResolvedValue({ totals: { visitors: 0, orders: 0, averageOrderValue: 0, addedRevenue: 0 }, hasPermission: false })
+
+    render(await Home({ searchParams: noSearch }))
+
+    expect(screen.getAllByTestId('stat-value').map((value) => value.textContent)).toEqual(Array(4).fill('Needs permission'))
+  })
+
+  it('keeps the page and shows a dash with "Could not load" on each card when the numbers fail', async () => {
+    vi.mocked(loadMetrics).mockRejectedValue(new Error('database is down'))
+
+    render(await Home({ searchParams: noSearch }))
+
+    expect(screen.getAllByTestId('stat-value').map((value) => value.textContent)).toEqual(Array(4).fill('-'))
+    expect(screen.getAllByTitle('Could not load')).toHaveLength(4)
+    expect(screen.getByRole('link', { name: /Create tier discount/ })).toBeInTheDocument()
   })
 })

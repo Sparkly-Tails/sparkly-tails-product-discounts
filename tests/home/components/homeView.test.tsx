@@ -10,11 +10,12 @@ import { DEFAULT_QUERY, TABLE_TOOLS, applyTableQuery } from '@/home/tableQuery'
 
 afterEach(cleanup)
 
+const CARDS = ['Visitors', 'Bundle orders', 'AOV', 'Added revenue'].map((label) => ({ label, value: '0', hint: label }))
 const ROWS = [{ key: 'tier:a', kind: 'tier' as const, title: 'Salmon Oil', subtitle: '', rules: '3+ units (10% off)', isActive: true, href: '/discounts/a' }]
 
 function show() {
   const view = applyTableQuery({ rows: ROWS, query: DEFAULT_QUERY, tools: TABLE_TOOLS })
-  return render(<HomeView view={view} query={DEFAULT_QUERY} version="9.8.7" />)
+  return render(<HomeView view={view} query={DEFAULT_QUERY} version="9.8.7" cards={CARDS} />)
 }
 
 describe('HomeView', () => {

@@ -1,15 +1,8 @@
 import { CalendarIcon, InfoIcon } from '@/home/components/icons'
 
-// Placeholders: the app does not collect this data yet, so the cards show the
-// sample values of the design.
-const STATS = [
-  { label: 'Visitors', value: '16', hint: 'Total visitors in period' },
-  { label: 'Bundle orders', value: '0', hint: 'Total bundle orders placed' },
-  { label: 'AOV', value: '0.00', hint: 'Average order value with discount' },
-  { label: 'Added revenue', value: '0.00', hint: 'Incremental revenue generated' },
-]
+import type { MetricCard } from '@/home/buildMetricCards'
 
-export default function StatCards() {
+export default function StatCards({ cards }: { cards: MetricCard[] }) {
   return (
     <section className="flex flex-col gap-3">
       <div className="flex items-center justify-between">
@@ -22,7 +15,7 @@ export default function StatCards() {
         </button>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {STATS.map((stat) => (
+        {cards.map((stat) => (
           <div
             key={stat.label}
             data-testid="stat-card"
