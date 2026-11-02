@@ -4,7 +4,8 @@ import { readBuiltWidget, runWidgetScripts } from '../helpers/builtWidget'
 
 /**
  * The product page's own price is the price of the product: while a tier discount applies, the widget changes the amount in
- * it to the unit price for the quantity chosen (the plain price struck beside it). Nothing of the theme is assumed: the price
+ * it to the unit price for the quantity chosen, with "each" after it (no struck price of its own: a compare-at price the theme
+ * shows stays the theme's). Nothing of the theme is assumed: the price
  * is found by its amount near the widget, never by a class name, and it is changed in place, in the theme's own markup and
  * type. Below the first tier, or when no price is found, the theme's price stays as the theme drew it.
  */
@@ -86,25 +87,25 @@ afterEach(() => {
 })
 
 describe('the product page price while a tier applies', () => {
-  it('shows the unit price for the quantity in the theme\'s own price, with the plain price struck and "each" after it', async () => {
+  it('shows the unit price for the quantity in the theme\'s own price, with "each" after it and no struck price of its own', async () => {
     await mountProductPage({ quantity: 10 })
     const price = document.querySelector('.price-item--regular') as HTMLElement
     expect(painted()).toEqual([price])
-    expect(squash(price.textContent)).toBe('£1.69 £1.63 each')
-    expect(squash(price.querySelector('s')!.textContent)).toBe('£1.69')
+    expect(squash(price.textContent)).toBe('£1.63 each')
+    expect(price.querySelector('s')).toBeNull()
   })
 
   it('changes the theme\'s text in place, adding no wrapper and copying no class of the theme', async () => {
     await mountProductPage({ quantity: 10 })
     const price = document.querySelector('.price-item--regular') as HTMLElement
     expect(price.className).toBe('price-item price-item--regular')
-    expect(Array.from(price.children).map((child) => child.tagName)).toEqual(['S', 'SMALL'])
+    expect(Array.from(price.children).map((child) => child.tagName)).toEqual(['SMALL'])
     for (const added of Array.from(price.children)) expect(added.className).toBe('')
   })
 
   it('needs no particular markup: a bare element with no price class, in a page with no section element, is found by its amount', async () => {
     await mountProductPage({ quantity: 10, priceHtml: plainPriceHtml(), wrapper: 'div' })
-    expect(squash(document.querySelector('b[data-x]')!.textContent)).toBe('£1.69 £1.63 each')
+    expect(squash(document.querySelector('b[data-x]')!.textContent)).toBe('£1.63 each')
   })
 
   it('keeps the theme\'s own way of writing an amount, such as a currency code after it', async () => {
@@ -118,7 +119,7 @@ describe('the product page price while a tier applies', () => {
     expect(painted()).toHaveLength(0)
     expect(document.querySelector('.price-item--regular')!.innerHTML).toBe('£1.69')
     await setQuantity(16)
-    expect(squash(document.querySelector('.price-item--regular')!.textContent)).toBe('£1.69 £1.55 each')
+    expect(squash(document.querySelector('.price-item--regular')!.textContent)).toBe('£1.55 each')
     expect(painted()).toHaveLength(1)
   })
 
@@ -133,7 +134,7 @@ describe('the product page price while a tier applies', () => {
     document.getElementById('price-main')!.innerHTML = '<div class="price"><span class="price-item">£1.69</span></div>'
     await vi.advanceTimersByTimeAsync(1000)
     expect(painted()).toHaveLength(1)
-    expect(squash(document.querySelector('.price-item')!.textContent)).toBe('£1.69 £1.63 each')
+    expect(squash(document.querySelector('.price-item')!.textContent)).toBe('£1.63 each')
   })
 
   it('does not touch what only looks like a price: a text with more than an amount in it, a price far from the widget', async () => {
@@ -167,8 +168,13 @@ const dawnSalePriceHtml = () => `
 describe('a theme that prints the price twice, one of them hidden', () => {
   it('changes the price that is shown, not the hidden copy that comes first in the page', async () => {
     await mountProductPage({ quantity: 10, priceHtml: dawnSalePriceHtml() })
-    expect(squash(document.querySelector('.price-item--sale')!.textContent)).toBe('£1.69 £1.63 each')
+    expect(squash(document.querySelector('.price-item--sale')!.textContent)).toBe('£1.63 each')
     expect(document.querySelector('.price__regular .price-item')!.innerHTML).toBe('£1.69')
+  })
+
+  it('leaves the compare-at price the theme shows as it is, and adds no struck price of its own', async () => {
+    await mountProductPage({ quantity: 10, priceHtml: dawnSalePriceHtml() })
+    expect(document.querySelectorAll('s')).toHaveLength(1)
     expect(document.querySelector('s.price-item')!.innerHTML.trim()).toBe('£2.10')
   })
 

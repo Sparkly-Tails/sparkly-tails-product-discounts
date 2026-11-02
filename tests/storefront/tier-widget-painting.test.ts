@@ -1,7 +1,5 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
 import { clearWidgetRegistry, readBuiltWidget, runWidgetScripts, WIDGET_COMPONENTS, WIDGET_CORE } from '../helpers/builtWidget'
 
 /** The tier widget's built scripts, run in the page the way the theme loads them, on markup like tier-pricing.liquid renders. */
@@ -332,11 +330,11 @@ describe('tier widget painting (redesign)', () => {
       expect(bar.getAttribute('aria-valuetext')).toBe('10 of 16 units. Offer unlocked, highest discount at 16.')
     })
 
-    it('a discounted price reads as the unit price, the original one marked as such for screen readers', async () => {
+    it('a discounted price reads as the unit price and "each", with no struck price of its own', async () => {
       await mountTiers(10)
       const price = document.querySelector('.price-item') as HTMLElement
-      expect(price.textContent!.replace(/\s+/g, ' ').trim()).toBe('£1.69 £1.63 each')
-      expect(readFileSync(join(process.cwd(), 'extensions/product-tier-pricing/src/tier-pricing.css'), 'utf8')).toMatch(/\[data-smooth-discounts-was\] s::after \{[^}]*content: ' \(original price\)'/)
+      expect(price.textContent!.replace(/\s+/g, ' ').trim()).toBe('£1.63 each')
+      expect(price.querySelector('s')).toBeNull()
     })
 
     it('the chip that matches the quantity is pressed, the others are not', async () => {
