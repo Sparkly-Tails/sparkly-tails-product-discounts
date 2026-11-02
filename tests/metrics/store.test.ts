@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { deleteShopMetrics, addVisit, purgeOldVisits, readSettings, STORE_TOOLS } from '@/metrics/store'
+import { deleteShopMetrics, addVisit, purgeOldVisits, readSettings, saveLiveProducts, saveTimeZone, STORE_TOOLS } from '@/metrics/store'
 
 const SHOP = 'demo.myshopify.com'
 const makeDb = () => ({
@@ -70,5 +70,19 @@ describe('readSettings', () => {
     const row = { timeZone: 'UTC', liveProducts: { a: 'd1', b: 5, c: null } }
     expect((await readSettings({ db: dbWith(row), shop: SHOP, tools: STORE_TOOLS }))?.liveProducts).toEqual({ a: 'd1' })
     expect((await readSettings({ db: dbWith({ timeZone: 'UTC', liveProducts: 'oops' }), shop: SHOP, tools: STORE_TOOLS }))?.liveProducts).toEqual({})
+  })
+})
+
+describe('saveLiveProducts and saveTimeZone', () => {
+  it('saveLiveProducts writes only the product map, creating the shop\'s row with the default time zone if needed', async () => {
+    const db = { metricsSync: { upsert: vi.fn(async () => ({})) } }
+    await saveLiveProducts({ db, shop: SHOP, liveProducts: { a: 'd1' } })
+    expect(db.metricsSync.upsert).toHaveBeenCalledExactlyOnceWith({ where: { shop: SHOP }, create: { shop: SHOP, liveProducts: { a: 'd1' } }, update: { liveProducts: { a: 'd1' } } })
+  })
+
+  it('saveTimeZone writes only the time zone', async () => {
+    const db = { metricsSync: { upsert: vi.fn(async () => ({})) } }
+    await saveTimeZone({ db, shop: SHOP, timeZone: 'Europe/Madrid' })
+    expect(db.metricsSync.upsert).toHaveBeenCalledExactlyOnceWith({ where: { shop: SHOP }, create: { shop: SHOP, timeZone: 'Europe/Madrid' }, update: { timeZone: 'Europe/Madrid' } })
   })
 })

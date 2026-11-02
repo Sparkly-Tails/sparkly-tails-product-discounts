@@ -82,3 +82,15 @@ export async function readSettings({ db, shop, tools }: { db: { metricsSync: { f
   const row = await db.metricsSync.findUnique({ where: { shop } })
   return row ? { timeZone: row.timeZone, liveProducts: tools.keepTextValues({ value: row.liveProducts, tools }) } : null
 }
+
+type SettingsUpsertDb = { metricsSync: { upsert: (args: { where: { shop: string }; create: { shop: string; liveProducts?: Record<string, string>; timeZone?: string }; update: { liveProducts?: Record<string, string>; timeZone?: string } }) => Promise<unknown> } }
+
+/** Saves the map of products in live discounts, creating the shop's row (with the default time zone) if it has none. */
+export async function saveLiveProducts({ db, shop, liveProducts }: { db: SettingsUpsertDb; shop: string; liveProducts: Record<string, string> }): Promise<void> {
+  await db.metricsSync.upsert({ where: { shop }, create: { shop, liveProducts }, update: { liveProducts } })
+}
+
+/** Saves the shop's time zone, creating the shop's row if it has none. */
+export async function saveTimeZone({ db, shop, timeZone }: { db: SettingsUpsertDb; shop: string; timeZone: string }): Promise<void> {
+  await db.metricsSync.upsert({ where: { shop }, create: { shop, timeZone }, update: { timeZone } })
+}

@@ -2,6 +2,10 @@ import { shopifyQuery } from '@/lib/shopify-client'
 import { METAFIELD_NAMESPACE, METAFIELD_KEYS } from '@/lib/metafieldNames'
 import type { WidgetStyle } from '@/lib/widgetStyle'
 import { CARD_INDEX_TOOLS, buildCardIndexValue } from '@/lib/cardIndex'
+import { getDb } from '@/lib/db'
+import { getRequestShop } from '@/lib/requestShop'
+import { refreshLiveProductsSafely, REFRESH_TOOLS } from '@/metrics/refreshSettings'
+import { saveLiveProducts } from '@/metrics/store'
 
 export interface Tier {
   minQty: number
@@ -137,6 +141,14 @@ export async function saveConfig(config: Config): Promise<void> {
       data.metafieldsSet.userErrors.map((e) => e.message).join('; '),
     )
   }
+
+  await refreshLiveProductsSafely({
+    discounts: config.discounts,
+    getShop: () => getRequestShop(),
+    saveLiveProducts: ({ shop, liveProducts }) => saveLiveProducts({ db: getDb(), shop, liveProducts }),
+    report: (message) => console.error(message),
+    tools: REFRESH_TOOLS,
+  })
 }
 
 /**

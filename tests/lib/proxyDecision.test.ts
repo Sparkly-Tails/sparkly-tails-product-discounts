@@ -31,6 +31,12 @@ describe('decideProxy', () => {
     }
   })
 
+  it('lets the storefront pixel report a view without a token: the pixel has none, and checks its own input', async () => {
+    const pixelHeaders = { authorization: null, secFetchDest: 'empty', accept: '*/*', rsc: null }
+    expect(await decideProxy(input({ pathname: '/collect/view', headers: pixelHeaders }))).toEqual({ kind: 'next' })
+    expect((await decideProxy(input({ pathname: '/', headers: fetchHeaders }))).kind).not.toBe('next')
+  })
+
   it('lets the public images of the homepage through without a token (an image request carries none)', async () => {
     const imageHeaders = { authorization: null, secFetchDest: 'image', accept: 'image/*', rsc: null }
     for (const pathname of ['/assets/home/tier-illustration.jpg', '/assets/home/time-illustration.jpg']) {

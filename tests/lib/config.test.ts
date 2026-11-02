@@ -2,6 +2,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { getConfig, saveConfig, isProductAvailable, pricesUniform, type Config } from '@/lib/config'
 import * as shopifyClient from '@/lib/shopify-client'
 import { METAFIELD_NAMESPACE, METAFIELD_KEYS } from '@/lib/metafieldNames'
+import { refreshLiveProductsSafely } from '@/metrics/refreshSettings'
+
+vi.mock('@/metrics/refreshSettings', async (original) => ({ ...(await original<typeof import('@/metrics/refreshSettings')>()), refreshLiveProductsSafely: vi.fn(async () => {}) }))
 
 describe('getConfig', () => {
   beforeEach(() => vi.restoreAllMocks())
@@ -54,7 +57,7 @@ describe('getConfig', () => {
 })
 
 describe('saveConfig', () => {
-  beforeEach(() => vi.restoreAllMocks())
+  beforeEach(() => { vi.restoreAllMocks(); vi.mocked(refreshLiveProductsSafely).mockClear() })
 
   it('writes the config as a JSON shop metafield', async () => {
     const shopIdSpy = vi.spyOn(shopifyClient, 'shopifyQuery')
@@ -93,6 +96,27 @@ describe('saveConfig', () => {
         ],
       }),
     )
+  })
+
+  it('refreshes the products-in-live-discounts copy that the visit counter reads, after the config is saved', async () => {
+    const spy = vi.spyOn(shopifyClient, 'shopifyQuery')
+    spy.mockResolvedValueOnce({ shop: { id: 'gid://shopify/Shop/1' } })
+    spy.mockResolvedValueOnce({ nodes: [{ id: 'gid://shopify/Product/1', handle: 'tuna' }] })
+    spy.mockResolvedValueOnce({ metafieldsSet: { userErrors: [] } })
+    const config: Config = { discounts: [{ discountId: 'disc_1', name: 'Tuna', title: '', status: 'live', pricingMode: 'percent', members: [{ productId: 'gid://shopify/Product/1' }], tiers: [] }] }
+    await saveConfig(config)
+    expect(refreshLiveProductsSafely).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(refreshLiveProductsSafely).mock.calls[0][0].discounts).toEqual(config.discounts)
+  })
+
+  it('does not refresh the copy when Shopify refuses the save', async () => {
+    vi.mocked(refreshLiveProductsSafely).mockClear()
+    const spy = vi.spyOn(shopifyClient, 'shopifyQuery')
+    spy.mockResolvedValueOnce({ shop: { id: 'gid://shopify/Shop/1' } })
+    spy.mockResolvedValueOnce({ nodes: [] })
+    spy.mockResolvedValueOnce({ metafieldsSet: { userErrors: [{ field: [], message: 'no' }] } })
+    await expect(saveConfig({ discounts: [] })).rejects.toThrow('no')
+    expect(refreshLiveProductsSafely).not.toHaveBeenCalled()
   })
 
   it('writes the live discounts as the product card index in the same call, so the two never differ', async () => {
