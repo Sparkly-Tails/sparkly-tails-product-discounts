@@ -15,6 +15,8 @@ export const METAFIELD_KEYS = {
   tierSiblingProducts: 'tier_sibling_products',
   /** Product. */
   tierSiblingVariants: 'tier_sibling_variants',
+  /** Shop: the live discounts a product card needs (see src/lib/cardIndex.ts); rewritten with tier_config on every save. */
+  cardIndex: 'tier_card_index',
   /** Discount (the Shopify discount of a flash sale): which tier discount that record applies. */
   flashRecord: 'flash_record',
 } as const

@@ -66,7 +66,7 @@ async function purgeRetainedData(shopId: string): Promise<void> {
       metafieldsDelete(metafields: $metafields) { userErrors { message } }
     }`,
     {
-      metafields: [METAFIELD_KEYS.tierConfig].map((key) => ({ ownerId: shopId, namespace: METAFIELD_NAMESPACE, key })),
+      metafields: [METAFIELD_KEYS.tierConfig, METAFIELD_KEYS.cardIndex].map((key) => ({ ownerId: shopId, namespace: METAFIELD_NAMESPACE, key })),
     },
   )
   if (deleted.metafieldsDelete.userErrors.length > 0) throw new Error(messages(deleted.metafieldsDelete.userErrors))

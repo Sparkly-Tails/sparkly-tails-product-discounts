@@ -6,12 +6,13 @@ describe('metafield names', () => {
     expect(METAFIELD_NAMESPACE).toBe('$app:smooth_discount')
   })
 
-  it('has the five keys with these exact values', () => {
+  it('has the six keys with these exact values', () => {
     expect(METAFIELD_KEYS).toEqual({
       tierConfig: 'tier_config',
       tierDiscount: 'tier_discount',
       tierSiblingProducts: 'tier_sibling_products',
       tierSiblingVariants: 'tier_sibling_variants',
+      cardIndex: 'tier_card_index',
       flashRecord: 'flash_record',
     })
   })

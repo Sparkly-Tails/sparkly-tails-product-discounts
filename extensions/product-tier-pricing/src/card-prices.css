@@ -1,0 +1,31 @@
+/* Product cards: the theme's price is hidden once the offer is painted, and the offer takes its place. */
+[data-smooth-discounts-replaced] {
+  display: none !important;
+}
+
+.smooth-discounts-card__price {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 0.5em;
+}
+
+.smooth-discounts-card__was {
+  opacity: 0.6;
+  font-weight: normal;
+}
+
+.smooth-discounts-card__from {
+  font-weight: 600;
+}
+
+.smooth-discounts-card__tag {
+  display: inline-block;
+  margin-top: 0.25em;
+  padding: 0.15em 0.6em;
+  border-radius: 999px;
+  background: #434625;
+  color: #fff;
+  font-size: 0.8em;
+  line-height: 1.5;
+}
