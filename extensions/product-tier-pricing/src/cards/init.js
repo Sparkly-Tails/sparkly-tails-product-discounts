@@ -28,11 +28,6 @@ export function parseText({ text }) {
   }
 }
 
-/** The handle of the product page being viewed (`/en/products/tuna` is `tuna`), or null on any other page. */
-export function readPageHandle({ pathname, tools }) {
-  return tools.readProductHandle({ href: pathname })
-}
-
 /** The address of a product's live data. `rootUrl` is the shop's root link: "/" or a language such as "/fr" (no slash after it). */
 export function buildProductPath({ rootUrl, handle }) {
   const root = rootUrl.endsWith('/') ? rootUrl : rootUrl + '/'
@@ -44,35 +39,27 @@ export function readVariants(product) {
   return product && Array.isArray(product.variants) ? product.variants : null
 }
 
-export function readJson(answer) {
-  return answer.ok ? answer.json() : null
-}
-
 /** The live variants of a product, or null when they cannot be read. Asked once per handle, whatever the number of cards. */
 export function loadVariants({ win, rootUrl, handle, products, tools }) {
   if (!products.has(handle)) {
     const path = tools.buildProductPath({ rootUrl, handle })
-    products.set(handle, win.fetch(path, { headers: { Accept: 'application/json' } }).then(tools.readJson).then(tools.readVariants).catch(tools.readNothing))
+    products.set(handle, win.fetch(path, { headers: { Accept: 'application/json' } }).then((answer) => (answer.ok ? answer.json() : null)).then(tools.readVariants).catch(() => null))
   }
   return products.get(handle)
-}
-
-export function readNothing() {
-  return null
 }
 
 /** One card: its product's live prices, the offer, the painting. A card that gets no offer is marked so it is not asked again. */
 export async function applyCard({ target, entries, context, tools }) {
   const variants = await tools.loadVariants({ win: context.win, rootUrl: context.config.rootUrl, handle: target.handle, products: context.products, tools })
   const offer = variants === null ? null : tools.buildCardOffer({ variants, entry: entries.get(target.handle), nowSeconds: Math.floor(context.win.Date.now() / 1000), tools })
-  if (offer === null) return tools.markCardOff(target.root)
+  if (offer === null) return tools.markCard({ root: target.root, state: 'off' })
   tools.paintCard({ target, offer, moneyFormat: context.config.moneyFormat, tools })
 }
 
 /** Marks a card as being worked on, so the next scan does not start it again, then gives it its offer. */
 export function startCard({ entries, context, tools }, target) {
   tools.markCard({ root: target.root, state: 'pending' })
-  tools.applyCard({ target, entries, context, tools }).catch(tools.markCardOff.bind(null, target.root))
+  tools.applyCard({ target, entries, context, tools }).catch(tools.markCard.bind(null, { root: target.root, state: 'off' }))
 }
 
 /** Finds the unmarked cards of discounted products now on the page and gives each its offer. */
@@ -80,7 +67,7 @@ export function scanCards({ entries, context, tools }) {
   const targets = tools.listCardTargets({
     root: context.win.document,
     handles: new Set(entries.keys()),
-    pageHandle: tools.readPageHandle({ pathname: context.win.location.pathname, tools }),
+    pageHandle: tools.readProductHandle({ href: context.win.location.pathname }),
     isMarked: tools.isMarked,
     tools,
   })
@@ -101,7 +88,7 @@ export function watchPage({ win, scan, tools }) {
 
 export const CARD_TOOLS = {
   ...OFFER_TOOLS, ...FIND_TOOLS, ...PAINT_TOOLS,
-  parseCardIndex, parseText, readCardConfig, readPageHandle, buildProductPath, readVariants, readJson, readNothing, loadVariants, applyCard, startCard, scanCards, scheduleScan, watchPage,
+  parseCardIndex, parseText, readCardConfig, buildProductPath, readVariants, loadVariants, applyCard, startCard, scanCards, scheduleScan, watchPage,
   buildCardOffer, buildFromText, buildTagText,
 }
 

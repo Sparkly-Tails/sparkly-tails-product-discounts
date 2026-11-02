@@ -6,6 +6,8 @@ const PRODUCT_LINK_SELECTOR = 'a[href*="/products/"]'
 // and anything in a dialog (cart drawer, quick view). Matching is by name, which most themes follow.
 const EXCLUDED_AREA_SELECTOR = '[data-smooth-discounts], header, nav, footer, form[action*="/cart"], [class*="cart" i], [id*="cart" i], cart-drawer, cart-items, [role="dialog"]'
 const PRICE_SELECTOR = '[class*="price" i], .money, [data-price]'
+// What this script has already painted: the theme price it hid and the price it put in its place, with everything inside them.
+const PAINTED_SELECTOR = '[data-smooth-discounts-replaced], .smooth-discounts-card__price'
 
 /** The handle in a product link (`/products/tuna?variant=1` is `tuna`), or null for any other link. */
 export function readProductHandle({ href }) {
@@ -21,9 +23,9 @@ export function isCardLink({ link }) {
   return link.closest(EXCLUDED_AREA_SELECTOR) === null
 }
 
-/** The element showing the price inside `node`: the first in document order, which is the outermost of nested ones. */
+/** The element showing the price inside `node` that has not been painted yet (the first in document order, which is the outermost of nested ones), or undefined. */
 export function findPriceElement({ node }) {
-  return node.querySelector(PRICE_SELECTOR)
+  return Array.from(node.querySelectorAll(PRICE_SELECTOR)).find((element) => element.closest(PAINTED_SELECTOR) === null)
 }
 
 /** The element and every ancestor above it, nearest first. */
@@ -44,7 +46,7 @@ export function hasOtherProduct({ root, handle, tools }) {
 }
 
 export function hasPriceElement(tools, node) {
-  return tools.findPriceElement({ node }) !== null
+  return tools.findPriceElement({ node }) !== undefined
 }
 
 /** `{ root, priceElement }` of the card a link belongs to, or null when it is not in one card of its own. */
@@ -76,18 +78,21 @@ export function isUnmarkedTarget(isMarked, target) {
   return !isMarked({ root: target.root })
 }
 
-export function listTargetPair(target) {
-  return [target.root, target]
+/** Adds a target to the map, one per price: a card with an image link and a title link finds its price twice, from two roots. The one whose root holds the other's stays: the whole card, with its image, not just its text. */
+export function addOuterTarget(targetsByPrice, target) {
+  const kept = targetsByPrice.get(target.priceElement)
+  targetsByPrice.set(target.priceElement, kept !== undefined && kept.root.contains(target.root) ? kept : target)
 }
 
 /** Every card on the page that is for a discounted product and not yet marked: `[{ handle, root, priceElement }]`, one per card. */
 export function listCardTargets({ root, handles, pageHandle, isMarked, tools }) {
   const targets = tools.listProductLinks({ root }).flatMap(tools.listLinkTargets.bind(null, { handles, pageHandle, tools }))
-  const unique = new Map(targets.map(tools.listTargetPair))
-  return Array.from(unique.values()).filter(tools.isUnmarkedTarget.bind(null, isMarked))
+  const targetsByPrice = new Map()
+  targets.forEach(tools.addOuterTarget.bind(null, targetsByPrice))
+  return Array.from(targetsByPrice.values()).filter(tools.isUnmarkedTarget.bind(null, isMarked))
 }
 
 export const FIND_TOOLS = {
   readProductHandle, listProductLinks, isCardLink, findPriceElement, listAncestors, isOtherProductLink, hasOtherProduct, hasPriceElement, findCardParts,
-  isCardHandle, readCardHandle, listLinkTargets, isUnmarkedTarget, listTargetPair, listCardTargets,
+  isCardHandle, readCardHandle, listLinkTargets, isUnmarkedTarget, addOuterTarget, listCardTargets,
 }

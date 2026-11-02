@@ -132,6 +132,59 @@ describe('a card of a discounted product', () => {
   })
 })
 
+/** A card whose image link and title link have no common element with a price below it, except the outer wrapper: two candidates for one card. */
+const splitCardHtml = (handle: string) => `
+  <li class="grid__item">
+    <div class="card-wrapper">
+      <div class="card__inner"><div class="media"><img alt=""></div><a href="/products/${handle}" class="card__link">image</a></div>
+      <div class="card__information">
+        <h3 class="card__heading"><a href="/products/${handle}">${handle}</a></h3>
+        <div class="price"><span class="price-item price-item--regular">£1.69</span></div>
+      </div>
+    </div>
+  </li>`
+
+describe('where the offer goes on a card', () => {
+  it('paints one price and one tag when the image and the title are in different parts of the card, both finding the same price', async () => {
+    await mountPage({ cards: splitCardHtml('tuna'), discounts: [discountOf([memberOf('tuna')])] })
+    expect(document.querySelectorAll('.smooth-discounts-card__price').length).toBe(1)
+    expect(document.querySelectorAll('.smooth-discounts-card__tag').length).toBe(1)
+  })
+
+  it('puts the tag on the product image, and not with the price', async () => {
+    await mountPage({ cards: splitCardHtml('tuna'), discounts: [discountOf([memberOf('tuna')])] })
+    const tag = document.querySelector('.smooth-discounts-card__tag') as HTMLElement
+    expect(tag.parentElement).toBe(document.querySelector('.media'))
+    expect(tag.classList.contains('smooth-discounts-card__tag--image')).toBe(true)
+    expect(document.querySelector('.card__information')!.contains(tag)).toBe(false)
+  })
+
+  it('puts the tag beside the image when the image is in a picture element', async () => {
+    const card = splitCardHtml('tuna').replace('<img alt="">', '<picture><img alt=""></picture>')
+    await mountPage({ cards: card, discounts: [discountOf([memberOf('tuna')])] })
+    expect((document.querySelector('.smooth-discounts-card__tag') as HTMLElement).parentElement).toBe(document.querySelector('.media'))
+  })
+
+  it('lets the tag be placed over the image by making the image holder a positioning box, unless the theme already did', async () => {
+    await mountPage({ cards: splitCardHtml('tuna').replace('class="media"', 'class="media" style="position: relative"') + splitCardHtml('salmon'), discounts: [discountOf([memberOf('tuna'), memberOf('salmon')])] })
+    const holders = Array.from(document.querySelectorAll('.media'))
+    expect(holders[0].classList.contains('smooth-discounts-card__media')).toBe(false)
+    expect(holders[1].classList.contains('smooth-discounts-card__media')).toBe(true)
+  })
+
+  it('forces the white text of the tag, because themes colour the links and prices that wrap a card', () => {
+    expect(built['card-prices.css']).toMatch(/smooth-discounts-card__tag\{[^}]*color:#fff!important/)
+  })
+
+  it('keeps the tag under the price when the card has no image', async () => {
+    const card = cardHtml('tuna').replace('<img alt="">', '')
+    await mountPage({ cards: card, discounts: [discountOf([memberOf('tuna')])] })
+    const tag = document.querySelector('.smooth-discounts-card__tag') as HTMLElement
+    expect(tag.previousElementSibling).toBe(document.querySelector('.smooth-discounts-card__price'))
+    expect(tag.classList.contains('smooth-discounts-card__tag--image')).toBe(false)
+  })
+})
+
 describe('which cards are touched', () => {
   it('leaves the cards of other products alone and asks for the prices of discounted products only', async () => {
     await mountPage({ cards: cardHtml('tuna') + cardHtml('chicken'), discounts: [discountOf([memberOf('tuna')])] })

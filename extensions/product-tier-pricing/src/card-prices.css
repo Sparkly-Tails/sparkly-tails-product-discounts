@@ -19,13 +19,33 @@
   font-weight: 600;
 }
 
+/* The tag is a pill. The colour is forced because themes set the colour of the links and prices that wrap a card. */
 .smooth-discounts-card__tag {
   display: inline-block;
   margin-top: 0.25em;
   padding: 0.15em 0.6em;
   border-radius: 999px;
   background: #434625;
-  color: #fff;
+  color: #fff !important;
   font-size: 0.8em;
   line-height: 1.5;
+}
+
+/* On the product image, in the top left corner (the sale and sold out badges of most themes sit at the bottom). */
+.smooth-discounts-card__media {
+  position: relative;
+}
+
+.smooth-discounts-card__tag--image {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 2;
+  margin: 0;
+  padding: 4px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: 0.02em;
+  pointer-events: none;
 }

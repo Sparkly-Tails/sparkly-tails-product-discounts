@@ -15,22 +15,19 @@ export function parseCardIndex({ text }) {
   }
 }
 
-export function buildEntry(discount, member) {
-  return { handle: member.handle, productId: member.productId, variantIds: member.variantIds, discount }
+export function addMemberEntry({ entries, discount }, member) {
+  entries.set(member.handle, { ...member, discount })
 }
 
-export function listDiscountEntries(tools, discount) {
-  return discount.members.map(tools.buildEntry.bind(null, discount))
-}
-
-export function listEntryPair(entry) {
-  return [entry.handle, entry]
+export function addDiscountEntries({ entries, tools }, discount) {
+  discount.members.forEach(tools.addMemberEntry.bind(null, { entries, discount }))
 }
 
 /** Every product of every discount, by its handle: `{ handle, productId, variantIds, discount }`. */
 export function mapEntriesByHandle({ index, tools }) {
-  const entries = index.discounts.flatMap(tools.listDiscountEntries.bind(null, tools))
-  return new Map(entries.map(tools.listEntryPair))
+  const entries = new Map()
+  index.discounts.forEach(tools.addDiscountEntries.bind(null, { entries, tools }))
+  return entries
 }
 
 /** A flash sale shows only while it runs; a regular discount (no window) always does. */
@@ -87,7 +84,7 @@ export function keepSavingOffer({ offer }) {
 export const OFFER_TOOLS = {
   flashPhase, sortTiersByMinQty, unitPriceAtTier, formatMoney,
   isDiscountRunning, isEligibleVariant, listEligibleVariants, pickTopTier, listCardPrices, pickCheapestOffer, buildOffer, keepLowerOffer, keepSavingOffer,
-  buildEntry, listDiscountEntries, listEntryPair, mapEntriesByHandle,
+  addMemberEntry, addDiscountEntries, mapEntriesByHandle,
 }
 
 /** `{ basePrice, salePrice, quantity }` for a card, or null when it should keep its price. `variants` come from /products/<handle>.js. */
