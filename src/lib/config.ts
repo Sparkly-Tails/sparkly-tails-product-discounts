@@ -1,6 +1,7 @@
 import { shopifyQuery } from '@/lib/shopify-client'
 import { METAFIELD_NAMESPACE, METAFIELD_KEYS } from '@/lib/metafieldNames'
 import type { WidgetStyle } from '@/lib/widgetStyle'
+import { CARD_INDEX_TOOLS, buildCardIndexValue } from '@/lib/cardIndex'
 
 export interface Tier {
   minQty: number
@@ -98,8 +99,10 @@ export async function getConfig(): Promise<Config> {
   return { discounts: Array.isArray(parsed.discounts) ? parsed.discounts : [] }
 }
 
+/** Writes the config, and with it the index of live discounts the product cards read, in one call so the two never differ. */
 export async function saveConfig(config: Config): Promise<void> {
   const shopId = await getShopId()
+  const cardIndex = await buildCardIndexValue({ discounts: config.discounts, tools: { ...CARD_INDEX_TOOLS, queryShop: shopifyQuery } })
 
   const data = await shopifyQuery<{
     metafieldsSet: { userErrors: { field: string[]; message: string }[] }
@@ -117,6 +120,13 @@ export async function saveConfig(config: Config): Promise<void> {
           key: METAFIELD_KEYS.tierConfig,
           type: 'json',
           value: JSON.stringify(config),
+        },
+        {
+          ownerId: shopId,
+          namespace: METAFIELD_NAMESPACE,
+          key: METAFIELD_KEYS.cardIndex,
+          type: 'json',
+          value: cardIndex,
         },
       ],
     },

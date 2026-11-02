@@ -73,7 +73,7 @@ describe('ensureFreshInstall', () => {
     expect(events).toEqual([
       'read-marker',
       'clear-tier-products',
-      `delete-shop-settings:shop/${METAFIELD_KEYS.tierConfig}`,
+      `delete-shop-settings:shop/${METAFIELD_KEYS.tierConfig},shop/${METAFIELD_KEYS.cardIndex}`,
       `write-marker:installation/${METAFIELD_NAMESPACE}/install_marker`,
     ])
     expect(clearDiscountMetafields).toHaveBeenCalledWith([{ productId: P1 }, { productId: P2 }])

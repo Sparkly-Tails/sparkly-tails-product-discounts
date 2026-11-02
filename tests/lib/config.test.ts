@@ -83,9 +83,35 @@ describe('saveConfig', () => {
             type: 'json',
             value: JSON.stringify(config),
           }),
+          expect.objectContaining({
+            ownerId: 'gid://shopify/Shop/1',
+            namespace: METAFIELD_NAMESPACE,
+            key: METAFIELD_KEYS.cardIndex,
+            type: 'json',
+            value: JSON.stringify({ discounts: [] }),
+          }),
         ],
       }),
     )
+  })
+
+  it('writes the live discounts as the product card index in the same call, so the two never differ', async () => {
+    const shopIdSpy = vi.spyOn(shopifyClient, 'shopifyQuery')
+    shopIdSpy.mockResolvedValueOnce({ shop: { id: 'gid://shopify/Shop/1' } })
+    shopIdSpy.mockResolvedValueOnce({ nodes: [{ id: 'gid://shopify/Product/7', handle: 'tuna-soup' }] })
+    shopIdSpy.mockResolvedValueOnce({ metafieldsSet: { userErrors: [] } })
+
+    await saveConfig({
+      discounts: [
+        { discountId: 'a', name: 'A', title: 'A', status: 'live', pricingMode: 'percent', members: [{ productId: 'gid://shopify/Product/7' }], tiers: [{ minQty: 3, percentOff: 10 }] },
+        { discountId: 'b', name: 'B', title: 'B', status: 'draft', pricingMode: 'percent', members: [{ productId: 'gid://shopify/Product/8' }], tiers: [{ minQty: 2, percentOff: 5 }] },
+      ],
+    })
+
+    const [, variables] = shopIdSpy.mock.calls[2] as [string, { metafields: { key: string; value: string }[] }]
+    const written = variables.metafields.find((metafield) => metafield.key === METAFIELD_KEYS.cardIndex)
+    expect(JSON.parse(written!.value)).toEqual({ discounts: [{ tiers: [{ minQty: 3, percentOff: 10 }], members: [{ productId: '7', handle: 'tuna-soup', variantIds: null }], flash: null }] })
+    expect(shopIdSpy).toHaveBeenCalledTimes(3)
   })
 
   it('throws when Shopify reports userErrors', async () => {

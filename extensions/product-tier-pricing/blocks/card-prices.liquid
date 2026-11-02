@@ -1,0 +1,28 @@
+{% comment %}
+  App embed: puts the discount on product cards (collection pages, search results, related products and any other
+  list of products). It finds the cards by their product links, so it does not depend on the theme's markup.
+  What it prints is the index the app keeps in the shop metafield tier_card_index: the live discounts with their
+  tiers and products. The script (card-prices.js) fetches the live prices of those products and paints the cards.
+  Nothing is printed when no discount is live, or when the shop sells in a currency other than its own, because
+  the tier prices are in the shop's currency.
+{% endcomment %}
+{%- assign card_index = shop.metafields['$app:smooth_discount'].tier_card_index -%}
+{%- if card_index != blank and cart.currency.iso_code == shop.currency -%}
+  <div
+    data-smooth-discounts-cards
+    hidden
+    data-index='{{ card_index.value | json | escape }}'
+    data-money-format='{{ shop.money_format | json | escape }}'
+    data-root-url='{{ routes.root_url | json | escape }}'
+  ></div>
+{%- endif -%}
+
+{% schema %}
+{
+  "name": "t:card_prices_name",
+  "target": "body",
+  "stylesheet": "card-prices.css",
+  "javascript": "card-prices.js",
+  "settings": []
+}
+{% endschema %}
