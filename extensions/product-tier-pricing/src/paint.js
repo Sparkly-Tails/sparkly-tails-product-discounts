@@ -5,7 +5,7 @@ import { setQuantityInput, setText } from './dom.js'
 export function paintPriceRow(elements, viewModel) {
   // Screen readers would otherwise read the two prices as bare numbers.
   if (viewModel.discountedPrice) {
-    const priceHtml = '<span class="sparkly-tier-pricing__sr-only">Discounted price: </span>' + viewModel.discountedPrice
+    const priceHtml = '<span class="smooth-discounts__sr-only">Discounted price: </span>' + viewModel.discountedPrice
     if (elements.priceEl.innerHTML !== priceHtml) elements.priceEl.innerHTML = priceHtml
   } else {
     setText(elements.priceEl, viewModel.plainPrice)
@@ -14,7 +14,7 @@ export function paintPriceRow(elements, viewModel) {
   if (elements.struckEl) {
     elements.struckEl.hidden = !viewModel.discountedPrice
     if (viewModel.discountedPrice) {
-      const struckHtml = '<span class="sparkly-tier-pricing__sr-only">Original price: </span>' + viewModel.plainPrice
+      const struckHtml = '<span class="smooth-discounts__sr-only">Original price: </span>' + viewModel.plainPrice
       if (elements.struckEl.innerHTML !== struckHtml) elements.struckEl.innerHTML = struckHtml
     }
   }
@@ -71,20 +71,20 @@ export function paintStatus(elements, viewModel) {
 
 // Rail: fill up to the dot, a pin per tier quantity, and the dot showing the
 // current quantity. A pin the dot sits on is hidden under it. Positions go
-// through --sparkly-tier-pct so the stylesheet keeps the end pins inside the rail.
+// through --smooth-discounts-pct so the stylesheet keeps the end pins inside the rail.
 export function paintProgressBar(elements, dot, semantics, offerState) {
   elements.fillEl.style.width = dot.dotPct + '%'
   elements.markersEl.innerHTML = ''
   dot.markers.forEach((marker) => {
     const el = document.createElement('span')
-    el.className = 'sparkly-tier-pricing__marker' +
-      (marker.reached ? ' sparkly-tier-pricing__marker--reached' : '') +
-      (marker.covered ? ' sparkly-tier-pricing__marker--covered' : '')
-    el.style.setProperty('--sparkly-tier-pct', marker.pct + '%')
+    el.className = 'smooth-discounts__marker' +
+      (marker.reached ? ' smooth-discounts__marker--reached' : '') +
+      (marker.covered ? ' smooth-discounts__marker--covered' : '')
+    el.style.setProperty('--smooth-discounts-pct', marker.pct + '%')
     el.textContent = String(marker.value)
     elements.markersEl.appendChild(el)
   })
-  elements.dotEl.style.setProperty('--sparkly-tier-pct', dot.dotPct + '%')
+  elements.dotEl.style.setProperty('--smooth-discounts-pct', dot.dotPct + '%')
   elements.dotEl.textContent = String(dot.dotValue)
   if (elements.railEl && offerState) elements.railEl.dataset.offerState = offerState
   if (elements.barEl) {
@@ -106,7 +106,7 @@ export function paintChips(elements, viewModel) {
   viewModel.chips.forEach((chip) => {
     const isTier = chip.kind === 'tier'
     const el = document.createElement(isTier ? 'button' : 'span')
-    el.className = 'sparkly-tier-pricing__chip sparkly-tier-pricing__chip--' + (isTier ? '' : 'current-') + chip.tone
+    el.className = 'smooth-discounts__chip smooth-discounts__chip--' + (isTier ? '' : 'current-') + chip.tone
     el.textContent = chip.label
     if (isTier) {
       el.type = 'button'

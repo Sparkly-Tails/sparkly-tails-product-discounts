@@ -25,7 +25,7 @@ interface Options { id?: string; flash?: object | null; timeDiscount?: object | 
 function widgetMarkup({ id = 'w1', flash = null, timeDiscount = null, siblings = [] }: Options = {}): string {
   const discount = { title: 'Tins', tiers: TIERS, siblings, ownVariantIds: null, ownVariantOptions: [], selfVariantId: V10 }
   return `
-    <div id="${id}" class="sparkly-tier-pricing" data-sparkly-tier-pricing
+    <div id="${id}" class="smooth-discounts" data-smooth-discounts
       data-discount='${JSON.stringify(discount)}' data-time-discount='${JSON.stringify(timeDiscount ?? {})}'
       data-product-id='"gid://shopify/Product/9"' data-selected-variant-id="10"
       data-base-price="1.69" data-compare-at-price="0" data-money-format='"£{{amount}}"' data-high-demand="false"
@@ -162,7 +162,7 @@ describe('painting waits for the parts', () => {
 })
 
 describe('the siblings list', () => {
-  const rows = () => Array.from(document.querySelectorAll('.sparkly-tier-pricing__list-item')).map((row) => row.textContent)
+  const rows = () => Array.from(document.querySelectorAll('.smooth-discounts__list-item')).map((row) => row.textContent)
 
   it('shows nothing until its part arrives, then the rows with what the cart holds now', async () => {
     loadBuiltComponent('tier-pricing-model.js')
@@ -179,6 +179,6 @@ describe('the siblings list', () => {
 
     expect(rows()).toHaveLength(1)
     expect(rows()[0]).toContain('Salmon Tin')
-    expect((document.querySelector('.sparkly-tier-pricing__list-qty') as HTMLElement).textContent).toBe('2')
+    expect((document.querySelector('.smooth-discounts__list-qty') as HTMLElement).textContent).toBe('2')
   })
 })

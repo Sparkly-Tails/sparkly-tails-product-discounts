@@ -32,8 +32,8 @@ describe('the app stylesheet carries the form tokens', () => {
   })
 
   it('carries the storefront widget stylesheet, which the form preview paints with', () => {
-    expect(css).toContain('.sparkly-tier-pricing__flash')
-    expect(css).toContain('.sparkly-tier-pricing__chip')
+    expect(css).toContain('.smooth-discounts__flash')
+    expect(css).toContain('.smooth-discounts__chip')
   })
 
   it('uses the Inter typeface that the layout loads from Google Fonts', () => {

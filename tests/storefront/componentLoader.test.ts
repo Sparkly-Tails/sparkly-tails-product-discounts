@@ -25,7 +25,7 @@ describe('registerComponent and findComponent', () => {
   it('keeps the registry on the page object under one name, so every script of the widget shares it', () => {
     registerComponent({ root, name: 'paint', api: {} })
 
-    expect(Object.keys(root)).toEqual(['SparklyTierPricing'])
+    expect(Object.keys(root)).toEqual(['SmoothDiscounts'])
   })
 })
 

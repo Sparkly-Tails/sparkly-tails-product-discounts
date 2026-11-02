@@ -186,14 +186,14 @@
   {%- if style_value.cornerRadius != blank -%}{%- assign style_radius = style_value.cornerRadius | plus: 0 | at_least: 0 | at_most: 24 -%}{%- endif -%}
 {%- endif -%}
 {%- capture style_vars -%}
-  --sparkly-tier-price-font-size: {{ style_price_size }}px; --sparkly-tier-moss: {{ block.settings.moss_color }}; --sparkly-tier-cream: {{ style_background }}; --sparkly-tier-sun: {{ block.settings.sun_color }};
-  {%- if style_radius != nil %} --sparkly-tier-radius: {{ style_radius }}px;{% endif -%}
+  --smooth-discounts-price-font-size: {{ style_price_size }}px; --smooth-discounts-moss: {{ block.settings.moss_color }}; --smooth-discounts-cream: {{ style_background }}; --smooth-discounts-sun: {{ block.settings.sun_color }};
+  {%- if style_radius != nil %} --smooth-discounts-radius: {{ style_radius }}px;{% endif -%}
 {%- endcapture -%}
 
 <div
-  id="sparkly-tier-pricing-{{ block.id }}"
-  class="sparkly-tier-pricing{% if discount_metafield != blank %} sparkly-tier-pricing--card{% endif %}"
-  data-sparkly-tier-pricing
+  id="smooth-discounts-{{ block.id }}"
+  class="smooth-discounts{% if discount_metafield != blank %} smooth-discounts--card{% endif %}"
+  data-smooth-discounts
   data-discount='{{ discount_json }}'
   data-time-discount='{{ time_discount_json }}'
   data-selected-variant-id="{{ product.selected_or_first_available_variant.id }}"
@@ -206,70 +206,70 @@
   data-component-urls='{{ component_urls_json }}'
   style="{{ style_vars | strip | escape }}"
 >
-  <div class="sparkly-tier-pricing__flash" data-tier-pricing-flash data-variant="hidden" hidden>
-    <div class="sparkly-tier-pricing__flash-main">
-      <span class="sparkly-tier-pricing__flash-icon" aria-hidden="true"></span>
-      <span class="sparkly-tier-pricing__flash-label" data-flash-label></span>
+  <div class="smooth-discounts__flash" data-tier-pricing-flash data-variant="hidden" hidden>
+    <div class="smooth-discounts__flash-main">
+      <span class="smooth-discounts__flash-icon" aria-hidden="true"></span>
+      <span class="smooth-discounts__flash-label" data-flash-label></span>
     </div>
-    <div class="sparkly-tier-pricing__flash-side">
-      <span class="sparkly-tier-pricing__flash-timer" data-flash-timer></span>
-      <span class="sparkly-tier-pricing__flash-aside" data-flash-aside></span>
-      <span class="sparkly-tier-pricing__flash-chip" data-flash-chip hidden><span class="sparkly-tier-pricing__flash-hourglass" aria-hidden="true"></span><span data-flash-chip-text></span></span>
+    <div class="smooth-discounts__flash-side">
+      <span class="smooth-discounts__flash-timer" data-flash-timer></span>
+      <span class="smooth-discounts__flash-aside" data-flash-aside></span>
+      <span class="smooth-discounts__flash-chip" data-flash-chip hidden><span class="smooth-discounts__flash-hourglass" aria-hidden="true"></span><span data-flash-chip-text></span></span>
     </div>
   </div>
-  <div class="sparkly-tier-pricing__body">
-    <div class="sparkly-tier-pricing__summary">
-      <div class="sparkly-tier-pricing__price-row">
-        <div class="sparkly-tier-pricing__price-group">
-          <span class="sparkly-tier-pricing__now-label" data-tier-pricing-now-label hidden></span>
-          <span class="sparkly-tier-pricing__price sparkly-tier-pricing__original-price" data-tier-pricing-price data-original-price="true">
+  <div class="smooth-discounts__body">
+    <div class="smooth-discounts__summary">
+      <div class="smooth-discounts__price-row">
+        <div class="smooth-discounts__price-group">
+          <span class="smooth-discounts__now-label" data-tier-pricing-now-label hidden></span>
+          <span class="smooth-discounts__price smooth-discounts__original-price" data-tier-pricing-price data-original-price="true">
             {{ product.selected_or_first_available_variant.price | money }}
           </span>
-          <span class="sparkly-tier-pricing__price sparkly-tier-pricing__discounted-price" data-discounted-price hidden>
+          <span class="smooth-discounts__price smooth-discounts__discounted-price" data-discounted-price hidden>
             {{ product.selected_or_first_available_variant.price | money }}
           </span>
-          <span class="sparkly-tier-pricing__each-label" data-tier-pricing-each-label>each</span>
-          <s class="sparkly-tier-pricing__struck" data-tier-pricing-struck hidden></s>
+          <span class="smooth-discounts__each-label" data-tier-pricing-each-label>each</span>
+          <s class="smooth-discounts__struck" data-tier-pricing-struck hidden></s>
         </div>
-        <span class="sparkly-tier-pricing__tag" data-tier-pricing-tag hidden></span>
+        <span class="smooth-discounts__tag" data-tier-pricing-tag hidden></span>
       </div>
 
       {%- if discount_metafield != blank -%}
         {%- comment -%} Empty mount point — JS (buildPromoLine) owns the wording. {%- endcomment -%}
-        <p class="sparkly-tier-pricing__promo" data-tier-pricing-promo aria-live="polite" aria-atomic="true"></p>
+        <p class="smooth-discounts__promo" data-tier-pricing-promo aria-live="polite" aria-atomic="true"></p>
       {%- endif -%}
     </div>
 
-    <div class="sparkly-tier-pricing__card" data-tier-pricing-card hidden>
-      <div class="sparkly-tier-pricing__tiers" data-tier-pricing-tiers></div>
-      <div class="sparkly-tier-pricing__rail-card" data-tier-pricing-rail data-offer-state="progress">
-        <div class="sparkly-tier-pricing__status-row" aria-live="polite" aria-atomic="true">
-          <span class="sparkly-tier-pricing__status" data-tier-pricing-status></span>
-          <span class="sparkly-tier-pricing__aside" data-tier-pricing-aside></span>
+    <div class="smooth-discounts__card" data-tier-pricing-card hidden>
+      <div class="smooth-discounts__tiers" data-tier-pricing-tiers></div>
+      <div class="smooth-discounts__rail-card" data-tier-pricing-rail data-offer-state="progress">
+        <div class="smooth-discounts__status-row" aria-live="polite" aria-atomic="true">
+          <span class="smooth-discounts__status" data-tier-pricing-status></span>
+          <span class="smooth-discounts__aside" data-tier-pricing-aside></span>
         </div>
-        <div class="sparkly-tier-pricing__bar-wrap" data-tier-pricing-bar role="progressbar" aria-label="Discount progress">
-          <div class="sparkly-tier-pricing__track">
-            <div class="sparkly-tier-pricing__fill" data-tier-pricing-fill></div>
+        <div class="smooth-discounts__bar-wrap" data-tier-pricing-bar role="progressbar" aria-label="Discount progress">
+          <div class="smooth-discounts__track">
+            <div class="smooth-discounts__fill" data-tier-pricing-fill></div>
           </div>
-          <div class="sparkly-tier-pricing__markers" data-tier-pricing-markers></div>
-          <span class="sparkly-tier-pricing__dot" data-tier-pricing-dot></span>
+          <div class="smooth-discounts__markers" data-tier-pricing-markers></div>
+          <span class="smooth-discounts__dot" data-tier-pricing-dot></span>
         </div>
       </div>
       {%- if discount_metafield != blank -%}
-        <div class="sparkly-tier-pricing__drawer" data-tier-pricing-drawer data-open="false">
-          <button type="button" class="sparkly-tier-pricing__toggle" data-tier-pricing-toggle aria-expanded="false" aria-controls="sparkly-tier-list-{{ block.id }}">
-            <span class="sparkly-tier-pricing__drawer-title">
-              <svg class="sparkly-tier-pricing__icon sparkly-tier-pricing__icon--closed" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M3 3h8v8H3V3zm2 2v4h4V5H5zm8-2h8v5h-8V3zm2 2v1h4V5h-4zM3 13h8v8H3v-8zm2 2v4h4v-4H5zm8-3h8v9h-8v-9zm2 2v5h4v-5h-4z"/></svg>
-              <svg class="sparkly-tier-pricing__icon sparkly-tier-pricing__icon--open" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" focusable="false"><path fill="currentColor" d="M3 17v2h6v-2H3zM3 5v2h10V5H3zm10 16v-2h8v-2h-8v-2h-2v6h2zM7 9v2H3v2h4v2h2V9H7zm14 4v-2H11v2h10zm-6-4h2V7h4V5h-4V3h-2v6z"/></svg>
+        <div class="smooth-discounts__drawer" data-tier-pricing-drawer data-open="false">
+          <button type="button" class="smooth-discounts__toggle" data-tier-pricing-toggle aria-expanded="false" aria-controls="smooth-discounts-list-{{ block.id }}">
+            <span class="smooth-discounts__drawer-title">
+              <svg class="smooth-discounts__icon smooth-discounts__icon--closed" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M3 3h8v8H3V3zm2 2v4h4V5H5zm8-2h8v5h-8V3zm2 2v1h4V5h-4zM3 13h8v8H3v-8zm2 2v4h4v-4H5zm8-3h8v9h-8v-9zm2 2v5h4v-5h-4z"/></svg>
+              <svg class="smooth-discounts__icon smooth-discounts__icon--open" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" focusable="false"><path fill="currentColor" d="M3 17v2h6v-2H3zM3 5v2h10V5H3zm10 16v-2h8v-2h-8v-2h-2v6h2zM7 9v2H3v2h4v2h2V9H7zm14 4v-2H11v2h10zm-6-4h2V7h4V5h-4V3h-2v6z"/></svg>
               <span>Mix &amp; match flavours</span>
             </span>
-            <span class="sparkly-tier-pricing__drawer-aside" aria-hidden="true">
-              <svg class="sparkly-tier-pricing__chevron" viewBox="0 0 24 24" width="16" height="16" focusable="false"><path fill="currentColor" d="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/></svg>
-              <span class="sparkly-tier-pricing__collapse">▲ Collapse</span>
+            <span class="smooth-discounts__drawer-aside" aria-hidden="true">
+              <svg class="smooth-discounts__chevron" viewBox="0 0 24 24" width="16" height="16" focusable="false"><path fill="currentColor" d="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/></svg>
+              <span class="smooth-discounts__collapse">▲ Collapse</span>
             </span>
           </button>
-          <div class="sparkly-tier-pricing__list" id="sparkly-tier-list-{{ block.id }}" data-tier-pricing-list hidden></div>
-          <p class="sparkly-tier-pricing__chosen" data-tier-pricing-chosen hidden></p>
+          <div class="smooth-discounts__list" id="smooth-discounts-list-{{ block.id }}" data-tier-pricing-list hidden></div>
+          <p class="smooth-discounts__chosen" data-tier-pricing-chosen hidden></p>
         </div>
       {%- endif -%}
     </div>
@@ -277,30 +277,30 @@
 </div>
 
 <style>
-  .sparkly-tier-pricing__original-price {
+  .smooth-discounts__original-price {
     transition: all 0.3s ease;
   }
 
   /* While a time-based discount runs, the regular price drops to the same
      struck, smaller, muted treatment the tier discounts use (see
-     `.sparkly-tier-pricing__price s`), and the sale price — which keeps the
+     `.smooth-discounts__price s`), and the sale price — which keeps the
      normal price styling: theme heading font, bold, theme text colour — sits
      to its left. */
-  .sparkly-tier-pricing__original-price[data-strike="true"] {
+  .smooth-discounts__original-price[data-strike="true"] {
     font-weight: 400;
-    font-size: calc(var(--sparkly-tier-price-font-size, 2.5rem) * 0.75);
+    font-size: calc(var(--smooth-discounts-price-font-size, 2.5rem) * 0.75);
     color: var(--color-secondary-text-main, #5b5c4e);
     text-decoration: line-through;
   }
 
-  .sparkly-tier-pricing__discounted-price {
+  .smooth-discounts__discounted-price {
     order: -1;
   }
 </style>
 
 {%- if block.settings.custom_css != blank -%}
   <style>
-    #sparkly-tier-pricing-{{ block.id }} {
+    #smooth-discounts-{{ block.id }} {
       {{ block.settings.custom_css }}
     }
   </style>

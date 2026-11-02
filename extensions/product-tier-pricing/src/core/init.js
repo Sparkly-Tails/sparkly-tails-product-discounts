@@ -18,7 +18,7 @@ function startLoadingComponents(container, config) {
 }
 
 export function initTierPricing() {
-  document.querySelectorAll('[data-sparkly-tier-pricing]').forEach((container) => {
+  document.querySelectorAll('[data-smooth-discounts]').forEach((container) => {
     const config = parseWidgetConfig(container)
     const elements = queryWidgetElements(container)
     const loading = startLoadingComponents(container, config)

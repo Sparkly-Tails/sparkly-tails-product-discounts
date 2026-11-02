@@ -913,8 +913,8 @@ test('the tier stylesheet sizes its text in px, never rem, and caps the price at
   const style = fs.readFileSync(path.join(__dirname, '../product-tier-pricing/src/tier-pricing.css'), 'utf8')
   const remSizes = style.match(/font-size:\s*[\d.]+rem/g) || []
   assert.deepEqual(remSizes, [])
-  assert.match(style, /font-size:\s*min\(var\(--sparkly-tier-price-font-size, 24px\), 36px\)/)
-  assert.match(style, /@media \(max-width: 749px\)[^}]*\{[^}]*font-size:\s*min\(var\(--sparkly-tier-price-font-size, 24px\), 28px\)/)
+  assert.match(style, /font-size:\s*min\(var\(--smooth-discounts-price-font-size, 24px\), 36px\)/)
+  assert.match(style, /@media \(max-width: 749px\)[^}]*\{[^}]*font-size:\s*min\(var\(--smooth-discounts-price-font-size, 24px\), 28px\)/)
 })
 
 // Rows: the number in the cart, and an Add link to the product unless it is the one on the page or sold out.

@@ -37,11 +37,11 @@ describe('tier-pricing.liquid: the style of a discount', () => {
   })
 
   it('takes the accent colour from the block setting alone', () => {
-    expect(block).toContain('--sparkly-tier-moss: {{ block.settings.moss_color }};')
+    expect(block).toContain('--smooth-discounts-moss: {{ block.settings.moss_color }};')
   })
 
   it('sets the radius variable only when the discount has a radius, and escapes the whole style attribute', () => {
-    expect(block).toContain('--sparkly-tier-radius')
+    expect(block).toContain('--smooth-discounts-radius')
     expect(block).toMatch(/style="\{\{ style_vars \| strip \| escape \}\}"/)
   })
 })
@@ -58,19 +58,19 @@ describe('tier-pricing.liquid: the colour check', () => {
 
 describe('tier-pricing.css: the radius variable', () => {
   it('has a radius variable that is 16px by default, with a medium and a small one derived from it', () => {
-    expect(css).toContain('--sparkly-tier-radius: 16px;')
-    expect(css).toContain('--sparkly-tier-radius-md: calc(var(--sparkly-tier-radius) * 0.75);')
-    expect(css).toContain('--sparkly-tier-radius-sm: calc(var(--sparkly-tier-radius) * 0.5);')
+    expect(css).toContain('--smooth-discounts-radius: 16px;')
+    expect(css).toContain('--smooth-discounts-radius-md: calc(var(--smooth-discounts-radius) * 0.75);')
+    expect(css).toContain('--smooth-discounts-radius-sm: calc(var(--smooth-discounts-radius) * 0.5);')
   })
 
   it('uses it for the card and the boxes and chips inside it, in place of fixed pixel radii', () => {
     const rule = (selector: string) => css.slice(css.indexOf(`${selector} {`), css.indexOf('}', css.indexOf(`${selector} {`)))
-    expect(rule('.sparkly-tier-pricing--card')).toContain('border-radius: var(--sparkly-tier-radius);')
-    for (const selector of ['.sparkly-tier-pricing__rail-card', '.sparkly-tier-pricing__drawer', '.sparkly-tier-pricing__toggle', '.sparkly-tier-pricing__list-item']) {
-      expect(rule(selector)).toContain('border-radius: var(--sparkly-tier-radius-md);')
+    expect(rule('.smooth-discounts--card')).toContain('border-radius: var(--smooth-discounts-radius);')
+    for (const selector of ['.smooth-discounts__rail-card', '.smooth-discounts__drawer', '.smooth-discounts__toggle', '.smooth-discounts__list-item']) {
+      expect(rule(selector)).toContain('border-radius: var(--smooth-discounts-radius-md);')
     }
-    for (const selector of ['.sparkly-tier-pricing__chip', '.sparkly-tier-pricing__list-thumb']) {
-      expect(rule(selector)).toContain('border-radius: var(--sparkly-tier-radius-sm);')
+    for (const selector of ['.smooth-discounts__chip', '.smooth-discounts__list-thumb']) {
+      expect(rule(selector)).toContain('border-radius: var(--smooth-discounts-radius-sm);')
     }
   })
 })
