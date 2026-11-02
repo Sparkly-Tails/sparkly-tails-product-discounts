@@ -35,3 +35,15 @@ So the saved background colour is not lost anywhere between the form and the sto
 - **Round corners and Price size** share one row, a half of the width each (one `grid grid-cols-2`); the sliders line up.
 - **The colour in use** is the first circle of the swatch row (a `role="img"` named "Current colour #RRGGBB[AA]"), laid over a checkerboard so any transparency shows. The seven swatches follow it and keep their own chosen state. It shows a colour typed, picked from a swatch or set in the picker.
 - The change applies to the Create and the Edit form alike: they are one component.
+
+## The real cause of "the colour never reaches the storefront" (found 2026-11-02, after the layout PR)
+
+On a product with a live discount and no flash sale (The Multi-managed Snowboard, saved with `backgroundColor #191C16`), the page printed:
+
+`--sparkly-tier-cream: <!-- BEGIN app snippet: sparkly-safe-hex -->#191C16<!-- END app snippet -->;`
+
+Shopify wraps the output of every **app snippet** it renders in HTML comments. Inside a `style` attribute that is not a colour, so the browser dropped the value, the stylesheet's `var(--sparkly-tier-surface)` had nothing to use, and the rail, chips and drawer stayed transparent (white on the white card). The corner radius and the price size do not go through a snippet, so they worked. The same cause is why the old theme colour "did nothing".
+
+An earlier check of the snippet on real Shopify passed because it ran the snippet as a plain theme snippet, which gets no comments; the earlier explanation (ended flash sales) was true for those discounts but not the whole story.
+
+The fix: the colour check (`#` plus exactly six or eight hexadecimal digits) is written inline in `tier-pricing.liquid` and the `sparkly-safe-hex` snippet is removed. A test now requires that the block renders no snippet. Checked on real Shopify through `shopify app dev` against the saved product: the style attribute is `--sparkly-tier-cream: #191C16`, and the rail and chips compute to `rgb(25, 28, 22)`.

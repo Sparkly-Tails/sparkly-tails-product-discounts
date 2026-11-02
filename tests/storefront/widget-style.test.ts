@@ -1,11 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { CORNER_RADIUS_RANGE, PRICE_SIZE_RANGE } from '@/lib/widgetStyle'
 
 const extension = (path: string) => readFileSync(join(process.cwd(), 'extensions/product-tier-pricing', path), 'utf8')
 const block = extension('blocks/tier-pricing.liquid')
-const hexSnippet = extension('snippets/sparkly-safe-hex.liquid')
 const css = extension('src/tier-pricing.css')
 
 describe('tier-pricing.liquid: the style of a discount', () => {
@@ -19,9 +18,17 @@ describe('tier-pricing.liquid: the style of a discount', () => {
     for (const setting of ['moss_color', 'cream_color', 'price_font_size', 'sun_color']) expect(block).toContain(`block.settings.${setting}`)
   })
 
-  it('lets a colour through only after the hex snippet has checked it', () => {
-    expect(block).toContain("render 'sparkly-safe-hex'")
-    expect(block).toContain("hex: style_value.backgroundColor")
+  it('lets a colour through only after the check in the block has passed it', () => {
+    expect(block).toContain('style_value.backgroundColor | strip | upcase')
+    expect(block).toContain('{%- assign style_background = candidate -%}')
+  })
+
+  // Shopify wraps every app snippet it renders in HTML comments (<!-- BEGIN app snippet: ... -->), so a value
+  // printed by a snippet into the style attribute is not a colour any more and the browser drops it. This is
+  // what made the saved colour never reach the storefront: the block must not render a snippet for it.
+  it('renders no snippet: the colour check is inline, because Shopify puts comments around app snippets', () => {
+    expect(block).not.toMatch(/\{%-?\s*render\b/)
+    expect(existsSync(join(process.cwd(), 'extensions/product-tier-pricing/snippets/sparkly-safe-hex.liquid'))).toBe(false)
   })
 
   it('keeps the numbers inside the ranges the form allows', () => {
@@ -39,12 +46,13 @@ describe('tier-pricing.liquid: the style of a discount', () => {
   })
 })
 
-describe('the sparkly-safe-hex snippet', () => {
+describe('tier-pricing.liquid: the colour check', () => {
   it('prints a colour only when it is # and exactly six or eight hexadecimal digits', () => {
-    expect(hexSnippet).toContain("first_character == '#' and candidate.size == 7 or first_character == '#' and candidate.size == 9")
-    expect(hexSnippet).toContain("slice: 0, 1")
-    expect(hexSnippet).toContain('slice: 1, 8')
-    for (const digit of '0123456789ABCDEF') expect(hexSnippet).toContain(`remove: '${digit}'`)
+    expect(block).toContain("first_character == '#' and candidate.size == 7 or first_character == '#' and candidate.size == 9")
+    expect(block).toContain("slice: 0, 1")
+    expect(block).toContain('slice: 1, 8')
+    for (const digit of '0123456789ABCDEF') expect(block).toContain(`remove: '${digit}'`)
+    expect(block).toContain('leftover == blank')
   })
 })
 
