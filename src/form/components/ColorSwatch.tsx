@@ -1,7 +1,5 @@
 import { CheckIcon } from '@/form/components/icons'
 
-const THEME_CHOSEN = 'border-2 border-form-surface-container-lowest ring-2 ring-form-secondary text-white'
-const THEME_IDLE = 'border-2 border-transparent hover:scale-105 transition-transform'
 const BACKGROUND_CHOSEN = 'border-2 border-form-primary ring-2 ring-form-secondary/30 text-form-primary'
 const BACKGROUND_IDLE = 'border hover:scale-105 transition-transform'
 const DEFAULT_EDGE = 'border-form-outline-variant/40'
@@ -27,10 +25,6 @@ function SwatchButton({ label, hex, className, isSelected, onSelect }: SwatchPro
       {isSelected ? <CheckIcon className="text-[16px]" /> : null}
     </button>
   )
-}
-
-export function ThemeSwatch(props: SwatchProps) {
-  return <SwatchButton {...props} className={props.isSelected ? THEME_CHOSEN : THEME_IDLE} />
 }
 
 /** `edgeClass` is the outline of the swatch when it is not chosen, for the one swatch whose outline differs. */
