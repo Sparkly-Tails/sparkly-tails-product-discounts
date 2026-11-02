@@ -42,10 +42,12 @@ export function prepareMedia({ media }) {
   if (!POSITIONED_VALUES.includes(style.position)) media.classList.add('smooth-discounts-card__media')
 }
 
-/** The tag goes on the product image like the theme's sale badge; a card without an image has it under the price. */
+/** The tag goes on the product image and takes the classes of the card's own badge (the sale tag), so it is set in the theme's badge style; a card without an image has it under the price. */
 export function placeTag({ tag, block, root, tools }) {
   const media = tools.findMediaElement({ root })
   if (media === null) return block.insertAdjacentElement('afterend', tag)
+  const badge = root.querySelector('.badge')
+  if (badge !== null) tag.className += ' ' + badge.className
   tools.prepareMedia({ media })
   tag.classList.add('smooth-discounts-card__tag--image')
   media.appendChild(tag)

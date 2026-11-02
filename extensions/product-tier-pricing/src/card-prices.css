@@ -19,8 +19,9 @@
   font-weight: 600;
 }
 
-/* The tag is a pill. The colour is forced because themes set the colour of the links and prices that wrap a card. */
-.smooth-discounts-card__tag {
+/* Under the price (a card with no image): a pill. The colour is forced because themes colour the links and prices that wrap a card.
+   A tag that took the classes of the theme's badge is left to the theme. */
+.smooth-discounts-card__tag:not(.badge) {
   display: inline-block;
   margin-top: 0.25em;
   padding: 0.15em 0.6em;
@@ -31,21 +32,33 @@
   line-height: 1.5;
 }
 
-/* On the product image, in the top left corner (the sale and sold out badges of most themes sit at the bottom). */
+/* On the product image, in the top left corner (the sale and sold out badges of most themes sit at the bottom).
+   Themes stretch everything in an image holder to the full image (Dawn: ".media > *"), so the size and place are forced. */
 .smooth-discounts-card__media {
   position: relative;
 }
 
 .smooth-discounts-card__tag--image {
-  position: absolute;
-  top: 12px;
-  left: 12px;
+  position: absolute !important;
+  top: 12px !important;
+  left: 12px !important;
+  width: auto !important;
+  height: auto !important;
+  max-width: none !important;
+  display: inline-block !important;
   z-index: 2;
   margin: 0;
-  padding: 4px 12px;
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 1.4;
-  letter-spacing: 0.02em;
   pointer-events: none;
+}
+
+/* The look of a theme badge (Dawn's sizes), in the theme's badge colours when it has them, for a card with no badge to copy. */
+.smooth-discounts-card__tag--image:not(.badge) {
+  padding: 5px 13px 6px;
+  border: 1px solid transparent;
+  border-radius: var(--badge-corner-radius, 40px);
+  background: rgb(var(--color-badge-background, 67 70 37));
+  color: rgb(var(--color-foreground, 255 255 255)) !important;
+  font-size: 12px;
+  letter-spacing: 1px;
+  line-height: 1;
 }

@@ -172,8 +172,24 @@ describe('where the offer goes on a card', () => {
     expect(holders[1].classList.contains('smooth-discounts-card__media')).toBe(true)
   })
 
-  it('forces the white text of the tag, because themes colour the links and prices that wrap a card', () => {
-    expect(built['card-prices.css']).toMatch(/smooth-discounts-card__tag\{[^}]*color:#fff!important/)
+  it('gives the tag the classes of the theme\'s own badge on the card, so it looks like the sale tag', async () => {
+    const card = splitCardHtml('tuna').replace('<img alt="">', '<img alt=""><span class="badge badge--bottom-left color-scheme-3">Sale</span>')
+    await mountPage({ cards: card, discounts: [discountOf([memberOf('tuna')])] })
+    const tag = document.querySelector('.smooth-discounts-card__tag') as HTMLElement
+    expect(tag.classList.contains('badge')).toBe(true)
+    expect(tag.classList.contains('color-scheme-3')).toBe(true)
+    expect(document.querySelector('.badge')!.textContent).toBe('Sale')
+  })
+
+  it('has no theme classes on the tag when the card has no badge', async () => {
+    await mountPage({ cards: splitCardHtml('tuna'), discounts: [discountOf([memberOf('tuna')])] })
+    expect((document.querySelector('.smooth-discounts-card__tag') as HTMLElement).className).toBe('smooth-discounts-card__tag smooth-discounts-card__tag--image')
+  })
+
+  it('sets the size and place of the tag over the theme\'s rule that stretches everything in an image holder, and its own colours only when the theme gave none', () => {
+    const css = built['card-prices.css']
+    for (const rule of ['position:absolute!important', 'top:12px!important', 'left:12px!important', 'width:auto!important', 'height:auto!important', 'max-width:none!important']) expect(css).toContain(rule)
+    expect(css).toMatch(/smooth-discounts-card__tag:not\(\.badge\)\{[^}]*color:#fff!important/)
   })
 
   it('keeps the tag under the price when the card has no image', async () => {
