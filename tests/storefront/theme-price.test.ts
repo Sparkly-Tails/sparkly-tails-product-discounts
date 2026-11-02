@@ -187,21 +187,22 @@ describe('a theme that prints the price twice, one of them hidden', () => {
   })
 })
 
-describe('the theme\'s "Sale" badge while the tier price shows', () => {
+describe('the theme\'s "Sale" badge next to the price the widget found', () => {
   const badge = () => document.getElementById('sale-badge') as HTMLElement
 
-  it('is hidden while a tier applies, and no other badge is', async () => {
+  it('is hidden, and no other badge is', async () => {
     await mountProductPage({ quantity: 10, priceHtml: dawnSalePriceHtml() })
     expect(badge().style.display).toBe('none')
     expect((document.getElementById('sold-badge') as HTMLElement).style.display).toBe('')
   })
 
-  it('comes back as the theme drew it below the first tier, with its own inline display kept', async () => {
-    await mountProductPage({ quantity: 10, priceHtml: dawnSalePriceHtml().replace('id="sale-badge"', 'id="sale-badge" style="display:inline-flex"') })
+  it('is hidden at quantity 1 too, before any tier applies, and stays hidden as the quantity moves', async () => {
+    await mountProductPage({ quantity: 1, priceHtml: dawnSalePriceHtml() })
+    expect(badge().style.display).toBe('none')
+    await setQuantity(10)
     expect(badge().style.display).toBe('none')
     await setQuantity(1)
-    expect(badge().style.display).toBe('inline-flex')
-    expect(badge().hasAttribute('data-smooth-discounts-hid')).toBe(false)
+    expect(badge().style.display).toBe('none')
   })
 
   it('is found by its word in any letter case, not by a class', async () => {

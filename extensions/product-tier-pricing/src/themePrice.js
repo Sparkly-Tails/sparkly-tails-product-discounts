@@ -111,7 +111,7 @@ export function paintFoundPrice({ priceEl, rootEl, viewModel, tools }) {
   if (!priceEl) return
   if (viewModel.discountedPrice) tools.paintUnitPrice({ priceEl, plainPrice: viewModel.plainPrice, discountedPrice: viewModel.discountedPrice, tools })
   else tools.restorePrice({ priceEl, tools })
-  tools.paintSaleBadge({ priceEl, rootEl, isDiscounted: Boolean(viewModel.discountedPrice), tools })
+  tools.paintSaleBadge({ priceEl, rootEl, tools })
 }
 
 export function paintThemePrice({ elements, viewModel, tools }) {

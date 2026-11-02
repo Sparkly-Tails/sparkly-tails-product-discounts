@@ -1,6 +1,7 @@
-// The theme's own "Sale" badge, hidden while the tier unit price shows in the theme's price. The badge is found by its word
-// (the text "Sale" alone, in any letter case) among the elements a few levels around the price, never by a class name. It is
-// hidden with an inline `display: none`, which no theme rule overrides, and the display it had is put back below the first tier.
+// The theme's own "Sale" badge, hidden whenever the widget has found the theme's price, at any quantity: the widget's tier
+// price replaces the theme's sale look. The badge is found by its word (the text "Sale" alone, in any letter case) among the
+// elements a few levels around the price, never by a class name. It is hidden with an inline `display: none`, which no theme
+// rule overrides.
 // Every step comes in through `tools`, so each one can be tried alone.
 
 const HIDDEN_ATTRIBUTE = 'data-smooth-discounts-hid'
@@ -40,17 +41,10 @@ export function hideBadge(badge) {
   badge.style.display = 'none'
 }
 
-export function showBadge(badge) {
-  badge.style.display = badge.getAttribute(HIDDEN_ATTRIBUTE)
-  badge.removeAttribute(HIDDEN_ATTRIBUTE)
-}
-
-export function paintSaleBadge({ priceEl, rootEl, isDiscounted, tools }) {
-  const badges = tools.findSaleBadges({ priceEl, rootEl, tools })
-  if (isDiscounted) badges.forEach(tools.hideBadge)
-  else badges.filter(tools.isMarkedBadge).forEach(tools.showBadge)
+export function paintSaleBadge({ priceEl, rootEl, tools }) {
+  tools.findSaleBadges({ priceEl, rootEl, tools }).forEach(tools.hideBadge)
 }
 
 export const SALE_BADGE_TOOLS = {
-  isSaleText, isMarkedBadge, isShownSaleText, isSaleBadge, findBadgeRoot, findSaleBadges, hideBadge, showBadge, paintSaleBadge,
+  isSaleText, isMarkedBadge, isShownSaleText, isSaleBadge, findBadgeRoot, findSaleBadges, hideBadge, paintSaleBadge,
 }
