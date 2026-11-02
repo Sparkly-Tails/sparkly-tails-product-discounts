@@ -207,9 +207,9 @@ describe('TierDiscountForm: the preview follows the form', () => {
 })
 
 describe('TierDiscountForm: the order of the cards', () => {
-  it('has Details, the products, the flash sale, the tiers and the design, in that order', () => {
+  it('has Details, the products, the tiers, the flash sale and the design, in that order', () => {
     renderForm()
-    const cards = ['Details', 'Products & variants', 'Flash sale', 'Tiers', 'Design']
+    const cards = ['Details', 'Products & variants', 'Tiers', 'Flash sale', 'Design']
     const shown = screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent ?? '').filter((name) => cards.includes(name))
     expect(shown).toEqual(cards)
   })

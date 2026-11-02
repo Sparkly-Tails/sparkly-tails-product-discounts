@@ -146,6 +146,52 @@ describe('DesignCard', () => {
   })
 })
 
+describe('DesignCard: the colour in use', () => {
+  it('is shown in the first circle, before the swatches', () => {
+    render(<Harness />)
+    const circle = screen.getByRole('img', { name: 'Current colour #F5EFE1' })
+    const row = circle.parentElement as HTMLElement
+    expect(row.firstElementChild).toBe(circle)
+    expect(row.querySelectorAll('button').length).toBeGreaterThanOrEqual(7)
+  })
+
+  it('follows the colour chosen from a swatch, typed, or picked in the picker, solid or partly transparent', () => {
+    render(<Harness />)
+    fireEvent.click(screen.getByRole('button', { name: 'Soft Gray' }))
+    expect(screen.getByRole('img', { name: 'Current colour #F3F4F6' })).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Background colour code'), { target: { value: '#2a9d8f' } })
+    expect(screen.getByRole('img', { name: 'Current colour #2A9D8F' })).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Background colour code'), { target: { value: '#ffffffcc' } })
+    expect(screen.getByRole('img', { name: 'Current colour #FFFFFFCC' })).toBeInTheDocument()
+    fireEvent.click(openPicker().querySelector('[aria-label="Transparency"]') as HTMLElement)
+    fireEvent.change(within(screen.getByRole('dialog')).getByRole('slider', { name: 'Transparency' }), { target: { value: '40' } })
+    expect(screen.getByRole('img', { name: 'Current colour #FFFFFF66' })).toBeInTheDocument()
+  })
+
+  it('paints the colour itself, over a checkerboard so transparency can be seen', () => {
+    render(<Harness initial={{ ...DEFAULT_WIDGET_STYLE, backgroundColor: '#2A9D8F' }} />)
+    const circle = screen.getByRole('img', { name: 'Current colour #2A9D8F' })
+    expect(circle.querySelector('[data-colour]')).toHaveStyle({ backgroundColor: 'rgb(42, 157, 143)' })
+    expect(circle.style.backgroundImage).toContain('linear-gradient')
+  })
+
+  it('keeps the last whole colour while a code is half typed', () => {
+    render(<Harness />)
+    fireEvent.change(screen.getByLabelText('Background colour code'), { target: { value: '#12' } })
+    expect(screen.getByRole('img', { name: 'Current colour #F5EFE1' })).toBeInTheDocument()
+  })
+})
+
+describe('DesignCard: the layout', () => {
+  it('puts Round corners and Price size in one row, a half of the width each', () => {
+    render(<Harness />)
+    const row = screen.getByRole('slider', { name: 'Round corners' }).closest('.grid') as HTMLElement
+    expect(row).not.toBeNull()
+    expect(row).toHaveClass('grid-cols-2')
+    expect(row).toContainElement(screen.getByRole('slider', { name: 'Price size' }))
+  })
+})
+
 describe('DesignCard: the colour picker', () => {
   it('is closed until the colour picker icon is pressed', () => {
     render(<Harness />)
@@ -155,6 +201,13 @@ describe('DesignCard: the colour picker', () => {
     fireEvent.click(icon)
     expect(icon).toHaveAttribute('aria-expanded', 'true')
     expect(screen.getByRole('dialog', { name: 'Colour picker' })).toBeInTheDocument()
+  })
+
+  it('is 60% of the width of the Design card, not all of it', () => {
+    render(<Harness />)
+    const panel = openPicker()
+    expect(panel).toHaveClass('w-3/5')
+    expect(panel).not.toHaveClass('right-0')
   })
 
   it('shows the red, green, blue and transparency of the colour it opens with', () => {

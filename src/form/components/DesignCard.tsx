@@ -42,8 +42,10 @@ export default function DesignCard({ style, onChange }: { style: WidgetStyle; on
         </div>
         <div hidden={!isOpen} className="pt-2 space-y-3">
           <BackgroundColors hex={style.backgroundColor} text={backgroundText} onTextChange={updateBackgroundText} onPick={pickBackground} />
-          <CornerRadius value={style.cornerRadius} onChange={(cornerRadius) => onChange({ ...style, cornerRadius })} />
-          <PriceSize value={style.priceSize} onChange={(priceSize) => onChange({ ...style, priceSize })} />
+          <div className="grid grid-cols-2 gap-4 pt-3 border-t border-form-outline-variant/20">
+            <CornerRadius value={style.cornerRadius} onChange={(cornerRadius) => onChange({ ...style, cornerRadius })} />
+            <PriceSize value={style.priceSize} onChange={(priceSize) => onChange({ ...style, priceSize })} />
+          </div>
         </div>
       </div>
     </div>

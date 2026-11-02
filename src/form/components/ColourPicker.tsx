@@ -1,13 +1,12 @@
 'use client'
 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { BackgroundSwatch } from '@/form/components/ColorSwatch'
+import { BackgroundSwatch, CHECKERBOARD } from '@/form/components/ColorSwatch'
 import { ColorizeIcon } from '@/form/components/icons'
 import { joinColour, splitColour } from '@/form/colour'
 import { BACKGROUND_COLORS, PALETTE_COLORS } from '@/form/designOptions'
 
 const PRESETS = [...BACKGROUND_COLORS, ...PALETTE_COLORS]
-const CHECKERBOARD = 'linear-gradient(45deg, #d1d5db 25%, transparent 25%, transparent 75%, #d1d5db 75%), linear-gradient(45deg, #d1d5db 25%, #ffffff 25%, #ffffff 75%, #d1d5db 75%)'
 const LABEL = 'text-form-label-sm text-form-on-surface font-medium'
 const NUMBER_BOX = 'w-14 h-8 px-2 rounded-lg bg-form-surface-container-low border border-form-outline-variant/60 font-mono text-[12px] text-form-on-surface text-right focus:outline-none focus:border-form-secondary'
 
@@ -33,7 +32,8 @@ function ChannelField({ label, value, max, onChange }: { label: string; value: n
 
 // The colour picker icon, and the panel it opens: a selection of colours, the red, green and blue of the
 // colour, and how transparent it is. `children` is the code box the icon sits in, so pressing it keeps the panel open.
-// It needs a positioned section around it (the Background colour group): the panel opens below that section.
+// It needs a positioned section around it (the Background colour group): the panel opens below that section,
+// 60% of its width.
 // The colour is a code: #RRGGBB while solid, #RRGGBBAA once it is partly transparent.
 export default function ColourPicker({ hex, onChange, children }: { hex: string; onChange: (hex: string) => void; children: ReactNode }) {
   const [isOpen, setIsOpen] = useState(false)
@@ -74,7 +74,7 @@ export default function ColourPicker({ hex, onChange, children }: { hex: string;
         </button>
       </div>
       {isOpen ? (
-        <div role="dialog" aria-label="Colour picker" className="absolute left-0 right-0 top-full mt-2 z-20 p-3 space-y-3 rounded-lg bg-form-surface-container-lowest border border-form-outline-variant/40 shadow-lg">
+        <div role="dialog" aria-label="Colour picker" className="absolute left-0 top-full mt-2 z-20 w-3/5 min-w-[16rem] p-3 space-y-3 rounded-lg bg-form-surface-container-lowest border border-form-outline-variant/40 shadow-lg">
           <div className="flex items-center gap-2 flex-wrap">
             {PRESETS.map((color) => (
               <BackgroundSwatch key={color.hex} label={color.label} hex={color.hex} edgeClass={color.edgeClass} isSelected={color.hex === hex} onSelect={() => choosePreset(color.hex)} />
