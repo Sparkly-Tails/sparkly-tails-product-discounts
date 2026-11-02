@@ -1,4 +1,4 @@
-// Reads the three style fields of the Design card from the form. A field that is missing or bad becomes its default.
+// Reads the two style fields of the Design card from the form. A field that is missing or bad becomes its default.
 import { readWidgetStyle, type WidgetStyle, type readHexColor, type readWholeNumber } from '@/lib/widgetStyle'
 
 export type StyleTools = { readWidgetStyle: typeof readWidgetStyle; readHexColor: typeof readHexColor; readWholeNumber: typeof readWholeNumber }
@@ -9,7 +9,6 @@ export function parseStyleFromForm({ formData, tools }: { formData: FormData; to
     values: {
       backgroundColor: String(formData.get('style-backgroundColor')),
       cornerRadius: String(formData.get('style-cornerRadius')),
-      priceSize: String(formData.get('style-priceSize')),
     },
     tools,
   })

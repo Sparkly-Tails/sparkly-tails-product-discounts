@@ -191,11 +191,9 @@ describe('TierDiscountForm: Discard', () => {
 })
 
 describe('TierDiscountForm: the preview follows the form', () => {
-  const price = () => document.querySelector('[data-tier-pricing-price]')
-
   it('shows the widget for the chosen product, or asks for one', () => {
     renderForm()
-    expect(price()).toHaveTextContent('$28.00')
+    expect(screen.getByRole('button', { name: '3 × $75.60' })).toBeInTheDocument()
     cleanup()
     renderForm({ mode: 'create', initial: EMPTY, initialTiers: EMPTY_TIERS })
     expect(screen.getByText('Add a product to see the preview')).toBeInTheDocument()
@@ -246,25 +244,25 @@ describe('TierDiscountForm: the order of the cards', () => {
 })
 
 describe('TierDiscountForm: the style', () => {
-  it('sends the three style values of the Design card to the save action, the defaults when it was left alone', async () => {
+  it('sends the two style values of the Design card to the save action, the defaults when it was left alone', async () => {
     const { saveAction } = renderForm()
     await act(async () => { fireEvent.submit(theForm()) })
     const formData = (saveAction.mock.calls[0] as unknown as [unknown, FormData])[1]
-    expect([formData.get('style-backgroundColor'), formData.get('style-cornerRadius'), formData.get('style-priceSize')]).toEqual(['#F5EFE1', '12', '24'])
+    expect([formData.get('style-backgroundColor'), formData.get('style-cornerRadius')]).toEqual(['#F5EFE1', '12'])
     expect(formData.has('style-themeColor')).toBe(false)
   })
 
   it('paints the preview with the chosen style at once, and sends it', async () => {
     const { saveAction } = renderForm()
     fireEvent.click(screen.getByRole('button', { name: 'White' }))
-    fireEvent.change(screen.getByRole('slider', { name: 'Price size' }), { target: { value: '36' } })
+    fireEvent.change(screen.getByRole('slider', { name: 'Round corners' }), { target: { value: '8' } })
     const widget = document.querySelector('.smooth-discounts') as HTMLElement
     expect(widget.style.getPropertyValue('--smooth-discounts-cream')).toBe('#FFFFFF')
-    expect(widget.style.getPropertyValue('--smooth-discounts-price-font-size')).toBe('36px')
+    expect(widget.style.getPropertyValue('--smooth-discounts-radius')).toBe('8px')
     await act(async () => { fireEvent.submit(theForm()) })
     const formData = (saveAction.mock.calls[0] as unknown as [unknown, FormData])[1]
     expect(formData.get('style-backgroundColor')).toBe('#FFFFFF')
-    expect(formData.get('style-priceSize')).toBe('36')
+    expect(formData.get('style-cornerRadius')).toBe('8')
   })
 
   it('counts a changed style as an unsaved change, and Discard takes it back', () => {

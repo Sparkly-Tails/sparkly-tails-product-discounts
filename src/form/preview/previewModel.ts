@@ -73,7 +73,6 @@ export function readQuantity({ text, tools }: { text: string; tools: { clampQuan
 /** The CSS variables the storefront block sets on the widget for a discount's style (the same names, so the same stylesheet paints it). */
 export function buildWidgetStyleVars({ style }: { style: WidgetStyle }): Record<string, string> {
   return {
-    '--smooth-discounts-price-font-size': `${style.priceSize}px`,
     '--smooth-discounts-cream': style.backgroundColor,
     '--smooth-discounts-sun': '#ffdc4c',
     '--smooth-discounts-radius': `${style.cornerRadius}px`,

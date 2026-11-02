@@ -133,7 +133,7 @@ describe('buildProductMetafields: flash sale and High Demand', () => {
   })
 
   it('carries the style of the discount as plain values, and null for a discount that has none', () => {
-    const style = { backgroundColor: '#FFFFFF80', cornerRadius: 4, priceSize: 30 }
+    const style = { backgroundColor: '#FFFFFF80', cornerRadius: 4 }
     expect(buildProductMetafields({ ...mix, style }, P1, SIBLING_REFERENCE_LIMIT).value.style).toEqual(style)
     expect(buildProductMetafields(mix, P1, SIBLING_REFERENCE_LIMIT).value.style).toBeNull()
   })

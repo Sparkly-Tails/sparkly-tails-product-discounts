@@ -2,7 +2,6 @@ import { BackgroundSwatch, CurrentColour } from '@/form/components/ColorSwatch'
 import ColourPicker from '@/form/components/ColourPicker'
 import { CropSquareIcon, SquareIcon } from '@/form/components/icons'
 import { BACKGROUND_COLORS, formatHexColor } from '@/form/designOptions'
-import { PRICE_SIZE_RANGE } from '@/lib/widgetStyle'
 
 const LABEL = 'text-form-label-sm text-form-on-surface font-medium'
 
@@ -62,30 +61,6 @@ export function CornerRadius({ value, onChange }: { value: number; onChange: (va
           className="w-full h-1.5 bg-form-surface-container rounded-lg appearance-none cursor-pointer accent-form-primary"
         />
         <CropSquareIcon className="text-[18px] text-form-on-surface-variant flex-shrink-0" />
-      </div>
-    </div>
-  )
-}
-
-export function PriceSize({ value, onChange }: { value: number; onChange: (value: number) => void }) {
-  return (
-    <div className="space-y-2.5">
-      <div className="flex items-center justify-between">
-        <span className={`${LABEL} block`}>Price size</span>
-        <span className="font-mono font-medium text-[12px] px-2 py-0.5 rounded bg-form-surface-container text-form-on-surface">{value} px</span>
-      </div>
-      {/* As tall as the Round corners row beside it (its icons are 18px), so the two sliders line up. */}
-      <div className="flex items-center h-[18px]">
-        <input
-          type="range"
-          aria-label="Price size"
-          min={PRICE_SIZE_RANGE.min}
-          max={PRICE_SIZE_RANGE.max}
-          step={1}
-          value={value}
-          onChange={(event) => onChange(Number(event.target.value))}
-          className="w-full h-1.5 bg-form-surface-container rounded-lg appearance-none cursor-pointer accent-form-primary"
-        />
       </div>
     </div>
   )

@@ -35,10 +35,11 @@ describe('flash sale in the tier widget', () => {
     vi.useFakeTimers({ now: nowSeconds * 1000 })
     document.body.innerHTML = `
       <input name="quantity" value="${quantity}">
+      <div class="price"><span class="price-item">£1.69</span></div>
       <div id="smooth-discounts-f1" class="smooth-discounts smooth-discounts--card" data-smooth-discounts
         data-discount='${JSON.stringify({ ...discount, ...(tiers ? { tiers } : {}) })}'
         data-product-id='"gid://shopify/Product/9"' data-selected-variant-id="10"
-        data-base-price="1.69" data-compare-at-price="0" data-money-format='"£{{amount}}"' data-high-demand="false"
+        data-base-price="1.69" data-money-format='"£{{amount}}"' data-high-demand="false"
         data-flash='${JSON.stringify(flash)}'>
         <div data-tier-pricing-flash data-variant="hidden" hidden>
           <div><span data-flash-label></span></div>
@@ -47,12 +48,6 @@ describe('flash sale in the tier widget', () => {
         <div class="smooth-discounts__body">
           <div class="smooth-discounts__summary">
             <div class="smooth-discounts__price-row">
-              <div class="smooth-discounts__price-group">
-                <span data-tier-pricing-now-label hidden></span>
-                <span data-tier-pricing-price>£1.69</span>
-                <span data-tier-pricing-each-label>each</span>
-                <s data-tier-pricing-struck hidden></s>
-              </div>
               <span data-tier-pricing-tag hidden></span>
             </div>
             <p data-tier-pricing-promo></p>
@@ -84,7 +79,7 @@ describe('flash sale in the tier widget', () => {
   }
   const widget = () => document.querySelector('[data-smooth-discounts]') as HTMLElement
   const cardHidden = () => (document.querySelector('[data-tier-pricing-card]') as HTMLElement).hidden
-  const price = () => (document.querySelector('[data-tier-pricing-price]') as HTMLElement).textContent!.trim()
+  const price = () => (document.querySelector('.price-item') as HTMLElement).textContent!.replace(/\s+/g, ' ').trim()
   const hasChrome = () => widget().classList.contains('smooth-discounts--card')
 
   async function setQuantity(value: number) {
@@ -109,8 +104,6 @@ describe('flash sale in the tier widget', () => {
     expect((document.querySelector('[data-tier-pricing-drawer]') as HTMLElement).hidden).toBe(true)
     expect((document.querySelector('[data-tier-pricing-tag]') as HTMLElement).hidden).toBe(true)
     // the price now, and the price from the start (the most discounted tier)
-    const nowLabel = document.querySelector('[data-tier-pricing-now-label]') as HTMLElement
-    expect([nowLabel.hidden, nowLabel.textContent]).toEqual([false, 'It is now:'])
     expect((document.querySelector('[data-tier-pricing-promo]') as HTMLElement).textContent).toBe('Get it from: £1.69') // 3 units: below the first tier
     await setQuantity(16)
     expect((document.querySelector('[data-tier-pricing-promo]') as HTMLElement).textContent).toBe('Get it from: £1.55') // 16 units: the top tier
@@ -127,7 +120,6 @@ describe('flash sale in the tier widget', () => {
     expect(bar()).toEqual({ hidden: false, variant: 'ends', label: 'Flash sale ends in', timer: ['04', '18', '49'], aside: '', chip: '' })
     expect([cardHidden(), hasChrome()]).toEqual([false, true])
     expect((document.querySelector('[data-tier-pricing-tiers]') as HTMLElement).hidden).toBe(false)
-    expect((document.querySelector('[data-tier-pricing-now-label]') as HTMLElement).hidden).toBe(true)
     expect((document.querySelector('[data-tier-pricing-status]') as HTMLElement).textContent).toBe('You have 3 units')
   })
 
@@ -185,7 +177,7 @@ describe('flash sale in the tier widget', () => {
     await vi.advanceTimersByTimeAsync(1000)
     expect([bar().hidden, cardHidden(), hasChrome()]).toEqual([true, true, false])
     expect(price()).toBe('£1.69')
-    expect((document.querySelector('[data-tier-pricing-struck]') as HTMLElement).hidden).toBe(true)
+    expect(document.querySelector('[data-smooth-discounts-was]')).toBeNull()
   })
 
   it('a page opened after the end shows only the plain price', async () => {

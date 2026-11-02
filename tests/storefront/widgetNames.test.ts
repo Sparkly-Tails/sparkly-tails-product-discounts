@@ -30,7 +30,7 @@ describe('the widget names', () => {
     expect(block).toContain('class="smooth-discounts{% if discount_metafield != blank %} smooth-discounts--card{% endif %}"')
     expect(block).toContain('id="smooth-discounts-{{ block.id }}"')
     expect(block).toContain('data-smooth-discounts')
-    expect(block).toContain('--smooth-discounts-price-font-size')
+    expect(block).toContain('--smooth-discounts-moss')
     expect(block).toContain('smooth-discounts__body')
     const css = readFileSync(join(root, 'extensions/product-tier-pricing/src/tier-pricing.css'), 'utf8')
     expect(css).toContain('.smooth-discounts__body')

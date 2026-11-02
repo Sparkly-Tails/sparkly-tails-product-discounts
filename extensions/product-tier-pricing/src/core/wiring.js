@@ -40,14 +40,6 @@ export function wireVariantChange(container, render) {
     if (variant && typeof variant.price === 'number') {
       container.dataset.basePrice = String(variant.price / 100)
     }
-    // Compare-at price is variant-specific too — keep it in sync so
-    // switching to a non-discounted variant doesn't leave a stale
-    // crossed-out price on screen. Accepts either casing the theme's
-    // variant object might use.
-    const variantCompareAt = variant && (variant.compareAtPrice != null ? variant.compareAtPrice : variant.compare_at_price)
-    if (typeof variantCompareAt === 'number') {
-      container.dataset.compareAtPrice = String(variantCompareAt / 100)
-    }
     render()
   })
 }

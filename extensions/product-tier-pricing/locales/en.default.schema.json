@@ -1,8 +1,6 @@
 {
   "name": "Tier pricing",
   "card_prices_name": "Product card prices",
-  "price_font_size_label": "Price font size",
-  "price_font_size_info": "The price is shown at 36px at most, also if a larger value was saved earlier.",
   "moss_color_label": "Progress bar / accent color",
   "cream_color_label": "Tier card background color",
   "sun_color_label": "\"Adding now\" bar segment color",

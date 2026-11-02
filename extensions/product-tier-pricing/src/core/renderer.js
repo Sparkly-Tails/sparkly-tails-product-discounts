@@ -29,7 +29,6 @@ export function createRenderer(container, config, elements, loading) {
     container.hidden = !isAvailable
     if (!isAvailable) return
     const basePrice = Number(container.dataset.basePrice)
-    const compareAtPrice = Number(container.dataset.compareAtPrice) || 0
     const quantityInput = document.querySelector('input[name="quantity"]')
     const addingQty = quantityInput ? Number(quantityInput.value) || 1 : 1
     const eligible = resolveEligibility(config.ownVariantIds, variantStateRef.value)
@@ -57,7 +56,6 @@ export function createRenderer(container, config, elements, loading) {
     const viewModel = parts.model.computeWidgetViewModel({
       tiers: eligible ? config.tiers : [],
       basePrice,
-      compareAtPrice,
       otherQty,
       addingQty,
       isGroup: config.isGroup,

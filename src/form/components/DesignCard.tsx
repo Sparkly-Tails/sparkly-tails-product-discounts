@@ -1,12 +1,12 @@
 import { useState } from 'react'
-import { BackgroundColors, CornerRadius, PriceSize } from '@/form/components/DesignControls'
+import { BackgroundColors, CornerRadius } from '@/form/components/DesignControls'
 import { ExpandLessIcon, ExpandMoreIcon, PaletteIcon } from '@/form/components/icons'
 import { isHexColor } from '@/form/designOptions'
 import type { WidgetStyle } from '@/lib/widgetStyle'
 
-// The "Design" card: background colour, round corners and price size of this discount's
-// storefront widget. The form holds the three values (`style`) and hears every change;
-// they travel with the form in three hidden fields and paint the preview.
+// The "Design" card: background colour and round corners of this discount's
+// storefront widget. The form holds the two values (`style`) and hears every change;
+// they travel with the form in two hidden fields and paint the preview.
 export default function DesignCard({ style, onChange }: { style: WidgetStyle; onChange: (style: WidgetStyle) => void }) {
   const [isOpen, setIsOpen] = useState(true)
   const [backgroundText, setBackgroundText] = useState(style.backgroundColor)
@@ -25,7 +25,6 @@ export default function DesignCard({ style, onChange }: { style: WidgetStyle; on
     <div className="bg-form-surface-container-lowest rounded-lg shadow-xs border border-form-outline-variant/20">
       <input type="hidden" name="style-backgroundColor" value={style.backgroundColor} />
       <input type="hidden" name="style-cornerRadius" value={style.cornerRadius} />
-      <input type="hidden" name="style-priceSize" value={style.priceSize} />
       <div className="p-form-lg space-y-form-md">
         {/* The whole row opens and closes the card; the title is the button, so keys and screen readers can too. */}
         <div onClick={() => setIsOpen(!isOpen)} className="flex items-center justify-between cursor-pointer">
@@ -42,9 +41,8 @@ export default function DesignCard({ style, onChange }: { style: WidgetStyle; on
         </div>
         <div hidden={!isOpen} className="pt-2 space-y-3">
           <BackgroundColors hex={style.backgroundColor} text={backgroundText} onTextChange={updateBackgroundText} onPick={pickBackground} />
-          <div className="grid grid-cols-2 gap-4 pt-3 border-t border-form-outline-variant/20">
+          <div className="pt-3 border-t border-form-outline-variant/20">
             <CornerRadius value={style.cornerRadius} onChange={(cornerRadius) => onChange({ ...style, cornerRadius })} />
-            <PriceSize value={style.priceSize} onChange={(priceSize) => onChange({ ...style, priceSize })} />
           </div>
         </div>
       </div>

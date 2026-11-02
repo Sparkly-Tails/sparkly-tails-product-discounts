@@ -1,35 +1,9 @@
-// Paints the view model onto the widget's own markup (price row, tag, promo, status, rail, chips). Copies fields, calculates nothing.
+// Paints the view model onto the widget's own markup (tag, promo, status, rail, chips) and the theme's own price. Copies fields, calculates nothing.
 import { computeTierButtonsSignature } from './progress.js'
 import { setQuantityInput, setText } from './dom.js'
+import { paintThemePrice, THEME_PRICE_TOOLS } from './themePrice.js'
 
-export function paintPriceRow(elements, viewModel) {
-  // Screen readers would otherwise read the two prices as bare numbers.
-  if (viewModel.discountedPrice) {
-    const priceHtml = '<span class="smooth-discounts__sr-only">Discounted price: </span>' + viewModel.discountedPrice
-    if (elements.priceEl.innerHTML !== priceHtml) elements.priceEl.innerHTML = priceHtml
-  } else {
-    setText(elements.priceEl, viewModel.plainPrice)
-  }
-  // The original price, struck, sits after "each".
-  if (elements.struckEl) {
-    elements.struckEl.hidden = !viewModel.discountedPrice
-    if (viewModel.discountedPrice) {
-      const struckHtml = '<span class="smooth-discounts__sr-only">Original price: </span>' + viewModel.plainPrice
-      if (elements.struckEl.innerHTML !== struckHtml) elements.struckEl.innerHTML = struckHtml
-    }
-  }
-  if (elements.nowLabelEl) {
-    elements.nowLabelEl.hidden = !viewModel.priceLabel
-    setText(elements.nowLabelEl, viewModel.priceLabel || '')
-  }
-  // "each" only makes sense once there's a per-unit/bulk-pricing story to
-  // explain — showCard already means "this product has a discount
-  // configured", the same condition that should hide it.
-  if (elements.eachLabelEl) elements.eachLabelEl.hidden = !viewModel.showCard
-  paintTag(elements, viewModel)
-}
-
-// The tag at the right of the price row: the tier pill, the High Demand tag, or nothing.
+// The tag in the summary row: the tier pill, the High Demand tag, or nothing.
 export function paintTag(elements, viewModel) {
   const el = elements.tagEl
   if (!el) return
@@ -135,7 +109,8 @@ export function paintProgressCard(elements, viewModel, basePrice, addingQty, tie
 }
 
 export function paintWidget(elements, viewModel, basePrice, addingQty, tierButtonsSignatureRef) {
-  paintPriceRow(elements, viewModel)
+  paintTag(elements, viewModel)
+  paintThemePrice({ elements, viewModel, tools: THEME_PRICE_TOOLS })
   paintPromo(elements, viewModel)
   paintCard(elements, viewModel)
   paintProgressCard(elements, viewModel, basePrice, addingQty, tierButtonsSignatureRef)

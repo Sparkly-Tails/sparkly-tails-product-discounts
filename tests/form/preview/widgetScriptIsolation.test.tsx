@@ -39,6 +39,6 @@ describe('the preview next to the storefront script', () => {
   it('still looks like the widget (the stylesheet and the painted parts are all there)', () => {
     document.body.innerHTML = renderPreviewMarkup()
     expect(document.querySelector('.smooth-discounts.smooth-discounts--card')).not.toBeNull()
-    expect(document.querySelector('[data-tier-pricing-price]')).toHaveProperty('textContent')
+    expect(document.querySelector('[data-tier-pricing-promo]')).not.toBeNull()
   })
 })

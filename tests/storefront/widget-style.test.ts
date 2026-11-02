@@ -1,21 +1,21 @@
 import { describe, it, expect } from 'vitest'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { CORNER_RADIUS_RANGE, PRICE_SIZE_RANGE } from '@/lib/widgetStyle'
+import { CORNER_RADIUS_RANGE } from '@/lib/widgetStyle'
 
 const extension = (path: string) => readFileSync(join(process.cwd(), 'extensions/product-tier-pricing', path), 'utf8')
 const block = extension('blocks/tier-pricing.liquid')
 const css = extension('src/tier-pricing.css')
 
 describe('tier-pricing.liquid: the style of a discount', () => {
-  it('reads the three values from the discount in the product metafield, and no theme colour', () => {
-    for (const key of ['backgroundColor', 'cornerRadius', 'priceSize']) expect(block).toContain(`style_value.${key}`)
+  it('reads both values from the discount in the product metafield, and no theme colour', () => {
+    for (const key of ['backgroundColor', 'cornerRadius']) expect(block).toContain(`style_value.${key}`)
     expect(block).toContain('discount_metafield.value.style')
     expect(block).not.toContain('themeColor')
   })
 
   it('falls back to the block settings of the theme editor when the discount has no usable value', () => {
-    for (const setting of ['moss_color', 'cream_color', 'price_font_size', 'sun_color']) expect(block).toContain(`block.settings.${setting}`)
+    for (const setting of ['moss_color', 'cream_color', 'sun_color']) expect(block).toContain(`block.settings.${setting}`)
   })
 
   it('lets a colour through only after the check in the block has passed it', () => {
@@ -32,7 +32,6 @@ describe('tier-pricing.liquid: the style of a discount', () => {
   })
 
   it('keeps the numbers inside the ranges the form allows', () => {
-    expect(block).toContain(`at_least: ${PRICE_SIZE_RANGE.min} | at_most: ${PRICE_SIZE_RANGE.max}`)
     expect(block).toContain(`at_least: ${CORNER_RADIUS_RANGE.min} | at_most: ${CORNER_RADIUS_RANGE.max}`)
   })
 

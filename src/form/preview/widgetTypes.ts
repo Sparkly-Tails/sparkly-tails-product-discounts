@@ -47,7 +47,6 @@ export interface WidgetViewModel {
   flashBar: WidgetFlashBar | null
   discountedPrice: string | null
   plainPrice: string
-  priceLabel: string | null
   progressState: { combinedQty: number } | null
   chips: WidgetChip[]
   tag: { kind: 'tier' | 'high-demand'; text: string } | null
@@ -61,7 +60,6 @@ export interface WidgetViewModel {
 export interface ComputeViewModelOptions {
   tiers: PreviewTier[]
   basePrice: number
-  compareAtPrice: number | null
   otherQty: number
   addingQty: number
   isGroup: boolean

@@ -36,19 +36,18 @@ describe('WidgetPreview', () => {
     renderPreview()
     const select = screen.getByLabelText('Product previewing:')
     expect(Array.from(select.querySelectorAll('option')).map((option) => option.textContent)).toEqual([SALMON.title, CHEWS.title])
-    expect(document.querySelector('[data-tier-pricing-price]')).toHaveTextContent('$28.00')
+    expect(screen.getByRole('button', { name: '3 × $75.60' })).toBeInTheDocument()
   })
 
   it('shows another product when it is chosen from the list', () => {
     renderPreview()
     fireEvent.change(screen.getByLabelText('Product previewing:'), { target: { value: '1' } })
-    expect(document.querySelector('[data-tier-pricing-price]')).toHaveTextContent('$40.00')
+    expect(screen.getByRole('button', { name: '3 × $108.00' })).toBeInTheDocument()
   })
 
   it('moves to the tier whose chip is clicked', () => {
     renderPreview()
     fireEvent.click(screen.getByRole('button', { name: '3 × $75.60' }))
-    expect(document.querySelector('[data-tier-pricing-price]')).toHaveTextContent('$25.20')
     expect(screen.getByRole('button', { name: /3 × \$75\.60/ })).toHaveAttribute('aria-pressed', 'true')
   })
 
@@ -56,12 +55,12 @@ describe('WidgetPreview', () => {
     const { rerender } = renderPreview()
     fireEvent.change(screen.getByLabelText('Product previewing:'), { target: { value: '1' } })
     rerender(<WidgetPreview products={[SALMON]} tiers={TIERS} flash={null} highDemand={false} style={DEFAULT_WIDGET_STYLE} timeZone="UTC" currencyCode="USD" initialNowSeconds={NOW} />)
-    expect(document.querySelector('[data-tier-pricing-price]')).toHaveTextContent('$28.00')
+    expect(screen.getByRole('button', { name: '3 × $75.60' })).toBeInTheDocument()
   })
 
   it('writes prices in the shop currency', () => {
     renderPreview({ currencyCode: 'GBP' })
-    expect(document.querySelector('[data-tier-pricing-price]')).toHaveTextContent('£28.00')
+    expect(screen.getByRole('button', { name: '3 × £75.60' })).toBeInTheDocument()
   })
 
   it('counts a flash sale down, second by second, in the shop time zone', () => {
@@ -86,7 +85,7 @@ describe('WidgetPreview', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Increase quantity' }))
     fireEvent.click(screen.getByRole('button', { name: 'Increase quantity' }))
     expect(input.value).toBe('3')
-    expect(document.querySelector('[data-tier-pricing-price]')).toHaveTextContent('$25.20')
+    expect(screen.getByRole('button', { name: /3 ×/ })).toHaveAttribute('aria-pressed', 'true')
   })
 
   it('shows no "Quantity" word, and still names the field for screen readers', () => {
@@ -107,7 +106,7 @@ describe('WidgetPreview', () => {
     const input = screen.getByLabelText('Quantity') as HTMLInputElement
     fireEvent.change(input, { target: { value: '5' } })
     expect(input.value).toBe('5')
-    expect(document.querySelector('[data-tier-pricing-price]')).toHaveTextContent('$23.80')
+    expect(screen.getByRole('button', { name: /5 ×/ })).toHaveAttribute('aria-pressed', 'true')
     fireEvent.change(input, { target: { value: '' } })
     expect(input.value).toBe('5')
   })
@@ -129,12 +128,11 @@ describe('WidgetPreview', () => {
     expect(screen.getByRole('button', { name: /5 ×/ })).toBeInTheDocument()
   })
 
-  it('paints the widget with the style it is given: background colour (with its transparency), corner radius and price size', () => {
-    renderPreview({ style: { backgroundColor: '#FFFFFF80', cornerRadius: 4, priceSize: 36 } })
+  it('paints the widget with the style it is given: background colour (with its transparency), corner radius', () => {
+    renderPreview({ style: { backgroundColor: '#FFFFFF80', cornerRadius: 4 } })
     const widget = document.querySelector('.smooth-discounts') as HTMLElement
     expect(widget.style.getPropertyValue('--smooth-discounts-moss')).toBe('')
     expect(widget.style.getPropertyValue('--smooth-discounts-cream')).toBe('#FFFFFF80')
     expect(widget.style.getPropertyValue('--smooth-discounts-radius')).toBe('4px')
-    expect(widget.style.getPropertyValue('--smooth-discounts-price-font-size')).toBe('36px')
   })
 })
