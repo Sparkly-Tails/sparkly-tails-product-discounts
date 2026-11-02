@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { clearWidgetRegistry, readBuiltWidget, runWidgetScripts, WIDGET_COMPONENTS, WIDGET_CORE } from '../helpers/builtWidget'
 
 /** The tier widget's built scripts, run in the page the way the theme loads them, on markup like tier-pricing.liquid renders. */
@@ -67,18 +69,14 @@ describe('tier widget painting (redesign)', () => {
   async function mountTiers(quantity: number, extra: Record<string, unknown> = {}) {
     document.body.innerHTML = `
       <input name="quantity" value="${quantity}">
+      <div class="price"><span class="price-item">£1.69</span></div>
       <div id="smooth-discounts-t1" class="smooth-discounts smooth-discounts--card" data-smooth-discounts
         data-discount='${JSON.stringify({ ...discount, ...extra, highDemand: undefined })}'
         data-product-id='"gid://shopify/Product/9"' data-selected-variant-id="10"
-        data-base-price="1.69" data-compare-at-price="0" data-money-format='"£{{amount}}"' data-high-demand="${extra.highDemand ? 'true' : 'false'}">
+        data-base-price="1.69" data-money-format='"£{{amount}}"' data-high-demand="${extra.highDemand ? 'true' : 'false'}">
         <div class="smooth-discounts__body">
           <div class="smooth-discounts__summary">
             <div class="smooth-discounts__price-row">
-              <div class="smooth-discounts__price-group">
-                <span data-tier-pricing-price>£1.69</span>
-                <span data-tier-pricing-each-label>each</span>
-                <s data-tier-pricing-struck hidden></s>
-              </div>
               <span data-tier-pricing-tag hidden></span>
             </div>
             <p data-tier-pricing-promo></p>
@@ -334,15 +332,11 @@ describe('tier widget painting (redesign)', () => {
       expect(bar.getAttribute('aria-valuetext')).toBe('10 of 16 units. Offer unlocked, highest discount at 16.')
     })
 
-    it('a discounted price reads as "Discounted price" then "Original price", never as two bare numbers', async () => {
+    it('a discounted price reads as the unit price, the original one marked as such for screen readers', async () => {
       await mountTiers(10)
-      const price = document.querySelector('[data-tier-pricing-price]') as HTMLElement
-      const struck = document.querySelector('[data-tier-pricing-struck]') as HTMLElement
-      expect(price.textContent!.replace(/\s+/g, ' ').trim()).toBe('Discounted price: £1.63')
-      expect(struck.textContent!.replace(/\s+/g, ' ').trim()).toBe('Original price: £1.69')
-      expect(struck.hidden).toBe(false)
-      expect(price.querySelectorAll('.smooth-discounts__sr-only')).toHaveLength(1)
-      expect(struck.querySelectorAll('.smooth-discounts__sr-only')).toHaveLength(1)
+      const price = document.querySelector('.price-item') as HTMLElement
+      expect(price.textContent!.replace(/\s+/g, ' ').trim()).toBe('£1.69 £1.63 each')
+      expect(readFileSync(join(process.cwd(), 'extensions/product-tier-pricing/src/tier-pricing.css'), 'utf8')).toMatch(/\[data-smooth-discounts-was\] s::after \{[^}]*content: ' \(original price\)'/)
     })
 
     it('the chip that matches the quantity is pressed, the others are not', async () => {

@@ -43,7 +43,7 @@ export function buildTiersInitial({ discount }: { discount: Discount }): TiersIn
 /** The Design card's values: the saved style without any field since retired (a style saved with a theme colour still carries one), or the defaults. */
 export function buildStyleValues({ discount }: { discount: Discount }): WidgetStyle {
   if (!discount.style) return DEFAULT_WIDGET_STYLE
-  return { backgroundColor: discount.style.backgroundColor, cornerRadius: discount.style.cornerRadius, priceSize: discount.style.priceSize }
+  return { backgroundColor: discount.style.backgroundColor, cornerRadius: discount.style.cornerRadius }
 }
 
 export function buildFormValues({ discount, memberInfo, tools }: {

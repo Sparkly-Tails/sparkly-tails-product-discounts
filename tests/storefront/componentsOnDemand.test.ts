@@ -24,18 +24,15 @@ interface Options { id?: string; flash?: object | null; siblings?: object[] }
 function widgetMarkup({ id = 'w1', flash = null, siblings = [] }: Options = {}): string {
   const discount = { title: 'Tins', tiers: TIERS, siblings, ownVariantIds: null, ownVariantOptions: [], selfVariantId: V10 }
   return `
+    <div class="price"><span class="price-item">£1.69</span></div>
     <div id="${id}" class="smooth-discounts" data-smooth-discounts
       data-discount='${JSON.stringify(discount)}'
       data-product-id='"gid://shopify/Product/9"' data-selected-variant-id="10"
-      data-base-price="1.69" data-compare-at-price="0" data-money-format='"£{{amount}}"' data-high-demand="false"
+      data-base-price="1.69" data-money-format='"£{{amount}}"' data-high-demand="false"
       data-flash='${JSON.stringify(flash)}' data-component-urls='${JSON.stringify(URLS)}'>
       <div data-tier-pricing-flash data-variant="hidden" hidden>
         <span data-flash-label></span><span data-flash-timer></span><span data-flash-aside></span><span data-flash-chip hidden><span data-flash-chip-text></span></span>
       </div>
-      <span data-tier-pricing-now-label hidden></span>
-      <span data-tier-pricing-price>£1.69</span>
-      <span data-tier-pricing-each-label>each</span>
-      <s data-tier-pricing-struck hidden></s>
       <span data-tier-pricing-tag hidden></span>
       <p data-tier-pricing-promo></p>
       <div data-tier-pricing-card hidden>
@@ -137,7 +134,7 @@ describe('painting waits for the parts', () => {
     scriptFor('model').dispatchEvent(new Event('error'))
     await vi.advanceTimersByTimeAsync(3000)
 
-    expect((document.querySelector('[data-tier-pricing-price]') as HTMLElement).textContent!.trim()).toBe('£1.69')
+    expect((document.querySelector('.price-item') as HTMLElement).textContent!.trim()).toBe('£1.69')
     expect((document.querySelector('[data-tier-pricing-card]') as HTMLElement).hidden).toBe(true)
   })
 
@@ -149,7 +146,7 @@ describe('painting waits for the parts', () => {
     await vi.advanceTimersByTimeAsync(0)
 
     expect((document.querySelector('[data-tier-pricing-card]') as HTMLElement).hidden).toBe(true)
-    expect((document.querySelector('[data-tier-pricing-price]') as HTMLElement).textContent!.trim()).toBe('£1.69')
+    expect((document.querySelector('.price-item') as HTMLElement).textContent!.trim()).toBe('£1.69')
   })
 })
 

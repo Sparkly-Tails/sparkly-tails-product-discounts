@@ -85,16 +85,13 @@ export function parseFlashConfig(raw) {
 
 export function queryWidgetElements(container) {
   return {
+    rootEl: container,
     flashEl: container.querySelector('[data-tier-pricing-flash]'),
     flashLabelEl: container.querySelector('[data-flash-label]'),
     flashTimerEl: container.querySelector('[data-flash-timer]'),
     flashAsideEl: container.querySelector('[data-flash-aside]'),
     flashChipEl: container.querySelector('[data-flash-chip]'),
     flashChipTextEl: container.querySelector('[data-flash-chip-text]'),
-    priceEl: container.querySelector('[data-tier-pricing-price]'),
-    eachLabelEl: container.querySelector('[data-tier-pricing-each-label]'),
-    struckEl: container.querySelector('[data-tier-pricing-struck]'),
-    nowLabelEl: container.querySelector('[data-tier-pricing-now-label]'),
     tagEl: container.querySelector('[data-tier-pricing-tag]'),
     promoEl: container.querySelector('[data-tier-pricing-promo]'),
     cardEl: container.querySelector('[data-tier-pricing-card]'),

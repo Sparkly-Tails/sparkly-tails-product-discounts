@@ -79,77 +79,45 @@
   display: none;
 }
 
-/* Price row: the price, "each" and the struck original on the left, the tag on the right. */
+/* Tag row: the tier tag, on the right. */
 .smooth-discounts__price-row {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 4px 8px;
 }
 
-.smooth-discounts__price-group {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-}
-
-.smooth-discounts__price {
-  font-family: var(--font-stack-body);
-  /* Hardcoded rather than var(--font-weight-body-bold): this theme sets
-     that var to 500 for body copy, which is lighter than the struck-out
-     price beside it and inverts the intended hierarchy. */
-  font-weight: 700;
-  /* The block setting (24px as in the design), never above 36px: a value
-     saved before the cap existed (44px) no longer oversizes the price. In px,
-     not rem: themes such as Dawn set the root font size to 62.5%. */
-  font-size: min(var(--smooth-discounts-price-font-size, 24px), 36px);
-  line-height: 1.3334;
-  font-variant-numeric: tabular-nums;
-  color: var(--smooth-discounts-ink);
-}
-
-@media (max-width: 749px) {
-  .smooth-discounts__price {
-    font-size: min(var(--smooth-discounts-price-font-size, 24px), 28px);
-  }
-}
-
-.smooth-discounts__now-label {
-  font-family: var(--font-stack-body);
-  font-weight: 500;
-  font-size: 12px;
-  line-height: 16px;
-  color: var(--smooth-discounts-text-secondary);
-}
-
-.smooth-discounts__now-label[hidden] {
-  display: none;
-}
-
-.smooth-discounts__each-label {
-  font-family: var(--font-stack-body);
-  font-weight: 500;
-  font-size: 12px;
-  line-height: 16px;
-  color: var(--smooth-discounts-text-secondary);
-}
-
-.smooth-discounts__struck {
-  font-family: var(--font-stack-body);
-  font-weight: 400;
-  font-size: 12px;
-  line-height: 16px;
-  font-variant-numeric: tabular-nums;
-  /* Theme's secondary text colour rather than a faded one: opacity dropped the
-     struck price below 4.5:1 contrast. */
-  color: var(--smooth-discounts-text-secondary);
-  text-decoration: line-through;
-}
-
-.smooth-discounts__struck[hidden],
 .smooth-discounts__tag[hidden] {
   display: none;
+}
+
+/* The theme's own price while a tier applies: the plain price struck, then the unit price in the theme's own type, then
+   "each". Everything is relative to the theme's price (em, inherited colour), so nothing here depends on its classes. */
+[data-smooth-discounts-was] s {
+  margin-inline-end: 0.35em;
+  font-weight: 400;
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+
+/* Read out after the struck price, hidden from sight: a screen reader would otherwise read two bare numbers. */
+[data-smooth-discounts-was] s::after {
+  content: ' (original price)';
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
+[data-smooth-discounts-was] small {
+  margin-inline-start: 0.25em;
+  font-size: 0.6em;
+  font-weight: 500;
+  letter-spacing: normal;
+  text-transform: none;
 }
 
 .smooth-discounts__sr-only {

@@ -3,7 +3,7 @@ import { DEFAULT_WIDGET_STYLE, WIDGET_STYLE_TOOLS, readHexColor, readWholeNumber
 
 describe('DEFAULT_WIDGET_STYLE', () => {
   it('is what the Design card starts with', () => {
-    expect(DEFAULT_WIDGET_STYLE).toEqual({ backgroundColor: '#F5EFE1', cornerRadius: 12, priceSize: 24 })
+    expect(DEFAULT_WIDGET_STYLE).toEqual({ backgroundColor: '#F5EFE1', cornerRadius: 12 })
   })
 })
 
@@ -40,17 +40,17 @@ describe('readWholeNumber', () => {
 })
 
 describe('readWidgetStyle', () => {
-  it('reads all three values', () => {
-    expect(readWidgetStyle({ values: { backgroundColor: '#ffffff', cornerRadius: '0', priceSize: '36' }, tools: WIDGET_STYLE_TOOLS })).toEqual({
-      backgroundColor: '#FFFFFF', cornerRadius: 0, priceSize: 36,
+  it('reads both values', () => {
+    expect(readWidgetStyle({ values: { backgroundColor: '#ffffff', cornerRadius: '0' }, tools: WIDGET_STYLE_TOOLS })).toEqual({
+      backgroundColor: '#FFFFFF', cornerRadius: 0,
     })
   })
 
   it('keeps the transparency of the background colour', () => {
-    expect(readWidgetStyle({ values: { backgroundColor: '#ffffff80', cornerRadius: '4', priceSize: '30' }, tools: WIDGET_STYLE_TOOLS }).backgroundColor).toBe('#FFFFFF80')
+    expect(readWidgetStyle({ values: { backgroundColor: '#ffffff80', cornerRadius: '4' }, tools: WIDGET_STYLE_TOOLS }).backgroundColor).toBe('#FFFFFF80')
   })
 
   it('replaces every bad value by its default', () => {
-    expect(readWidgetStyle({ values: { backgroundColor: '', cornerRadius: 'wide', priceSize: '' }, tools: WIDGET_STYLE_TOOLS })).toEqual(DEFAULT_WIDGET_STYLE)
+    expect(readWidgetStyle({ values: { backgroundColor: '', cornerRadius: 'wide' }, tools: WIDGET_STYLE_TOOLS })).toEqual(DEFAULT_WIDGET_STYLE)
   })
 })

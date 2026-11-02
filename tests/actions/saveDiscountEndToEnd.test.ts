@@ -73,22 +73,22 @@ beforeEach(() => {
 afterEach(() => vi.useRealTimers())
 
 describe('the style of a discount', () => {
-  it('is saved with the discount from the three fields of the Design card', async () => {
+  it('is saved with the discount from the two fields of the Design card', async () => {
     const { saveSpy } = setup()
-    await save(form({ 'style-backgroundColor': '#ffffffcc', 'style-cornerRadius': '4', 'style-priceSize': '30' }))
-    expect(saveSpy.mock.calls[0][0].discounts[0].style).toEqual({ backgroundColor: '#FFFFFFCC', cornerRadius: 4, priceSize: 30 })
+    await save(form({ 'style-backgroundColor': '#ffffffcc', 'style-cornerRadius': '4' }))
+    expect(saveSpy.mock.calls[0][0].discounts[0].style).toEqual({ backgroundColor: '#FFFFFFCC', cornerRadius: 4 })
   })
 
   it('is saved with the Design card\'s defaults when the card was left alone (or the fields are missing)', async () => {
     const { saveSpy } = setup()
     await save(form())
-    expect(saveSpy.mock.calls[0][0].discounts[0].style).toEqual({ backgroundColor: '#F5EFE1', cornerRadius: 12, priceSize: 24 })
+    expect(saveSpy.mock.calls[0][0].discounts[0].style).toEqual({ backgroundColor: '#F5EFE1', cornerRadius: 12 })
   })
 
   it('replaces a value that is not a colour or a number by its default instead of storing it', async () => {
     const { saveSpy } = setup()
-    await save(form({ 'style-backgroundColor': 'red;}</style>', 'style-priceSize': 'huge' }))
-    expect(saveSpy.mock.calls[0][0].discounts[0].style).toMatchObject({ backgroundColor: '#F5EFE1', priceSize: 24 })
+    await save(form({ 'style-backgroundColor': 'red;}</style>', 'style-cornerRadius': 'huge' }))
+    expect(saveSpy.mock.calls[0][0].discounts[0].style).toMatchObject({ backgroundColor: '#F5EFE1', cornerRadius: 12 })
   })
 })
 
@@ -105,7 +105,7 @@ describe('saving a new discount', () => {
     const { saveSpy } = setup()
     await save(form())
     expect(saveSpy).toHaveBeenCalledWith({
-      discounts: [{ discountId: expect.stringMatching(/^disc_/), name: 'Soup', title: 'Soup', status: 'draft', pricingMode: 'percent', members: [{ productId: P1 }], tiers: [{ minQty: 5, percentOff: 10 }], style: { backgroundColor: '#F5EFE1', cornerRadius: 12, priceSize: 24 } }],
+      discounts: [{ discountId: expect.stringMatching(/^disc_/), name: 'Soup', title: 'Soup', status: 'draft', pricingMode: 'percent', members: [{ productId: P1 }], tiers: [{ minQty: 5, percentOff: 10 }], style: { backgroundColor: '#F5EFE1', cornerRadius: 12 } }],
     })
     expect(redirect).toHaveBeenCalledWith(expect.stringMatching(/^\/discounts\/disc_/))
   })

@@ -6,7 +6,7 @@ import { buildPriceTag, buildPromoLine, buildStatusCopy, buildTierChips, tierNum
 // `flashTools` carries the flash sale functions (phase, countdown, bar): they live in the flash component,
 // which a page without a flash sale never loads. Without a `flash` they are not used.
 
-export function computeWidgetViewModel({ tiers, basePrice, compareAtPrice, otherQty, addingQty, isGroup, highDemand, flash, flashTools, nowSeconds, formatMoney: formatMoneyFn }) {
+export function computeWidgetViewModel({ tiers, basePrice, otherQty, addingQty, isGroup, highDemand, flash, flashTools, nowSeconds, formatMoney: formatMoneyFn }) {
   const plainPrice = formatMoneyFn(basePrice)
   const hasTiers = !!(tiers && tiers.length > 0)
   const phase = flash && hasTiers ? flashTools.flashPhase({ nowSeconds, startsAtUnix: flash.startsAtUnix, endsAtUnix: flash.endsAtUnix }) : null
@@ -31,9 +31,8 @@ export function computeWidgetViewModel({ tiers, basePrice, compareAtPrice, other
       }),
       discountedPrice: null,
       plainPrice,
-      // "It is now: £1.69" and, from the start, "Get it from: £1.63": the unit price the tiers give the quantity
-      // selected now (page plus cart), the same price the running sale shows. Below the first tier it is the plain price.
-      priceLabel: 'It is now:',
+      // "Get it from: £1.63": the unit price the tiers give the quantity selected now (page plus cart), the same
+      // price the running sale shows. Below the first tier it is the plain price.
       progressState,
       chips: [],
       tag: null,
@@ -54,10 +53,6 @@ export function computeWidgetViewModel({ tiers, basePrice, compareAtPrice, other
   // No discount for this variant, or a flash sale that is not running (before
   // its start without a teaser, or over): the plain price only.
   if (!hasTiers || (phase && phase !== 'running')) {
-    // Without a tier discount, fall back to Shopify's own compare-at price, if
-    // the merchant set one, so a plain markdown still shows a crossed-out
-    // original price like a tiered discount does.
-    const hasCompareAtDiscount = compareAtPrice != null && compareAtPrice > basePrice
     return {
       showCard: false,
       showChips: false,
@@ -67,9 +62,8 @@ export function computeWidgetViewModel({ tiers, basePrice, compareAtPrice, other
         phase, showTeaser: !!flash.showTeaser, reachedTier: 0, unitPriceLabel: '',
         countdownText: flashTools.formatFlashCountdown({ secondsLeft }), countdownParts: flashTools.flashCountdownParts({ secondsLeft }), chipText: flashTools.formatFlashChip({ secondsLeft }),
       }) : null,
-      discountedPrice: hasCompareAtDiscount ? plainPrice : null,
-      plainPrice: hasCompareAtDiscount ? formatMoneyFn(compareAtPrice) : plainPrice,
-      priceLabel: null,
+      discountedPrice: null,
+      plainPrice,
       progressState: null,
       chips: [],
       tag: null,
@@ -108,7 +102,6 @@ export function computeWidgetViewModel({ tiers, basePrice, compareAtPrice, other
     flashBar,
     discountedPrice: isDiscounted ? formatMoneyFn(unit) : null,
     plainPrice,
-    priceLabel: null,
     progressState,
     chips: buildTierChips({ tiers, basePrice, combinedQty: progressState.combinedQty, formatMoney: formatMoneyFn }),
     tag: buildPriceTag({ progressState, tiers, highDemand: !!highDemand }),

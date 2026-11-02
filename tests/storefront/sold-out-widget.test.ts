@@ -59,20 +59,15 @@ describe('the widget with and without stock', () => {
       ${withThemeElement ? '<product-variants></product-variants>' : ''}
       <form action="/cart/add" method="post"><input type="hidden" name="id" value="${selectedVariantId}"></form>
       <input name="quantity" value="1">
+      <div class="price"><span class="price-item">£1.69</span></div>
       <div id="smooth-discounts-s1" class="smooth-discounts smooth-discounts--card" data-smooth-discounts
         data-discount='${JSON.stringify({ ...discount, selfVariantId: 'gid://shopify/ProductVariant/' + selectedVariantId })}'
         ${soldOut === null ? '' : `data-sold-out-variant-ids='${soldOut}'`}
         data-product-id='"gid://shopify/Product/9"' data-selected-variant-id="${selectedVariantId}"
-        data-base-price="1.69" data-compare-at-price="0" data-money-format='"£{{amount}}"' data-high-demand="false" data-flash='null'>
+        data-base-price="1.69" data-money-format='"£{{amount}}"' data-high-demand="false" data-flash='null'>
         <div class="smooth-discounts__body">
           <div class="smooth-discounts__summary">
             <div class="smooth-discounts__price-row">
-              <div class="smooth-discounts__price-group">
-                <span data-tier-pricing-now-label hidden></span>
-                <span data-tier-pricing-price>£1.69</span>
-                <span data-tier-pricing-each-label>each</span>
-                <s data-tier-pricing-struck hidden></s>
-              </div>
               <span data-tier-pricing-tag hidden></span>
             </div>
             <p data-tier-pricing-promo></p>
@@ -113,7 +108,7 @@ describe('the widget with and without stock', () => {
   it('shows the widget with its price when the selected variant has stock', async () => {
     await mountWidget({ soldOut: '[]' })
     expect(widget().hidden).toBe(false)
-    expect((document.querySelector('[data-tier-pricing-price]') as HTMLElement).textContent!.trim()).toBe('£1.69')
+    expect((document.querySelector('.price-item') as HTMLElement).textContent!.trim()).toBe('£1.69')
   })
 
   it('shows the widget when the block gave no list, because a missing value must not hide it', async () => {
@@ -168,8 +163,7 @@ describe('the widget on a theme without the theme\'s own variant event', () => {
         data-discount='${JSON.stringify({ title: 'T', tiers: [], siblings: [], ownVariantIds: null, ownVariantOptions: [], selfVariantId: 'gid://shopify/ProductVariant/10' })}'
         data-sold-out-variant-ids='[11]'
         data-product-id='"gid://shopify/Product/9"' data-selected-variant-id="10"
-        data-base-price="1.69" data-compare-at-price="0" data-money-format='"£{{amount}}"' data-high-demand="false" data-flash='null'>
-        <span data-tier-pricing-price>£1.69</span>
+        data-base-price="1.69" data-money-format='"£{{amount}}"' data-high-demand="false" data-flash='null'>
       </div>`
     runWidgetScripts({ built })
     await vi.advanceTimersByTimeAsync(0)

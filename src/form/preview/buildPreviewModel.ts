@@ -50,7 +50,6 @@ export function buildPreviewModel({ products, selectedIndex, tiers, flash, highD
   const viewModel = tools.computeWidgetViewModel({
     tiers: tools.withUnitAnchor(tiers),
     basePrice: product.price,
-    compareAtPrice: null,
     otherQty: 0,
     addingQty: quantity,
     isGroup: false,

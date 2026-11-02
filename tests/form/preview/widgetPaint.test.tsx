@@ -29,7 +29,7 @@ function mountScript({ nowSeconds, quantity, tiers, flash, highDemand }: Scenari
     <input name="quantity" value="${quantity}">
     <div id="script-widget" class="smooth-discounts${tiers.length ? ' smooth-discounts--card' : ''}" data-smooth-discounts
       data-discount='${JSON.stringify({ title: 'T', tiers, siblings: [], ownVariantIds: null, ownVariantOptions: [], selfVariantId: 'gid://shopify/ProductVariant/10' })}'
-      data-product-id='"gid://shopify/Product/9"' data-selected-variant-id="10" data-base-price="28" data-compare-at-price="0" data-money-format='"\${{amount}}"'
+      data-product-id='"gid://shopify/Product/9"' data-selected-variant-id="10" data-base-price="28" data-money-format='"\${{amount}}"'
       data-high-demand="${highDemand}" data-flash='${JSON.stringify(flash)}'>
       <div data-tier-pricing-flash data-variant="hidden" hidden>
         <div><span data-flash-label></span></div>
@@ -38,12 +38,6 @@ function mountScript({ nowSeconds, quantity, tiers, flash, highDemand }: Scenari
       <div class="smooth-discounts__body">
         <div class="smooth-discounts__summary">
           <div class="smooth-discounts__price-row">
-            <div class="smooth-discounts__price-group">
-              <span data-tier-pricing-now-label hidden></span>
-              <span data-tier-pricing-price>$28.00</span>
-              <span data-tier-pricing-each-label>each</span>
-              <s data-tier-pricing-struck hidden></s>
-            </div>
             <span data-tier-pricing-tag hidden></span>
           </div>
           <p data-tier-pricing-promo></p>
@@ -85,10 +79,6 @@ function fingerprint(root: HTMLElement) {
     flash: shown('[data-tier-pricing-flash]')
       ? { variant: find('[data-tier-pricing-flash]')!.dataset.variant, label: text('[data-flash-label]'), digits: [...root.querySelectorAll('.smooth-discounts__flash-digit')].map((digit) => digit.textContent), aside: text('[data-flash-aside]'), chip: shown('[data-flash-chip]') ? text('[data-flash-chip-text]') : '' }
       : null,
-    nowLabel: shown('[data-tier-pricing-now-label]') ? text('[data-tier-pricing-now-label]') : null,
-    price: text('[data-tier-pricing-price]'),
-    each: shown('[data-tier-pricing-each-label]'),
-    struck: shown('[data-tier-pricing-struck]') ? text('[data-tier-pricing-struck]') : null,
     tag: shown('[data-tier-pricing-tag]') ? { kind: find('[data-tier-pricing-tag]')!.dataset.kind, text: text('[data-tier-pricing-tag]') } : null,
     promo: text('[data-tier-pricing-promo]'),
     card: cardShown,

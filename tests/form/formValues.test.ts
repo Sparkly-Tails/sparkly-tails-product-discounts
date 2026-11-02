@@ -44,11 +44,10 @@ describe('isFormDirty', () => {
     expect(dirty({ flash: { ...SAVED.flash, enabled: false } })).toBe(true)
   })
 
-  it('is dirty when any of the four style values changes', () => {
+  it('is dirty when any of the style values changes', () => {
     expect(dirty({ style: { ...SAVED.style, backgroundColor: '#FFFFFF80' } })).toBe(true)
     expect(dirty({ style: { ...SAVED.style, backgroundColor: '#FFFFFF' } })).toBe(true)
     expect(dirty({ style: { ...SAVED.style, cornerRadius: 0 } })).toBe(true)
-    expect(dirty({ style: { ...SAVED.style, priceSize: 30 } })).toBe(true)
     expect(dirty({ style: { ...SAVED.style } })).toBe(false)
   })
 

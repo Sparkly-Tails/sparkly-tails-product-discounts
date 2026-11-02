@@ -20,13 +20,13 @@ const openPicker = () => {
 }
 
 describe('DesignCard', () => {
-  it('shows the heading, what it is for and the three groups of controls', () => {
+  it('shows the heading, what it is for and the two groups of controls', () => {
     render(<Harness />)
     expect(screen.getByRole('heading', { level: 2, name: 'Design' })).toBeInTheDocument()
     expect(screen.getByText('Card styling and color palettes for the storefront widget')).toBeInTheDocument()
     expect(screen.getByText('Background colour')).toBeInTheDocument()
     expect(screen.getByText('Round corners')).toBeInTheDocument()
-    expect(screen.getByText('Price size')).toBeInTheDocument()
+    expect(screen.queryByText('Price size')).toBeNull()
   })
 
   it('has no colour theme section any more, and does not call the background "secondary"', () => {
@@ -89,41 +89,27 @@ describe('DesignCard', () => {
     expect(screen.getByText('20 px')).toBeInTheDocument()
   })
 
-  it('sends the three values with the form, as hidden fields that follow the choices', () => {
+  it('sends the two values with the form, as hidden fields that follow the choices', () => {
     const { container } = render(<Harness />)
     const read = () => Object.fromEntries([...container.querySelectorAll('input[type="hidden"]')].map((field) => [field.getAttribute('name'), (field as HTMLInputElement).value]))
-    expect(read()).toEqual({ 'style-backgroundColor': '#F5EFE1', 'style-cornerRadius': '12', 'style-priceSize': '24' })
+    expect(read()).toEqual({ 'style-backgroundColor': '#F5EFE1', 'style-cornerRadius': '12' })
     fireEvent.click(screen.getByRole('button', { name: 'White' }))
     fireEvent.change(screen.getByRole('slider', { name: 'Round corners' }), { target: { value: '4' } })
-    fireEvent.change(screen.getByRole('slider', { name: 'Price size' }), { target: { value: '30' } })
-    expect(read()).toEqual({ 'style-backgroundColor': '#FFFFFF', 'style-cornerRadius': '4', 'style-priceSize': '30' })
-  })
-
-  it('has a price size slider from 12 to 48 px that shows its value', () => {
-    render(<Harness />)
-    const slider = screen.getByRole('slider', { name: 'Price size' })
-    expect(slider).toHaveAttribute('min', '12')
-    expect(slider).toHaveAttribute('max', '48')
-    expect(slider).toHaveAttribute('step', '1')
-    expect(slider).toHaveValue('24')
-    expect(screen.getByText('24 px')).toBeInTheDocument()
-    fireEvent.change(slider, { target: { value: '36' } })
-    expect(screen.getByText('36 px')).toBeInTheDocument()
+    expect(read()).toEqual({ 'style-backgroundColor': '#FFFFFF', 'style-cornerRadius': '4' })
   })
 
   it('reports the whole style on every change', () => {
     const changes: WidgetStyle[] = []
     render(<Harness onChange={(style) => changes.push(style)} />)
     fireEvent.click(screen.getByRole('button', { name: 'White' }))
-    fireEvent.change(screen.getByRole('slider', { name: 'Price size' }), { target: { value: '30' } })
-    expect(changes).toEqual([{ ...DEFAULT_WIDGET_STYLE, backgroundColor: '#FFFFFF' }, { ...DEFAULT_WIDGET_STYLE, backgroundColor: '#FFFFFF', priceSize: 30 }])
+    fireEvent.change(screen.getByRole('slider', { name: 'Round corners' }), { target: { value: '4' } })
+    expect(changes).toEqual([{ ...DEFAULT_WIDGET_STYLE, backgroundColor: '#FFFFFF' }, { ...DEFAULT_WIDGET_STYLE, backgroundColor: '#FFFFFF', cornerRadius: 4 }])
   })
 
   it('opens with the saved style chosen', () => {
-    render(<Harness initial={{ backgroundColor: '#FFFFFF', cornerRadius: 0, priceSize: 40 }} />)
+    render(<Harness initial={{ backgroundColor: '#FFFFFF', cornerRadius: 0 }} />)
     expect(screen.getByRole('button', { name: 'White' })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByText('0 px')).toBeInTheDocument()
-    expect(screen.getByText('40 px')).toBeInTheDocument()
   })
 
   it('has no submit buttons', () => {
@@ -183,12 +169,10 @@ describe('DesignCard: the colour in use', () => {
 })
 
 describe('DesignCard: the layout', () => {
-  it('puts Round corners and Price size in one row, a half of the width each', () => {
+  it('has no price size slider: the price shown is the theme\'s own', () => {
     render(<Harness />)
-    const row = screen.getByRole('slider', { name: 'Round corners' }).closest('.grid') as HTMLElement
-    expect(row).not.toBeNull()
-    expect(row).toHaveClass('grid-cols-2')
-    expect(row).toContainElement(screen.getByRole('slider', { name: 'Price size' }))
+    expect(screen.queryByRole('slider', { name: 'Price size' })).toBeNull()
+    expect(screen.getByRole('slider', { name: 'Round corners' })).toBeInTheDocument()
   })
 })
 
