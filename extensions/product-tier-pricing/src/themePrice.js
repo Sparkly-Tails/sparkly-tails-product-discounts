@@ -60,9 +60,23 @@ export function isAmountElement({ plainPrice, tools }, element) {
   return element.children.length === 0 && tools.isAmountText({ text: element.textContent.trim(), plainPrice })
 }
 
-/** A price outside the widget: the one this script changed, or an element with nothing in it but the plain price. */
+export function isPriceMatch({ plainPrice, tools }, element) {
+  return tools.isMarkedPrice(element) || tools.isAmountElement({ plainPrice, tools }, element)
+}
+
+/** The element is drawn: neither it nor an ancestor has `display: none`, and it is not `visibility: hidden`. A theme can print the same price twice and hide one copy. */
+export function isDisplayed(element) {
+  const style = element.ownerDocument.defaultView.getComputedStyle(element)
+  return style.display !== 'none' && style.visibility !== 'hidden'
+}
+
+export function isVisible({ element, tools }) {
+  return tools.listAncestors({ element }).every(tools.isDisplayed)
+}
+
+/** A price outside the widget that the page shows: the one this script changed, or an element with nothing in it but the plain price. The cheap checks come first. */
 export function isPriceElement({ rootEl, plainPrice, tools }, element) {
-  return !rootEl.contains(element) && (tools.isMarkedPrice(element) || tools.isAmountElement({ plainPrice, tools }, element))
+  return !rootEl.contains(element) && tools.isPriceMatch({ plainPrice, tools }, element) && tools.isVisible({ element, tools })
 }
 
 /** The price element nearest the widget (the first in document order among equals), or null. */
@@ -130,6 +144,6 @@ export function paintThemePrice({ elements, viewModel, tools }) {
 
 export const THEME_PRICE_TOOLS = {
   isAmountText, listAncestors, isBelowBody, findSearchRoot, hasDescendant, measureDistance, buildDistanceEntry, compareSteps,
-  isMarkedPrice, isAmountElement, isPriceElement, findThemePrice, isPaintedPrice, removeMarks, restorePrice, readOriginalText,
+  isMarkedPrice, isAmountElement, isPriceMatch, isDisplayed, isVisible, isPriceElement, findThemePrice, isPaintedPrice, removeMarks, restorePrice, readOriginalText,
   isCurrentPaint, writeUnitPrice, paintUnitPrice, paintFoundPrice,
 }
