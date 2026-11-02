@@ -20,6 +20,11 @@
 {%- endif -%}
 {%- assign selected_variant_id = product.selected_or_first_available_variant.id | prepend: 'gid://shopify/ProductVariant/' -%}
 {%- assign discount_json = '{"tiers":[]}' -%}
+{%- comment -%} The variants without stock: the widget hides itself for them. Listing the sold-out ones (not the available ones) means a variant the loop does not reach stays shown. {%- endcomment -%}
+{%- assign first_sold_out = true -%}
+{%- capture sold_out_variant_ids_json -%}
+  [{%- for variant in product.variants -%}{%- unless variant.available -%}{%- unless first_sold_out -%},{%- endunless -%}{%- assign first_sold_out = false -%}{{ variant.id }}{%- endunless -%}{%- endfor -%}]
+{%- endcapture -%}
 {%- if discount_metafield != blank -%}
   {%- assign sibling_product_refs = product.metafields['$app:smooth_discount'].tier_sibling_products.value -%}
   {%- assign sibling_variant_refs = product.metafields['$app:smooth_discount'].tier_sibling_variants.value -%}
@@ -184,6 +189,8 @@
   data-high-demand="{{ discount_metafield.value.highDemand | default: false }}"
   data-flash='{{ discount_metafield.value.flash | json | escape }}'
   data-component-urls='{{ component_urls_json }}'
+  data-sold-out-variant-ids='{{ sold_out_variant_ids_json | strip }}'
+  {% unless product.selected_or_first_available_variant.available %}hidden{% endunless %}
   style="{{ style_vars | strip | escape }}"
 >
   <div class="smooth-discounts__flash" data-tier-pricing-flash data-variant="hidden" hidden>

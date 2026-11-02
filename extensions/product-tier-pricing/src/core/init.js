@@ -3,7 +3,8 @@ import { parseWidgetConfig, queryWidgetElements } from '../config.js'
 import { listNeededComponents, loadComponentSet, parseComponentUrls } from '../loader/components.js'
 import { loadComponent } from '../loader/registry.js'
 import { createRenderer } from './renderer.js'
-import { wireAddToCartForm, wireCartAwarePolling, wireLoopSubscriptionsPricePoll, wireQuantityStepper, wireVariantChange } from './wiring.js'
+import { extractNumericId } from '../tierMath.js'
+import { readSelectedVariantId, syncSelectedVariant, wireAddToCartForm, wireCartAwarePolling, wireLoopSubscriptionsPricePoll, wireQuantityStepper, wireSelectedVariantField, wireVariantChange } from './wiring.js'
 
 // Starts loading what this widget needs. `components` resolves with the loaded components, or with null when
 // one cannot be loaded: the widget then keeps the plain price the block rendered and the page does not break.
@@ -29,6 +30,13 @@ export function initTierPricing() {
     wireQuantityStepper(render)
     wireAddToCartForm(render)
     wireVariantChange(container, render)
+    wireSelectedVariantField({
+      root: document,
+      soldOutVariantIds: config.soldOutVariantIds,
+      variantStateRef: render.variantStateRef,
+      render,
+      tools: { extractNumericId, readSelectedVariantId, syncSelectedVariant, startTimer: (callback, milliseconds) => window.setInterval(callback, milliseconds) },
+    })
     wireLoopSubscriptionsPricePoll(container, render)
     if (config.hasTiers) wireCartAwarePolling(render)
   })
