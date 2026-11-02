@@ -73,8 +73,8 @@ export default function TierDiscountForm({
       >
         <Fragment key={discardCount}>
           <DetailsCard initialName={initial.name} onNameChange={(name) => setValues((current) => ({ ...current, name }))} />
-          <FlashCard shopTimezone={shopTimezone} nowLocal={nowLocal} initial={initial.flash} onChange={(flashValues) => setValues((current) => ({ ...current, flash: flashValues }))} />
           <ProductsCard initialMembers={initial.members} currencyCode={currencyCode} excludeDiscountId={excludeDiscountId} onMembersChange={(members) => setValues((current) => ({ ...current, members }))} />
+          <FlashCard shopTimezone={shopTimezone} nowLocal={nowLocal} initial={initial.flash} onChange={(flashValues) => setValues((current) => ({ ...current, flash: flashValues }))} />
           <TiersCard
             allowPriceBasedModes={pricesUniform(values.members.map((member) => member.price))}
             basePrice={pickBasePrice({ members: values.members })}

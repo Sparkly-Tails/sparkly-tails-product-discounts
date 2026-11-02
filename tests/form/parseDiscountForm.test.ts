@@ -41,12 +41,17 @@ describe('parseDiscountForm: a good form', () => {
     })
   })
 
-  it('reads the four style fields, and replaces bad ones by the defaults', () => {
-    const style = { 'style-themeColor': '#e63946', 'style-backgroundColor': '#ffffff', 'style-cornerRadius': '0', 'style-priceSize': '36' }
+  it('reads the three style fields, and replaces bad ones by the defaults', () => {
+    const style = { 'style-backgroundColor': '#ffffff', 'style-cornerRadius': '0', 'style-priceSize': '36' }
     const good = parse({ ...VALID, ...style })
-    expect('values' in good && good.values.style).toEqual({ themeColor: '#E63946', backgroundColor: '#FFFFFF', cornerRadius: 0, priceSize: 36 })
-    const bad = parse({ ...VALID, 'style-themeColor': 'red;}', 'style-backgroundColor': '', 'style-cornerRadius': '99', 'style-priceSize': 'big' })
+    expect('values' in good && good.values.style).toEqual({ backgroundColor: '#FFFFFF', cornerRadius: 0, priceSize: 36 })
+    const bad = parse({ ...VALID, 'style-backgroundColor': '', 'style-cornerRadius': '99', 'style-priceSize': 'big' })
     expect('values' in bad && bad.values.style).toEqual({ ...DEFAULT_WIDGET_STYLE, cornerRadius: 24 })
+  })
+
+  it('keeps the transparency of a background colour, and ignores a theme colour field an old form still sends', () => {
+    const parsed = parse({ ...VALID, 'style-backgroundColor': '#ffffffcc', 'style-themeColor': '#e63946' })
+    expect('values' in parsed && parsed.values.style).toEqual({ ...DEFAULT_WIDGET_STYLE, backgroundColor: '#FFFFFFCC' })
   })
 
   it('reads fixed prices when the mode is fixed', () => {

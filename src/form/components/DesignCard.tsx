@@ -1,12 +1,12 @@
 import { useState } from 'react'
-import { BackgroundColors, CornerRadius, PriceSize, ThemeColors } from '@/form/components/DesignControls'
+import { BackgroundColors, CornerRadius, PriceSize } from '@/form/components/DesignControls'
 import { ExpandLessIcon, ExpandMoreIcon, PaletteIcon } from '@/form/components/icons'
 import { isHexColor } from '@/form/designOptions'
 import type { WidgetStyle } from '@/lib/widgetStyle'
 
-// The "Design" card: colour theme, background colour, round corners and price size of
-// this discount's storefront widget. The form holds the four values (`style`) and hears
-// every change; they travel with the form in four hidden fields and paint the preview.
+// The "Design" card: background colour, round corners and price size of this discount's
+// storefront widget. The form holds the three values (`style`) and hears every change;
+// they travel with the form in three hidden fields and paint the preview.
 export default function DesignCard({ style, onChange }: { style: WidgetStyle; onChange: (style: WidgetStyle) => void }) {
   const [isOpen, setIsOpen] = useState(true)
   const [backgroundText, setBackgroundText] = useState(style.backgroundColor)
@@ -22,8 +22,7 @@ export default function DesignCard({ style, onChange }: { style: WidgetStyle; on
   }
 
   return (
-    <div className="bg-form-surface-container-lowest rounded-lg shadow-xs border border-form-outline-variant/20 overflow-hidden">
-      <input type="hidden" name="style-themeColor" value={style.themeColor} />
+    <div className="bg-form-surface-container-lowest rounded-lg shadow-xs border border-form-outline-variant/20">
       <input type="hidden" name="style-backgroundColor" value={style.backgroundColor} />
       <input type="hidden" name="style-cornerRadius" value={style.cornerRadius} />
       <input type="hidden" name="style-priceSize" value={style.priceSize} />
@@ -42,7 +41,6 @@ export default function DesignCard({ style, onChange }: { style: WidgetStyle; on
           {isOpen ? <ExpandLessIcon className="text-[20px] text-form-on-surface-variant" /> : <ExpandMoreIcon className="text-[20px] text-form-on-surface-variant" />}
         </div>
         <div hidden={!isOpen} className="pt-2 space-y-3">
-          <ThemeColors hex={style.themeColor} onChange={(themeColor) => onChange({ ...style, themeColor })} />
           <BackgroundColors hex={style.backgroundColor} text={backgroundText} onTextChange={updateBackgroundText} onPick={pickBackground} />
           <CornerRadius value={style.cornerRadius} onChange={(cornerRadius) => onChange({ ...style, cornerRadius })} />
           <PriceSize value={style.priceSize} onChange={(priceSize) => onChange({ ...style, priceSize })} />

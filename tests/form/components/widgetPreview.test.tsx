@@ -129,11 +129,11 @@ describe('WidgetPreview', () => {
     expect(screen.getByRole('button', { name: /5 ×/ })).toBeInTheDocument()
   })
 
-  it('paints the widget with the style it is given: colours, corner radius and price size', () => {
-    renderPreview({ style: { themeColor: '#E63946', backgroundColor: '#FFFFFF', cornerRadius: 4, priceSize: 36 } })
+  it('paints the widget with the style it is given: background colour (with its transparency), corner radius and price size', () => {
+    renderPreview({ style: { backgroundColor: '#FFFFFF80', cornerRadius: 4, priceSize: 36 } })
     const widget = document.querySelector('.sparkly-tier-pricing') as HTMLElement
-    expect(widget.style.getPropertyValue('--sparkly-tier-moss')).toBe('#E63946')
-    expect(widget.style.getPropertyValue('--sparkly-tier-cream')).toBe('#FFFFFF')
+    expect(widget.style.getPropertyValue('--sparkly-tier-moss')).toBe('')
+    expect(widget.style.getPropertyValue('--sparkly-tier-cream')).toBe('#FFFFFF80')
     expect(widget.style.getPropertyValue('--sparkly-tier-radius')).toBe('4px')
     expect(widget.style.getPropertyValue('--sparkly-tier-price-font-size')).toBe('36px')
   })

@@ -5,7 +5,7 @@ import { computeLocalFlashStatus, describeFlashState, DISCOUNT_STATE_TOOLS } fro
 import { formatShopLocalNow } from '@/flash/schedule'
 import FormPage from '@/form/components/FormPage'
 import TierDiscountForm from '@/form/components/TierDiscountForm'
-import { buildFlashValues, buildFormValues, buildSelectedMembers, buildTiersInitial } from '@/form/loadFormValues'
+import { buildFlashValues, buildFormValues, buildSelectedMembers, buildStyleValues, buildTiersInitial } from '@/form/loadFormValues'
 import { getConfig } from '@/lib/config'
 import { getMemberInfo } from '@/lib/products'
 import { getShopCurrencyCode, getShopTimezone, zonedTimeToUtc } from '@/lib/shop'
@@ -25,7 +25,7 @@ export default async function DiscountPage({ params }: { params: Promise<{ disco
     : null
   const flashState = describeFlashState({ discountStatus: discount.status, flashStatus })
   const badge = [discount.status === 'live' ? 'Live' : 'Draft', flashState].filter(Boolean).join(' · ')
-  const { values, initialTiers } = buildFormValues({ discount, memberInfo, tools: { buildSelectedMembers, buildFlashValues, buildTiersInitial } })
+  const { values, initialTiers } = buildFormValues({ discount, memberInfo, tools: { buildSelectedMembers, buildFlashValues, buildStyleValues, buildTiersInitial } })
 
   return (
     <FormPage>

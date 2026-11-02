@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildFormValues, buildSelectedMembers, buildFlashValues, buildTiersInitial } from '@/form/loadFormValues'
+import { buildFormValues, buildSelectedMembers, buildFlashValues, buildStyleValues, buildTiersInitial } from '@/form/loadFormValues'
 import type { Discount } from '@/lib/config'
 import { DEFAULT_WIDGET_STYLE } from '@/lib/widgetStyle'
 import type { MemberInfo } from '@/lib/products'
@@ -52,7 +52,7 @@ describe('buildTiersInitial', () => {
 })
 
 describe('buildFormValues', () => {
-  const tools = { buildSelectedMembers, buildFlashValues, buildTiersInitial }
+  const tools = { buildSelectedMembers, buildFlashValues, buildStyleValues, buildTiersInitial }
 
   it('fills the form from the saved discount', () => {
     const { values, initialTiers } = buildFormValues({ discount: PERCENT, memberInfo: [SALMON], tools })
@@ -65,9 +65,14 @@ describe('buildFormValues', () => {
   })
 
   it('fills the Design card from the saved style, or with its defaults for a discount saved before styles existed', () => {
-    const style = { themeColor: '#E63946', backgroundColor: '#FFFFFF', cornerRadius: 4, priceSize: 30 }
+    const style = { backgroundColor: '#FFFFFF', cornerRadius: 4, priceSize: 30 }
     expect(buildFormValues({ discount: { ...PERCENT, style }, memberInfo: [SALMON], tools }).values.style).toEqual(style)
     expect(buildFormValues({ discount: PERCENT, memberInfo: [SALMON], tools }).values.style).toEqual(DEFAULT_WIDGET_STYLE)
+  })
+
+  it('leaves out the theme colour a style saved before it was removed still carries', () => {
+    const saved = { themeColor: '#E63946', backgroundColor: '#FFFFFF', cornerRadius: 4, priceSize: 30 } as unknown as Discount['style']
+    expect(buildFormValues({ discount: { ...PERCENT, style: saved }, memberInfo: [SALMON], tools }).values.style).toEqual({ backgroundColor: '#FFFFFF', cornerRadius: 4, priceSize: 30 })
   })
 
   it('skips a product that no longer exists in the shop, as the old page did', () => {

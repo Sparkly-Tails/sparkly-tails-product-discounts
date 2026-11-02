@@ -5,7 +5,7 @@ import type { FormValues } from '@/form/formValues'
 import type { SelectedMember } from '@/form/memberSelection'
 import type { Discount } from '@/lib/config'
 import type { MemberInfo } from '@/lib/products'
-import { DEFAULT_WIDGET_STYLE } from '@/lib/widgetStyle'
+import { DEFAULT_WIDGET_STYLE, type WidgetStyle } from '@/lib/widgetStyle'
 
 const NO_FLASH: FlashValues = { enabled: false, startsAt: '', endsAt: '', showTeaser: true, highDemand: false }
 
@@ -40,10 +40,16 @@ export function buildTiersInitial({ discount }: { discount: Discount }): TiersIn
   }
 }
 
+/** The Design card's values: the saved style without any field since retired (a style saved with a theme colour still carries one), or the defaults. */
+export function buildStyleValues({ discount }: { discount: Discount }): WidgetStyle {
+  if (!discount.style) return DEFAULT_WIDGET_STYLE
+  return { backgroundColor: discount.style.backgroundColor, cornerRadius: discount.style.cornerRadius, priceSize: discount.style.priceSize }
+}
+
 export function buildFormValues({ discount, memberInfo, tools }: {
   discount: Discount
   memberInfo: MemberInfo[]
-  tools: { buildSelectedMembers: typeof buildSelectedMembers; buildFlashValues: typeof buildFlashValues; buildTiersInitial: typeof buildTiersInitial }
+  tools: { buildSelectedMembers: typeof buildSelectedMembers; buildFlashValues: typeof buildFlashValues; buildStyleValues: typeof buildStyleValues; buildTiersInitial: typeof buildTiersInitial }
 }): { values: FormValues; initialTiers: TiersInitial } {
   return {
     values: {
@@ -52,7 +58,7 @@ export function buildFormValues({ discount, memberInfo, tools }: {
       pricingMode: discount.pricingMode,
       tiers: discount.tiers,
       flash: tools.buildFlashValues({ discount }),
-      style: discount.style ?? DEFAULT_WIDGET_STYLE,
+      style: tools.buildStyleValues({ discount }),
     },
     initialTiers: tools.buildTiersInitial({ discount }),
   }
