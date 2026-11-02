@@ -4,26 +4,10 @@ import { render, screen, cleanup } from '@testing-library/react'
 import '@testing-library/jest-dom/vitest'
 import fs from 'node:fs'
 import path from 'node:path'
-import HomeHeader from '@/home/components/HomeHeader'
 import HomeFooter from '@/home/components/HomeFooter'
 import * as icons from '@/home/components/icons'
 
 afterEach(cleanup)
-
-describe('HomeHeader', () => {
-  it('has a white background, not the cream of the page', () => {
-    const { container } = render(<HomeHeader />)
-    const header = container.querySelector('header') as HTMLElement
-    expect(header).toHaveClass('bg-home-surface-container-lowest')
-    expect(header).not.toHaveClass('bg-home-surface')
-  })
-
-  it('shows the "ST" mark and the app name from the design', () => {
-    render(<HomeHeader />)
-    expect(screen.getByText('ST')).toBeInTheDocument()
-    expect(screen.getByText('Smooth Discounts')).toBeInTheDocument()
-  })
-})
 
 describe('HomeFooter', () => {
   it('shows the app name with the given version and three links that go nowhere yet', () => {

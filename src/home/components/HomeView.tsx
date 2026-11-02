@@ -1,7 +1,6 @@
 import CreateCards from '@/home/components/CreateCards'
 import DiscountsTable from '@/home/components/DiscountsTable'
 import HomeFooter from '@/home/components/HomeFooter'
-import HomeHeader from '@/home/components/HomeHeader'
 import StatCards from '@/home/components/StatCards'
 import TipBanner from '@/home/components/TipBanner'
 import type { TableQuery, TableView } from '@/home/tableQuery'
@@ -12,7 +11,6 @@ import type { TableQuery, TableView } from '@/home/tableQuery'
 export default function HomeView({ view, query, version }: { view: TableView; query: TableQuery; version: string }) {
   return (
     <div className="font-home bg-home-surface text-home-on-surface min-h-screen antialiased flex flex-col">
-      <HomeHeader />
       <main className="w-full max-w-[1024px] mx-auto px-6 py-8 flex-1 flex flex-col gap-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>

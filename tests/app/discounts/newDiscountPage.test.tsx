@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest'
-import { render, screen, cleanup, fireEvent, act } from '@testing-library/react'
+import { render, screen, cleanup, fireEvent, act, within } from '@testing-library/react'
 import '@testing-library/jest-dom/vitest'
 
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }))
 vi.mock('@/lib/shop', () => ({ getShopTimezone: vi.fn(async () => 'Europe/London'), getShopCurrencyCode: vi.fn(async () => 'GBP') }))
 vi.mock('@/actions/saveDiscount', () => ({ saveDiscount: vi.fn(async () => ({ error: 'Shopify allows only 25 active discounts.' })) }))
 vi.mock('@/actions/memberPickerActions', () => ({
@@ -34,11 +35,11 @@ describe('the Create page', () => {
     expect(screen.queryByRole('button', { name: /Delete/ })).toBeNull()
   })
 
-  it('has Discard (back to the discounts), Go live and Save, the last two off until there is something to save', async () => {
+  it('has Go live in the footer, and Save and Discard in Shopify\'s save bar; Go live and Save are off until there is something to save', async () => {
     await renderPage()
-    expect(screen.getByRole('link', { name: 'Discard' })).toHaveAttribute('href', '/')
+    expect(within(document.querySelector('ui-save-bar') as HTMLElement).getByRole('button', { name: 'Discard' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Go live' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+    expect(within(document.querySelector('ui-save-bar') as HTMLElement).getByRole('button', { name: 'Save' })).toBeDisabled()
   })
 
   it('uses the shop time zone and currency', async () => {

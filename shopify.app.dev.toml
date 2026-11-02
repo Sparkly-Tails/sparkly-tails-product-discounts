@@ -17,7 +17,7 @@
 # every token are environment variables on the dev Vercel project, never in git.
 
 client_id = "f707124c97ab92f1fc7dd99b1a01c8e1"
-name = "demo"
+name = "Smooth Discounts"
 application_url = "https://sparkly-tails-product-discounts-nyq.vercel.app"
 embedded = true
 

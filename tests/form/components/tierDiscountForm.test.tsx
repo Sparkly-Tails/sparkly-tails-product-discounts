@@ -1,11 +1,13 @@
 // @vitest-environment jsdom
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest'
-import { render, screen, cleanup, fireEvent, act } from '@testing-library/react'
+import { render, screen, cleanup, fireEvent, act, within } from '@testing-library/react'
 import '@testing-library/jest-dom/vitest'
 import TierDiscountForm from '@/form/components/TierDiscountForm'
 import type { FormValues } from '@/form/formValues'
 import { DEFAULT_WIDGET_STYLE } from '@/lib/widgetStyle'
 
+const push = vi.hoisted(() => vi.fn())
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push }) }))
 vi.mock('@/actions/memberPickerActions', () => ({
   searchProductsAction: vi.fn(async () => []),
   listProductsAction: vi.fn(async () => []),
@@ -40,10 +42,19 @@ function renderForm(overrides: Partial<Parameters<typeof TierDiscountForm>[0]> =
   return { saveAction, ...view }
 }
 
-beforeEach(() => vi.useFakeTimers({ now: NOW * 1000 }))
-afterEach(() => { cleanup(); vi.useRealTimers() })
+// Shopify's save bar, as the page sees it: shown or hidden by id. `barShown()` says which it is now.
+const BAR_ID = 'discount-save-bar'
+let barShown = false
+beforeEach(() => {
+  vi.useFakeTimers({ now: NOW * 1000 })
+  barShown = false
+  push.mockClear()
+  ;(window as unknown as { shopify?: unknown }).shopify = { saveBar: { show: (id: string) => { if (id === BAR_ID) barShown = true }, hide: (id: string) => { if (id === BAR_ID) barShown = false } } }
+})
+afterEach(() => { cleanup(); vi.useRealTimers(); delete (window as unknown as { shopify?: unknown }).shopify })
 
-const STATUS = 'Unsaved changes on this discount tier'
+const theForm = () => document.querySelector('form') as HTMLFormElement
+const saveBarButton = (name: string) => within(document.querySelector('ui-save-bar') as HTMLElement).getByRole('button', { name })
 const nameField = () => screen.getByLabelText('Internal name')
 
 describe('TierDiscountForm: what it shows', () => {
@@ -68,19 +79,37 @@ describe('TierDiscountForm: what it shows', () => {
   })
 })
 
-describe('TierDiscountForm: the footer', () => {
-  it('has Discard, Go live and Save, and no status line while nothing is changed', () => {
+describe('TierDiscountForm: the save bar and the footer', () => {
+  it('has Go live in the footer, and Save and Discard in Shopify\'s save bar, which is hidden while nothing is changed', () => {
     renderForm()
-    expect(screen.getByRole('button', { name: 'Discard' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Go live' })).toHaveAttribute('name', 'goLive')
-    expect(screen.getByRole('button', { name: 'Save' })).not.toHaveAttribute('name')
-    expect(screen.queryByText(STATUS)).toBeNull()
+    expect(theForm()).not.toContainElement(document.querySelector('ui-save-bar') as HTMLElement)
+    expect(saveBarButton('Save')).toBeInTheDocument()
+    expect(saveBarButton('Discard')).toBeInTheDocument()
+    expect(barShown).toBe(false)
   })
 
-  it('shows "Unsaved changes" as soon as anything is changed', () => {
+  it('has no Save and no Discard of its own in the footer, and no unsaved-changes line', () => {
     renderForm()
     fireEvent.change(nameField(), { target: { value: 'Black Friday' } })
-    expect(screen.getByText(STATUS)).toBeInTheDocument()
+    const buttonsOutsideTheBar = screen.getAllByRole('button').filter((button) => !button.closest('ui-save-bar'))
+    expect(buttonsOutsideTheBar.map((button) => button.textContent).filter((text) => text === 'Save' || text === 'Discard')).toEqual([])
+    expect(screen.queryByText(/Unsaved changes/)).toBeNull()
+  })
+
+  it('shows the save bar as soon as anything is changed', () => {
+    renderForm()
+    fireEvent.change(nameField(), { target: { value: 'Black Friday' } })
+    expect(barShown).toBe(true)
+  })
+
+  it('saves the form when Save is pressed in the bar', async () => {
+    const { saveAction } = renderForm()
+    fireEvent.change(nameField(), { target: { value: 'Black Friday' } })
+    await act(async () => { fireEvent.click(saveBarButton('Save')) })
+    expect(saveAction).toHaveBeenCalledTimes(1)
+    const formData = (saveAction.mock.calls[0] as unknown as [unknown, FormData])[1]
+    expect(formData.get('name')).toBe('Black Friday')
   })
 
   it.each([
@@ -91,35 +120,35 @@ describe('TierDiscountForm: the footer', () => {
   ])('shows it when %s', (_what, change) => {
     renderForm()
     change()
-    expect(screen.getByText(STATUS)).toBeInTheDocument()
+    expect(barShown).toBe(true)
   })
 
   it('goes away when the change is put back', () => {
     renderForm()
     fireEvent.change(nameField(), { target: { value: 'Black Friday' } })
     fireEvent.change(nameField(), { target: { value: 'Salmon Oil Volume Discount' } })
-    expect(screen.queryByText(STATUS)).toBeNull()
+    expect(barShown).toBe(false)
   })
 
   it('cannot save or go live without a product and a complete tier', () => {
     renderForm({ initial: EMPTY, initialTiers: EMPTY_TIERS, mode: 'create' })
-    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+    expect(saveBarButton('Save')).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Go live' })).toBeDisabled()
   })
 
   it('can save once there is a product and a complete tier', () => {
     renderForm()
-    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
+    expect(saveBarButton('Save')).toBeEnabled()
     fireEvent.change(screen.getByLabelText('Tier 1 percent off'), { target: { value: '' } })
-    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+    expect(saveBarButton('Save')).toBeDisabled()
   })
 })
 
 describe('TierDiscountForm: the edit footer', () => {
-  it('has Delete first, then Discard, Go live and Save, for a draft', () => {
+  it('has Delete first, then Go live, for a draft', () => {
     renderForm({ status: 'draft', deleteAction: async () => {} })
-    const names = screen.getAllByRole('button').map((button) => button.textContent).filter((text) => ['Delete', 'Discard', 'Go live', 'Take offline', 'Save'].includes(text ?? ''))
-    expect(names).toEqual(['Delete', 'Discard', 'Go live', 'Save'])
+    const names = screen.getAllByRole('button').filter((button) => !button.closest('ui-save-bar')).map((button) => button.textContent).filter((text) => ['Delete', 'Discard', 'Go live', 'Take offline', 'Save'].includes(text ?? ''))
+    expect(names).toEqual(['Delete', 'Go live'])
   })
 
   it('has Take offline instead of Go live for a live discount', () => {
@@ -146,17 +175,18 @@ describe('TierDiscountForm: Discard', () => {
     fireEvent.change(screen.getByLabelText('Tier 1 percent off'), { target: { value: '12' } })
     fireEvent.click(screen.getByRole('button', { name: 'Remove Salmon Oil' }))
     fireEvent.click(screen.getByRole('checkbox', { name: 'Run as a flash sale' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Discard' }))
+    fireEvent.click(saveBarButton('Discard'))
     expect(nameField()).toHaveValue('Salmon Oil Volume Discount')
     expect(screen.getByLabelText('Tier 1 percent off')).toHaveValue(10)
     expect(screen.getByText('Salmon Oil')).toBeInTheDocument()
     expect(screen.getByRole('checkbox', { name: 'Run as a flash sale' })).not.toBeChecked()
-    expect(screen.queryByText(STATUS)).toBeNull()
+    expect(barShown).toBe(false)
   })
 
-  it('on the create page is a link back to the discounts', () => {
+  it('on the create page leaves for the discounts, as nothing was saved', () => {
     renderForm({ mode: 'create', initial: EMPTY, initialTiers: EMPTY_TIERS })
-    expect(screen.getByRole('link', { name: 'Discard' })).toHaveAttribute('href', '/')
+    fireEvent.click(saveBarButton('Discard'))
+    expect(push).toHaveBeenCalledWith('/')
   })
 })
 
@@ -218,7 +248,7 @@ describe('TierDiscountForm: the order of the cards', () => {
 describe('TierDiscountForm: the style', () => {
   it('sends the three style values of the Design card to the save action, the defaults when it was left alone', async () => {
     const { saveAction } = renderForm()
-    await act(async () => { fireEvent.submit(screen.getByRole('button', { name: 'Save' }).closest('form')!) })
+    await act(async () => { fireEvent.submit(theForm()) })
     const formData = (saveAction.mock.calls[0] as unknown as [unknown, FormData])[1]
     expect([formData.get('style-backgroundColor'), formData.get('style-cornerRadius'), formData.get('style-priceSize')]).toEqual(['#F5EFE1', '12', '24'])
     expect(formData.has('style-themeColor')).toBe(false)
@@ -231,7 +261,7 @@ describe('TierDiscountForm: the style', () => {
     const widget = document.querySelector('.smooth-discounts') as HTMLElement
     expect(widget.style.getPropertyValue('--smooth-discounts-cream')).toBe('#FFFFFF')
     expect(widget.style.getPropertyValue('--smooth-discounts-price-font-size')).toBe('36px')
-    await act(async () => { fireEvent.submit(screen.getByRole('button', { name: 'Save' }).closest('form')!) })
+    await act(async () => { fireEvent.submit(theForm()) })
     const formData = (saveAction.mock.calls[0] as unknown as [unknown, FormData])[1]
     expect(formData.get('style-backgroundColor')).toBe('#FFFFFF')
     expect(formData.get('style-priceSize')).toBe('36')
@@ -239,12 +269,12 @@ describe('TierDiscountForm: the style', () => {
 
   it('counts a changed style as an unsaved change, and Discard takes it back', () => {
     renderForm()
-    expect(screen.queryByText(STATUS)).toBeNull()
+    expect(barShown).toBe(false)
     fireEvent.click(screen.getByRole('button', { name: 'White' }))
-    expect(screen.getByText(STATUS)).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Discard' }))
+    expect(barShown).toBe(true)
+    fireEvent.click(saveBarButton('Discard'))
     expect(screen.getByRole('button', { name: 'Warm Sand' })).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.queryByText(STATUS)).toBeNull()
+    expect(barShown).toBe(false)
   })
 })
 
@@ -259,7 +289,7 @@ describe('TierDiscountForm: saving', () => {
 
   it('sends the name, the products, the mode and the tiers to the save action', async () => {
     const { saveAction } = renderForm()
-    await act(async () => { fireEvent.submit(screen.getByRole('button', { name: 'Save' }).closest('form')!) })
+    await act(async () => { fireEvent.submit(theForm()) })
     expect(saveAction).toHaveBeenCalledTimes(1)
     const formData = (saveAction.mock.calls[0] as unknown as [unknown, FormData])[1]
     expect(formData.get('name')).toBe('Salmon Oil Volume Discount')
@@ -274,7 +304,7 @@ describe('TierDiscountForm: saving', () => {
     renderForm({ saveAction: vi.fn(async () => ({ error: 'Shopify allows only 25 active discounts.' })) })
     fireEvent.change(nameField(), { target: { value: 'Black Friday' } })
     fireEvent.change(screen.getByLabelText('Tier 1 percent off'), { target: { value: '12' } })
-    await act(async () => { fireEvent.submit(screen.getByRole('button', { name: 'Save' }).closest('form')!) })
+    await act(async () => { fireEvent.submit(theForm()) })
     expect(screen.getByRole('alert')).toHaveTextContent('Shopify allows only 25 active discounts.')
     expect(nameField()).toHaveValue('Black Friday')
     expect(screen.getByLabelText('Tier 1 percent off')).toHaveValue(12)
