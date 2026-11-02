@@ -19,14 +19,14 @@ interface LoadMetricsArgs {
 
 const NO_TOTALS: MetricTotals = { visitors: 0, orders: 0, averageOrderValue: 0, addedRevenue: 0 }
 
-/** Reads the scopes, brings the orders up to date, then reads the stored numbers of the period (days in the shop's time zone). */
+/** Refreshes the settings the sync and the visit counting read, reads the scopes, brings the orders up to date, then reads the stored numbers of the period (days in the shop's time zone). */
 export async function loadMetrics(args: LoadMetricsArgs): Promise<{ totals: MetricTotals; hasPermission: boolean }> {
   const { shop, nowIso, fromDay, toDay, timeZone } = args
+  await args.refresh({ shop, timeZone })
   const scopes = await args.readScopes({ shop })
   if (!scopes.includes('read_orders')) return { totals: NO_TOTALS, hasPermission: false }
   const synced = await args.syncOrders({ shop, nowIso })
   if (synced === 'needs-permission') return { totals: NO_TOTALS, hasPermission: false }
-  await args.refresh({ shop, timeZone })
   const fromIso = args.convertToUtc(`${fromDay}T00:00`, timeZone)
   const toIso = args.convertToUtc(`${args.addDays({ day: toDay, count: 1 })}T00:00`, timeZone)
   const rows = await args.readRows({ shop, fromIso, toIso })

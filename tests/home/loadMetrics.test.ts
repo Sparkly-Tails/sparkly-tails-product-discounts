@@ -48,4 +48,16 @@ describe('loadMetrics', () => {
     expect(result.hasPermission).toBe(false)
     expect(args.readRows).not.toHaveBeenCalled()
   })
+
+  it('refreshes the settings before the sync reads them, so the first backfill knows the live products', async () => {
+    const { args, calls } = makeArgs()
+    await loadMetrics(args)
+    expect(calls.indexOf('refresh')).toBeLessThan(calls.indexOf('sync'))
+  })
+
+  it('refreshes the settings even when the shop has not approved the order scope, so the visits are still counted', async () => {
+    const { args } = makeArgs({ readScopes: vi.fn(async () => ['read_products']) })
+    await loadMetrics(args)
+    expect(args.refresh).toHaveBeenCalledWith({ shop: 'demo.myshopify.com', timeZone: 'Europe/London' })
+  })
 })
