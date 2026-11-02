@@ -23,5 +23,5 @@ export function runWidgetScripts({ built, components = WIDGET_COMPONENTS }: { bu
 
 /** Forgets the components a test registered, so the next one starts from a page that has none. */
 export function clearWidgetRegistry(): void {
-  delete (window as unknown as Record<string, unknown>).SparklyTierPricing
+  delete (window as unknown as Record<string, unknown>).SmoothDiscounts
 }

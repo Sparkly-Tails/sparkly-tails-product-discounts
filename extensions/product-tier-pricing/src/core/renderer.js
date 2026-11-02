@@ -63,7 +63,7 @@ export function createRenderer(container, config, elements, loading) {
       formatMoney: formatMoneyFn,
     })
     // A flash sale that has not started (teaser off) or is over has no card: only the plain price.
-    if (config.hasTiers) container.classList.toggle('sparkly-tier-pricing--card', viewModel.showChrome)
+    if (config.hasTiers) container.classList.toggle('smooth-discounts--card', viewModel.showChrome)
     if (elements.drawerEl) elements.drawerEl.hidden = !config.isGroup || !viewModel.showDrawer
     if (parts.flash) parts.flash.paintFlashBar(elements, viewModel)
     parts.paint.paintWidget(elements, viewModel, basePrice, addingQty, tierButtonsSignatureRef)

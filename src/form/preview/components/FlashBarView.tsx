@@ -3,11 +3,11 @@ import type { WidgetFlashBar } from '@/form/preview/widgetTypes'
 
 function FlashTimer({ parts }: { parts: string[] }) {
   return (
-    <span className="sparkly-tier-pricing__flash-timer" data-flash-timer>
+    <span className="smooth-discounts__flash-timer" data-flash-timer>
       {parts.map((part, index) => (
         <Fragment key={index}>
-          {index > 0 ? <span className="sparkly-tier-pricing__flash-sep">:</span> : null}
-          <span className="sparkly-tier-pricing__flash-digit">{part}</span>
+          {index > 0 ? <span className="smooth-discounts__flash-sep">:</span> : null}
+          <span className="smooth-discounts__flash-digit">{part}</span>
         </Fragment>
       ))}
     </span>
@@ -17,8 +17,8 @@ function FlashTimer({ parts }: { parts: string[] }) {
 function FlashChip({ text }: { text: string }) {
   if (!text) return null
   return (
-    <span className="sparkly-tier-pricing__flash-chip" data-flash-chip>
-      <span className="sparkly-tier-pricing__flash-hourglass" aria-hidden="true"></span>
+    <span className="smooth-discounts__flash-chip" data-flash-chip>
+      <span className="smooth-discounts__flash-hourglass" aria-hidden="true"></span>
       <span data-flash-chip-text>{text}</span>
     </span>
   )
@@ -29,14 +29,14 @@ function FlashChip({ text }: { text: string }) {
 export default function FlashBarView({ bar }: { bar: WidgetFlashBar | null }) {
   if (!bar || bar.variant === 'hidden') return null
   return (
-    <div className="sparkly-tier-pricing__flash" data-tier-pricing-flash data-variant={bar.variant}>
-      <div className="sparkly-tier-pricing__flash-main">
-        <span className="sparkly-tier-pricing__flash-icon" aria-hidden="true"></span>
-        <span className="sparkly-tier-pricing__flash-label" data-flash-label>{bar.label}</span>
+    <div className="smooth-discounts__flash" data-tier-pricing-flash data-variant={bar.variant}>
+      <div className="smooth-discounts__flash-main">
+        <span className="smooth-discounts__flash-icon" aria-hidden="true"></span>
+        <span className="smooth-discounts__flash-label" data-flash-label>{bar.label}</span>
       </div>
-      <div className="sparkly-tier-pricing__flash-side">
+      <div className="smooth-discounts__flash-side">
         <FlashTimer parts={bar.timerParts} />
-        <span className="sparkly-tier-pricing__flash-aside" data-flash-aside>{bar.aside}</span>
+        <span className="smooth-discounts__flash-aside" data-flash-aside>{bar.aside}</span>
         <FlashChip text={bar.chip} />
       </div>
     </div>

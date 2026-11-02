@@ -88,12 +88,12 @@ export function paintFlashTimer(timerEl, parts) {
     parts.forEach((part, index) => {
       if (index > 0) {
         const sep = document.createElement('span')
-        sep.className = 'sparkly-tier-pricing__flash-sep'
+        sep.className = 'smooth-discounts__flash-sep'
         sep.textContent = ':'
         timerEl.appendChild(sep)
       }
       const digit = document.createElement('span')
-      digit.className = 'sparkly-tier-pricing__flash-digit'
+      digit.className = 'smooth-discounts__flash-digit'
       timerEl.appendChild(digit)
     })
   }

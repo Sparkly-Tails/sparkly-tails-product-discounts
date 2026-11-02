@@ -29,7 +29,7 @@ describe('WidgetPreview', () => {
     renderPreview({ products: [] })
     expect(screen.getByText('Add a product to see the preview')).toBeInTheDocument()
     expect(screen.queryByLabelText('Product previewing:')).toBeNull()
-    expect(document.querySelector('.sparkly-tier-pricing')).toBeNull()
+    expect(document.querySelector('.smooth-discounts')).toBeNull()
   })
 
   it('shows the widget for the first product, with a list of the products to preview', () => {
@@ -66,7 +66,7 @@ describe('WidgetPreview', () => {
 
   it('counts a flash sale down, second by second, in the shop time zone', () => {
     renderPreview({ flash: { startsAt: '2026-10-30T09:00', endsAt: '2027-01-15T10:00', showTeaser: true }, initialNowSeconds: Date.parse('2027-01-15T07:00:00Z') / 1000 })
-    const digits = () => Array.from(document.querySelectorAll('.sparkly-tier-pricing__flash-digit')).map((digit) => digit.textContent)
+    const digits = () => Array.from(document.querySelectorAll('.smooth-discounts__flash-digit')).map((digit) => digit.textContent)
     expect(digits()).toEqual(['03', '00', '00'])
     act(() => { vi.advanceTimersByTime(1000) })
     expect(digits()).toEqual(['02', '59', '59'])
@@ -97,7 +97,7 @@ describe('WidgetPreview', () => {
 
   it('puts the quantity picker below the widget', () => {
     renderPreview()
-    const widget = document.querySelector('.sparkly-tier-pricing') as Element
+    const widget = document.querySelector('.smooth-discounts') as Element
     const position = widget.compareDocumentPosition(screen.getByLabelText('Quantity'))
     expect(position & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
@@ -131,10 +131,10 @@ describe('WidgetPreview', () => {
 
   it('paints the widget with the style it is given: background colour (with its transparency), corner radius and price size', () => {
     renderPreview({ style: { backgroundColor: '#FFFFFF80', cornerRadius: 4, priceSize: 36 } })
-    const widget = document.querySelector('.sparkly-tier-pricing') as HTMLElement
-    expect(widget.style.getPropertyValue('--sparkly-tier-moss')).toBe('')
-    expect(widget.style.getPropertyValue('--sparkly-tier-cream')).toBe('#FFFFFF80')
-    expect(widget.style.getPropertyValue('--sparkly-tier-radius')).toBe('4px')
-    expect(widget.style.getPropertyValue('--sparkly-tier-price-font-size')).toBe('36px')
+    const widget = document.querySelector('.smooth-discounts') as HTMLElement
+    expect(widget.style.getPropertyValue('--smooth-discounts-moss')).toBe('')
+    expect(widget.style.getPropertyValue('--smooth-discounts-cream')).toBe('#FFFFFF80')
+    expect(widget.style.getPropertyValue('--smooth-discounts-radius')).toBe('4px')
+    expect(widget.style.getPropertyValue('--smooth-discounts-price-font-size')).toBe('36px')
   })
 })

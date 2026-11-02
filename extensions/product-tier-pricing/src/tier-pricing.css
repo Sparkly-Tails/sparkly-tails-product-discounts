@@ -4,79 +4,79 @@
    and the text, border and surface colours come from the theme (the block's
    own moss/cream settings are the fallbacks). The success greens and the warm
    hint colour are the design's own. */
-.sparkly-tier-pricing,
-.sparkly-tier-pricing *,
-.sparkly-tier-pricing *::before,
-.sparkly-tier-pricing *::after {
+.smooth-discounts,
+.smooth-discounts *,
+.smooth-discounts *::before,
+.smooth-discounts *::after {
   box-sizing: border-box;
 }
 
-.sparkly-tier-pricing {
+.smooth-discounts {
   /* The card's corner radius; a discount's style sets it on the element (see the block). The boxes and chips
      inside get 3/4 and 1/2 of it, which is the old 12px and 8px at the default 16px. */
-  --sparkly-tier-radius: 16px;
-  --sparkly-tier-radius-md: calc(var(--sparkly-tier-radius) * 0.75);
-  --sparkly-tier-radius-sm: calc(var(--sparkly-tier-radius) * 0.5);
-  --sparkly-tier-ink: var(--color-text-main, #2a2a22);
-  --sparkly-tier-text-secondary: var(--color-secondary-text-main, #5b5c4e);
-  --sparkly-tier-border: var(--color-borders-main, #ddd6c2);
-  --sparkly-tier-surface: var(--sparkly-tier-cream, #f3ecd9);
-  --sparkly-tier-sand: color-mix(in srgb, var(--sparkly-tier-border) 70%, var(--sparkly-tier-surface));
-  --sparkly-tier-track: #fff;
-  --sparkly-tier-olive: var(--sparkly-tier-moss, #434625);
-  --sparkly-tier-warm: #c47b44;
-  --sparkly-tier-success-50: #ecfdf5;
-  --sparkly-tier-success-100: #d1fae5;
-  --sparkly-tier-success-600: #059669;
-  --sparkly-tier-success-700: #047857;
-  --sparkly-tier-success-800: #065f46;
-  --sparkly-tier-success-900: #064e3b;
-  --sparkly-tier-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  --sparkly-tier-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+  --smooth-discounts-radius: 16px;
+  --smooth-discounts-radius-md: calc(var(--smooth-discounts-radius) * 0.75);
+  --smooth-discounts-radius-sm: calc(var(--smooth-discounts-radius) * 0.5);
+  --smooth-discounts-ink: var(--color-text-main, #2a2a22);
+  --smooth-discounts-text-secondary: var(--color-secondary-text-main, #5b5c4e);
+  --smooth-discounts-border: var(--color-borders-main, #ddd6c2);
+  --smooth-discounts-surface: var(--smooth-discounts-cream, #f3ecd9);
+  --smooth-discounts-sand: color-mix(in srgb, var(--smooth-discounts-border) 70%, var(--smooth-discounts-surface));
+  --smooth-discounts-track: #fff;
+  --smooth-discounts-olive: var(--smooth-discounts-moss, #434625);
+  --smooth-discounts-warm: #c47b44;
+  --smooth-discounts-success-50: #ecfdf5;
+  --smooth-discounts-success-100: #d1fae5;
+  --smooth-discounts-success-600: #059669;
+  --smooth-discounts-success-700: #047857;
+  --smooth-discounts-success-800: #065f46;
+  --smooth-discounts-success-900: #064e3b;
+  --smooth-discounts-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --smooth-discounts-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
   /* Theme's "selected" colour — the same variable the theme's own variant
      picker uses for its checked/selected swatch border. Falls back to the
      block's configurable moss color, then a hardcoded default. */
-  --sparkly-tier-accent: var(--color-text-main, var(--sparkly-tier-moss, #434625));
-  --sparkly-tier-ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --smooth-discounts-accent: var(--color-text-main, var(--smooth-discounts-moss, #434625));
+  --smooth-discounts-ease: cubic-bezier(0.4, 0, 0.2, 1);
   font-family: var(--font-stack-body);
 }
 
 /* The card: a product with a tier discount. The body holds the padding so a
    bar at the top of the card (flash sale) can run edge to edge. */
-.sparkly-tier-pricing--card {
+.smooth-discounts--card {
   margin: 16px 0;
   overflow: hidden;
-  border: 1px solid var(--sparkly-tier-border);
-  border-radius: var(--sparkly-tier-radius);
-  background: var(--sparkly-tier-track);
+  border: 1px solid var(--smooth-discounts-border);
+  border-radius: var(--smooth-discounts-radius);
+  background: var(--smooth-discounts-track);
   box-shadow: 0 8px 24px -4px rgba(35, 38, 28, 0.08), 0 2px 6px -1px rgba(35, 38, 28, 0.04);
 }
 
-.sparkly-tier-pricing--card .sparkly-tier-pricing__body {
+.smooth-discounts--card .smooth-discounts__body {
   display: flex;
   flex-direction: column;
   gap: 16px;
   padding: 20px;
 }
 
-.sparkly-tier-pricing__summary {
+.smooth-discounts__summary {
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
 
-.sparkly-tier-pricing__card {
+.smooth-discounts__card {
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
 
-.sparkly-tier-pricing__card[hidden] {
+.smooth-discounts__card[hidden] {
   display: none;
 }
 
 /* Price row: the price, "each" and the struck original on the left, the tag on the right. */
-.sparkly-tier-pricing__price-row {
+.smooth-discounts__price-row {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
@@ -84,13 +84,13 @@
   gap: 4px 8px;
 }
 
-.sparkly-tier-pricing__price-group {
+.smooth-discounts__price-group {
   display: flex;
   align-items: baseline;
   gap: 8px;
 }
 
-.sparkly-tier-pricing__price {
+.smooth-discounts__price {
   font-family: var(--font-stack-body);
   /* Hardcoded rather than var(--font-weight-body-bold): this theme sets
      that var to 500 for body copy, which is lighter than the struck-out
@@ -99,39 +99,39 @@
   /* The block setting (24px as in the design), never above 36px: a value
      saved before the cap existed (44px) no longer oversizes the price. In px,
      not rem: themes such as Dawn set the root font size to 62.5%. */
-  font-size: min(var(--sparkly-tier-price-font-size, 24px), 36px);
+  font-size: min(var(--smooth-discounts-price-font-size, 24px), 36px);
   line-height: 1.3334;
   font-variant-numeric: tabular-nums;
-  color: var(--sparkly-tier-ink);
+  color: var(--smooth-discounts-ink);
 }
 
 @media (max-width: 749px) {
-  .sparkly-tier-pricing__price {
-    font-size: min(var(--sparkly-tier-price-font-size, 24px), 28px);
+  .smooth-discounts__price {
+    font-size: min(var(--smooth-discounts-price-font-size, 24px), 28px);
   }
 }
 
-.sparkly-tier-pricing__now-label {
+.smooth-discounts__now-label {
   font-family: var(--font-stack-body);
   font-weight: 500;
   font-size: 12px;
   line-height: 16px;
-  color: var(--sparkly-tier-text-secondary);
+  color: var(--smooth-discounts-text-secondary);
 }
 
-.sparkly-tier-pricing__now-label[hidden] {
+.smooth-discounts__now-label[hidden] {
   display: none;
 }
 
-.sparkly-tier-pricing__each-label {
+.smooth-discounts__each-label {
   font-family: var(--font-stack-body);
   font-weight: 500;
   font-size: 12px;
   line-height: 16px;
-  color: var(--sparkly-tier-text-secondary);
+  color: var(--smooth-discounts-text-secondary);
 }
 
-.sparkly-tier-pricing__struck {
+.smooth-discounts__struck {
   font-family: var(--font-stack-body);
   font-weight: 400;
   font-size: 12px;
@@ -139,16 +139,16 @@
   font-variant-numeric: tabular-nums;
   /* Theme's secondary text colour rather than a faded one: opacity dropped the
      struck price below 4.5:1 contrast. */
-  color: var(--sparkly-tier-text-secondary);
+  color: var(--smooth-discounts-text-secondary);
   text-decoration: line-through;
 }
 
-.sparkly-tier-pricing__struck[hidden],
-.sparkly-tier-pricing__tag[hidden] {
+.smooth-discounts__struck[hidden],
+.smooth-discounts__tag[hidden] {
   display: none;
 }
 
-.sparkly-tier-pricing__sr-only {
+.smooth-discounts__sr-only {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -161,14 +161,14 @@
 }
 
 /* The tag: the tier pill, or the High Demand tag with a flame. */
-.sparkly-tier-pricing__tag {
+.smooth-discounts__tag {
   display: inline-flex;
   align-items: center;
   gap: 4px;
   padding: 2px 10px;
   border-radius: 999px;
-  background: var(--sparkly-tier-success-100);
-  color: var(--sparkly-tier-success-800);
+  background: var(--smooth-discounts-success-100);
+  color: var(--smooth-discounts-success-800);
   font-family: var(--font-stack-body);
   font-size: 12px;
   line-height: 16px;
@@ -177,11 +177,11 @@
   white-space: nowrap;
 }
 
-.sparkly-tier-pricing__tag[data-kind='high-demand'] {
+.smooth-discounts__tag[data-kind='high-demand'] {
   font-weight: 600;
 }
 
-.sparkly-tier-pricing__tag[data-kind='high-demand']::before {
+.smooth-discounts__tag[data-kind='high-demand']::before {
   content: '';
   width: 12px;
   height: 12px;
@@ -190,24 +190,24 @@
   mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2c1 3.5-1.5 5-1.5 7.5 0 1.2.8 2 1.9 2 .9 0 1.6-.6 1.6-1.6 2.2 1.2 3.5 3.2 3.5 5.6A5.5 5.5 0 0 1 12 21a5.5 5.5 0 0 1-5.5-5.5C6.5 11 9.5 8.5 12 2z'/%3E%3C/svg%3E") center / contain no-repeat;
 }
 
-.sparkly-tier-pricing__promo {
+.smooth-discounts__promo {
   margin: 0;
   font-family: var(--font-stack-body);
   font-size: 12px;
   line-height: 16px;
-  color: var(--sparkly-tier-text-secondary);
+  color: var(--smooth-discounts-text-secondary);
 }
 
-.sparkly-tier-pricing__chip:focus-visible,
-.sparkly-tier-pricing__toggle:focus-visible,
-.sparkly-tier-pricing__add:focus-visible,
-.sparkly-tier-pricing__list-link:focus-visible {
-  outline: 2px solid var(--sparkly-tier-accent);
+.smooth-discounts__chip:focus-visible,
+.smooth-discounts__toggle:focus-visible,
+.smooth-discounts__add:focus-visible,
+.smooth-discounts__list-link:focus-visible {
+  outline: 2px solid var(--smooth-discounts-accent);
   outline-offset: 2px;
 }
 
 /* Chips: "8 × £13.00" per tier, the applied tier ticked, a dashed chip for the current quantity. */
-.sparkly-tier-pricing__tiers {
+.smooth-discounts__tiers {
   display: flex;
   flex-wrap: nowrap;
   overflow-x: auto;
@@ -219,22 +219,22 @@
   margin: 6px 0 0;
 }
 
-.sparkly-tier-pricing__tiers[hidden],
-.sparkly-tier-pricing__drawer[hidden] {
+.smooth-discounts__tiers[hidden],
+.smooth-discounts__drawer[hidden] {
   display: none;
 }
 
-.sparkly-tier-pricing__chip {
+.smooth-discounts__chip {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
   margin: 0;
   padding: 6px 12px;
-  border: 1px solid var(--sparkly-tier-border);
-  border-radius: var(--sparkly-tier-radius-sm);
-  background: var(--sparkly-tier-track);
-  color: var(--sparkly-tier-text-secondary);
+  border: 1px solid var(--smooth-discounts-border);
+  border-radius: var(--smooth-discounts-radius-sm);
+  background: var(--smooth-discounts-track);
+  color: var(--smooth-discounts-text-secondary);
   font-family: var(--font-stack-body);
   font-size: 12px;
   line-height: 16px;
@@ -245,64 +245,64 @@
   transition: border-color 120ms ease;
 }
 
-.sparkly-tier-pricing__chip:hover {
-  border-color: var(--sparkly-tier-ink);
+.smooth-discounts__chip:hover {
+  border-color: var(--smooth-discounts-ink);
 }
 
-.sparkly-tier-pricing__chip--applied {
-  border-color: var(--sparkly-tier-success-600);
-  background: var(--sparkly-tier-success-50);
-  color: var(--sparkly-tier-success-800);
+.smooth-discounts__chip--applied {
+  border-color: var(--smooth-discounts-success-600);
+  background: var(--smooth-discounts-success-50);
+  color: var(--smooth-discounts-success-800);
 }
 
-.sparkly-tier-pricing__chip--exact,
-.sparkly-tier-pricing__chip--current-progress,
-.sparkly-tier-pricing__chip--current-offer,
-.sparkly-tier-pricing__chip--current-highest {
+.smooth-discounts__chip--exact,
+.smooth-discounts__chip--current-progress,
+.smooth-discounts__chip--current-offer,
+.smooth-discounts__chip--current-highest {
   border-width: 2px;
   font-weight: 700;
-  box-shadow: var(--sparkly-tier-shadow-sm);
+  box-shadow: var(--smooth-discounts-shadow-sm);
 }
 
-.sparkly-tier-pricing__chip--exact,
-.sparkly-tier-pricing__chip--current-progress {
-  border-color: var(--sparkly-tier-ink);
-  background: var(--sparkly-tier-surface);
-  color: var(--sparkly-tier-ink);
+.smooth-discounts__chip--exact,
+.smooth-discounts__chip--current-progress {
+  border-color: var(--smooth-discounts-ink);
+  background: var(--smooth-discounts-surface);
+  color: var(--smooth-discounts-ink);
 }
 
-.sparkly-tier-pricing__chip--current-offer {
-  border-color: var(--sparkly-tier-olive);
-  background: var(--sparkly-tier-track);
-  color: var(--sparkly-tier-olive);
+.smooth-discounts__chip--current-offer {
+  border-color: var(--smooth-discounts-olive);
+  background: var(--smooth-discounts-track);
+  color: var(--smooth-discounts-olive);
 }
 
-.sparkly-tier-pricing__chip--current-highest {
-  border-color: var(--sparkly-tier-success-600);
-  background: var(--sparkly-tier-success-50);
-  color: var(--sparkly-tier-success-800);
+.smooth-discounts__chip--current-highest {
+  border-color: var(--smooth-discounts-success-600);
+  background: var(--smooth-discounts-success-50);
+  color: var(--smooth-discounts-success-800);
 }
 
-.sparkly-tier-pricing__chip--current-progress,
-.sparkly-tier-pricing__chip--current-offer,
-.sparkly-tier-pricing__chip--current-highest {
+.smooth-discounts__chip--current-progress,
+.smooth-discounts__chip--current-offer,
+.smooth-discounts__chip--current-highest {
   border-style: dashed;
   cursor: default;
-  animation: sparklyTierFadeIn 180ms var(--sparkly-tier-ease);
+  animation: smoothDiscountsFadeIn 180ms var(--smooth-discounts-ease);
 }
 
 /* The status and rail card. */
-.sparkly-tier-pricing__rail-card {
+.smooth-discounts__rail-card {
   display: flex;
   flex-direction: column;
   gap: 8px;
   padding: 12px;
-  border: 1px solid var(--sparkly-tier-border);
-  border-radius: var(--sparkly-tier-radius-md);
-  background: var(--sparkly-tier-surface);
+  border: 1px solid var(--smooth-discounts-border);
+  border-radius: var(--smooth-discounts-radius-md);
+  background: var(--smooth-discounts-surface);
 }
 
-.sparkly-tier-pricing__status-row {
+.smooth-discounts__status-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -311,43 +311,43 @@
   line-height: 16px;
 }
 
-.sparkly-tier-pricing__status {
-  color: var(--sparkly-tier-ink);
+.smooth-discounts__status {
+  color: var(--smooth-discounts-ink);
 }
 
-.sparkly-tier-pricing__rail-card[data-offer-state='offer'] .sparkly-tier-pricing__status-row {
+.smooth-discounts__rail-card[data-offer-state='offer'] .smooth-discounts__status-row {
   padding-top: 2px;
 }
 
-.sparkly-tier-pricing__rail-card[data-offer-state='highest'] .sparkly-tier-pricing__status-row {
+.smooth-discounts__rail-card[data-offer-state='highest'] .smooth-discounts__status-row {
   font-weight: 500;
 }
 
-.sparkly-tier-pricing__status strong {
+.smooth-discounts__status strong {
   font-weight: 700;
 }
 
-.sparkly-tier-pricing__aside {
+.smooth-discounts__aside {
   font-weight: 600;
   text-align: right;
-  color: var(--sparkly-tier-warm);
+  color: var(--smooth-discounts-warm);
 }
 
-.sparkly-tier-pricing__aside[data-tone='olive'] {
-  color: var(--sparkly-tier-olive);
+.smooth-discounts__aside[data-tone='olive'] {
+  color: var(--smooth-discounts-olive);
 }
 
-.sparkly-tier-pricing__aside[data-tone='success'] {
+.smooth-discounts__aside[data-tone='success'] {
   display: flex;
   align-items: center;
   gap: 4px;
-  color: var(--sparkly-tier-success-700);
+  color: var(--smooth-discounts-success-700);
   font-weight: 700;
   font-size: 11px;
   line-height: 16.5px;
 }
 
-.sparkly-tier-pricing__aside[data-tone='success']::before {
+.smooth-discounts__aside[data-tone='success']::before {
   content: '';
   flex: none;
   width: 14px;
@@ -358,38 +358,38 @@
 }
 
 /* The pin rail: a 6px track with a pin at every tier quantity and the current quantity. */
-.sparkly-tier-pricing__bar-wrap {
+.smooth-discounts__bar-wrap {
   position: relative;
   width: 100%;
   margin: 2px 0;
   padding: 8px 0;
 }
 
-.sparkly-tier-pricing__track {
+.smooth-discounts__track {
   height: 6px;
   width: 100%;
   overflow: hidden;
   border-radius: 999px;
-  background: var(--sparkly-tier-sand);
+  background: var(--smooth-discounts-sand);
 }
 
-.sparkly-tier-pricing__fill {
+.smooth-discounts__fill {
   height: 100%;
-  background: var(--sparkly-tier-olive);
+  background: var(--smooth-discounts-olive);
   border-radius: 999px;
-  transition: width 200ms var(--sparkly-tier-ease);
+  transition: width 200ms var(--smooth-discounts-ease);
 }
 
-.sparkly-tier-pricing__rail-card[data-offer-state='highest'] .sparkly-tier-pricing__track {
-  background: var(--sparkly-tier-success-600);
+.smooth-discounts__rail-card[data-offer-state='highest'] .smooth-discounts__track {
+  background: var(--smooth-discounts-success-600);
 }
 
-.sparkly-tier-pricing__rail-card[data-offer-state='highest'] .sparkly-tier-pricing__fill {
+.smooth-discounts__rail-card[data-offer-state='highest'] .smooth-discounts__fill {
   background: transparent;
 }
 
-.sparkly-tier-pricing__marker,
-.sparkly-tier-pricing__dot {
+.smooth-discounts__marker,
+.smooth-discounts__dot {
   position: absolute;
   top: 50%;
   transform: translate(-50%, -50%);
@@ -403,74 +403,74 @@
 }
 
 /* The end pins sit inside the rail (their edge on the rail's edge), as in the design. */
-.sparkly-tier-pricing__marker {
-  left: clamp(12px, var(--sparkly-tier-pct, 0%), calc(100% - 12px));
+.smooth-discounts__marker {
+  left: clamp(12px, var(--smooth-discounts-pct, 0%), calc(100% - 12px));
   width: 24px;
   height: 24px;
-  border: 1px solid var(--sparkly-tier-border);
-  background: var(--sparkly-tier-track);
-  box-shadow: var(--sparkly-tier-shadow-sm);
+  border: 1px solid var(--smooth-discounts-border);
+  background: var(--smooth-discounts-track);
+  box-shadow: var(--smooth-discounts-shadow-sm);
   font-size: 10px;
   line-height: 1.5;
-  color: var(--sparkly-tier-text-secondary);
+  color: var(--smooth-discounts-text-secondary);
 }
 
-.sparkly-tier-pricing__rail-card:not([data-offer-state='progress']) .sparkly-tier-pricing__marker--reached {
+.smooth-discounts__rail-card:not([data-offer-state='progress']) .smooth-discounts__marker--reached {
   border: 0;
-  background: var(--sparkly-tier-success-600);
+  background: var(--smooth-discounts-success-600);
   color: #fff;
 }
 
-.sparkly-tier-pricing__rail-card[data-offer-state='highest'] .sparkly-tier-pricing__marker--reached {
-  background: var(--sparkly-tier-success-800);
+.smooth-discounts__rail-card[data-offer-state='highest'] .smooth-discounts__marker--reached {
+  background: var(--smooth-discounts-success-800);
 }
 
-.sparkly-tier-pricing__marker--covered {
+.smooth-discounts__marker--covered {
   visibility: hidden;
 }
 
-.sparkly-tier-pricing__dot {
-  left: clamp(14px, var(--sparkly-tier-pct, 0%), calc(100% - 14px));
+.smooth-discounts__dot {
+  left: clamp(14px, var(--smooth-discounts-pct, 0%), calc(100% - 14px));
   z-index: 1;
   min-width: 28px;
   height: 28px;
   padding: 0 4px;
-  border: 2px solid var(--sparkly-tier-ink);
+  border: 2px solid var(--smooth-discounts-ink);
   border-radius: 999px;
-  background: var(--sparkly-tier-track);
-  box-shadow: var(--sparkly-tier-shadow);
+  background: var(--smooth-discounts-track);
+  box-shadow: var(--smooth-discounts-shadow);
   font-size: 12px;
   line-height: 16px;
-  color: var(--sparkly-tier-ink);
-  transition: left 200ms var(--sparkly-tier-ease);
+  color: var(--smooth-discounts-ink);
+  transition: left 200ms var(--smooth-discounts-ease);
 }
 
-.sparkly-tier-pricing__rail-card[data-offer-state='offer'] .sparkly-tier-pricing__dot {
-  border-color: var(--sparkly-tier-olive);
-  color: var(--sparkly-tier-olive);
+.smooth-discounts__rail-card[data-offer-state='offer'] .smooth-discounts__dot {
+  border-color: var(--smooth-discounts-olive);
+  color: var(--smooth-discounts-olive);
 }
 
-.sparkly-tier-pricing__rail-card[data-offer-state='highest'] .sparkly-tier-pricing__dot {
+.smooth-discounts__rail-card[data-offer-state='highest'] .smooth-discounts__dot {
   border-color: #fff;
-  background: var(--sparkly-tier-success-900);
+  background: var(--smooth-discounts-success-900);
   color: #fff;
 }
 
 /* The drawer: a trigger when closed, the list with a header when open. */
-.sparkly-tier-pricing__drawer {
-  border: 1px solid var(--sparkly-tier-border);
-  border-radius: var(--sparkly-tier-radius-md);
-  background: var(--sparkly-tier-surface);
+.smooth-discounts__drawer {
+  border: 1px solid var(--smooth-discounts-border);
+  border-radius: var(--smooth-discounts-radius-md);
+  background: var(--smooth-discounts-surface);
 }
 
-.sparkly-tier-pricing__drawer[data-open='true'] {
+.smooth-discounts__drawer[data-open='true'] {
   display: flex;
   flex-direction: column;
   gap: 12px;
   padding: 14px;
 }
 
-.sparkly-tier-pricing__toggle {
+.smooth-discounts__toggle {
   display: flex;
   width: 100%;
   align-items: center;
@@ -479,28 +479,28 @@
   padding: 10px 14px;
   border: 0;
   background: none;
-  color: var(--sparkly-tier-ink);
+  color: var(--smooth-discounts-ink);
   font-family: var(--font-stack-body);
   font-size: 12px;
   line-height: 16px;
   font-weight: 600;
   text-align: left;
   cursor: pointer;
-  border-radius: var(--sparkly-tier-radius-md);
+  border-radius: var(--smooth-discounts-radius-md);
 }
 
-.sparkly-tier-pricing__toggle[hidden] {
+.smooth-discounts__toggle[hidden] {
   display: none;
 }
 
-.sparkly-tier-pricing__drawer[data-open='true'] .sparkly-tier-pricing__toggle {
+.smooth-discounts__drawer[data-open='true'] .smooth-discounts__toggle {
   padding: 0 0 4px;
-  border-bottom: 1px solid color-mix(in srgb, var(--sparkly-tier-border) 60%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--smooth-discounts-border) 60%, transparent);
   border-radius: 0;
   font-weight: 700;
 }
 
-.sparkly-tier-pricing__drawer-title {
+.smooth-discounts__drawer-title {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -508,81 +508,81 @@
   min-height: 24px;
 }
 
-.sparkly-tier-pricing__drawer[data-open='true'] .sparkly-tier-pricing__drawer-title {
+.smooth-discounts__drawer[data-open='true'] .smooth-discounts__drawer-title {
   gap: 6px;
   min-height: 20px;
 }
 
-.sparkly-tier-pricing__icon {
+.smooth-discounts__icon {
   flex: none;
-  color: var(--sparkly-tier-olive);
+  color: var(--smooth-discounts-olive);
 }
 
-.sparkly-tier-pricing__icon--open,
-.sparkly-tier-pricing__collapse {
+.smooth-discounts__icon--open,
+.smooth-discounts__collapse {
   display: none;
 }
 
-.sparkly-tier-pricing__drawer[data-open='true'] .sparkly-tier-pricing__icon--open {
+.smooth-discounts__drawer[data-open='true'] .smooth-discounts__icon--open {
   display: inline;
 }
 
-.sparkly-tier-pricing__drawer[data-open='true'] .sparkly-tier-pricing__icon--closed,
-.sparkly-tier-pricing__drawer[data-open='true'] .sparkly-tier-pricing__chevron {
+.smooth-discounts__drawer[data-open='true'] .smooth-discounts__icon--closed,
+.smooth-discounts__drawer[data-open='true'] .smooth-discounts__chevron {
   display: none;
 }
 
-.sparkly-tier-pricing__drawer-aside {
+.smooth-discounts__drawer-aside {
   display: inline-flex;
   align-items: center;
-  color: var(--sparkly-tier-text-secondary);
+  color: var(--smooth-discounts-text-secondary);
 }
 
-.sparkly-tier-pricing__drawer[data-open='true'] .sparkly-tier-pricing__collapse {
+.smooth-discounts__drawer[data-open='true'] .smooth-discounts__collapse {
   display: inline;
   font-weight: 600;
 }
 
-.sparkly-tier-pricing__list {
+.smooth-discounts__list {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  animation: sparklyTierFadeIn 160ms var(--sparkly-tier-ease);
+  animation: smoothDiscountsFadeIn 160ms var(--smooth-discounts-ease);
 }
 
-.sparkly-tier-pricing__list[hidden] {
+.smooth-discounts__list[hidden] {
   display: none;
 }
 
-.sparkly-tier-pricing__chosen {
+.smooth-discounts__chosen {
   margin: 0;
   font-family: var(--font-stack-body);
   font-size: 11px;
   line-height: 16px;
   font-weight: 600;
-  color: var(--sparkly-tier-text-secondary);
+  color: var(--smooth-discounts-text-secondary);
 }
 
-.sparkly-tier-pricing__chosen[hidden] {
+.smooth-discounts__chosen[hidden] {
   display: none;
 }
 
-.sparkly-tier-pricing__list-item {
+.smooth-discounts__list-item {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 8px 12px;
   padding: 10px;
-  border: 1px solid var(--sparkly-tier-border);
-  border-radius: var(--sparkly-tier-radius-md);
-  background: var(--sparkly-tier-track);
-  box-shadow: var(--sparkly-tier-shadow-sm);
+  border: 1px solid var(--smooth-discounts-border);
+  border-radius: var(--smooth-discounts-radius-md);
+  background: var(--smooth-discounts-track);
+  box-shadow: var(--smooth-discounts-shadow-sm);
 }
 
 /* The product link wants at least 140px; when the count and Add button do not fit
    beside it, they drop to a second line and the name gets the full width. */
-.sparkly-tier-pricing__list-link {
+.smooth-discounts__list-link {
   display: flex;
   flex: 1 1 140px;
   align-items: center;
@@ -594,45 +594,45 @@
 
 /* Phones: the name always gets the whole row; the count and Add button sit under it. */
 @media (max-width: 480px) {
-  .sparkly-tier-pricing__list-link {
+  .smooth-discounts__list-link {
     flex-basis: 100%;
   }
 }
 
-.sparkly-tier-pricing__list-thumb {
+.smooth-discounts__list-thumb {
   width: 40px;
   height: 40px;
   flex: none;
-  border-radius: var(--sparkly-tier-radius-sm);
-  border: 1px solid var(--sparkly-tier-border);
+  border-radius: var(--smooth-discounts-radius-sm);
+  border: 1px solid var(--smooth-discounts-border);
   object-fit: cover;
-  background: var(--sparkly-tier-surface);
+  background: var(--smooth-discounts-surface);
 }
 
-.sparkly-tier-pricing__list-text {
+.smooth-discounts__list-text {
   display: flex;
   flex-direction: column;
   min-width: 0;
 }
 
-.sparkly-tier-pricing__list-name {
+.smooth-discounts__list-name {
   font-family: var(--font-stack-body);
   font-size: 12px;
   line-height: 16px;
   font-weight: 700;
-  color: var(--sparkly-tier-ink);
+  color: var(--smooth-discounts-ink);
   overflow-wrap: anywhere;
 }
 
-.sparkly-tier-pricing__list-price {
+.smooth-discounts__list-price {
   font-family: var(--font-stack-body);
   font-size: 11px;
   line-height: 16.5px;
   font-variant-numeric: tabular-nums;
-  color: var(--sparkly-tier-text-secondary);
+  color: var(--smooth-discounts-text-secondary);
 }
 
-.sparkly-tier-pricing__row-action {
+.smooth-discounts__row-action {
   display: flex;
   flex: none;
   margin-left: auto;
@@ -640,60 +640,60 @@
   gap: 10px;
 }
 
-.sparkly-tier-pricing__list-qty {
+.smooth-discounts__list-qty {
   min-width: 22px;
   font-family: var(--font-stack-body);
   font-size: 12px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   text-align: center;
-  color: var(--sparkly-tier-olive);
+  color: var(--smooth-discounts-olive);
 }
 
-.sparkly-tier-pricing__add {
+.smooth-discounts__add {
   position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   padding: 4px 10px;
-  border: 1px solid var(--sparkly-tier-border);
+  border: 1px solid var(--smooth-discounts-border);
   border-radius: 6px;
-  background: var(--sparkly-tier-track);
-  box-shadow: var(--sparkly-tier-shadow-sm);
+  background: var(--smooth-discounts-track);
+  box-shadow: var(--smooth-discounts-shadow-sm);
   font-family: var(--font-stack-body);
   font-size: 12px;
   line-height: 16px;
   font-weight: 500;
-  color: var(--sparkly-tier-ink);
+  color: var(--smooth-discounts-ink);
   text-decoration: none;
 }
 
 /* A 44px touch target around the small button (WCAG 2.5.5). */
-.sparkly-tier-pricing__add::after {
+.smooth-discounts__add::after {
   content: '';
   position: absolute;
   inset: -10px;
 }
 
-.sparkly-tier-pricing__add:hover {
-  background: var(--sparkly-tier-surface);
+.smooth-discounts__add:hover {
+  background: var(--smooth-discounts-surface);
 }
 
 /* The flash bar at the top of the card: dark with a pulsing bolt (teaser, ends
    in), green banner (first tier), dark with a star (a higher tier). */
-.sparkly-tier-pricing {
-  --sparkly-tier-flash-dark: #1a1c16;
-  --sparkly-tier-flash-amber: #fbbf24;
-  --sparkly-tier-flash-mint: #6ee7b7;
+.smooth-discounts {
+  --smooth-discounts-flash-dark: #1a1c16;
+  --smooth-discounts-flash-amber: #fbbf24;
+  --smooth-discounts-flash-mint: #6ee7b7;
 }
 
-.sparkly-tier-pricing__flash {
+.smooth-discounts__flash {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
   padding: 12px 20px;
-  background: var(--sparkly-tier-flash-dark);
+  background: var(--smooth-discounts-flash-dark);
   box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.05);
   color: #fff;
   font-family: var(--font-stack-body);
@@ -701,89 +701,89 @@
   line-height: 16px;
 }
 
-.sparkly-tier-pricing__flash[hidden] {
+.smooth-discounts__flash[hidden] {
   display: none;
 }
 
-.sparkly-tier-pricing__flash[data-variant='tier-first'] {
-  background: var(--sparkly-tier-success-900);
+.smooth-discounts__flash[data-variant='tier-first'] {
+  background: var(--smooth-discounts-success-900);
   /* This bar holds the sentence, the unit price and the timer chip: 11px instead of 12px
      (all three together) keeps it on one line in a 389px card. */
   font-size: 11px;
 }
 
-.sparkly-tier-pricing__flash-main,
-.sparkly-tier-pricing__flash-side {
+.smooth-discounts__flash-main,
+.smooth-discounts__flash-side {
   display: flex;
   align-items: center;
 }
 
-.sparkly-tier-pricing__flash-main {
+.smooth-discounts__flash-main {
   gap: 8px;
   min-width: 0;
   /* The design's icon line is 28px tall, which sets the height of the bar. */
   min-height: 28px;
 }
 
-.sparkly-tier-pricing__flash-side {
+.smooth-discounts__flash-side {
   flex: none;
   gap: 8px;
 }
 
-.sparkly-tier-pricing__flash-label {
+.smooth-discounts__flash-label {
   font-weight: 700;
 }
 
-.sparkly-tier-pricing__flash[data-variant='teaser'] .sparkly-tier-pricing__flash-label,
-.sparkly-tier-pricing__flash[data-variant='ends'] .sparkly-tier-pricing__flash-label {
+.smooth-discounts__flash[data-variant='teaser'] .smooth-discounts__flash-label,
+.smooth-discounts__flash[data-variant='ends'] .smooth-discounts__flash-label {
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
 
-.sparkly-tier-pricing__flash[data-variant='tier-first'] .sparkly-tier-pricing__flash-label {
+.smooth-discounts__flash[data-variant='tier-first'] .smooth-discounts__flash-label {
   font-weight: 600;
 }
 
-.sparkly-tier-pricing__flash-icon,
-.sparkly-tier-pricing__flash-hourglass {
+.smooth-discounts__flash-icon,
+.smooth-discounts__flash-hourglass {
   flex: none;
   background: currentColor;
-  -webkit-mask: var(--sparkly-tier-flash-mask) center / contain no-repeat;
-  mask: var(--sparkly-tier-flash-mask) center / contain no-repeat;
+  -webkit-mask: var(--smooth-discounts-flash-mask) center / contain no-repeat;
+  mask: var(--smooth-discounts-flash-mask) center / contain no-repeat;
 }
 
-.sparkly-tier-pricing__flash-icon {
+.smooth-discounts__flash-icon {
   width: 18px;
   height: 18px;
-  color: var(--sparkly-tier-flash-amber);
-  --sparkly-tier-flash-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M13 2 4 14h6l-1 8 9-12h-6z'/%3E%3C/svg%3E");
+  color: var(--smooth-discounts-flash-amber);
+  --smooth-discounts-flash-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M13 2 4 14h6l-1 8 9-12h-6z'/%3E%3C/svg%3E");
 }
 
-.sparkly-tier-pricing__flash[data-variant='ends'] .sparkly-tier-pricing__flash-icon {
-  animation: sparklyTierPulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+.smooth-discounts__flash[data-variant='ends'] .smooth-discounts__flash-icon {
+  animation: smoothDiscountsPulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
-.sparkly-tier-pricing__flash[data-variant='tier-first'] .sparkly-tier-pricing__flash-icon {
-  color: var(--sparkly-tier-flash-mint);
-  --sparkly-tier-flash-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M2 22l5-14 9 9-14 5zm11-17 1.5-3 1.5 3 3 1.5-3 1.5-1.5 3-1.5-3-3-1.5zm6 8 1-2 1 2 2 1-2 1-1 2-1-2-2-1z'/%3E%3C/svg%3E");
+.smooth-discounts__flash[data-variant='tier-first'] .smooth-discounts__flash-icon {
+  color: var(--smooth-discounts-flash-mint);
+  --smooth-discounts-flash-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M2 22l5-14 9 9-14 5zm11-17 1.5-3 1.5 3 3 1.5-3 1.5-1.5 3-1.5-3-3-1.5zm6 8 1-2 1 2 2 1-2 1-1 2-1-2-2-1z'/%3E%3C/svg%3E");
 }
 
-.sparkly-tier-pricing__flash[data-variant='tier-higher'] .sparkly-tier-pricing__flash-icon {
-  --sparkly-tier-flash-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2 9.2 8.6 2 9.2l5.5 4.8L5.8 21 12 17.3l6.2 3.7-1.7-7 5.5-4.8-7.2-.6z'/%3E%3C/svg%3E");
+.smooth-discounts__flash[data-variant='tier-higher'] .smooth-discounts__flash-icon {
+  --smooth-discounts-flash-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2 9.2 8.6 2 9.2l5.5 4.8L5.8 21 12 17.3l6.2 3.7-1.7-7 5.5-4.8-7.2-.6z'/%3E%3C/svg%3E");
 }
 
-.sparkly-tier-pricing__flash-timer {
+.smooth-discounts__flash-timer {
   display: flex;
   align-items: center;
   gap: 4px;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
-.sparkly-tier-pricing__flash-timer:empty {
+.smooth-discounts__flash-timer:empty {
   display: none;
 }
 
-.sparkly-tier-pricing__flash-digit {
+.smooth-discounts__flash-digit {
   padding: 4px 8px;
   border-radius: 4px;
   background: rgba(255, 255, 255, 0.15);
@@ -791,21 +791,21 @@
   font-variant-numeric: tabular-nums;
 }
 
-.sparkly-tier-pricing__flash-sep {
+.smooth-discounts__flash-sep {
   font-weight: 700;
   color: rgba(255, 255, 255, 0.7);
 }
 
-.sparkly-tier-pricing__flash-aside {
-  color: var(--sparkly-tier-flash-mint);
+.smooth-discounts__flash-aside {
+  color: var(--smooth-discounts-flash-mint);
   font-weight: 700;
 }
 
-.sparkly-tier-pricing__flash-aside:empty {
+.smooth-discounts__flash-aside:empty {
   display: none;
 }
 
-.sparkly-tier-pricing__flash-chip {
+.smooth-discounts__flash-chip {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -817,23 +817,23 @@
   font-variant-numeric: tabular-nums;
 }
 
-.sparkly-tier-pricing__flash-chip[hidden] {
+.smooth-discounts__flash-chip[hidden] {
   display: none;
 }
 
-.sparkly-tier-pricing__flash-hourglass {
+.smooth-discounts__flash-hourglass {
   width: 12px;
   height: 12px;
-  --sparkly-tier-flash-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6 2v6l4 4-4 4v6h12v-6l-4-4 4-4V2H6zm10 14.5V20H8v-3.5l4-4 4 4zm-4-5-4-4V4h8v3.5l-4 4z'/%3E%3C/svg%3E");
+  --smooth-discounts-flash-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6 2v6l4 4-4 4v6h12v-6l-4-4 4-4V2H6zm10 14.5V20H8v-3.5l4-4 4 4zm-4-5-4-4V4h8v3.5l-4 4z'/%3E%3C/svg%3E");
 }
 
-@keyframes sparklyTierPulse {
+@keyframes smoothDiscountsPulse {
   50% {
     opacity: 0.5;
   }
 }
 
-@keyframes sparklyTierFadeIn {
+@keyframes smoothDiscountsFadeIn {
   from {
     opacity: 0;
     transform: scale(0.92);
@@ -845,11 +845,11 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .sparkly-tier-pricing__fill,
-  .sparkly-tier-pricing__dot,
-  .sparkly-tier-pricing__chip,
-  .sparkly-tier-pricing__flash-icon,
-  .sparkly-tier-pricing__list {
+  .smooth-discounts__fill,
+  .smooth-discounts__dot,
+  .smooth-discounts__chip,
+  .smooth-discounts__flash-icon,
+  .smooth-discounts__list {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
   }

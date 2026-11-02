@@ -24,19 +24,19 @@ async function mount(discount: Record<string, unknown>, opts: { selectedVariantI
   document.body.innerHTML = `
     <product-variants></product-variants>
     <input name="quantity" value="1">
-    <div id="sparkly-tier-pricing-b1" class="sparkly-tier-pricing" data-sparkly-tier-pricing
+    <div id="smooth-discounts-b1" class="smooth-discounts" data-smooth-discounts
       data-discount='{"tiers":[]}' data-time-discount='${timeDiscount}'
       data-product-id='"gid://shopify/Product/9"'
       data-selected-variant-id="${selectedVariantId}"
       data-base-price="${basePrice}" data-compare-at-price="0" data-money-format='"£{{amount}}"'>
-      <div class="sparkly-tier-pricing__price-row">
-        <span class="sparkly-tier-pricing__price sparkly-tier-pricing__original-price" data-tier-pricing-price data-original-price="true">£${basePrice}</span>
-        <span class="sparkly-tier-pricing__price sparkly-tier-pricing__discounted-price" data-discounted-price hidden>£${basePrice}</span>
-        <span class="sparkly-tier-pricing__each-label" data-tier-pricing-each-label>each</span>
+      <div class="smooth-discounts__price-row">
+        <span class="smooth-discounts__price smooth-discounts__original-price" data-tier-pricing-price data-original-price="true">£${basePrice}</span>
+        <span class="smooth-discounts__price smooth-discounts__discounted-price" data-discounted-price hidden>£${basePrice}</span>
+        <span class="smooth-discounts__each-label" data-tier-pricing-each-label>each</span>
       </div>
-      <div class="sparkly-tier-pricing__card" data-tier-pricing-card hidden>
-        <div class="sparkly-tier-pricing__status-row"><span data-tier-pricing-status></span><span data-tier-pricing-aside></span></div>
-        <div class="sparkly-tier-pricing__bar-wrap"><div class="sparkly-tier-pricing__track"><div data-tier-pricing-fill></div></div><div data-tier-pricing-markers></div><span data-tier-pricing-dot></span></div>
+      <div class="smooth-discounts__card" data-tier-pricing-card hidden>
+        <div class="smooth-discounts__status-row"><span data-tier-pricing-status></span><span data-tier-pricing-aside></span></div>
+        <div class="smooth-discounts__bar-wrap"><div class="smooth-discounts__track"><div data-tier-pricing-fill></div></div><div data-tier-pricing-markers></div><span data-tier-pricing-dot></span></div>
         <div data-tier-pricing-tiers></div>
       </div>
     </div>
@@ -148,7 +148,7 @@ describe('the built storefront scripts', () => {
 
     for (const name of [...WIDGET_COMPONENTS, WIDGET_CORE, 'time-based-discount.js']) (0, eval)(built[name])
 
-    expect(Object.getOwnPropertyNames(window).filter((name) => !before.has(name))).toEqual(['SparklyTierPricing'])
+    expect(Object.getOwnPropertyNames(window).filter((name) => !before.has(name))).toEqual(['SmoothDiscounts'])
   })
 })
 
@@ -200,14 +200,14 @@ describe('tier widget painting (redesign)', () => {
   async function mountTiers(quantity: number, extra: Record<string, unknown> = {}) {
     document.body.innerHTML = `
       <input name="quantity" value="${quantity}">
-      <div id="sparkly-tier-pricing-t1" class="sparkly-tier-pricing sparkly-tier-pricing--card" data-sparkly-tier-pricing
+      <div id="smooth-discounts-t1" class="smooth-discounts smooth-discounts--card" data-smooth-discounts
         data-discount='${JSON.stringify({ ...discount, ...extra, highDemand: undefined })}' data-time-discount="{}"
         data-product-id='"gid://shopify/Product/9"' data-selected-variant-id="10"
         data-base-price="1.69" data-compare-at-price="0" data-money-format='"£{{amount}}"' data-high-demand="${extra.highDemand ? 'true' : 'false'}">
-        <div class="sparkly-tier-pricing__body">
-          <div class="sparkly-tier-pricing__summary">
-            <div class="sparkly-tier-pricing__price-row">
-              <div class="sparkly-tier-pricing__price-group">
+        <div class="smooth-discounts__body">
+          <div class="smooth-discounts__summary">
+            <div class="smooth-discounts__price-row">
+              <div class="smooth-discounts__price-group">
                 <span data-tier-pricing-price data-original-price="true">£1.69</span>
                 <span data-discounted-price hidden>£1.69</span>
                 <span data-tier-pricing-each-label>each</span>
@@ -246,7 +246,7 @@ describe('tier widget painting (redesign)', () => {
     const text = (selector: string) => (document.querySelector(selector) as HTMLElement).textContent
     const dot = document.querySelector('[data-tier-pricing-dot]') as HTMLElement
     const aside = document.querySelector('[data-tier-pricing-aside]') as HTMLElement
-    const pct = (el: HTMLElement) => el.style.getPropertyValue('--sparkly-tier-pct')
+    const pct = (el: HTMLElement) => el.style.getPropertyValue('--smooth-discounts-pct')
     return {
       promo: text('[data-tier-pricing-promo]'),
       status: text('[data-tier-pricing-status]'),
@@ -256,7 +256,7 @@ describe('tier widget painting (redesign)', () => {
       dot: dot.textContent,
       dotPct: pct(dot),
       fill: (document.querySelector('[data-tier-pricing-fill]') as HTMLElement).style.width,
-      markers: [...document.querySelectorAll('.sparkly-tier-pricing__marker')].map((m) => ({ text: m.textContent, pct: pct(m as HTMLElement), reached: m.classList.contains('sparkly-tier-pricing__marker--reached'), covered: m.classList.contains('sparkly-tier-pricing__marker--covered') })),
+      markers: [...document.querySelectorAll('.smooth-discounts__marker')].map((m) => ({ text: m.textContent, pct: pct(m as HTMLElement), reached: m.classList.contains('smooth-discounts__marker--reached'), covered: m.classList.contains('smooth-discounts__marker--covered') })),
     }
   }
 
@@ -298,7 +298,7 @@ describe('tier widget painting (redesign)', () => {
     return [...document.querySelectorAll('[data-tier-pricing-tiers] > *')].map((el) => ({
       text: el.textContent,
       tag: el.tagName,
-      tone: el.className.replace('sparkly-tier-pricing__chip sparkly-tier-pricing__chip--', ''),
+      tone: el.className.replace('smooth-discounts__chip smooth-discounts__chip--', ''),
     }))
   }
 
@@ -382,10 +382,10 @@ describe('tier widget painting (redesign)', () => {
     })
     ;(document.querySelector('[data-tier-pricing-toggle]') as HTMLElement).click()
     await vi.advanceTimersByTimeAsync(0)
-    const rows = [...document.querySelectorAll('.sparkly-tier-pricing__list-item')].map((row) => ({
-      name: row.querySelector('.sparkly-tier-pricing__list-name')!.textContent,
-      price: row.querySelector('.sparkly-tier-pricing__list-price')!.textContent,
-      qty: row.querySelector('.sparkly-tier-pricing__list-qty')!.textContent,
+    const rows = [...document.querySelectorAll('.smooth-discounts__list-item')].map((row) => ({
+      name: row.querySelector('.smooth-discounts__list-name')!.textContent,
+      price: row.querySelector('.smooth-discounts__list-price')!.textContent,
+      qty: row.querySelector('.smooth-discounts__list-qty')!.textContent,
       href: row.querySelector('a')!.getAttribute('href'),
       hasImage: !!row.querySelector('img'),
     }))
@@ -417,8 +417,8 @@ describe('tier widget painting (redesign)', () => {
     await vi.advanceTimersByTimeAsync(0)
   }
 
-  const rowAdds = () => [...document.querySelectorAll('.sparkly-tier-pricing__list-item')].map((row) => {
-    const add = row.querySelector('.sparkly-tier-pricing__add')
+  const rowAdds = () => [...document.querySelectorAll('.smooth-discounts__list-item')].map((row) => {
+    const add = row.querySelector('.smooth-discounts__add')
     return add ? { href: add.getAttribute('href'), label: add.getAttribute('aria-label'), text: add.textContent, target: add.getAttribute('target') } : null
   })
 
@@ -441,8 +441,8 @@ describe('tier widget painting (redesign)', () => {
 
   it('there are no − / + buttons in the list, and pressing Add does not change the cart', async () => {
     await openList()
-    expect(document.querySelectorAll('.sparkly-tier-pricing__list button')).toHaveLength(0)
-    await click('.sparkly-tier-pricing__add', 0)
+    expect(document.querySelectorAll('.smooth-discounts__list button')).toHaveLength(0)
+    await click('.smooth-discounts__add', 0)
     expect(cartRequests).toEqual([])
     expect(cartItems).toEqual([])
   })
@@ -450,7 +450,7 @@ describe('tier widget painting (redesign)', () => {
   it('a row shows what is in the cart, and the bar, dot and copy follow the cart', async () => {
     cartItems = [{ key: '200:k', product_id: 20, variant_id: 200, quantity: 8 }]
     await openList()
-    const numbers = () => [...document.querySelectorAll('.sparkly-tier-pricing__list-qty')]
+    const numbers = () => [...document.querySelectorAll('.smooth-discounts__list-qty')]
     expect(numbers().map((el) => el.textContent)).toEqual(['0', '8', '0'])
     expect(numbers()[1].getAttribute('aria-label')).toBe('8 in cart')
     expect(painted()).toMatchObject({ status: 'You have 8 units', aside: 'Add 8 for £1.55/ea', dot: '8' })
@@ -475,8 +475,8 @@ describe('tier widget painting (redesign)', () => {
       expect(price.textContent!.replace(/\s+/g, ' ').trim()).toBe('Discounted price: £1.63')
       expect(struck.textContent!.replace(/\s+/g, ' ').trim()).toBe('Original price: £1.69')
       expect(struck.hidden).toBe(false)
-      expect(price.querySelectorAll('.sparkly-tier-pricing__sr-only')).toHaveLength(1)
-      expect(struck.querySelectorAll('.sparkly-tier-pricing__sr-only')).toHaveLength(1)
+      expect(price.querySelectorAll('.smooth-discounts__sr-only')).toHaveLength(1)
+      expect(struck.querySelectorAll('.smooth-discounts__sr-only')).toHaveLength(1)
     })
 
     it('the chip that matches the quantity is pressed, the others are not', async () => {
