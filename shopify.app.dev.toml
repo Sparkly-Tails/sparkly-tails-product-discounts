@@ -22,7 +22,7 @@ application_url = "https://sparkly-tails-product-discounts-nyq.vercel.app"
 embedded = true
 
 [access_scopes]
-scopes = "read_discounts,read_products,write_discounts,write_products"
+scopes = "read_discounts,read_products,write_discounts,write_products,read_orders,read_all_orders,read_reports,write_pixels,read_customer_events"
 
 [auth]
 redirect_urls = [ "https://sparkly-tails-product-discounts-nyq.vercel.app/api/auth" ]
@@ -37,6 +37,11 @@ api_version = "2026-10"
   [[webhooks.subscriptions]]
   uri = "/webhooks/app/scopes_update"
   topics = [ "app/scopes_update" ]
+
+  # Bundle orders for the homepage metrics. Handled by src/app/webhooks/orders/paid/route.ts.
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/orders/paid"
+  topics = [ "orders/paid" ]
 
   # Mandatory compliance topics. Handled by src/app/webhooks/compliance/route.ts.
   [[webhooks.subscriptions]]
