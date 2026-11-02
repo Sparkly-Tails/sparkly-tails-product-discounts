@@ -1,0 +1,45 @@
+{
+  "id": 5100200300400,
+  "admin_graphql_api_id": "gid://shopify/Order/5100200300400",
+  "created_at": "2026-11-02T10:15:00+00:00",
+  "currency": "GBP",
+  "current_subtotal_price": "17.25",
+  "current_subtotal_price_set": {
+    "shop_money": { "amount": "17.25", "currency_code": "GBP" },
+    "presentment_money": { "amount": "17.25", "currency_code": "GBP" }
+  },
+  "line_items": [
+    {
+      "id": 1,
+      "product_id": 9001,
+      "quantity": 10,
+      "price": "1.69",
+      "price_set": { "shop_money": { "amount": "1.69", "currency_code": "GBP" }, "presentment_money": { "amount": "1.69", "currency_code": "GBP" } },
+      "discount_allocations": [
+        { "amount": "1.65", "amount_set": { "shop_money": { "amount": "1.65", "currency_code": "GBP" }, "presentment_money": { "amount": "1.65", "currency_code": "GBP" } }, "discount_application_index": 0 }
+      ]
+    },
+    {
+      "id": 2,
+      "product_id": 9002,
+      "quantity": 1,
+      "price": "2.00",
+      "price_set": { "shop_money": { "amount": "2.00", "currency_code": "GBP" }, "presentment_money": { "amount": "2.00", "currency_code": "GBP" } },
+      "discount_allocations": [
+        { "amount": "0.50", "amount_set": { "shop_money": { "amount": "0.50", "currency_code": "GBP" }, "presentment_money": { "amount": "0.50", "currency_code": "GBP" } }, "discount_application_index": 1 }
+      ]
+    },
+    {
+      "id": 3,
+      "product_id": null,
+      "quantity": 1,
+      "price": "1.00",
+      "price_set": { "shop_money": { "amount": "1.00", "currency_code": "GBP" }, "presentment_money": { "amount": "1.00", "currency_code": "GBP" } },
+      "discount_allocations": []
+    }
+  ],
+  "discount_applications": [
+    { "type": "automatic", "title": "Product tier discounts", "target_type": "line_item", "allocation_method": "each", "value": "1.65", "value_type": "fixed_amount" },
+    { "type": "automatic", "title": "Spring offer", "target_type": "line_item", "allocation_method": "across", "value": "0.50", "value_type": "fixed_amount" }
+  ]
+}
