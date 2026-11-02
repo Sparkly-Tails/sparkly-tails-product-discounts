@@ -8,6 +8,23 @@ export function listedMixMatchItems(siblings) {
   return (siblings || []).filter((sibling) => sibling.listed)
 }
 
+// The numeric ids (as texts) of the variants that have no stock, from the block's data; null when the block gave
+// none, which leaves the widget showing.
+export function parseSoldOutVariantIds(raw) {
+  try {
+    const ids = JSON.parse(raw)
+    return Array.isArray(ids) ? ids.map(String) : null
+  } catch {
+    return null
+  }
+}
+
+// False only for a variant the block listed as sold out; an unknown list or variant never hides the widget.
+export function isVariantAvailable({ soldOutVariantIds, variantId }) {
+  if (!soldOutVariantIds || variantId == null) return true
+  return !soldOutVariantIds.includes(String(variantId))
+}
+
 export function parseWidgetConfig(container) {
   const discount = JSON.parse(container.dataset.discount)
   const moneyFormat = JSON.parse(container.dataset.moneyFormat)
@@ -41,6 +58,7 @@ export function parseWidgetConfig(container) {
     title: discount.title,
     highDemand: container.dataset.highDemand === 'true',
     flash: parseFlashConfig(container.dataset.flash),
+    soldOutVariantIds: parseSoldOutVariantIds(container.dataset.soldOutVariantIds),
     hasTiers: !!(tiers && tiers.length > 0),
     ownVariantIds,
     ownVariantOptions,

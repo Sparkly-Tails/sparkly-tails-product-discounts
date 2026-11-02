@@ -52,6 +52,35 @@ export function wireVariantChange(container, render) {
   })
 }
 
+// How often the product form's id field is looked at, for the themes that change it without an event.
+const VARIANT_FIELD_POLL_MS = 800
+
+// The variant the buyer has chosen, read from the id field of the product form. Every theme keeps that field
+// current (the form adds that variant to the cart), so this works whatever the theme's own variant picker is.
+// `tools.extractNumericId` turns the field's text into the variant's number.
+export function readSelectedVariantId({ root, tools }) {
+  const field = root.querySelector('form[action*="/cart/add"] [name="id"]')
+  return field && field.value ? tools.extractNumericId(field.value) : null
+}
+
+// Takes the variant from the form when it is not the one the widget knows, and repaints.
+export function syncSelectedVariant({ root, variantStateRef, render, tools }) {
+  const variantId = tools.readSelectedVariantId({ root, tools })
+  if (!variantId || variantId === String(variantStateRef.value)) return
+  variantStateRef.value = variantId
+  render()
+}
+
+// Repaints when the chosen variant changes: on the change events themes dispatch around that field, and on a timer
+// for the themes that set it without one. Only a product with a variant out of stock needs it. `tools` brings in
+// extractNumericId, readSelectedVariantId, syncSelectedVariant and startTimer(callback, ms).
+export function wireSelectedVariantField({ root, soldOutVariantIds, variantStateRef, render, tools }) {
+  if (!soldOutVariantIds || soldOutVariantIds.length === 0) return
+  const syncNow = tools.syncSelectedVariant.bind(null, { root, variantStateRef, render, tools })
+  root.addEventListener('change', syncNow, true)
+  tools.startTimer(syncNow, VARIANT_FIELD_POLL_MS)
+}
+
 export function wireLoopSubscriptionsPricePoll(container, render) {
   let lastLoopPriceText = null
   setInterval(() => {

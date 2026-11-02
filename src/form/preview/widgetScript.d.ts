@@ -6,6 +6,15 @@ declare module '*/widgetFunctions.js' {
   export const formatMoney: (amount: number, format: string) => string
 }
 
+declare module '*/config.js' {
+  export function parseSoldOutVariantIds(raw: string | undefined): string[] | null
+  export function isVariantAvailable(options: { soldOutVariantIds: string[] | null; variantId: string | number | null }): boolean
+}
+
+declare module '*/core/wiring.js' {
+  export function readSelectedVariantId(options: { root: Document; tools: { extractNumericId: (id: string) => string } }): string | null
+}
+
 declare module '*/loader/registry.js' {
   export function findComponent(options: { root: object; name: string }): unknown
   export function registerComponent(options: { root: object; name: string; api: unknown }): void

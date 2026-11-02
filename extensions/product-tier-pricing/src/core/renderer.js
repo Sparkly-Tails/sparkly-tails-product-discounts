@@ -1,4 +1,5 @@
 // The render cycle of one widget.
+import { isVariantAvailable } from '../config.js'
 import { formatMoney, resolveEligibility } from '../tierMath.js'
 import { fetchGroupCartState, resetStepperIfJustAdded } from './cart.js'
 
@@ -23,6 +24,10 @@ export function createRenderer(container, config, elements, loading) {
   let siblingsApi = null
 
   async function render() {
+    // A variant without stock has no widget: nothing is painted or fetched until a variant with stock is chosen.
+    const isAvailable = isVariantAvailable({ soldOutVariantIds: config.soldOutVariantIds, variantId: variantStateRef.value })
+    container.hidden = !isAvailable
+    if (!isAvailable) return
     const basePrice = Number(container.dataset.basePrice)
     const compareAtPrice = Number(container.dataset.compareAtPrice) || 0
     const quantityInput = document.querySelector('input[name="quantity"]')
