@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { deleteShopMetrics, addVisit, purgeOldVisits, readSettings, saveLiveProducts, saveTimeZone, saveBundleRows, readOrderRows, readVisitorSum, STORE_TOOLS } from '@/metrics/store'
+import { deleteShopMetrics, addVisit, purgeOldVisits, readSettings, saveLiveProducts, saveTimeZone, saveBundleRows, readOrderRows, readVisitorSum, readLiveProducts, STORE_TOOLS } from '@/metrics/store'
 
 const SHOP = 'demo.myshopify.com'
 const makeDb = () => ({
@@ -140,5 +140,17 @@ describe('readVisitorSum', () => {
   it('is 0 when there are no days', async () => {
     const aggregate = vi.fn(async () => ({ _sum: { visitors: null } }))
     expect(await readVisitorSum({ db: { discountDailyStat: { aggregate } }, shop: SHOP, fromDay: '2026-10-04', toDay: '2026-11-02' })).toBe(0)
+  })
+})
+
+describe('readLiveProducts', () => {
+  it('gives the map of the shop, keeping only entries whose value is text', async () => {
+    const findUnique = vi.fn(async () => ({ liveProducts: { a: 'd1', b: 5 } }))
+    expect(await readLiveProducts({ db: { metricsSync: { findUnique } }, shop: SHOP, tools: STORE_TOOLS })).toEqual({ a: 'd1' })
+    expect(findUnique).toHaveBeenCalledWith({ where: { shop: SHOP }, select: { liveProducts: true } })
+  })
+
+  it('gives an empty map for a shop with no row', async () => {
+    expect(await readLiveProducts({ db: { metricsSync: { findUnique: vi.fn(async () => null) } }, shop: SHOP, tools: STORE_TOOLS })).toEqual({})
   })
 })

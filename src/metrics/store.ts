@@ -158,3 +158,9 @@ export async function readVisitorSum({ db, shop, fromDay, toDay }: { db: { disco
   const result = await db.discountDailyStat.aggregate({ where: { shop, day: { gte: fromDay, lte: toDay } }, _sum: { visitors: true } })
   return result._sum.visitors ?? 0
 }
+
+/** The map of products in live discounts that the storefront and the orders read; empty when the shop has no row yet. */
+export async function readLiveProducts({ db, shop, tools }: { db: { metricsSync: { findUnique: (args: { where: { shop: string }; select: { liveProducts: true } }) => Promise<{ liveProducts: unknown } | null> } }; shop: string; tools: StoreTools }): Promise<Record<string, string>> {
+  const row = await db.metricsSync.findUnique({ where: { shop }, select: { liveProducts: true } })
+  return tools.keepTextValues({ value: row?.liveProducts, tools })
+}
