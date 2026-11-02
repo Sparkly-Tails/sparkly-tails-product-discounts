@@ -33,3 +33,54 @@ model Session {
   refreshToken        String?
   refreshTokenExpires DateTime?
 }
+
+// Homepage metrics. Nothing here identifies a person: a visitor is a hash that changes every day.
+
+/// Distinct visitors counted per shop, discount and day (the shop's time zone).
+model DiscountDailyStat {
+  id         Int    @id @default(autoincrement())
+  shop       String
+  discountId String
+  day        String
+  visitors   Int    @default(0)
+
+  @@unique([shop, discountId, day])
+}
+
+/// Visitors already counted today, so a second view the same day adds nothing. Rows older than two days are deleted.
+model VisitorSeen {
+  id         Int    @id @default(autoincrement())
+  shop       String
+  discountId String
+  day        String
+  visitorKey String
+
+  @@unique([shop, discountId, day, visitorKey])
+  @@index([shop, day])
+}
+
+/// One row per paid order and discount that the order's bundle lines belong to.
+model BundleOrder {
+  id             Int      @id @default(autoincrement())
+  shop           String
+  orderId        String
+  discountId     String
+  orderedAt      DateTime
+  currency       String
+  units          Int
+  orderSubtotal  Decimal  @db.Decimal(12, 2)
+  discountAmount Decimal  @db.Decimal(12, 2)
+  addedRevenue   Decimal  @db.Decimal(12, 2)
+
+  @@unique([shop, orderId, discountId])
+  @@index([shop, orderedAt])
+}
+
+/// One row per shop: how far the orders have been read, and a copy of the shop time zone and of the products in live discounts, so a storefront request never has to ask Shopify.
+model MetricsSync {
+  shop            String    @id
+  lastOrderSyncAt DateTime?
+  backfilledUntil DateTime?
+  timeZone        String    @default("UTC")
+  liveProducts    Json      @default("{}")
+}

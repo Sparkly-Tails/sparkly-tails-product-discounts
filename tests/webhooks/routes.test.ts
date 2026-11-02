@@ -5,9 +5,12 @@ import { POST as scopesUpdate } from '@/app/webhooks/app/scopes_update/route'
 import { POST as compliance } from '@/app/webhooks/compliance/route'
 import { deleteShopSessions } from '@/lib/sessions'
 import { refreshStoredScopes } from '@/lib/storedScopes'
+import { deleteShopMetrics } from '@/metrics/store'
 
 vi.mock('@/lib/sessions', () => ({ deleteShopSessions: vi.fn(async () => {}), updateStoredScope: vi.fn(async () => {}) }))
 vi.mock('@/lib/storedScopes', () => ({ refreshStoredScopes: vi.fn(async () => {}) }))
+vi.mock('@/lib/db', () => ({ getDb: () => ({ marker: 'db' }) }))
+vi.mock('@/metrics/store', () => ({ deleteShopMetrics: vi.fn(async () => {}) }))
 
 const SECRET = 'client-secret'
 const A = 'demo.myshopify.com'
@@ -25,6 +28,7 @@ beforeEach(() => {
   process.env.SHOPIFY_API_SECRET_KEY = SECRET
   vi.mocked(deleteShopSessions).mockClear()
   vi.mocked(refreshStoredScopes).mockClear()
+  vi.mocked(deleteShopMetrics).mockClear()
 })
 
 describe('app/uninstalled', () => {
@@ -87,6 +91,17 @@ describe('app/scopes_update', () => {
 })
 
 describe('compliance', () => {
+  it('shop/redact also deletes the metrics rows of the body shop', async () => {
+    expect((await compliance(post(redactBody(A), 'shop/redact'))).status).toBe(200)
+    expect(deleteShopMetrics).toHaveBeenCalledExactlyOnceWith({ db: { marker: 'db' }, shop: A })
+  })
+
+  it('customers/redact and customers/data_request delete no metrics: none hold customer data', async () => {
+    await compliance(post('{}', 'customers/redact'))
+    await compliance(post('{}', 'customers/data_request'))
+    expect(deleteShopMetrics).not.toHaveBeenCalled()
+  })
+
   it('acknowledges customers/data_request and customers/redact without touching the database', async () => {
     expect((await compliance(post('{"customer":{"email":"a@b.c"}}', 'customers/data_request'))).status).toBe(200)
     expect((await compliance(post('{}', 'customers/redact'))).status).toBe(200)
