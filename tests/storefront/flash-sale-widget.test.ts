@@ -35,7 +35,7 @@ describe('flash sale in the tier widget', () => {
     vi.useFakeTimers({ now: nowSeconds * 1000 })
     document.body.innerHTML = `
       <input name="quantity" value="${quantity}">
-      <div id="sparkly-tier-pricing-f1" class="sparkly-tier-pricing sparkly-tier-pricing--card" data-sparkly-tier-pricing
+      <div id="smooth-discounts-f1" class="smooth-discounts smooth-discounts--card" data-smooth-discounts
         data-discount='${JSON.stringify({ ...discount, ...(tiers ? { tiers } : {}) })}' data-time-discount="{}"
         data-product-id='"gid://shopify/Product/9"' data-selected-variant-id="10"
         data-base-price="1.69" data-compare-at-price="0" data-money-format='"£{{amount}}"' data-high-demand="false"
@@ -44,10 +44,10 @@ describe('flash sale in the tier widget', () => {
           <div><span data-flash-label></span></div>
           <div><span data-flash-timer></span><span data-flash-aside></span><span data-flash-chip hidden><span data-flash-chip-text></span></span></div>
         </div>
-        <div class="sparkly-tier-pricing__body">
-          <div class="sparkly-tier-pricing__summary">
-            <div class="sparkly-tier-pricing__price-row">
-              <div class="sparkly-tier-pricing__price-group">
+        <div class="smooth-discounts__body">
+          <div class="smooth-discounts__summary">
+            <div class="smooth-discounts__price-row">
+              <div class="smooth-discounts__price-group">
                 <span data-tier-pricing-now-label hidden></span>
                 <span data-tier-pricing-price data-original-price="true">£1.69</span>
                 <span data-discounted-price hidden>£1.69</span>
@@ -78,15 +78,15 @@ describe('flash sale in the tier widget', () => {
       hidden: el.hidden,
       variant: el.dataset.variant,
       label: (el.querySelector('[data-flash-label]') as HTMLElement).textContent,
-      timer: [...el.querySelectorAll('.sparkly-tier-pricing__flash-digit')].map((digit) => digit.textContent),
+      timer: [...el.querySelectorAll('.smooth-discounts__flash-digit')].map((digit) => digit.textContent),
       aside: (el.querySelector('[data-flash-aside]') as HTMLElement).textContent,
       chip: (el.querySelector('[data-flash-chip]') as HTMLElement).hidden ? '' : (el.querySelector('[data-flash-chip-text]') as HTMLElement).textContent,
     }
   }
-  const widget = () => document.querySelector('[data-sparkly-tier-pricing]') as HTMLElement
+  const widget = () => document.querySelector('[data-smooth-discounts]') as HTMLElement
   const cardHidden = () => (document.querySelector('[data-tier-pricing-card]') as HTMLElement).hidden
   const price = () => (document.querySelector('[data-tier-pricing-price]') as HTMLElement).textContent!.trim()
-  const hasChrome = () => widget().classList.contains('sparkly-tier-pricing--card')
+  const hasChrome = () => widget().classList.contains('smooth-discounts--card')
 
   async function setQuantity(value: number) {
     const input = document.querySelector('input[name="quantity"]') as HTMLInputElement
@@ -101,7 +101,7 @@ describe('flash sale in the tier widget', () => {
     expect([cardHidden(), hasChrome(), price()]).toEqual([false, true, '£1.69'])
     // the progress bar: the quantity and the pins at the tier quantities, in the no-offer state
     expect((document.querySelector('[data-tier-pricing-dot]') as HTMLElement).textContent).toBe('3')
-    expect([...document.querySelectorAll('.sparkly-tier-pricing__marker')].map((pin) => pin.textContent)).toEqual(['1', '8', '16'])
+    expect([...document.querySelectorAll('.smooth-discounts__marker')].map((pin) => pin.textContent)).toEqual(['1', '8', '16'])
     expect((document.querySelector('[data-tier-pricing-rail]') as HTMLElement).dataset.offerState).toBe('progress')
     expect((document.querySelector('[data-tier-pricing-status]') as HTMLElement).textContent).toBe('You have 3 units')
     expect((document.querySelector('[data-tier-pricing-aside]') as HTMLElement).textContent).toBe('Tier prices start with the sale')

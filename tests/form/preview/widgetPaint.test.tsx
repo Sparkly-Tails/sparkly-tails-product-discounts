@@ -27,7 +27,7 @@ function mountScript({ nowSeconds, quantity, tiers, flash, highDemand }: Scenari
   vi.useFakeTimers({ now: nowSeconds * 1000 })
   document.body.innerHTML = `
     <input name="quantity" value="${quantity}">
-    <div id="script-widget" class="sparkly-tier-pricing${tiers.length ? ' sparkly-tier-pricing--card' : ''}" data-sparkly-tier-pricing
+    <div id="script-widget" class="smooth-discounts${tiers.length ? ' smooth-discounts--card' : ''}" data-smooth-discounts
       data-discount='${JSON.stringify({ title: 'T', tiers, siblings: [], ownVariantIds: null, ownVariantOptions: [], selfVariantId: 'gid://shopify/ProductVariant/10' })}' data-time-discount="{}"
       data-product-id='"gid://shopify/Product/9"' data-selected-variant-id="10" data-base-price="28" data-compare-at-price="0" data-money-format='"\${{amount}}"'
       data-high-demand="${highDemand}" data-flash='${JSON.stringify(flash)}'>
@@ -35,10 +35,10 @@ function mountScript({ nowSeconds, quantity, tiers, flash, highDemand }: Scenari
         <div><span data-flash-label></span></div>
         <div><span data-flash-timer></span><span data-flash-aside></span><span data-flash-chip hidden><span data-flash-chip-text></span></span></div>
       </div>
-      <div class="sparkly-tier-pricing__body">
-        <div class="sparkly-tier-pricing__summary">
-          <div class="sparkly-tier-pricing__price-row">
-            <div class="sparkly-tier-pricing__price-group">
+      <div class="smooth-discounts__body">
+        <div class="smooth-discounts__summary">
+          <div class="smooth-discounts__price-row">
+            <div class="smooth-discounts__price-group">
               <span data-tier-pricing-now-label hidden></span>
               <span data-tier-pricing-price data-original-price="true">$28.00</span>
               <span data-discounted-price hidden>$28.00</span>
@@ -72,7 +72,7 @@ function renderPreview({ nowSeconds, quantity, tiers, flash, highDemand }: Scena
     },
   })
   const { container } = render(<WidgetView viewModel={viewModel!} hasTiers={tiers.length > 0} widgetStyle={DEFAULT_WIDGET_STYLE} onPickQuantity={() => {}} />)
-  return container.querySelector('.sparkly-tier-pricing') as HTMLElement
+  return container.querySelector('.smooth-discounts') as HTMLElement
 }
 
 // What the person reads and what changes how it looks, from either markup.
@@ -82,9 +82,9 @@ function fingerprint(root: HTMLElement) {
   const text = (selector: string) => (find(selector)?.textContent ?? '').trim()
   const cardShown = shown('[data-tier-pricing-card]')
   return {
-    chrome: root.classList.contains('sparkly-tier-pricing--card'),
+    chrome: root.classList.contains('smooth-discounts--card'),
     flash: shown('[data-tier-pricing-flash]')
-      ? { variant: find('[data-tier-pricing-flash]')!.dataset.variant, label: text('[data-flash-label]'), digits: [...root.querySelectorAll('.sparkly-tier-pricing__flash-digit')].map((digit) => digit.textContent), aside: text('[data-flash-aside]'), chip: shown('[data-flash-chip]') ? text('[data-flash-chip-text]') : '' }
+      ? { variant: find('[data-tier-pricing-flash]')!.dataset.variant, label: text('[data-flash-label]'), digits: [...root.querySelectorAll('.smooth-discounts__flash-digit')].map((digit) => digit.textContent), aside: text('[data-flash-aside]'), chip: shown('[data-flash-chip]') ? text('[data-flash-chip-text]') : '' }
       : null,
     nowLabel: shown('[data-tier-pricing-now-label]') ? text('[data-tier-pricing-now-label]') : null,
     price: text('[data-tier-pricing-price]'),
@@ -95,7 +95,7 @@ function fingerprint(root: HTMLElement) {
     card: cardShown,
     chips: cardShown && shown('[data-tier-pricing-tiers]') ? [...root.querySelectorAll('[data-tier-pricing-tiers] > *')].map((chip) => [chip.tagName, chip.className, chip.textContent, chip.getAttribute('aria-pressed')]) : null,
     rail: cardShown
-      ? { offerState: find('[data-tier-pricing-rail]')!.dataset.offerState, status: text('[data-tier-pricing-status]'), strong: text('[data-tier-pricing-status] strong'), aside: text('[data-tier-pricing-aside]'), tone: find('[data-tier-pricing-aside]')!.dataset.tone, fill: find('[data-tier-pricing-fill]')!.style.width, dot: text('[data-tier-pricing-dot]'), dotPct: find('[data-tier-pricing-dot]')!.style.getPropertyValue('--sparkly-tier-pct'), markers: [...root.querySelectorAll('.sparkly-tier-pricing__marker')].map((marker) => [marker.className, marker.textContent, (marker as HTMLElement).style.getPropertyValue('--sparkly-tier-pct')]), valueNow: find('[data-tier-pricing-bar]')!.getAttribute('aria-valuenow'), valueText: find('[data-tier-pricing-bar]')!.getAttribute('aria-valuetext') }
+      ? { offerState: find('[data-tier-pricing-rail]')!.dataset.offerState, status: text('[data-tier-pricing-status]'), strong: text('[data-tier-pricing-status] strong'), aside: text('[data-tier-pricing-aside]'), tone: find('[data-tier-pricing-aside]')!.dataset.tone, fill: find('[data-tier-pricing-fill]')!.style.width, dot: text('[data-tier-pricing-dot]'), dotPct: find('[data-tier-pricing-dot]')!.style.getPropertyValue('--smooth-discounts-pct'), markers: [...root.querySelectorAll('.smooth-discounts__marker')].map((marker) => [marker.className, marker.textContent, (marker as HTMLElement).style.getPropertyValue('--smooth-discounts-pct')]), valueNow: find('[data-tier-pricing-bar]')!.getAttribute('aria-valuenow'), valueText: find('[data-tier-pricing-bar]')!.getAttribute('aria-valuetext') }
       : null,
   }
 }

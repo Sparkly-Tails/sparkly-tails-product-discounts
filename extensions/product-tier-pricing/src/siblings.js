@@ -70,32 +70,32 @@ export function paintMixMatchList(listEl, rows) {
   listEl.innerHTML = ''
   rows.forEach((row) => {
     const item = document.createElement('div')
-    item.className = 'sparkly-tier-pricing__list-item'
+    item.className = 'smooth-discounts__list-item'
 
     const link = document.createElement('a')
     link.href = row.href
-    link.className = 'sparkly-tier-pricing__list-link'
+    link.className = 'smooth-discounts__list-link'
 
     if (row.imageUrl) {
       const img = document.createElement('img')
       img.src = row.imageUrl
       img.alt = ''
-      img.className = 'sparkly-tier-pricing__list-thumb'
+      img.className = 'smooth-discounts__list-thumb'
       link.appendChild(img)
     } else {
       const placeholder = document.createElement('span')
-      placeholder.className = 'sparkly-tier-pricing__list-thumb sparkly-tier-pricing__list-thumb--placeholder'
+      placeholder.className = 'smooth-discounts__list-thumb smooth-discounts__list-thumb--placeholder'
       link.appendChild(placeholder)
     }
 
     const text = document.createElement('span')
-    text.className = 'sparkly-tier-pricing__list-text'
+    text.className = 'smooth-discounts__list-text'
     const name = document.createElement('span')
-    name.className = 'sparkly-tier-pricing__list-name'
+    name.className = 'smooth-discounts__list-name'
     name.textContent = row.title
     text.appendChild(name)
     const price = document.createElement('span')
-    price.className = 'sparkly-tier-pricing__list-price'
+    price.className = 'smooth-discounts__list-price'
     price.textContent = row.available ? (row.priceLabel ? row.priceLabel + ' each' : '') : 'Sold out'
     text.appendChild(price)
     link.appendChild(text)
@@ -111,10 +111,10 @@ export function paintMixMatchList(listEl, rows) {
 // it (the product on the page and sold-out rows have none).
 export function paintRowAction(row) {
   const group = document.createElement('div')
-  group.className = 'sparkly-tier-pricing__row-action'
+  group.className = 'smooth-discounts__row-action'
 
   const count = document.createElement('span')
-  count.className = 'sparkly-tier-pricing__list-qty'
+  count.className = 'smooth-discounts__list-qty'
   count.textContent = String(row.qty)
   count.setAttribute('aria-label', row.qty + ' in cart')
   group.appendChild(count)
@@ -122,7 +122,7 @@ export function paintRowAction(row) {
   if (row.showAdd) {
     const add = document.createElement('a')
     add.href = row.href
-    add.className = 'sparkly-tier-pricing__add'
+    add.className = 'smooth-discounts__add'
     add.textContent = '+ Add'
     add.setAttribute('aria-label', 'Add ' + row.title)
     group.appendChild(add)

@@ -10,7 +10,7 @@ import { readBuiltWidget, runWidgetScripts } from '../../helpers/builtWidget'
 
 /**
  * The admin imports the storefront widget script for its functions, and that script also starts itself
- * when it loads: it scans the page for [data-sparkly-tier-pricing] and reads the Shopify block's data
+ * when it loads: it scans the page for [data-smooth-discounts] and reads the Shopify block's data
  * attributes from each hit. The preview's markup must therefore never carry that marker, or the admin
  * page dies with `"undefined" is not valid JSON` as soon as it loads with a product in the preview.
  */
@@ -28,7 +28,7 @@ afterEach(() => { document.body.innerHTML = ''; vi.clearAllTimers(); vi.useRealT
 
 describe('the preview next to the storefront script', () => {
   it('does not carry the marker the script scans for', () => {
-    expect(renderPreviewMarkup()).not.toContain('data-sparkly-tier-pricing')
+    expect(renderPreviewMarkup()).not.toContain('data-smooth-discounts')
   })
 
   it('lets the script load on a page whose server markup already holds the preview', () => {
@@ -38,7 +38,7 @@ describe('the preview next to the storefront script', () => {
 
   it('still looks like the widget (the stylesheet and the painted parts are all there)', () => {
     document.body.innerHTML = renderPreviewMarkup()
-    expect(document.querySelector('.sparkly-tier-pricing.sparkly-tier-pricing--card')).not.toBeNull()
+    expect(document.querySelector('.smooth-discounts.smooth-discounts--card')).not.toBeNull()
     expect(document.querySelector('[data-tier-pricing-price]')).toHaveProperty('textContent')
   })
 })

@@ -1,7 +1,7 @@
 // The widget is a core script plus components, each its own script. A component registers its functions on one
 // shared object of the page when it runs; the core waits for the ones it needs and adds the script of any
 // that is not on the page yet. `root` is the page's window.
-const REGISTRY_KEY = 'SparklyTierPricing'
+const REGISTRY_KEY = 'SmoothDiscounts'
 
 /** A promise that something else settles: here, the component's script, when it runs or fails to load. */
 class Deferred {

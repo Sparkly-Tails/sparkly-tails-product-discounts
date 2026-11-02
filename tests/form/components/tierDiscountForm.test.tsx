@@ -203,9 +203,9 @@ describe('TierDiscountForm: the preview follows the form', () => {
 
   it('does not change with the name', () => {
     renderForm()
-    const before = document.querySelector('.sparkly-tier-pricing')!.innerHTML
+    const before = document.querySelector('.smooth-discounts')!.innerHTML
     fireEvent.change(nameField(), { target: { value: 'Black Friday' } })
-    expect(document.querySelector('.sparkly-tier-pricing')!.innerHTML).toBe(before)
+    expect(document.querySelector('.smooth-discounts')!.innerHTML).toBe(before)
   })
 
   it('changes with the tiers', () => {
@@ -258,9 +258,9 @@ describe('TierDiscountForm: the style', () => {
     const { saveAction } = renderForm()
     fireEvent.click(screen.getByRole('button', { name: 'White' }))
     fireEvent.change(screen.getByRole('slider', { name: 'Price size' }), { target: { value: '36' } })
-    const widget = document.querySelector('.sparkly-tier-pricing') as HTMLElement
-    expect(widget.style.getPropertyValue('--sparkly-tier-cream')).toBe('#FFFFFF')
-    expect(widget.style.getPropertyValue('--sparkly-tier-price-font-size')).toBe('36px')
+    const widget = document.querySelector('.smooth-discounts') as HTMLElement
+    expect(widget.style.getPropertyValue('--smooth-discounts-cream')).toBe('#FFFFFF')
+    expect(widget.style.getPropertyValue('--smooth-discounts-price-font-size')).toBe('36px')
     await act(async () => { fireEvent.submit(theForm()) })
     const formData = (saveAction.mock.calls[0] as unknown as [unknown, FormData])[1]
     expect(formData.get('style-backgroundColor')).toBe('#FFFFFF')
