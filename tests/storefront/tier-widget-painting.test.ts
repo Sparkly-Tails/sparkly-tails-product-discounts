@@ -224,16 +224,16 @@ describe('tier widget painting (redesign)', () => {
     expect(painted().status).toBe('You have 22 units (Exceeds 16+ tier)')
   })
 
-  it('the tag: the tier pill once an offer applies, High Demand when switched on before, nothing otherwise', async () => {
+  it('the tag: High Demand when switched on before an offer applies, nothing otherwise (no tier tag)', async () => {
     const tag = () => document.querySelector('[data-tier-pricing-tag]') as HTMLElement
     await mountTiers(5)
     expect(tag().hidden).toBe(true)
     await setQuantity(10)
-    expect([tag().hidden, tag().textContent, tag().dataset.kind]).toEqual([false, 'Tier 1 Active (8+ units)', 'tier'])
+    expect(tag().hidden).toBe(true)
     await mountTiers(5, { highDemand: true })
     expect([tag().hidden, tag().textContent, tag().dataset.kind]).toEqual([false, 'High Demand', 'high-demand'])
     await setQuantity(16)
-    expect(tag().textContent).toBe('Tier 2 Active (16+ • Unlimited)')
+    expect(tag().hidden).toBe(true)
   })
 
   it('opens the mix & match list: a row per member with thumbnail slot, name, price at the applied tier and its cart quantity', async () => {

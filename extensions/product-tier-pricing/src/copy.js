@@ -95,24 +95,14 @@ export function buildTierChips({ tiers, basePrice, combinedQty, formatMoney: for
   return chips
 }
 
-// "Tier 1 Active (8+ units)"; the top tier is unlimited: "Tier 2 Active (16+ • Unlimited)".
 // Tier numbers count the discount's real tiers; the hidden start tier is not one.
 export function tierNumberOf(tiers, minQty) {
   const sorted = sortTiersByMinQty(tiers)
   return sorted.findIndex((tier) => tier.minQty === minQty) + (isUnitAnchorTier(sorted[0]) ? 0 : 1)
 }
 
-export function formatTierPill({ tiers, minQty }) {
-  const sorted = sortTiersByMinQty(tiers)
-  const isTop = minQty === sorted[sorted.length - 1].minQty
-  return 'Tier ' + tierNumberOf(tiers, minQty) + ' Active (' + minQty + '+' + (isTop ? ' • Unlimited' : ' units') + ')'
-}
-
-// The tag at the right of the price row: the tier pill once an offer applies,
-// else the High Demand tag when it is switched on, else nothing.
-export function buildPriceTag({ progressState, tiers, highDemand }) {
-  if (classifyOfferState(progressState) !== 'progress') {
-    return { kind: 'tier', text: formatTierPill({ tiers, minQty: progressState.tierState.minQty }) }
-  }
+// The tag at the right of the price row: the High Demand tag when it is switched on and no offer applies yet, else nothing.
+export function buildPriceTag({ progressState, highDemand }) {
+  if (classifyOfferState(progressState) !== 'progress') return null
   return highDemand ? { kind: 'high-demand', text: 'High Demand' } : null
 }

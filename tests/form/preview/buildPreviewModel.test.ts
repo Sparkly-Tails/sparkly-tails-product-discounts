@@ -43,10 +43,10 @@ describe('buildPreviewModel: tiers', () => {
     expect(labels).toEqual(['1 × $28.00', '3 × $75.60', '5 × $119.00'])
   })
 
-  it('shows the tier price once its quantity is chosen', () => {
+  it('shows the tier price once its quantity is chosen, with no tier tag', () => {
     const viewModel = build({ quantity: 3 }).viewModel
     expect(viewModel?.discountedPrice).toBe('$25.20')
-    expect(viewModel?.tag).toEqual({ kind: 'tier', text: 'Tier 1 Active (3+ units)' })
+    expect(viewModel?.tag).toBeNull()
   })
 
   it('uses an anchor price as the exact total for its quantity', () => {
