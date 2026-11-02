@@ -1,4 +1,4 @@
-import { BackgroundSwatch } from '@/form/components/ColorSwatch'
+import { BackgroundSwatch, CurrentColour } from '@/form/components/ColorSwatch'
 import ColourPicker from '@/form/components/ColourPicker'
 import { CropSquareIcon, SquareIcon } from '@/form/components/icons'
 import { BACKGROUND_COLORS, formatHexColor } from '@/form/designOptions'
@@ -21,6 +21,7 @@ export function BackgroundColors({ hex, text, onTextChange, onPick }: {
         <span className="text-form-body-sm text-form-on-surface-variant font-mono">{hex}</span>
       </div>
       <div className="flex items-center gap-2 flex-wrap">
+        <CurrentColour hex={hex} />
         {BACKGROUND_COLORS.map((color) => (
           <BackgroundSwatch key={color.hex} label={color.label} hex={color.hex} edgeClass={color.edgeClass} isSelected={color.hex === hex} onSelect={() => onPick(color.hex)} />
         ))}
@@ -43,7 +44,7 @@ export function BackgroundColors({ hex, text, onTextChange, onPick }: {
 
 export function CornerRadius({ value, onChange }: { value: number; onChange: (value: number) => void }) {
   return (
-    <div className="pt-2 space-y-2.5 border-t border-form-outline-variant/20">
+    <div className="space-y-2.5">
       <div className="flex items-center justify-between">
         <span className={`${LABEL} block`}>Round corners</span>
         <span className="font-mono font-medium text-[12px] px-2 py-0.5 rounded bg-form-surface-container text-form-on-surface">{value} px</span>
@@ -68,21 +69,24 @@ export function CornerRadius({ value, onChange }: { value: number; onChange: (va
 
 export function PriceSize({ value, onChange }: { value: number; onChange: (value: number) => void }) {
   return (
-    <div className="pt-2 space-y-2.5 border-t border-form-outline-variant/20">
+    <div className="space-y-2.5">
       <div className="flex items-center justify-between">
         <span className={`${LABEL} block`}>Price size</span>
         <span className="font-mono font-medium text-[12px] px-2 py-0.5 rounded bg-form-surface-container text-form-on-surface">{value} px</span>
       </div>
-      <input
-        type="range"
-        aria-label="Price size"
-        min={PRICE_SIZE_RANGE.min}
-        max={PRICE_SIZE_RANGE.max}
-        step={1}
-        value={value}
-        onChange={(event) => onChange(Number(event.target.value))}
-        className="w-full h-1.5 bg-form-surface-container rounded-lg appearance-none cursor-pointer accent-form-primary"
-      />
+      {/* As tall as the Round corners row beside it (its icons are 18px), so the two sliders line up. */}
+      <div className="flex items-center h-[18px]">
+        <input
+          type="range"
+          aria-label="Price size"
+          min={PRICE_SIZE_RANGE.min}
+          max={PRICE_SIZE_RANGE.max}
+          step={1}
+          value={value}
+          onChange={(event) => onChange(Number(event.target.value))}
+          className="w-full h-1.5 bg-form-surface-container rounded-lg appearance-none cursor-pointer accent-form-primary"
+        />
+      </div>
     </div>
   )
 }
