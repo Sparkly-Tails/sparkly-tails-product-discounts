@@ -3,7 +3,7 @@ import { allowSharedCombining, SHARED_RECORD_TOOLS, findSharedRecord, flattenRec
 import type { ShopifyQuery } from '@/flash/shopifyRecord'
 
 const TIER_FUNCTION = { id: 'fn-tier', handle: 'product-discount' }
-const TIME_FUNCTION = { id: 'fn-time', handle: 'time-based-discount' }
+const OTHER_FUNCTION = { id: 'fn-other', handle: 'other-discount' }
 
 function node(options: { id: string; functionId: string; isFlash?: boolean; combines?: boolean }) {
   return {
@@ -17,7 +17,7 @@ function fakeQuery(nodes: ReturnType<typeof node>[], updateErrors: { message: st
   return vi.fn(async (text: string) =>
     text.includes('discountAutomaticAppUpdate')
       ? { discountAutomaticAppUpdate: { userErrors: updateErrors } }
-      : { shopifyFunctions: { nodes: [TIER_FUNCTION, TIME_FUNCTION] }, discountNodes: { nodes } },
+      : { shopifyFunctions: { nodes: [TIER_FUNCTION, OTHER_FUNCTION] }, discountNodes: { nodes } },
   )
 }
 
@@ -41,7 +41,7 @@ describe('allowSharedCombining', () => {
   it('never touches a flash record or another Function\'s discount', async () => {
     const query = fakeQuery([
       node({ id: 'gid://shopify/DiscountAutomaticNode/2', functionId: 'fn-tier', isFlash: true }),
-      node({ id: 'gid://shopify/DiscountAutomaticNode/3', functionId: 'fn-time' }),
+      node({ id: 'gid://shopify/DiscountAutomaticNode/3', functionId: 'fn-other' }),
     ])
     expect(await run(query)).toBe('missing')
     expect(query).toHaveBeenCalledTimes(1)
@@ -78,7 +78,7 @@ describe('flattenRecordNode, findSharedRecord and findFunctionId', () => {
   })
 
   it('finds the Function id by handle, or an empty text', () => {
-    expect(findFunctionId({ functions: [TIER_FUNCTION, TIME_FUNCTION], handle: 'time-based-discount' })).toBe('fn-time')
+    expect(findFunctionId({ functions: [TIER_FUNCTION, OTHER_FUNCTION], handle: 'other-discount' })).toBe('fn-other')
     expect(findFunctionId({ functions: [TIER_FUNCTION], handle: 'nope' })).toBe('')
   })
 })

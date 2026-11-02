@@ -6,15 +6,12 @@ import type { FlashStatus } from '@/flash/status'
 
 export interface DiscountRow {
   key: string
-  kind: 'tier' | 'time'
   title: string
   subtitle: string
   rules: string
   isActive: boolean
   href: string
 }
-
-export type TimeStatusLabel = 'Upcoming' | 'Active' | 'Expired'
 
 const AMOUNT_KEY = { percent: 'percentOff', fixed: 'fixedPrice' } as const
 
@@ -43,19 +40,6 @@ export function describeTierRules(options: {
     parts.push(step.minQty + '+ units (' + amountText + ')')
   }
   return parts.join(', ')
-}
-
-// Upcoming: the whole window; Active: when it ends; Expired: when it ended.
-export function describeTimeSchedule(options: {
-  startsAt: string
-  endsAt: string
-  statusLabel: TimeStatusLabel
-  formatDate: (options: { value: string }) => string
-}): string {
-  const { startsAt, endsAt, statusLabel, formatDate } = options
-  if (statusLabel === 'Upcoming') return formatDate({ value: startsAt }) + ' - ' + formatDate({ value: endsAt }) + ' (Scheduled)'
-  if (statusLabel === 'Active') return 'Ends ' + formatDate({ value: endsAt })
-  return 'Ended ' + formatDate({ value: endsAt })
 }
 
 // "Flash sale: Nov 27, 2026 - Nov 30, 2026 (Upcoming)": the whole window with the state of the sale.
@@ -103,7 +87,6 @@ export function buildTierRow(options: {
   const rowTitle = pickTitle({ name, title })
   return {
     key: 'tier:' + discountId,
-    kind: 'tier',
     title: rowTitle,
     subtitle: pickSubtitle({ rowTitle, title }),
     rules,
@@ -112,26 +95,3 @@ export function buildTierRow(options: {
   }
 }
 
-export function buildTimeRow(options: {
-  discountId: string
-  title: string
-  schedule: string
-  statusLabel: TimeStatusLabel
-  pickTitle: (options: { name: string; title: string }) => string
-}): DiscountRow {
-  const { discountId, title, schedule, statusLabel, pickTitle } = options
-  return {
-    key: 'time:' + discountId,
-    kind: 'time',
-    title: pickTitle({ name: title, title: '' }),
-    subtitle: '',
-    rules: schedule,
-    isActive: statusLabel === 'Active',
-    href: '/time-discounts/' + encodeURIComponent(discountId),
-  }
-}
-
-// Tier rows first, then the time-based rows, each in stored order.
-export function buildDiscountRows({ tierRows, timeRows }: { tierRows: DiscountRow[]; timeRows: DiscountRow[] }): DiscountRow[] {
-  return [...tierRows, ...timeRows]
-}

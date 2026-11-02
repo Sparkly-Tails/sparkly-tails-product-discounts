@@ -1,26 +1,23 @@
-// The state of the homepage "All discounts" table (tab, type filter, search,
+// The state of the homepage "All discounts" table (tab, search,
 // sort, page) and what it shows. The state lives in the page address, and
 // every step is a small pure function; the steps are handed to the functions
 // that need them through TABLE_TOOLS.
 import type { DiscountRow } from '@/home/discountRows'
 
 export const TAB_VALUES = ['all', 'active', 'inactive'] as const
-export const TYPE_VALUES = ['all', 'tier', 'time'] as const
-export const SORT_VALUES = ['default', 'title-asc', 'title-desc', 'type', 'status'] as const
+export const SORT_VALUES = ['default', 'title-asc', 'title-desc', 'status'] as const
 
 export type StatusTab = (typeof TAB_VALUES)[number]
-export type TypeFilter = (typeof TYPE_VALUES)[number]
 export type SortKey = (typeof SORT_VALUES)[number]
 
 export interface TableQuery {
   tab: StatusTab
-  type: TypeFilter
   search: string
   sort: SortKey
   page: number
 }
 
-export const DEFAULT_QUERY: TableQuery = { tab: 'all', type: 'all', search: '', sort: 'default', page: 1 }
+export const DEFAULT_QUERY: TableQuery = { tab: 'all', search: '', sort: 'default', page: 1 }
 export const PAGE_SIZE = 10
 // Below this many discounts the pagination line is left out.
 export const MIN_ROWS_FOR_PAGINATION = 5
@@ -36,8 +33,6 @@ export interface TableView {
 }
 
 const ACTIVE_WANTED = { all: [true, false], active: [true], inactive: [false] }
-const KIND_WANTED = { all: ['tier', 'time'], tier: ['tier'], time: ['time'] }
-const KIND_RANK = { tier: 0, time: 1 }
 
 // The last value when a parameter is repeated in the address ("?tab=a&tab=b").
 export function pickLastValue({ value }: { value: string | string[] | undefined }): string {
@@ -62,7 +57,6 @@ export function parseTableQuery(options: {
   const { raw, tools } = options
   return {
     tab: tools.parseChoice({ value: tools.pickLastValue({ value: raw.tab }), allowed: TAB_VALUES, fallback: 'all' }),
-    type: tools.parseChoice({ value: tools.pickLastValue({ value: raw.type }), allowed: TYPE_VALUES, fallback: 'all' }),
     search: tools.pickLastValue({ value: raw.search }).trim(),
     sort: tools.parseChoice({ value: tools.pickLastValue({ value: raw.sort }), allowed: SORT_VALUES, fallback: 'default' }),
     page: tools.parsePageNumber({ value: tools.pickLastValue({ value: raw.page }) }),
@@ -74,15 +68,6 @@ export function filterByTab({ rows, tab }: { rows: DiscountRow[]; tab: StatusTab
   const kept: DiscountRow[] = []
   for (const row of rows) {
     if (wanted.includes(row.isActive)) kept.push(row)
-  }
-  return kept
-}
-
-export function filterByType({ rows, type }: { rows: DiscountRow[]; type: TypeFilter }): DiscountRow[] {
-  const wanted = KIND_WANTED[type]
-  const kept: DiscountRow[] = []
-  for (const row of rows) {
-    if (wanted.includes(row.kind)) kept.push(row)
   }
   return kept
 }
@@ -104,12 +89,6 @@ export function sortByTitleAscending({ rows }: { rows: DiscountRow[] }): Discoun
 
 export function sortByTitleDescending({ rows }: { rows: DiscountRow[] }): DiscountRow[] {
   return [...rows].sort((first, second) => second.title.localeCompare(first.title, 'en', { sensitivity: 'base' }))
-}
-
-export function sortByType({ rows }: { rows: DiscountRow[] }): DiscountRow[] {
-  return [...rows].sort(
-    (first, second) => KIND_RANK[first.kind] - KIND_RANK[second.kind] || first.title.localeCompare(second.title, 'en', { sensitivity: 'base' }),
-  )
 }
 
 export function sortByStatus({ rows }: { rows: DiscountRow[] }): DiscountRow[] {
@@ -144,19 +123,17 @@ export const TABLE_TOOLS = {
   parseChoice,
   parsePageNumber,
   filterByTab,
-  filterByType,
   filterBySearch,
   sortRows,
   countRows,
   computePaging,
-  sorters: { 'title-asc': sortByTitleAscending, 'title-desc': sortByTitleDescending, type: sortByType, status: sortByStatus },
+  sorters: { 'title-asc': sortByTitleAscending, 'title-desc': sortByTitleDescending, status: sortByStatus },
 }
 
 export function applyTableQuery(options: { rows: DiscountRow[]; query: TableQuery; tools: typeof TABLE_TOOLS }): TableView {
   const { rows, query, tools } = options
   const byTab = tools.filterByTab({ rows, tab: query.tab })
-  const byType = tools.filterByType({ rows: byTab, type: query.type })
-  const matches = tools.filterBySearch({ rows: byType, search: query.search })
+  const matches = tools.filterBySearch({ rows: byTab, search: query.search })
   const sorted = tools.sortRows({ rows: matches, sort: query.sort, sorters: tools.sorters })
   const paging = tools.computePaging({ matchCount: sorted.length, page: query.page, pageSize: PAGE_SIZE })
   return {

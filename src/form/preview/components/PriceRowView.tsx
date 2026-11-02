@@ -2,7 +2,7 @@ import type { WidgetViewModel } from '@/form/preview/widgetTypes'
 
 function PriceValue({ discountedPrice, plainPrice }: { discountedPrice: string | null; plainPrice: string }) {
   return (
-    <span className="smooth-discounts__price smooth-discounts__original-price" data-tier-pricing-price data-original-price="true">
+    <span className="smooth-discounts__price" data-tier-pricing-price>
       {discountedPrice ? <><span className="smooth-discounts__sr-only">Discounted price: </span>{discountedPrice}</> : plainPrice}
     </span>
   )

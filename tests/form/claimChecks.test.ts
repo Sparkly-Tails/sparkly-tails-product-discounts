@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { checkMemberFree, assertFreeOfClaims } from '@/form/claimChecks'
 import { CLAIM_TOOLS, describePickRefusal, describeSaveRefusal, findClaim, type Claim } from '@/form/claims'
 
-const SPRING: Claim = { kind: 'tier', discountId: 'disc_a', discountName: 'Spring', productId: 'p1' }
+const SPRING: Claim = { discountId: 'disc_a', discountName: 'Spring', productId: 'p1' }
 
 function buildTools(_claims: Claim[]) {
   return { ...CLAIM_TOOLS, findClaim, describePickRefusal, describeSaveRefusal, readMemberInfo: vi.fn(), readMemberTitle: vi.fn(async () => 'Tuna Soup') }

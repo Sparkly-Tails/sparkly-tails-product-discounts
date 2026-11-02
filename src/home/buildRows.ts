@@ -1,7 +1,7 @@
 // Builds the rows of the homepage table from the stored discounts, one small
 // step at a time. The steps come in through `tools`, so each can be replaced.
-import type { DiscountRow, TimeStatusLabel } from '@/home/discountRows'
-import type { TierDiscountInput, TimeDiscountInput } from '@/home/loadDiscountRows'
+import type { DiscountRow } from '@/home/discountRows'
+import type { TierDiscountInput } from '@/home/loadDiscountRows'
 import type { RowTools } from '@/home/rowTools'
 import type { FlashStatus } from '@/flash/status'
 
@@ -53,17 +53,3 @@ export function buildTierRows({ discounts, currencyCode, timezone, getFlashStatu
   return rows
 }
 
-export function buildTimeRows({ discounts, timezone, getStatusLabel, tools }: {
-  discounts: TimeDiscountInput[]
-  timezone: string
-  getStatusLabel: (options: { startsAt: string; endsAt: string; timezone: string }) => TimeStatusLabel
-  tools: RowTools
-}): DiscountRow[] {
-  const rows: DiscountRow[] = []
-  for (const discount of discounts) {
-    const statusLabel = getStatusLabel({ startsAt: discount.startsAt, endsAt: discount.endsAt, timezone })
-    const schedule = tools.describeTimeSchedule({ startsAt: discount.startsAt, endsAt: discount.endsAt, statusLabel, formatDate: tools.formatNaiveDate })
-    rows.push(tools.buildTimeRow({ discountId: discount.discountId, title: discount.title, schedule, statusLabel, pickTitle: tools.pickRowTitle }))
-  }
-  return rows
-}

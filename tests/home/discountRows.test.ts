@@ -1,11 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import {
-  buildDiscountRows,
   buildTierRow,
-  buildTimeRow,
   describeTierRules,
   describeFlashSchedule,
-  describeTimeSchedule,
   joinRuleTexts,
   listTierSteps,
   pickRowSubtitle,
@@ -53,28 +50,6 @@ describe('listTierSteps', () => {
   })
 })
 
-describe('describeTimeSchedule', () => {
-  const dates = { startsAt: '2026-11-27T09:00', endsAt: '2026-11-30T23:59', formatDate }
-
-  it('shows the whole window for an upcoming discount', () => {
-    expect(describeTimeSchedule({ ...dates, statusLabel: 'Upcoming' })).toBe('Nov 27, 2026 - Nov 30, 2026 (Scheduled)')
-  })
-
-  it('shows when an active discount ends', () => {
-    expect(describeTimeSchedule({ ...dates, statusLabel: 'Active' })).toBe('Ends Nov 30, 2026')
-  })
-
-  it('shows when an expired discount ended', () => {
-    expect(describeTimeSchedule({ ...dates, statusLabel: 'Expired' })).toBe('Ended Nov 30, 2026')
-  })
-
-  it('does not throw or print "Invalid Date" for dates that cannot be read', () => {
-    const text = describeTimeSchedule({ startsAt: 'soon', endsAt: '', statusLabel: 'Expired', formatDate })
-    expect(typeof text).toBe('string')
-    expect(text).not.toContain('Invalid Date')
-  })
-})
-
 describe('pickRowTitle and pickRowSubtitle', () => {
   it('uses the name, then the customer title, then "Untitled discount"', () => {
     expect(pickRowTitle({ name: 'Salmon Oil', title: 'Buy more' })).toBe('Salmon Oil')
@@ -95,7 +70,6 @@ describe('buildTierRow', () => {
   it('maps a live discount to an active row that links to its edit page', () => {
     expect(buildTierRow(base)).toEqual({
       key: 'tier:disc 1/a',
-      kind: 'tier',
       title: 'Salmon Oil',
       subtitle: 'Buy more, save more',
       rules: '3+ units (10% off)',
@@ -116,43 +90,6 @@ describe('buildTierRow', () => {
   it('falls back to "Untitled discount" when both are blank', () => {
     const row = buildTierRow({ ...base, name: '', title: '' })
     expect([row.title, row.subtitle]).toEqual(['Untitled discount', ''])
-  })
-})
-
-describe('buildTimeRow', () => {
-  const base = { discountId: 'td1', title: 'Spring Sale', schedule: 'Ends Nov 30, 2026', statusLabel: 'Active' as const, pickTitle: pickRowTitle }
-
-  it('maps an active discount to an active row that links to its edit page', () => {
-    expect(buildTimeRow(base)).toEqual({
-      key: 'time:td1',
-      kind: 'time',
-      title: 'Spring Sale',
-      subtitle: '',
-      rules: 'Ends Nov 30, 2026',
-      isActive: true,
-      href: '/time-discounts/td1',
-    })
-  })
-
-  it('maps upcoming and expired discounts to inactive rows', () => {
-    expect(buildTimeRow({ ...base, statusLabel: 'Upcoming' }).isActive).toBe(false)
-    expect(buildTimeRow({ ...base, statusLabel: 'Expired' }).isActive).toBe(false)
-  })
-
-  it('falls back to "Untitled discount" for a blank title', () => {
-    expect(buildTimeRow({ ...base, title: ' ' }).title).toBe('Untitled discount')
-  })
-})
-
-describe('buildDiscountRows', () => {
-  it('puts the tier rows before the time-based rows and keeps each stored order', () => {
-    const tool = { pickTitle: pickRowTitle, pickSubtitle: pickRowSubtitle }
-    const tierRows = [
-      buildTierRow({ discountId: 'a', name: 'A', title: '', status: 'live', rules: '', ...tool }),
-      buildTierRow({ discountId: 'b', name: 'B', title: '', status: 'live', rules: '', ...tool }),
-    ]
-    const timeRows = [buildTimeRow({ discountId: 'c', title: 'C', schedule: '', statusLabel: 'Active', pickTitle: pickRowTitle })]
-    expect(buildDiscountRows({ tierRows, timeRows }).map((row) => row.key)).toEqual(['tier:a', 'tier:b', 'time:c'])
   })
 })
 

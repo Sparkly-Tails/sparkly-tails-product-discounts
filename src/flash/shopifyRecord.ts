@@ -1,8 +1,7 @@
 // The Shopify automatic discount of one flash sale. It runs the same tier
 // Function as the shared "Product tier discounts" discount, but with its own
 // start and end, so Shopify itself turns the sale on and off. Its only config
-// is the id of the tier discount it applies. Copied from the time-based
-// discount's record code (which will be removed); nothing imports from it.
+// is the id of the tier discount it applies.
 import type { shopifyQuery } from '@/lib/shopify-client'
 import { METAFIELD_KEYS, METAFIELD_NAMESPACE } from '@/lib/metafieldNames'
 

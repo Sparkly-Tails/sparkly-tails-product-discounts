@@ -53,7 +53,6 @@ export interface SaveTools extends ShopClaimTools {
   // the steps of this file
   checkWindow: typeof checkWindow
   checkLiveClaims: typeof checkLiveClaims
-  checkLiveAvailability: typeof checkLiveAvailability
   checkAvailability: typeof checkAvailability
   chooseDiscount: typeof chooseDiscount
   buildSavePlan: typeof buildSavePlan
@@ -75,15 +74,9 @@ export async function checkLiveClaims({ next, tools }: { next: Discount; tools: 
   if (next.status === 'live') await tools.assertFreeOfLiveDiscounts({ members: next.members, discountId: next.discountId, tools })
 }
 
-/** A live flash sale also needs its products free of the time-based discounts that are upcoming or running. */
-export async function checkLiveAvailability({ next, tools }: { next: Discount; tools: SaveTools }): Promise<void> {
-  if (next.status === 'live' && next.flash) await tools.assertFreeOfOpenTimeDiscounts({ members: next.members, discountId: next.discountId, tools })
-}
-
 export async function checkAvailability({ values, next, tools }: { values: ParsedDiscount; next: Discount; tools: SaveTools }): Promise<void> {
   await tools.checkLiveClaims({ next, tools })
   await tools.assertPricingAllowed(values.members, values.pricingMode, values.tiers)
-  await tools.checkLiveAvailability({ next, tools })
 }
 
 export function chooseDiscount({ existing, values, tools }: { existing: Discount | undefined; values: ParsedDiscount; tools: SaveTools }): Discount {

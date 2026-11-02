@@ -8,17 +8,15 @@ const read = (path: string) => readFileSync(join(root, path), 'utf8')
 
 const FUNCTION_QUERIES = [
   { path: 'extensions/product-discount/src/cart_lines_discounts_generate_run.graphql', key: METAFIELD_KEYS.tierConfig },
-  { path: 'extensions/time-based-discount/src/cart_lines_discounts_generate_run.graphql', key: METAFIELD_KEYS.timeFunctionConfig },
 ]
 
 const liquidRead = (key: string) => `product.metafields['${METAFIELD_NAMESPACE}'].${key}`
 
 const LIQUID_READERS = [
-  { path: 'extensions/product-tier-pricing/blocks/tier-pricing.liquid', keys: [METAFIELD_KEYS.tierDiscount, METAFIELD_KEYS.tierSiblingProducts, METAFIELD_KEYS.tierSiblingVariants, METAFIELD_KEYS.timeDiscount] },
-  { path: 'extensions/product-tier-pricing/blocks/time-based-discount.liquid', keys: [METAFIELD_KEYS.timeDiscount] },
+  { path: 'extensions/product-tier-pricing/blocks/tier-pricing.liquid', keys: [METAFIELD_KEYS.tierDiscount, METAFIELD_KEYS.tierSiblingProducts, METAFIELD_KEYS.tierSiblingVariants] },
 ]
 
-const OLD_NAMESPACES = ['sparkly_product_discounts', 'sparkly_time_discounts', 'sparkly_tiers']
+const OLD_NAMESPACES = ['sparkly_product_discounts', 'sparkly_tiers']
 const SCANNED_EXTENSIONS = ['.ts', '.tsx', '.js', '.mjs', '.liquid', '.graphql', '.rs', '.toml']
 const SKIPPED_DIRECTORIES = ['node_modules', 'target', 'dist', '.next']
 

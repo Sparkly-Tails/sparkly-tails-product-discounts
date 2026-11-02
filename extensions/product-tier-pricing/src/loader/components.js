@@ -1,11 +1,10 @@
 // Which components one widget needs. The block hands over the address of every component in
 // data-component-urls (blocks/tier-pricing.liquid); the list of names is decided here from what the widget shows.
 
-/** The components every widget needs, plus the flash sale and the time-based sale only when the widget has one. */
-export function listNeededComponents({ hasFlash, hasTimeSale }) {
+/** The components every widget needs, plus the flash sale only when the widget has one. */
+export function listNeededComponents({ hasFlash }) {
   const names = ['model', 'paint']
   if (hasFlash) names.push('flash')
-  if (hasTimeSale) names.push('timeSale')
   return names
 }
 
@@ -16,11 +15,6 @@ export function parseComponentUrls(json) {
   } catch {
     return {}
   }
-}
-
-/** True when the block rendered a time-based discount (the block writes `{}` when the product has none). */
-export function isTimeSaleData(json) {
-  return Boolean(json) && json !== '{}'
 }
 
 /** Starts every load at once; resolves with { name: functions } when all are in, rejects when one fails. */

@@ -13,20 +13,19 @@ const URLS = {
   model: 'https://cdn.example/tier-pricing-model.js',
   paint: 'https://cdn.example/tier-pricing-paint.js',
   flash: 'https://cdn.example/tier-pricing-flash.js',
-  timeSale: 'https://cdn.example/tier-pricing-time-sale.js',
   siblings: 'https://cdn.example/tier-pricing-siblings.js',
 }
 const V10 = 'gid://shopify/ProductVariant/10'
 const SIBLING = { productId: 'gid://shopify/Product/20', variantId: null, title: 'Salmon Tin', url: '/products/salmon', imageUrl: null, price: 169, available: true, cartVariantId: 20, listed: true }
 const TIERS = [{ minQty: 8, fixedPrice: 1.63 }, { minQty: 16, fixedPrice: 1.55 }]
 
-interface Options { id?: string; flash?: object | null; timeDiscount?: object | null; siblings?: object[] }
+interface Options { id?: string; flash?: object | null; siblings?: object[] }
 
-function widgetMarkup({ id = 'w1', flash = null, timeDiscount = null, siblings = [] }: Options = {}): string {
+function widgetMarkup({ id = 'w1', flash = null, siblings = [] }: Options = {}): string {
   const discount = { title: 'Tins', tiers: TIERS, siblings, ownVariantIds: null, ownVariantOptions: [], selfVariantId: V10 }
   return `
     <div id="${id}" class="smooth-discounts" data-smooth-discounts
-      data-discount='${JSON.stringify(discount)}' data-time-discount='${JSON.stringify(timeDiscount ?? {})}'
+      data-discount='${JSON.stringify(discount)}'
       data-product-id='"gid://shopify/Product/9"' data-selected-variant-id="10"
       data-base-price="1.69" data-compare-at-price="0" data-money-format='"£{{amount}}"' data-high-demand="false"
       data-flash='${JSON.stringify(flash)}' data-component-urls='${JSON.stringify(URLS)}'>
@@ -34,8 +33,7 @@ function widgetMarkup({ id = 'w1', flash = null, timeDiscount = null, siblings =
         <span data-flash-label></span><span data-flash-timer></span><span data-flash-aside></span><span data-flash-chip hidden><span data-flash-chip-text></span></span>
       </div>
       <span data-tier-pricing-now-label hidden></span>
-      <span data-tier-pricing-price data-original-price="true">£1.69</span>
-      <span data-discounted-price hidden>£1.69</span>
+      <span data-tier-pricing-price>£1.69</span>
       <span data-tier-pricing-each-label>each</span>
       <s data-tier-pricing-struck hidden></s>
       <span data-tier-pricing-tag hidden></span>
@@ -92,12 +90,6 @@ describe('which parts a page loads', () => {
     await startCore({ flash: { startsAtUnix: 1_800_000_000, endsAtUnix: 1_800_086_400, showTeaser: true } })
 
     expect(scriptAddresses()).toEqual([URLS.model, URLS.paint, URLS.flash])
-  })
-
-  it('a product with a time-based discount also asks for the time-based sale', async () => {
-    await startCore({ timeDiscount: { startsAt: '2026-10-05T12:00:00.000Z', endsAt: '2026-10-06T12:00:00.000Z', items: [] } })
-
-    expect(scriptAddresses()).toEqual([URLS.model, URLS.paint, URLS.timeSale])
   })
 
   it('a group does not ask for the siblings list until the list is opened, then asks once', async () => {

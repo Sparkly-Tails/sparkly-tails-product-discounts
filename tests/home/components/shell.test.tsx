@@ -21,8 +21,8 @@ describe('HomeFooter', () => {
 
 describe('icons', () => {
   const iconNames = [
-    'CalendarIcon', 'InfoIcon', 'LayersIcon', 'ScheduleIcon', 'FilterListIcon', 'SwapVertIcon',
-    'SearchIcon', 'ChevronLeftIcon', 'ChevronRightIcon', 'ArrowForwardIcon', 'LightbulbIcon', 'TierTypeIcon', 'TimeTypeIcon',
+    'CalendarIcon', 'InfoIcon', 'LayersIcon', 'SwapVertIcon',
+    'SearchIcon', 'ChevronLeftIcon', 'ChevronRightIcon', 'ArrowForwardIcon', 'LightbulbIcon',
   ] as const
 
   it.each(iconNames)('%s renders a decorative svg that takes a class name', (name) => {

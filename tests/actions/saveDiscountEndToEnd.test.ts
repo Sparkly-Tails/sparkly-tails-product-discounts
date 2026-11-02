@@ -3,7 +3,6 @@ import { saveDiscount } from '@/actions/saveDiscount'
 import { redirect } from 'next/navigation'
 import { ensureTierDiscount } from '@/lib/tierDiscount'
 import { syncDiscountRecord } from '@/flash/discountRecord'
-import { getTimeDiscountsConfig, type TimeDiscount } from '@/timeDiscounts/config'
 import type { Config, Discount } from '@/lib/config'
 
 /**
@@ -24,7 +23,6 @@ vi.mock('next/navigation', () => ({ redirect: vi.fn() }))
 vi.mock('@/lib/tierDiscount', () => ({ ensureTierDiscount: vi.fn() }))
 vi.mock('@/lib/shop', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/shop')>()), getShopTimezone: vi.fn(async () => 'Europe/London') }))
 vi.mock('@/lib/shopify-client', () => ({ shopifyQuery: vi.fn() }))
-vi.mock('@/timeDiscounts/config', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/timeDiscounts/config')>()), getTimeDiscountsConfig: vi.fn() }))
 vi.mock('@/flash/discountRecord', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/flash/discountRecord')>()), syncDiscountRecord: vi.fn() }))
 
 const P1 = 'gid://shopify/Product/1'
@@ -36,13 +34,6 @@ const info = (productId: string, price: number, variantId?: string) => ({ produc
 
 function discountOf(over: Partial<Discount> = {}): Discount {
   return { discountId: 'disc_1', name: 'Soup', title: 'Soup Sale', status: 'draft', pricingMode: 'percent', members: [{ productId: P1 }], tiers: [{ minQty: 5, percentOff: 10 }], ...over }
-}
-
-function timeDiscountOf(over: Partial<TimeDiscount> = {}): TimeDiscount {
-  return {
-    discountId: 'time_1', shopifyDiscountId: 'gid://shopify/DiscountAutomaticNode/3', name: 'Weekend', title: 'Weekend sale', startsAt: '2026-11-10T09:00', endsAt: '2026-11-11T09:00',
-    kind: 'perProduct', items: [{ productId: P1, pricingMode: 'percent', amount: 10 }], ...over,
-  }
 }
 
 function form(fields: Record<string, string> = {}, members: { productId: string; variantId?: string }[] = [{ productId: P1 }]): FormData {
@@ -76,7 +67,6 @@ beforeEach(() => {
   vi.mocked(ensureTierDiscount).mockResolvedValue('exists')
   vi.mocked(syncDiscountRecord).mockReset()
   vi.mocked(syncDiscountRecord).mockResolvedValue(RECORD_ID)
-  vi.mocked(getTimeDiscountsConfig).mockResolvedValue({ discounts: [] })
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(new Date('2026-11-01T10:00:00Z')) // 10:00 in London (summer time ended on 25 October)
 })
@@ -248,23 +238,6 @@ describe('saving a flash sale', () => {
     expect(syncSpy).toHaveBeenCalledTimes(1)
     const { convertToUtc } = vi.mocked(syncDiscountRecord).mock.calls[0][0]
     expect(convertToUtc('2026-11-27T09:00')).toBe('2026-11-27T09:00:00.000Z')
-  })
-
-  it('refuses to go live as a flash sale while a time-based discount that is upcoming or running has the product, saving and creating nothing', async () => {
-    const { saveSpy } = setup()
-    vi.mocked(getTimeDiscountsConfig).mockResolvedValue({ discounts: [timeDiscountOf()] })
-    expect(await save(form(flash({ goLive: 'on' })))).toEqual({
-      error: `"${P1}" is already in time-based discount "Weekend sale", which is upcoming or running. A flash sale cannot share a product with it.`,
-    })
-    expect(syncDiscountRecord).not.toHaveBeenCalled()
-    expect(saveSpy).not.toHaveBeenCalled()
-  })
-
-  it('goes live as a flash sale when the time-based discount with the product has expired', async () => {
-    const { saveSpy } = setup()
-    vi.mocked(getTimeDiscountsConfig).mockResolvedValue({ discounts: [timeDiscountOf({ startsAt: '2026-10-01T09:00', endsAt: '2026-10-02T09:00' })] })
-    await save(form(flash({ goLive: 'on' })))
-    expect(saveSpy).toHaveBeenCalledTimes(1)
   })
 
   it('shows Shopify\'s message and leaves everything as it was when the record is refused', async () => {

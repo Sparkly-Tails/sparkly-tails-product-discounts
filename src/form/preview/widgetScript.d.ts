@@ -13,8 +13,7 @@ declare module '*/loader/registry.js' {
 }
 
 declare module '*/loader/components.js' {
-  export function listNeededComponents(options: { hasFlash: boolean; hasTimeSale: boolean }): string[]
+  export function listNeededComponents(options: { hasFlash: boolean }): string[]
   export function parseComponentUrls(json: string | undefined): Record<string, string>
-  export function isTimeSaleData(json: string | undefined): boolean
   export function loadComponentSet(options: { names: string[]; loadOne: (name: string) => Promise<unknown> }): Promise<Record<string, unknown>>
 }

@@ -11,7 +11,6 @@ const COMPONENTS: Record<string, string> = {
   model: 'tier-pricing-model.js',
   paint: 'tier-pricing-paint.js',
   flash: 'tier-pricing-flash.js',
-  timeSale: 'tier-pricing-time-sale.js',
   siblings: 'tier-pricing-siblings.js',
 }
 
@@ -19,8 +18,8 @@ describe('the extension build list', () => {
   const scriptNames = EXTENSION_SCRIPTS.map((script: { name: string }) => script.name)
 
   it('builds exactly the scripts and stylesheets the blocks and the core script use', () => {
-    expect(scriptNames.sort()).toEqual(['tier-pricing-flash.js', 'tier-pricing-model.js', 'tier-pricing-paint.js', 'tier-pricing-siblings.js', 'tier-pricing-time-sale.js', 'tier-pricing.js', 'time-based-discount.js'])
-    expect(EXTENSION_STYLESHEETS.map((sheet: { name: string }) => sheet.name).sort()).toEqual(['tier-pricing.css', 'time-based-discount.css'])
+    expect(scriptNames.sort()).toEqual(['tier-pricing-flash.js', 'tier-pricing-model.js', 'tier-pricing-paint.js', 'tier-pricing-siblings.js', 'tier-pricing.js'])
+    expect(EXTENSION_STYLESHEETS.map((sheet: { name: string }) => sheet.name).sort()).toEqual(['tier-pricing.css'])
   })
 
   it('keeps Shopify\'s limit of 10,000 bytes for a script', () => {
@@ -32,7 +31,7 @@ describe('the extension build list', () => {
   })
 
   it('has each block name a script and a stylesheet that the build produces', () => {
-    for (const block of ['blocks/tier-pricing.liquid', 'blocks/time-based-discount.liquid']) {
+    for (const block of ['blocks/tier-pricing.liquid']) {
       const schema = JSON.parse(read(block).split('{% schema %}')[1].split('{% endschema %}')[0])
       expect(scriptNames).toContain(schema.javascript)
       expect(EXTENSION_STYLESHEETS.map((sheet: { name: string }) => sheet.name)).toContain(schema.stylesheet)

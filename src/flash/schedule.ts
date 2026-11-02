@@ -1,7 +1,6 @@
 // The start and end of a flash sale: checks on what the form holds. Times are
 // the shop's wall-clock text from a datetime-local input (`2026-11-27T09:00`),
-// which compares correctly as text. Copied from the time-based discount's
-// schedule check (which will be removed), so nothing here imports from it.
+// which compares correctly as text.
 
 /** Shown (and thrown) when a flash sale's end time is no longer in the future. */
 export const FLASH_END_PASSED_MESSAGE = 'The end time has already passed. Choose a later end time.'
