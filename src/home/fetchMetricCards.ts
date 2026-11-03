@@ -6,7 +6,7 @@ import type { MetricCard } from '@/home/buildMetricCards'
 const CARD_COUNT = 4
 
 type Answer = { ok: boolean; json: () => Promise<unknown> }
-type SendRequest = (url: string, init: { headers: Record<string, string> }) => Promise<Answer>
+type SendRequest = (url: string, init: { headers: Record<string, string>; cache: 'no-store' }) => Promise<Answer>
 
 function isText(value: unknown): boolean {
   return typeof value === 'string'
@@ -45,7 +45,7 @@ export function readSessionToken({ bridge }: { bridge: { idToken?: () => Promise
 
 /** The answer's content, or null when the route refused. */
 export async function fetchAnswer({ url, readToken, request }: { url: string; readToken: () => Promise<string>; request: SendRequest }): Promise<unknown> {
-  const answer = await request(url, { headers: { Authorization: `Bearer ${await readToken()}` } })
+  const answer = await request(url, { headers: { Authorization: `Bearer ${await readToken()}` }, cache: 'no-store' })
   return answer.ok ? answer.json() : null
 }
 

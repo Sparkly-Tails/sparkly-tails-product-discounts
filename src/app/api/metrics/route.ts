@@ -37,11 +37,13 @@ export async function GET(request: Request): Promise<Response> {
   })
 
   let cards = buildFailedCards()
+  let days: { fromDay: string; toDay: string } | null = null
   try {
     const timeZone = await getShopTimezone()
     const nowIso = new Date().toISOString()
     const today = pickShopDay({ nowIso, timeZone })
     const range = parseMetricsQuery({ raw: Object.fromEntries(new URL(request.url).searchParams), today })
+    days = { fromDay: range.fromDay, toDay: range.toDay }
     const database = getDb()
     const shop = await getRequestShop()
     const currencyCode = await getShopCurrencyCode()
@@ -88,5 +90,5 @@ export async function GET(request: Request): Promise<Response> {
     console.log(`Could not load the homepage metrics: ${error instanceof Error ? error.message : 'unknown error'}`)
   }
   await pixelCheck
-  return Response.json({ cards })
+  return Response.json({ cards, range: days }, { headers: { 'Cache-Control': 'no-store' } })
 }

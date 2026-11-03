@@ -10,11 +10,13 @@ afterEach(cleanup)
 const TODAY = '2026-11-02'
 const PRESETS = listRangePresets({ today: TODAY })
 
-function show(keep = '') {
-  return render(<DateRangePicker label="Last 30 days" today={TODAY} presets={PRESETS} keep={keep} />)
+function show(keep = '', range = { fromDay: '2026-10-04', toDay: '2026-11-02' }) {
+  return render(<DateRangePicker label="Last 30 days" today={TODAY} fromDay={range.fromDay} toDay={range.toDay} presets={PRESETS} keep={keep} />)
 }
 const open = () => fireEvent.click(screen.getByRole('button', { name: /Last 30 days/ }))
 const day = (text: string) => document.querySelector(`[data-day="${text}"]`) as HTMLButtonElement
+const position = (text: string) => day(text).getAttribute('data-range-position')
+const SHORT_RANGE = { fromDay: '2026-10-30', toDay: '2026-11-02' }
 
 describe('DateRangePicker', () => {
   it('shows the label on the button and nothing else until it is pressed', () => {
@@ -80,5 +82,50 @@ describe('DateRangePicker', () => {
     open()
     fireEvent.mouseDown(document.body)
     expect(screen.queryByRole('link', { name: 'Today' })).toBeNull()
+  })
+
+  it('opens on the month of the last day of the range, with its first and last day marked and the days between shaded', () => {
+    show('', SHORT_RANGE)
+    open()
+    expect(screen.getByText('November 2026')).toBeInTheDocument()
+    expect(position('2026-11-02')).toBe('edge')
+    expect(position('2026-11-01')).toBe('inside')
+    fireEvent.click(screen.getByRole('button', { name: 'Previous month' }))
+    expect([position('2026-10-29'), position('2026-10-30'), position('2026-10-31')]).toEqual(['outside', 'edge', 'inside'])
+  })
+
+  it('marks every day of the last 30 days, the first one an edge', () => {
+    show()
+    open()
+    expect(position('2026-11-02')).toBe('edge')
+    expect(position('2026-11-01')).toBe('inside')
+    fireEvent.click(screen.getByRole('button', { name: 'Previous month' }))
+    expect([position('2026-10-03'), position('2026-10-04'), position('2026-10-05')]).toEqual(['outside', 'edge', 'inside'])
+  })
+
+  it('marks a one-day range as one edge day', () => {
+    show('', { fromDay: '2026-11-02', toDay: '2026-11-02' })
+    open()
+    expect([position('2026-11-01'), position('2026-11-02')]).toEqual(['outside', 'edge'])
+  })
+
+  it('shows the days being chosen instead of the range while a choice is on', () => {
+    show('', SHORT_RANGE)
+    open()
+    fireEvent.click(day('2026-11-01'))
+    expect([position('2026-11-01'), position('2026-11-02')]).toEqual(['edge', 'outside'])
+    fireEvent.click(day('2026-11-02'))
+    expect([position('2026-11-01'), position('2026-11-02')]).toEqual(['edge', 'edge'])
+  })
+
+  it('shows the range again, in its month, when it is opened again after a choice or a month change', () => {
+    show('', SHORT_RANGE)
+    open()
+    fireEvent.click(day('2026-11-01'))
+    fireEvent.click(screen.getByRole('button', { name: 'Previous month' }))
+    fireEvent.keyDown(document.body, { key: 'Escape' })
+    open()
+    expect(screen.getByText('November 2026')).toBeInTheDocument()
+    expect([position('2026-11-01'), position('2026-11-02')]).toEqual(['inside', 'edge'])
   })
 })

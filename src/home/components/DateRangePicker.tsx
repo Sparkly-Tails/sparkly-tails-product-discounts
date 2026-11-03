@@ -19,6 +19,27 @@ function pickNextDays({ picks, day }: { picks: string[]; day: string }): string[
   return picks.length === 1 ? [picks[0], day] : [day]
 }
 
+type RangePosition = 'edge' | 'inside' | 'outside'
+
+// The days the calendar marks: the ones being chosen while a choice is on, else the range the cards are for.
+function pickMarkedDays({ picks, fromDay, toDay }: { picks: string[]; fromDay: string; toDay: string }): { fromDay: string; toDay: string } {
+  const sorted = [...picks].sort()
+  return picks.length === 0 ? { fromDay, toDay } : { fromDay: sorted[0], toDay: sorted[sorted.length - 1] }
+}
+
+// Whether a day is the first or last of the marked days, between them, or neither (day texts sort like dates).
+function classifyDay({ day, fromDay, toDay }: { day: string; fromDay: string; toDay: string }): RangePosition {
+  const isEdge = [fromDay, toDay].includes(day)
+  const isBetween = [fromDay, day, toDay].sort()[1] === day
+  return isEdge ? 'edge' : isBetween ? 'inside' : 'outside'
+}
+
+const DAY_CLASSES: Record<RangePosition, string> = {
+  edge: 'bg-home-primary text-white',
+  inside: 'bg-home-primary/15 text-home-on-surface',
+  outside: 'text-home-on-surface hover:bg-home-surface-container',
+}
+
 function MonthHeader({ monthStart, today, onMove }: { monthStart: string; today: string; onMove: (monthStart: string) => void }) {
   return (
     <div className="flex items-center justify-between">
@@ -39,30 +60,31 @@ function MonthHeader({ monthStart, today, onMove }: { monthStart: string; today:
   )
 }
 
-function DayCell({ day, today, isPicked, onPick }: { day: string | null; today: string; isPicked: boolean; onPick: (day: string) => void }) {
+function DayCell({ day, today, position, onPick }: { day: string | null; today: string; position: RangePosition; onPick: (day: string) => void }) {
   if (day === null) return <span />
   return (
     <button
       type="button"
       data-day={day}
-      aria-pressed={isPicked}
+      data-range-position={position}
+      aria-pressed={position !== 'outside'}
       disabled={day > today}
       onClick={() => onPick(day)}
-      className={'h-7 rounded-lg text-xs disabled:opacity-30 ' + (isPicked ? 'bg-home-primary text-white' : 'text-home-on-surface hover:bg-home-surface-container')}
+      className={'h-7 rounded-lg text-xs disabled:opacity-30 ' + DAY_CLASSES[position]}
     >
       {Number(day.slice(8, 10))}
     </button>
   )
 }
 
-function MonthGrid({ monthStart, today, picks, onPick }: { monthStart: string; today: string; picks: string[]; onPick: (day: string) => void }) {
+function MonthGrid({ monthStart, today, marked, onPick }: { monthStart: string; today: string; marked: { fromDay: string; toDay: string }; onPick: (day: string) => void }) {
   return (
     <div className="grid grid-cols-7 gap-y-1 text-center text-[11px]">
       {WEEKDAYS.map((weekday) => (
         <span key={weekday} className="text-home-on-surface-variant">{weekday}</span>
       ))}
       {buildMonthGrid({ monthStart }).map((day, index) => (
-        <DayCell key={day ?? `empty-${index}`} day={day} today={today} isPicked={day !== null && picks.includes(day)} onPick={onPick} />
+        <DayCell key={day ?? `empty-${index}`} day={day} today={today} position={day === null ? 'outside' : classifyDay({ day, ...marked })} onPick={onPick} />
       ))}
     </div>
   )
@@ -120,24 +142,33 @@ function useCloseOnOutside({ isOpen, rootRef, onClose }: { isOpen: boolean; root
 
 // The "Last 30 days" button of the number cards: it opens a month calendar and the list of ready-made ranges.
 // A preset is a link; two chosen days and Apply make the custom link. It closes with Escape, a click outside, or a choice.
-export default function DateRangePicker({ label, today, presets, keep }: { label: string; today: string; presets: RangePreset[]; keep: string }) {
+// The calendar marks the range the cards are for (`fromDay` to `toDay`), opens on the month of its last day, and goes back to
+// both every time it is opened.
+export default function DateRangePicker({ label, today, fromDay, toDay, presets, keep }: { label: string; today: string; fromDay: string; toDay: string; presets: RangePreset[]; keep: string }) {
   const [isOpen, setIsOpen] = useState(false)
-  const [monthStart, setMonthStart] = useState(pickMonthStart({ day: today }))
+  const [monthStart, setMonthStart] = useState(pickMonthStart({ day: toDay }))
   const [picks, setPicks] = useState<string[]>([])
   const rootRef = useRef<HTMLDivElement>(null)
   const close = () => setIsOpen(false)
+  const toggle = () => {
+    if (!isOpen) {
+      setPicks([])
+      setMonthStart(pickMonthStart({ day: toDay }))
+    }
+    setIsOpen(!isOpen)
+  }
   useCloseOnOutside({ isOpen, rootRef, onClose: close })
 
   return (
     <div ref={rootRef} className="relative">
-      <button type="button" aria-expanded={isOpen} aria-haspopup="true" onClick={() => setIsOpen(!isOpen)} className={BUTTON_CLASS}>
+      <button type="button" aria-expanded={isOpen} aria-haspopup="true" onClick={toggle} className={BUTTON_CLASS}>
         <CalendarIcon className="text-sm h-5 text-home-on-surface-variant" />
         <span>{label}</span>
       </button>
       {isOpen ? (
         <div className="absolute left-0 top-full mt-2 z-20 w-72 bg-home-surface-container-lowest border border-home-outline-variant/70 rounded-xl p-3 flex flex-col gap-3">
           <MonthHeader monthStart={monthStart} today={today} onMove={setMonthStart} />
-          <MonthGrid monthStart={monthStart} today={today} picks={picks} onPick={(day) => setPicks(pickNextDays({ picks, day }))} />
+          <MonthGrid monthStart={monthStart} today={today} marked={pickMarkedDays({ picks, fromDay, toDay })} onPick={(day) => setPicks(pickNextDays({ picks, day }))} />
           <ApplyLink picks={picks} keep={keep} onClose={close} />
           <PresetLinks presets={presets} keep={keep} onClose={close} />
         </div>

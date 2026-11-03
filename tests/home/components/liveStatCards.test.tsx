@@ -6,7 +6,7 @@ import LiveStatCards from '@/home/components/LiveStatCards'
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }))
 
-const RANGE = { label: 'Last 30 days', today: '2026-11-02', presets: [], keep: '' }
+const RANGE = { label: 'Last 30 days', today: '2026-11-02', fromDay: '2026-10-04', toDay: '2026-11-02', presets: [], keep: '' }
 const CARDS = [
   { label: 'Visitors', value: '40', hint: 'a' },
   { label: 'Bundle orders', value: '3', hint: 'b' },
@@ -39,7 +39,7 @@ describe('LiveStatCards', () => {
 
     expect(values()).toEqual(['…', '…', '…', '…'])
     await waitFor(() => expect(values()).toEqual(['40', '3', '£21.50', '£4.00']))
-    expect(fetchMock).toHaveBeenCalledWith('/api/metrics', { headers: { Authorization: 'Bearer session-token' } })
+    expect(fetchMock).toHaveBeenCalledWith('/api/metrics', { headers: { Authorization: 'Bearer session-token' }, cache: 'no-store' })
   })
 
   it('does not ask for the numbers until the window load event, then asks once', async () => {
@@ -84,5 +84,22 @@ describe('LiveStatCards', () => {
     await act(async () => { window.dispatchEvent(new Event('load')) })
 
     expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('asks again, and shows what the new address gives, when the range changes from the last 7 days back to the last 30', async () => {
+    setReadyState('complete')
+    const answers: Record<string, typeof CARDS> = {
+      '/api/metrics?range=last7': CARDS,
+      '/api/metrics': CARDS.map((card) => ({ ...card, value: `${card.value}!` })),
+    }
+    fetchMock.mockImplementation(async (url: string) => ({ ok: true, json: async () => ({ cards: answers[url] }) }))
+
+    const view = render(<LiveStatCards key="/api/metrics?range=last7" metricsUrl="/api/metrics?range=last7" range={RANGE} />)
+    await waitFor(() => expect(values()).toEqual(['40', '3', '£21.50', '£4.00']))
+    view.rerender(<LiveStatCards key="/api/metrics" metricsUrl="/api/metrics" range={RANGE} />)
+
+    expect(values()).toEqual(['…', '…', '…', '…'])
+    await waitFor(() => expect(values()).toEqual(['40!', '3!', '£21.50!', '£4.00!']))
+    expect(fetchMock.mock.calls.map((call) => call[0])).toEqual(['/api/metrics?range=last7', '/api/metrics'])
   })
 })

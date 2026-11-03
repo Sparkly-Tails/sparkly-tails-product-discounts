@@ -36,6 +36,16 @@ describe('GET /api/metrics', () => {
     expect([args.shop, args.fromDay, args.toDay, args.timeZone]).toEqual(['demo.myshopify.com', '2026-10-04', '2026-11-02', 'UTC'])
   })
 
+  it('says in the answer which days the cards are for, and that no cache may keep the answer', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-11-02T12:00:00Z'))
+
+    const response = await call('?range=last7')
+
+    expect(response.headers.get('Cache-Control')).toBe('no-store')
+    expect((await response.json()).range).toEqual({ fromDay: '2026-10-27', toDay: '2026-11-02' })
+  })
+
   it('uses the range in the address', async () => {
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(new Date('2026-11-02T12:00:00Z'))

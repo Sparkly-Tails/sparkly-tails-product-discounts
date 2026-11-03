@@ -33,5 +33,5 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
 
   // The date button keeps the table settings, and the table links keep the range (the query's `keep`).
   const tableParams = buildTableHref({ query: { ...query, keep: '' }, changes: { page: query.page } }).replace(/^\/\??/, '')
-  return <HomeView view={view} query={query} version={packageJson.version} metricsUrl={buildMetricsUrl({ params: query.keep })} range={{ label: range.label, today, presets: listRangePresets({ today }), keep: tableParams }} />
+  return <HomeView view={view} query={query} version={packageJson.version} metricsUrl={buildMetricsUrl({ params: query.keep })} range={{ label: range.label, today, fromDay: range.fromDay, toDay: range.toDay, presets: listRangePresets({ today }), keep: tableParams }} />
 }
