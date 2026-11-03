@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { stubChipLayout } from '../helpers/chipLayout'
 import { clearWidgetRegistry, readBuiltWidget, runWidgetScripts, WIDGET_COMPONENTS, WIDGET_CORE } from '../helpers/builtWidget'
 
 /** The tier widget's built scripts, run in the page the way the theme loads them, on markup like tier-pricing.liquid renders. */
@@ -53,7 +54,7 @@ describe('tier widget painting (redesign)', () => {
       return { ok: true, json: async () => ({}) }
     }))
   })
-  afterEach(() => { vi.clearAllTimers(); vi.useRealTimers(); vi.unstubAllGlobals(); document.body.innerHTML = '' })
+  afterEach(() => { vi.clearAllTimers(); vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks(); document.body.innerHTML = '' })
 
   const discount = {
     title: 'Tins',
@@ -195,6 +196,13 @@ describe('tier widget painting (redesign)', () => {
     expect(chips().map((chip) => [chip.text, chip.tone])).toEqual([
       ['1 × £1.69', 'idle'], ['8 × £13.04', 'idle'], ['16 × £24.80 ✓', 'applied'], ['20 × £31.00 ★', 'current-highest'],
     ])
+  })
+
+  it('scrolls the row of boxes to the right to keep the dashed box of a quantity past the top tier in view', async () => {
+    stubChipLayout({ chipWidth: 90, viewWidth: 250 })
+    await mountTiers(20)
+    const row = document.querySelector('[data-tier-pricing-tiers]') as HTMLElement
+    expect(row.scrollLeft).toBe(4 * 90 - 250)
   })
 
   it('clicking a tier chip sets the quantity on the page', async () => {

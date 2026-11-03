@@ -1,6 +1,7 @@
 // Paints the view model onto the widget's own markup (tag, promo, status, rail, chips) and the theme's own price. Copies fields, calculates nothing.
 import { computeTierButtonsSignature } from './progress.js'
 import { setQuantityInput, setText } from './dom.js'
+import { CHIP_SCROLL_TOOLS, scrollActiveChipIntoView } from './chipScroll.js'
 import { paintThemePrice, THEME_PRICE_TOOLS } from './themePrice.js'
 
 // The tag in the summary row: the tier pill, the High Demand tag, or nothing.
@@ -73,7 +74,7 @@ export function paintProgressBar(elements, dot, semantics, offerState) {
 
 // One chip per tier ("8 × £13.00", the applied tier ticked); a dashed chip
 // between two tiers shows the total for the quantity that sits between them.
-// Only the tier chips are buttons: they set the quantity on the page.
+// Only the tier chips are buttons: they set the quantity on the page. The row scrolls to keep the active chip in view.
 export function paintChips(elements, viewModel) {
   const combinedQty = viewModel.progressState.combinedQty
   elements.tiersEl.innerHTML = ''
@@ -89,6 +90,7 @@ export function paintChips(elements, viewModel) {
     }
     elements.tiersEl.appendChild(el)
   })
+  scrollActiveChipIntoView({ tiersEl: elements.tiersEl, tools: CHIP_SCROLL_TOOLS })
 }
 
 // Skips the destructive rebuild (replays animation, clears focus) when

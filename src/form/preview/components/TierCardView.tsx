@@ -1,11 +1,16 @@
-import type { CSSProperties } from 'react'
+import { useLayoutEffect, useRef, type CSSProperties } from 'react'
+import { CHIP_SCROLL } from '@/form/preview/chipScroll'
 import type { WidgetDot, WidgetStatus, WidgetViewModel } from '@/form/preview/widgetTypes'
 
-function ChipRow({ viewModel, onPickQuantity }: { viewModel: WidgetViewModel; onPickQuantity: (quantity: number) => void }) {
-  if (!viewModel.showChips || !viewModel.progressState) return null
-  const quantity = viewModel.progressState.combinedQty
+// The row of boxes scrolls sideways; when the quantity (or the tiers) change, the active box is moved into view.
+function ChipButtons({ viewModel, quantity, onPickQuantity }: { viewModel: WidgetViewModel; quantity: number; onPickQuantity: (quantity: number) => void }) {
+  const rowRef = useRef<HTMLDivElement>(null)
+  const chipsKey = viewModel.chips.map((chip) => chip.label).join('|')
+  useLayoutEffect(() => {
+    if (rowRef.current) CHIP_SCROLL.scrollActiveChipIntoView({ tiersEl: rowRef.current, tools: CHIP_SCROLL.CHIP_SCROLL_TOOLS })
+  }, [quantity, chipsKey])
   return (
-    <div className="smooth-discounts__tiers" data-tier-pricing-tiers>
+    <div ref={rowRef} className="smooth-discounts__tiers" data-tier-pricing-tiers>
       {viewModel.chips.map((chip) => (chip.kind === 'tier' ? (
         <button key={chip.qty + chip.kind} type="button" className={`smooth-discounts__chip smooth-discounts__chip--${chip.tone}`} aria-pressed={chip.qty === quantity} onClick={() => onPickQuantity(chip.qty)}>{chip.label}</button>
       ) : (
@@ -13,6 +18,11 @@ function ChipRow({ viewModel, onPickQuantity }: { viewModel: WidgetViewModel; on
       )))}
     </div>
   )
+}
+
+function ChipRow({ viewModel, onPickQuantity }: { viewModel: WidgetViewModel; onPickQuantity: (quantity: number) => void }) {
+  if (!viewModel.showChips || !viewModel.progressState) return null
+  return <ChipButtons viewModel={viewModel} quantity={viewModel.progressState.combinedQty} onPickQuantity={onPickQuantity} />
 }
 
 export interface Rail {
