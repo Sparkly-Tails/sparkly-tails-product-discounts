@@ -27,8 +27,14 @@ describe('the app stylesheet carries the form tokens', () => {
   })
 
   it('defines the form colours from the design', () => {
-    expect(css).toContain('--color-form-surface: #f9f9f9')
     expect(css).toContain('--color-form-secondary: #0055c7')
+  })
+
+  it('paints the page with the homepage\'s background, and a test reads both files so they cannot drift apart', () => {
+    const readToken = (file: string, name: string) => fs.readFileSync(path.resolve(__dirname, file), 'utf8').match(new RegExp(`${name}: (#[0-9a-f]{6});`))?.[1]
+    expect(readToken('../../src/form/form.css', '--color-form-surface')).toBe('#fbf9f4')
+    expect(readToken('../../src/form/form.css', '--color-form-background')).toBe('#fbf9f4')
+    expect(readToken('../../src/form/form.css', '--color-form-surface')).toBe(readToken('../../src/home/home.css', '--color-home-surface'))
   })
 
   it('carries the storefront widget stylesheet, which the form preview paints with', () => {
