@@ -1,15 +1,15 @@
 import CreateCards from '@/home/components/CreateCards'
 import DiscountsTable from '@/home/components/DiscountsTable'
 import HomeFooter from '@/home/components/HomeFooter'
-import StatCards, { type RangeButton } from '@/home/components/StatCards'
-import type { MetricCard } from '@/home/buildMetricCards'
+import LiveStatCards from '@/home/components/LiveStatCards'
+import type { RangeButton } from '@/home/components/StatCards'
 import TipBanner from '@/home/components/TipBanner'
 import type { TableQuery, TableView } from '@/home/tableQuery'
 
 // The whole homepage of the design, in its own light palette whatever the
-// browser prefers: header, title, number cards, create cards, the table, the
-// tip and the footer.
-export default function HomeView({ view, query, version, cards, range }: { view: TableView; query: TableQuery; version: string; cards: MetricCard[]; range: RangeButton }) {
+// browser prefers: header, title, number cards (filled in by the browser after the page has loaded, so the
+// page itself does not wait for them), create cards, the table, the tip and the footer.
+export default function HomeView({ view, query, version, metricsUrl, range }: { view: TableView; query: TableQuery; version: string; metricsUrl: string; range: RangeButton }) {
   return (
     <div className="font-home bg-home-surface text-home-on-surface min-h-screen antialiased flex flex-col">
       <main className="w-full max-w-[1024px] mx-auto px-6 py-8 flex-1 flex flex-col gap-6">
@@ -24,7 +24,7 @@ export default function HomeView({ view, query, version, cards, range }: { view:
           </div>
           <div className="flex items-center gap-2"></div>
         </div>
-        <StatCards cards={cards} range={range} />
+        <LiveStatCards key={metricsUrl} metricsUrl={metricsUrl} range={range} />
         <CreateCards />
         <DiscountsTable view={view} query={query} />
         <TipBanner />

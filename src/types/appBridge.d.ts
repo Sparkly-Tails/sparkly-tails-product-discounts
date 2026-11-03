@@ -1,5 +1,6 @@
 // What the pages use of Shopify App Bridge (loaded in the root layout): the <ui-save-bar> element, and the
-// `shopify.saveBar` calls that show and hide it by id.
+// `shopify.saveBar` calls that show and hide it by id, and `shopify.idToken()`, the session token the app's own
+// requests carry.
 import type { DetailedHTMLProps, HTMLAttributes } from 'react'
 
 declare module 'react' {
@@ -12,6 +13,6 @@ declare module 'react' {
 
 declare global {
   interface Window {
-    shopify?: { saveBar?: { show(id: string): unknown; hide(id: string): unknown } }
+    shopify?: { saveBar?: { show(id: string): unknown; hide(id: string): unknown }; idToken?: () => Promise<string> }
   }
 }

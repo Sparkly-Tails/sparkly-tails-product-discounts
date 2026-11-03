@@ -27,3 +27,8 @@ export function buildMetricCards({ totals, currencyCode, hasPermission, formatMo
 export function buildFailedCards(): MetricCard[] {
   return ['Visitors', 'Bundle orders', 'AOV', 'Added revenue'].map((label) => ({ label, value: '-', hint: 'Could not load' }))
 }
+
+/** The cards while the numbers are on their way: the page shows them at once and fills them in later. */
+export function buildLoadingCards(): MetricCard[] {
+  return ['Visitors', 'Bundle orders', 'AOV', 'Added revenue'].map((label) => ({ label, value: '…', hint: 'Loading the numbers' }))
+}
