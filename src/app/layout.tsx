@@ -35,8 +35,8 @@ export default async function RootLayout({
         <script src="https://cdn.shopify.com/shopifycloud/app-bridge.js"></script>
       </head>
       <body>
-        <VersionLabel version={packageJson.version} />
         <SavedToastProvider>{children}</SavedToastProvider>
+        <VersionLabel version={packageJson.version} />
       </body>
     </html>
   );

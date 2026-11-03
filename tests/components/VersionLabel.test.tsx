@@ -22,4 +22,10 @@ describe('VersionLabel', () => {
     const { container } = render(<VersionLabel version="0.1.0" />)
     expect(container).toBeEmptyDOMElement()
   })
+
+  it('has no padding above it, so it sits at the bottom of the page', () => {
+    navigation.pathname = '/discounts/new'
+    render(<VersionLabel version="0.1.0" />)
+    expect(screen.getByText('v0.1.0').className).not.toMatch(/(^|\s)pt-/)
+  })
 })

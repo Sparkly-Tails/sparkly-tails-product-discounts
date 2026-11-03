@@ -35,10 +35,10 @@ describe('the Create page', () => {
     expect(screen.queryByRole('button', { name: /Delete/ })).toBeNull()
   })
 
-  it('has Go live in the footer, and Save and Discard in Shopify\'s save bar; Go live and Save are off until there is something to save', async () => {
+  it('has no Go live (a new discount is published only after it is saved), and Save and Discard in Shopify\'s save bar; Save is off until there is something to save', async () => {
     await renderPage()
     expect(within(document.querySelector('ui-save-bar') as HTMLElement).getByRole('button', { name: 'Discard' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Go live' })).toBeDisabled()
+    expect(screen.queryByRole('button', { name: 'Go live' })).toBeNull()
     expect(within(document.querySelector('ui-save-bar') as HTMLElement).getByRole('button', { name: 'Save' })).toBeDisabled()
   })
 

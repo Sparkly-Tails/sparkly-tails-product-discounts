@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import * as layout from '@/app/layout'
 import { ensureFreshInstall } from '@/lib/freshInstall'
 import VersionLabel from '@/components/VersionLabel'
+import { SavedToastProvider } from '@/components/SavedToast'
 
 vi.mock('@/lib/freshInstall', () => ({ ensureFreshInstall: vi.fn() }))
 
@@ -46,6 +47,16 @@ describe('root layout', () => {
     walk(page)
 
     expect(found).toHaveLength(1)
+  })
+
+  it('puts the version label after the page, at the bottom', async () => {
+    vi.mocked(ensureFreshInstall).mockResolvedValue('fresh')
+
+    const page = await layout.default({ children: null })
+
+    const body = ((page as unknown as { props: { children: unknown[] } }).props.children as { type: unknown; props: { children?: unknown } }[]).find((child) => (child as { type: unknown }).type === 'body') as unknown as { props: { children: { type: unknown }[] } }
+    const order = body.props.children.map((child) => child.type)
+    expect(order.indexOf(VersionLabel)).toBeGreaterThan(order.indexOf(SavedToastProvider))
   })
 
   // Loaded straight from Google (not through next/font/google, which Turbopack could not resolve on Vercel).

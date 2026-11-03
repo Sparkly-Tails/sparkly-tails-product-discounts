@@ -8,6 +8,7 @@ import FlashCard from '@/form/components/FlashCard'
 import FormActions from '@/form/components/FormActions'
 import FormShell from '@/form/components/FormShell'
 import SaveBar from '@/form/components/SaveBar'
+import SaveMessage from '@/form/components/SaveMessage'
 import ProductsCard from '@/form/components/ProductsCard'
 import TiersCard, { type TiersInitial } from '@/form/components/TiersCard'
 import WidgetPreview from '@/form/preview/components/WidgetPreview'
@@ -18,7 +19,8 @@ import { pricesUniform } from '@/lib/pricesUniform'
 export type SaveState = { error: string } | null
 
 // The whole tier discount form (Create and Edit): the cards in the left column,
-// the live preview in the right one and one footer. It keeps the values of every
+// the live preview in the right one and the header with its buttons (only on a saved discount: a new one
+// cannot be published or deleted yet). It keeps the values of every
 // card to show the preview, to say when something is unsaved, to allow saving
 // only with a product and a complete tier, and to take everything back on Discard.
 export default function TierDiscountForm({
@@ -28,7 +30,7 @@ export default function TierDiscountForm({
   heading: string
   badge: string
   mode: 'create' | 'edit'
-  /** Whether the discount is live (the footer then offers Take offline instead of Go live). */
+  /** Whether the discount is live (the header then offers Take offline instead of Go live). */
   status: 'draft' | 'live'
   initial: FormValues
   initialTiers: TiersInitial
@@ -39,7 +41,7 @@ export default function TierDiscountForm({
   initialNowSeconds: number
   excludeDiscountId?: string
   saveAction: (state: SaveState, formData: FormData) => Promise<SaveState>
-  /** Deletes the discount (Edit only); without it the footer has no Delete. */
+  /** Deletes the discount (Edit only); without it the header has no Delete. */
   deleteAction?: () => Promise<void>
 }) {
   const [values, setValues] = useState(initial)
@@ -70,6 +72,8 @@ export default function TierDiscountForm({
           breadcrumbLabel={breadcrumbLabel}
           heading={heading}
           badge={badge}
+          actions={<FormActions mode={mode} status={status} canSave={canSave} deleteAction={deleteAction} />}
+          notice={<SaveMessage state={saveState} />}
           preview={
             <WidgetPreview
               products={buildPreviewProducts({ members: values.members })}
@@ -82,7 +86,6 @@ export default function TierDiscountForm({
               initialNowSeconds={initialNowSeconds}
             />
           }
-          footer={<FormActions status={status} canSave={canSave} saveState={saveState} deleteAction={deleteAction} />}
         >
           <Fragment key={discardCount}>
             <DetailsCard initialName={initial.name} onNameChange={(name) => setValues((current) => ({ ...current, name }))} />

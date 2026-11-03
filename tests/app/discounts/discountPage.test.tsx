@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, cleanup, fireEvent, act } from '@testing-library/react'
+import { render, screen, cleanup, fireEvent, act, within } from '@testing-library/react'
 import '@testing-library/jest-dom/vitest'
 import type { Discount } from '@/lib/config'
 
@@ -51,6 +51,12 @@ describe('the Edit page: the saved discount in the form', () => {
     expect(screen.getByLabelText('Tier 1 percent off')).toHaveValue(10)
     expect(screen.queryByLabelText('Title')).toBeNull()
     expect(screen.queryByText('Resulting prices')).toBeNull()
+  })
+
+  it('is called Edit Discount in the breadcrumb, with Delete and Take offline in the header', async () => {
+    await renderPage(baseDiscount)
+    expect(within(screen.getByRole('navigation', { name: 'Breadcrumb' })).getByText('Edit Discount')).toBeInTheDocument()
+    expect(within(screen.getByTestId('form-header')).getAllByRole('button').map((button) => button.textContent)).toEqual(['Delete', 'Take offline'])
   })
 
   it('opens a fixed-price discount in fixed mode', async () => {
