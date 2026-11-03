@@ -39,7 +39,7 @@
     }
   ],
   "discount_applications": [
-    { "type": "automatic", "title": "Product tier discounts", "target_type": "line_item", "allocation_method": "each", "value": "1.65", "value_type": "fixed_amount" },
+    { "type": "automatic", "title": "15% off", "target_type": "line_item", "allocation_method": "each", "value": "1.65", "value_type": "fixed_amount" },
     { "type": "automatic", "title": "Spring offer", "target_type": "line_item", "allocation_method": "across", "value": "0.50", "value_type": "fixed_amount" }
   ]
 }

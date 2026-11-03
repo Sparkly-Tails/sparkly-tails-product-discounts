@@ -1,7 +1,6 @@
 // Reads an order from the webhook payload (REST names) or from the Admin API (GraphQL names) into the same plain facts.
 // Both readers return null for anything malformed and never throw. Which discount application is this app's is decided
 // in one place, isAppDiscount.
-import { TIER_DISCOUNT_TITLE } from '@/lib/tierDiscount'
 import { roundMoney } from '@/metrics/addedRevenue'
 import { readJson } from '@/metrics/collectView'
 import { mapEach } from '@/metrics/mapEach'
@@ -13,12 +12,14 @@ type Application = { type: string; title: string }
 const AUTOMATIC_TYPE = 'automatic'
 /** How the Admin API names the application types the webhook names otherwise. */
 const GRAPHQL_TYPES: Record<string, string> = { AutomaticDiscountApplication: AUTOMATIC_TYPE }
+/** The messages the discount Function gives each application: "15% off", "12.5% off" or "£12.00 each" (a test reads the Function to keep this true). */
+const TIER_MESSAGE_PATTERN = /^(\d+(\.\d+)?% off|£\d+\.\d{2} each)$/
 const AMOUNT_PATTERN = /^-?\d+(\.\d+)?$/
 const GID_PARTS_PATTERN = /^(number|string):\d{1,20}$/
 
-/** True for a discount application that is this app's discount. */
+/** True for a discount application that is this app's discount: an automatic one titled with a message of the discount Function (an order carries that message, not the discount's own title). */
 export function isAppDiscount({ type, title }: Application): boolean {
-  return type === AUTOMATIC_TYPE && title === TIER_DISCOUNT_TITLE
+  return type === AUTOMATIC_TYPE && TIER_MESSAGE_PATTERN.test(title)
 }
 
 export function readRecord({ value }: { value: unknown }): Unit | null {
