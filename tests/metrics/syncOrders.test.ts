@@ -15,7 +15,7 @@ const node = (number: number, createdAt: string) => ({
   id: `gid://shopify/Order/${number}`,
   createdAt,
   currentSubtotalPriceSet: { shopMoney: { amount: '17.25', currencyCode: 'GBP' } },
-  lineItems: { nodes: [{ product: { id: PRODUCT }, quantity: 10, originalUnitPriceSet: { shopMoney: { amount: '1.69' } }, discountAllocations: [{ allocatedAmountSet: { shopMoney: { amount: '1.65' } }, discountApplication: { __typename: 'AutomaticDiscountApplication', title: 'Product tier discounts' } }] }] },
+  lineItems: { nodes: [{ product: { id: PRODUCT }, quantity: 10, originalUnitPriceSet: { shopMoney: { amount: '1.69' } }, discountAllocations: [{ allocatedAmountSet: { shopMoney: { amount: '1.65' } }, discountApplication: { __typename: 'AutomaticDiscountApplication', title: '15% off' } }] }] },
 })
 const minutesAfter = (start: string, count: number) => new Date(Date.parse(start) + count * 60_000).toISOString()
 
