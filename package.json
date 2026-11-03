@@ -1,6 +1,6 @@
 {
   "name": "sparkly-tails-product-discounts",
-  "version": "0.23.147",
+  "version": "0.23.148",
   "private": true,
   "engines": {
     "node": ">=20.9.0"
@@ -14,8 +14,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "check:isolation": "node scripts/check-store-isolation.mjs",
-    "deploy:dev": "node scripts/build-extension.mjs && shopify app deploy --config shopify.app.dev.toml",
-    "deploy:prod": "node scripts/build-extension.mjs && shopify app deploy --config shopify.app.toml",
+    "deploy:dev": "npm ci --prefix extensions/metrics-pixel && node scripts/build-extension.mjs && shopify app deploy --config shopify.app.dev.toml",
+    "deploy:prod": "npm ci --prefix extensions/metrics-pixel && node scripts/build-extension.mjs && shopify app deploy --config shopify.app.toml",
     "postinstall": "prisma generate"
   },
   "dependencies": {
