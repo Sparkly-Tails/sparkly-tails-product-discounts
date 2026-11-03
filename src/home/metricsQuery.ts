@@ -126,3 +126,8 @@ export function buildMetricsParams({ raw, today, tools = PARSE_TOOLS }: { raw: R
   const custom = tools.pickCustomRange({ from: tools.pickLastValue({ value: raw.from }), to: tools.pickLastValue({ value: raw.to }), today, tools })
   return tools.formatParams({ presetKey, custom, tools })
 }
+
+/** The route that gives the cards for the range; it takes the same range parameters as the page. */
+export function buildMetricsUrl({ params }: { params: string }): string {
+  return params ? `/api/metrics?${params}` : '/api/metrics'
+}

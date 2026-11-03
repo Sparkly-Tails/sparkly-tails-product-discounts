@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseMetricsQuery, buildMetricsParams } from '@/home/metricsQuery'
+import { parseMetricsQuery, buildMetricsParams, buildMetricsUrl } from '@/home/metricsQuery'
 
 const TODAY = '2026-11-02'
 const LAST_30 = { fromDay: '2026-10-04', toDay: '2026-11-02', label: 'Last 30 days' }
@@ -43,5 +43,13 @@ describe('buildMetricsParams', () => {
     expect(buildMetricsParams({ raw: { range: 'last7' }, today: TODAY })).toBe('range=last7')
     expect(buildMetricsParams({ raw: { from: '2026-10-12', to: '2026-11-02' }, today: TODAY })).toBe('from=2026-10-12&to=2026-11-02')
     expect(buildMetricsParams({ raw: { from: 'nonsense', to: '2026-11-02' }, today: TODAY })).toBe('')
+  })
+})
+
+describe('buildMetricsUrl', () => {
+  it('is the metrics route alone for the default range, and carries the range parameters otherwise', () => {
+    expect(buildMetricsUrl({ params: '' })).toBe('/api/metrics')
+    expect(buildMetricsUrl({ params: 'range=last7' })).toBe('/api/metrics?range=last7')
+    expect(buildMetricsUrl({ params: 'from=2026-10-12&to=2026-11-02' })).toBe('/api/metrics?from=2026-10-12&to=2026-11-02')
   })
 })
