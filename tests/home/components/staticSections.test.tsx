@@ -17,7 +17,7 @@ const CARDS: MetricCard[] = [
   { label: 'Added revenue', value: '£4.00', hint: 'Added hint' },
 ]
 
-const RANGE = { label: 'Last 30 days', today: '2026-11-02', presets: listRangePresets({ today: '2026-11-02' }), keep: '' }
+const RANGE = { label: 'Last 30 days', today: '2026-11-02', fromDay: '2026-10-04', toDay: '2026-11-02', presets: listRangePresets({ today: '2026-11-02' }), keep: '' }
 
 describe('StatCards', () => {
   it('shows the label and value of each card it is given, in order, and the date button with the label of the range', () => {

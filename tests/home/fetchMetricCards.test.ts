@@ -35,7 +35,7 @@ describe('fetchMetricCards', () => {
     const cards = await fetchMetricCards({ url: '/api/metrics?range=last7', readToken: async () => 'tok-1', request })
 
     expect(cards).toEqual(CARDS)
-    expect(request).toHaveBeenCalledWith('/api/metrics?range=last7', { headers: { Authorization: 'Bearer tok-1' } })
+    expect(request).toHaveBeenCalledWith('/api/metrics?range=last7', { headers: { Authorization: 'Bearer tok-1' }, cache: 'no-store' })
   })
 
   it('gives the failed cards when the answer is not ok', async () => {

@@ -7,6 +7,8 @@ import type { MetricCard } from '@/home/buildMetricCards'
 export interface RangeButton {
   label: string
   today: string
+  fromDay: string
+  toDay: string
   presets: RangePreset[]
   keep: string
 }
@@ -15,7 +17,7 @@ export default function StatCards({ cards, range }: { cards: MetricCard[]; range
   return (
     <section className="flex flex-col gap-3">
       <div className="flex items-center justify-between">
-        <DateRangePicker label={range.label} today={range.today} presets={range.presets} keep={range.keep} />
+        <DateRangePicker label={range.label} today={range.today} fromDay={range.fromDay} toDay={range.toDay} presets={range.presets} keep={range.keep} />
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {cards.map((stat) => (

@@ -10,7 +10,7 @@ import { DEFAULT_QUERY, TABLE_TOOLS, applyTableQuery } from '@/home/tableQuery'
 
 afterEach(cleanup)
 
-const RANGE = { label: 'Last 30 days', today: '2026-11-02', presets: [], keep: '' }
+const RANGE = { label: 'Last 30 days', today: '2026-11-02', fromDay: '2026-10-04', toDay: '2026-11-02', presets: [], keep: '' }
 const ROWS = [{ key: 'tier:a', kind: 'tier' as const, title: 'Salmon Oil', subtitle: '', rules: '3+ units (10% off)', isActive: true, href: '/discounts/a' }]
 
 function show() {
