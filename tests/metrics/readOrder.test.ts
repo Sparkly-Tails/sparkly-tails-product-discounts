@@ -6,11 +6,18 @@ const fromWebhook = (body: string) => readWebhookOrder({ body, tools: READ_ORDER
 const fromGraphql = (node: unknown) => readGraphqlOrder({ node, tools: READ_ORDER_TOOLS })
 
 describe('isAppDiscount', () => {
-  it('is an automatic discount with the title of this app\'s discount', () => {
-    expect(isAppDiscount({ type: 'automatic', title: 'Product tier discounts' })).toBe(true)
+  it.each([['a percent tier', '15% off'], ['a percent with decimals', '12.5% off'], ['a fixed price tier', '£12.00 each']])('is an automatic discount with the message the discount Function gives: %s', (_name, title) => {
+    expect(isAppDiscount({ type: 'automatic', title })).toBe(true)
   })
 
-  it.each([['another title', 'automatic', 'Spring offer'], ['a discount code of that title', 'discount_code', 'Product tier discounts'], ['no title', 'automatic', '']])('is not %s', (_name, type, title) => {
+  it.each([
+    ['another title', 'automatic', 'Spring offer'],
+    ['the title of the discount record, which never reaches an order', 'automatic', 'Product tier discounts'],
+    ['a discount code with the message of a tier', 'discount_code', '15% off'],
+    ['no title', 'automatic', ''],
+    ['a longer sentence that starts like a tier message', 'automatic', '15% off sale'],
+    ['a percent sign alone', 'automatic', '% off'],
+  ])('is not %s', (_name, type, title) => {
     expect(isAppDiscount({ type, title })).toBe(false)
   })
 })
@@ -52,7 +59,7 @@ describe('readWebhookOrder', () => {
   })
 })
 
-/** The shape of an order read with the Admin API; checked against a real order once plan task 3 is done. */
+/** The shape of an order read with the Admin API; the real order is in tests/metrics/realOrder.test.ts. */
 const graphqlNode = {
   id: 'gid://shopify/Order/5100200300400',
   createdAt: '2026-11-02T10:15:00Z',
@@ -63,7 +70,7 @@ const graphqlNode = {
         product: { id: 'gid://shopify/Product/9001' },
         quantity: 10,
         originalUnitPriceSet: { shopMoney: { amount: '1.69' } },
-        discountAllocations: [{ allocatedAmountSet: { shopMoney: { amount: '1.65' } }, discountApplication: { __typename: 'AutomaticDiscountApplication', title: 'Product tier discounts' } }],
+        discountAllocations: [{ allocatedAmountSet: { shopMoney: { amount: '1.65' } }, discountApplication: { __typename: 'AutomaticDiscountApplication', title: '15% off' } }],
       },
       { product: null, quantity: 1, originalUnitPriceSet: { shopMoney: { amount: '1.00' } }, discountAllocations: [] },
     ],

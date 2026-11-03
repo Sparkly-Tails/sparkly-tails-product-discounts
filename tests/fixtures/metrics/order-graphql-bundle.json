@@ -1,0 +1,32 @@
+{
+  "id": "gid://shopify/Order/18975080907006",
+  "createdAt": "2026-11-03T11:12:56Z",
+  "currentSubtotalPriceSet": { "shopMoney": { "amount": "8903.88", "currencyCode": "USD" } },
+  "lineItems": {
+    "nodes": [
+      {
+        "product": { "id": "gid://shopify/Product/15411507167486" },
+        "quantity": 3,
+        "originalUnitPriceSet": { "shopMoney": { "amount": "785.95" } },
+        "discountAllocations": [
+          {
+            "allocatedAmountSet": { "shopMoney": { "amount": "353.67" } },
+            "discountApplication": { "__typename": "AutomaticDiscountApplication", "allocationMethod": "EACH", "title": "15% off" }
+          }
+        ]
+      },
+      {
+        "product": { "id": "gid://shopify/Product/15411507331326" },
+        "quantity": 4,
+        "originalUnitPriceSet": { "shopMoney": { "amount": "600.0" } },
+        "discountAllocations": []
+      },
+      {
+        "product": { "id": "gid://shopify/Product/15411507659006" },
+        "quantity": 6,
+        "originalUnitPriceSet": { "shopMoney": { "amount": "749.95" } },
+        "discountAllocations": []
+      }
+    ]
+  }
+}
