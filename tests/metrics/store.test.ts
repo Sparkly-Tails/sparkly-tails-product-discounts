@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { deleteShopMetrics, addVisit, purgeOldVisits, readSettings, saveLiveProducts, saveTimeZone, STORE_TOOLS } from '@/metrics/store'
+import { deleteShopMetrics, addVisit, purgeOldVisits, readSettings, saveLiveProducts, saveTimeZone, saveBundleRows, readOrderRows, readVisitorSum, readLiveProducts, readSyncMarker, writeSyncMarker, STORE_TOOLS } from '@/metrics/store'
 
 const SHOP = 'demo.myshopify.com'
 const makeDb = () => ({
@@ -84,5 +84,88 @@ describe('saveLiveProducts and saveTimeZone', () => {
     const db = { metricsSync: { upsert: vi.fn(async () => ({})) } }
     await saveTimeZone({ db, shop: SHOP, timeZone: 'Europe/Madrid' })
     expect(db.metricsSync.upsert).toHaveBeenCalledExactlyOnceWith({ where: { shop: SHOP }, create: { shop: SHOP, timeZone: 'Europe/Madrid' }, update: { timeZone: 'Europe/Madrid' } })
+  })
+})
+
+describe('saveBundleRows', () => {
+  const rows = [
+    { discountId: 'd1', orderId: 'gid://shopify/Order/1', orderedAt: '2026-11-02T10:00:00.000Z', currency: 'GBP', units: 10, orderSubtotal: 17.25, discountAmount: 1.65, addedRevenue: 13.5 },
+    { discountId: 'd2', orderId: 'gid://shopify/Order/1', orderedAt: '2026-11-02T10:00:00.000Z', currency: 'GBP', units: 2, orderSubtotal: 17.25, discountAmount: 0.5, addedRevenue: 1 },
+  ]
+
+  /** A fake table keyed like the real one: shop + order + discount. */
+  function keyedTable() {
+    const stored = new Map<string, unknown>()
+    const upsert = vi.fn(async (args: { where: { shop_orderId_discountId: { shop: string; orderId: string; discountId: string } }; create: unknown }) => {
+      const { shop, orderId, discountId } = args.where.shop_orderId_discountId
+      stored.set(`${shop}|${orderId}|${discountId}`, args.create)
+    })
+    return { stored, upsert }
+  }
+
+  it('upserts each row on the shop, order and discount key, so saving the same rows twice makes no second record', async () => {
+    const table = keyedTable()
+    const db = { bundleOrder: { upsert: table.upsert } }
+    await saveBundleRows({ db, shop: SHOP, rows })
+    await saveBundleRows({ db, shop: SHOP, rows })
+    expect(table.upsert).toHaveBeenCalledTimes(4)
+    expect(table.stored.size).toBe(2)
+  })
+
+  it('stores the time as a date and the amounts as given', async () => {
+    const table = keyedTable()
+    await saveBundleRows({ db: { bundleOrder: { upsert: table.upsert } }, shop: SHOP, rows: [rows[0]] })
+    expect(table.upsert.mock.calls[0][0].create).toEqual({
+      shop: SHOP, orderId: 'gid://shopify/Order/1', discountId: 'd1', orderedAt: new Date('2026-11-02T10:00:00.000Z'), currency: 'GBP', units: 10, orderSubtotal: 17.25, discountAmount: 1.65, addedRevenue: 13.5,
+    })
+  })
+})
+
+describe('readOrderRows', () => {
+  it('asks for the orders from the first time up to but not including the second, and gives plain numbers', async () => {
+    const findMany = vi.fn(async () => [{ discountId: 'd1', orderId: 'o1', orderedAt: new Date('2026-11-02T10:00:00.000Z'), currency: 'GBP', units: 3, orderSubtotal: { toString: () => '17.25' }, discountAmount: { toString: () => '1.65' }, addedRevenue: { toString: () => '13.50' } }])
+    const result = await readOrderRows({ db: { bundleOrder: { findMany } }, shop: SHOP, fromIso: '2026-11-01T00:00:00.000Z', toIso: '2026-11-03T00:00:00.000Z' })
+    expect(findMany).toHaveBeenCalledWith({ where: { shop: SHOP, orderedAt: { gte: new Date('2026-11-01T00:00:00.000Z'), lt: new Date('2026-11-03T00:00:00.000Z') } } })
+    expect(result).toEqual([{ discountId: 'd1', orderId: 'o1', orderedAt: '2026-11-02T10:00:00.000Z', currency: 'GBP', units: 3, orderSubtotal: 17.25, discountAmount: 1.65, addedRevenue: 13.5 }])
+  })
+})
+
+describe('readVisitorSum', () => {
+  it('adds the visitors of every discount from the first day to the last day, both included', async () => {
+    const aggregate = vi.fn(async () => ({ _sum: { visitors: 42 } }))
+    expect(await readVisitorSum({ db: { discountDailyStat: { aggregate } }, shop: SHOP, fromDay: '2026-10-04', toDay: '2026-11-02' })).toBe(42)
+    expect(aggregate).toHaveBeenCalledWith({ where: { shop: SHOP, day: { gte: '2026-10-04', lte: '2026-11-02' } }, _sum: { visitors: true } })
+  })
+
+  it('is 0 when there are no days', async () => {
+    const aggregate = vi.fn(async () => ({ _sum: { visitors: null } }))
+    expect(await readVisitorSum({ db: { discountDailyStat: { aggregate } }, shop: SHOP, fromDay: '2026-10-04', toDay: '2026-11-02' })).toBe(0)
+  })
+})
+
+describe('readLiveProducts', () => {
+  it('gives the map of the shop, keeping only entries whose value is text', async () => {
+    const findUnique = vi.fn(async () => ({ liveProducts: { a: 'd1', b: 5 } }))
+    expect(await readLiveProducts({ db: { metricsSync: { findUnique } }, shop: SHOP, tools: STORE_TOOLS })).toEqual({ a: 'd1' })
+    expect(findUnique).toHaveBeenCalledWith({ where: { shop: SHOP }, select: { liveProducts: true } })
+  })
+
+  it('gives an empty map for a shop with no row', async () => {
+    expect(await readLiveProducts({ db: { metricsSync: { findUnique: vi.fn(async () => null) } }, shop: SHOP, tools: STORE_TOOLS })).toEqual({})
+  })
+})
+
+describe('the sync marker', () => {
+  it('reads the two times as text, and null for both when the shop has no row', async () => {
+    const findUnique = vi.fn(async () => ({ lastOrderSyncAt: new Date('2026-11-02T10:00:00.000Z'), backfilledUntil: null }))
+    expect(await readSyncMarker({ db: { metricsSync: { findUnique } }, shop: SHOP })).toEqual({ lastOrderSyncAt: '2026-11-02T10:00:00.000Z', backfilledUntil: null })
+    expect(await readSyncMarker({ db: { metricsSync: { findUnique: vi.fn(async () => null) } }, shop: SHOP })).toEqual({ lastOrderSyncAt: null, backfilledUntil: null })
+  })
+
+  it('writes the two times as dates, creating the shop\'s row if it has none', async () => {
+    const upsert = vi.fn(async () => ({}))
+    await writeSyncMarker({ db: { metricsSync: { upsert } }, shop: SHOP, lastOrderSyncAt: '2026-11-02T12:00:00.000Z', backfilledUntil: '2026-08-04T12:00:00.000Z' })
+    const data = { lastOrderSyncAt: new Date('2026-11-02T12:00:00.000Z'), backfilledUntil: new Date('2026-08-04T12:00:00.000Z') }
+    expect(upsert).toHaveBeenCalledExactlyOnceWith({ where: { shop: SHOP }, create: { shop: SHOP, ...data }, update: data })
   })
 })
