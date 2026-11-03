@@ -5,6 +5,7 @@ import '@testing-library/jest-dom/vitest'
 import SubmitButton from '@/form/components/SubmitButton'
 import DeleteButton from '@/form/components/DeleteButton'
 import StatusButton from '@/form/components/StatusButton'
+import FormActions from '@/form/components/FormActions'
 
 afterEach(cleanup)
 
@@ -70,5 +71,28 @@ describe('DeleteButton', () => {
   it('is red', () => {
     render(<form><DeleteButton deleteAction={async () => {}} /></form>)
     expect(screen.getByRole('button', { name: 'Delete' }).className).toContain('text-form-error')
+  })
+})
+
+describe('FormActions', () => {
+  it('has Delete first, then Go live, for a draft', () => {
+    render(<form><FormActions mode="edit" status="draft" canSave deleteAction={async () => {}} /></form>)
+    expect(screen.getAllByRole('button').map((button) => button.textContent)).toEqual(['Delete', 'Go live'])
+  })
+
+  it('has Take offline instead of Go live for a live discount', () => {
+    render(<form><FormActions mode="edit" status="live" canSave deleteAction={async () => {}} /></form>)
+    expect(screen.getAllByRole('button').map((button) => button.textContent)).toEqual(['Delete', 'Take offline'])
+  })
+
+  it('switches the status button off, but not Delete, when the form cannot be saved', () => {
+    render(<form><FormActions mode="edit" status="draft" canSave={false} deleteAction={async () => {}} /></form>)
+    expect(screen.getByRole('button', { name: 'Go live' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Delete' })).toBeEnabled()
+  })
+
+  it('has nothing for a new discount', () => {
+    const { container } = render(<form><FormActions mode="create" status="draft" canSave deleteAction={async () => {}} /></form>)
+    expect(container.querySelector('button')).toBeNull()
   })
 })

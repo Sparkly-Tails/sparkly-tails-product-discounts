@@ -34,7 +34,7 @@ function renderForm(overrides: Partial<Parameters<typeof TierDiscountForm>[0]> =
   const saveAction = vi.fn(async () => null)
   const view = render(
     <TierDiscountForm
-      breadcrumbLabel="Edit tier discount" heading="Salmon Oil Volume Discount" badge="Draft" mode="edit"
+      breadcrumbLabel="Edit Discount" heading="Salmon Oil Volume Discount" badge="Draft" mode="edit"
       initial={SAVED} initialTiers={SAVED_TIERS} currencyCode="USD" shopTimezone="UTC" nowLocal="2026-10-30T12:00"
       initialNowSeconds={NOW} status="draft" saveAction={saveAction} {...overrides}
     />,
@@ -79,17 +79,17 @@ describe('TierDiscountForm: what it shows', () => {
   })
 })
 
-describe('TierDiscountForm: the save bar and the footer', () => {
-  it('has Go live in the footer, and Save and Discard in Shopify\'s save bar, which is hidden while nothing is changed', () => {
+describe('TierDiscountForm: the save bar and the header buttons', () => {
+  it('has Go live in the header, and Save and Discard in Shopify\'s save bar, which is hidden while nothing is changed', () => {
     renderForm()
-    expect(screen.getByRole('button', { name: 'Go live' })).toHaveAttribute('name', 'goLive')
+    expect(within(screen.getByTestId('form-header')).getByRole('button', { name: 'Go live' })).toHaveAttribute('name', 'goLive')
     expect(theForm()).not.toContainElement(document.querySelector('ui-save-bar') as HTMLElement)
     expect(saveBarButton('Save')).toBeInTheDocument()
     expect(saveBarButton('Discard')).toBeInTheDocument()
     expect(barShown).toBe(false)
   })
 
-  it('has no Save and no Discard of its own in the footer, and no unsaved-changes line', () => {
+  it('has no Save and no Discard of its own, and no unsaved-changes line', () => {
     renderForm()
     fireEvent.change(nameField(), { target: { value: 'Black Friday' } })
     const buttonsOutsideTheBar = screen.getAllByRole('button').filter((button) => !button.closest('ui-save-bar'))
@@ -131,9 +131,14 @@ describe('TierDiscountForm: the save bar and the footer', () => {
   })
 
   it('cannot save or go live without a product and a complete tier', () => {
-    renderForm({ initial: EMPTY, initialTiers: EMPTY_TIERS, mode: 'create' })
+    renderForm({ initial: EMPTY, initialTiers: EMPTY_TIERS })
     expect(saveBarButton('Save')).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Go live' })).toBeDisabled()
+  })
+
+  it('cannot save without a product and a complete tier when it is new', () => {
+    renderForm({ initial: EMPTY, initialTiers: EMPTY_TIERS, mode: 'create' })
+    expect(saveBarButton('Save')).toBeDisabled()
   })
 
   it('can save once there is a product and a complete tier', () => {
@@ -144,11 +149,13 @@ describe('TierDiscountForm: the save bar and the footer', () => {
   })
 })
 
-describe('TierDiscountForm: the edit footer', () => {
-  it('has Delete first, then Go live, for a draft', () => {
+describe('TierDiscountForm: the header buttons', () => {
+  const headerButtons = () => within(screen.getByTestId('form-header')).queryAllByRole('button').map((button) => button.textContent)
+
+  it('has Delete first, then Go live, for a draft, on the right of the heading', () => {
     renderForm({ status: 'draft', deleteAction: async () => {} })
-    const names = screen.getAllByRole('button').filter((button) => !button.closest('ui-save-bar')).map((button) => button.textContent).filter((text) => ['Delete', 'Discard', 'Go live', 'Take offline', 'Save'].includes(text ?? ''))
-    expect(names).toEqual(['Delete', 'Go live'])
+    expect(headerButtons()).toEqual(['Delete', 'Go live'])
+    expect(screen.getByRole('heading', { level: 1 }).closest('[data-testid="form-header-row"]')).toContainElement(screen.getByRole('button', { name: 'Delete' }))
   })
 
   it('has Take offline instead of Go live for a live discount', () => {
@@ -157,9 +164,11 @@ describe('TierDiscountForm: the edit footer', () => {
     expect(screen.queryByRole('button', { name: 'Go live' })).toBeNull()
   })
 
-  it('has no Delete on the create page', () => {
+  it('has no buttons in the header while the discount is new: it cannot be published or deleted before it is saved', () => {
     renderForm({ mode: 'create', initial: EMPTY, initialTiers: EMPTY_TIERS })
+    expect(headerButtons()).toEqual([])
     expect(screen.queryByRole('button', { name: 'Delete' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Go live' })).toBeNull()
   })
 
   it('can delete even when the form is not valid to save', () => {

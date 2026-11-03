@@ -30,7 +30,7 @@ export default async function DiscountPage({ params }: { params: Promise<{ disco
   return (
     <FormPage>
       <TierDiscountForm
-        breadcrumbLabel="Edit tier discount"
+        breadcrumbLabel="Edit Discount"
         heading={discount.name}
         badge={badge}
         mode="edit"

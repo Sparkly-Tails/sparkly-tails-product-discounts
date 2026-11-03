@@ -1,24 +1,20 @@
 import DeleteButton from '@/form/components/DeleteButton'
-import FormFooter from '@/form/components/FormFooter'
-import SaveMessage from '@/form/components/SaveMessage'
 import StatusButton from '@/form/components/StatusButton'
-import type { SaveState } from '@/form/components/TierDiscountForm'
 
-// The bottom of the form: why the last save did not go through, and the buttons (Delete, far left, only when the
-// discount can be deleted; Go live or Take offline). Save and Discard are in Shopify's save bar (SaveBar), which
-// also tells that there are unsaved changes.
-export default function FormActions({ status, canSave, saveState, deleteAction }: {
+// The buttons on the right of the form's heading: Delete (only when the discount can be deleted) and Go live or
+// Take offline. A new discount has none of them, since it cannot be published or deleted before it is saved. Save
+// and Discard are in Shopify's save bar (SaveBar), which also tells that there are unsaved changes.
+export default function FormActions({ mode, status, canSave, deleteAction }: {
+  mode: 'create' | 'edit'
   status: 'draft' | 'live'
   canSave: boolean
-  saveState: SaveState
   deleteAction?: () => Promise<void>
 }) {
+  if (mode === 'create') return null
   return (
     <>
-      <SaveMessage state={saveState} />
-      <FormFooter leading={deleteAction ? <DeleteButton deleteAction={deleteAction} /> : null}>
-        <StatusButton status={status} isDisabled={!canSave} />
-      </FormFooter>
+      {deleteAction ? <DeleteButton deleteAction={deleteAction} /> : null}
+      <StatusButton status={status} isDisabled={!canSave} />
     </>
   )
 }
