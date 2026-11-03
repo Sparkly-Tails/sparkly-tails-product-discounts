@@ -15,6 +15,8 @@ export interface TableQuery {
   search: string
   sort: SortKey
   page: number
+  // Other parameters of the page address (the date range of the cards) that every table link carries along.
+  keep?: string
 }
 
 export const DEFAULT_QUERY: TableQuery = { tab: 'all', search: '', sort: 'default', page: 1 }
@@ -150,10 +152,10 @@ export function applyTableQuery(options: { rows: DiscountRow[]; query: TableQuer
 // The address for a table state with some values changed. Default values are
 // left out; any change except the page goes back to page 1.
 export function buildTableHref({ query, changes }: { query: TableQuery; changes: Partial<TableQuery> }): string {
-  const next: TableQuery = { ...query, page: 1, ...changes }
+  const { keep = '', ...next }: TableQuery = { ...query, page: 1, ...changes }
   const entries = Object.entries(next)
     .filter(([key, value]) => value !== DEFAULT_QUERY[key as keyof TableQuery])
     .map(([key, value]) => [key, String(value)])
-  const text = new URLSearchParams(entries).toString()
+  const text = [new URLSearchParams(entries).toString(), keep].filter((part) => part !== '').join('&')
   return text ? '/?' + text : '/'
 }
