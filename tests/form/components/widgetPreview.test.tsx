@@ -4,6 +4,7 @@ import { render, screen, cleanup, fireEvent, act } from '@testing-library/react'
 import '@testing-library/jest-dom/vitest'
 import WidgetPreview from '@/form/preview/components/WidgetPreview'
 import { DEFAULT_WIDGET_STYLE } from '@/lib/widgetStyle'
+import { stubChipLayout } from '../../helpers/chipLayout'
 
 const NOW = 1_800_000_000
 const SALMON = { title: 'Wild Alaskan Salmon Oil for Dogs (16 fl oz)', price: 28, imageUrl: null }
@@ -15,7 +16,7 @@ function renderPreview(overrides: Partial<Parameters<typeof WidgetPreview>[0]> =
 }
 
 beforeEach(() => vi.useFakeTimers({ now: NOW * 1000 }))
-afterEach(() => { cleanup(); vi.useRealTimers() })
+afterEach(() => { cleanup(); vi.useRealTimers(); vi.restoreAllMocks() })
 
 describe('WidgetPreview', () => {
   it('shows the Preview heading, that it is a live view, and the touch note', () => {
@@ -165,5 +166,16 @@ describe('WidgetPreview', () => {
     expect(widget.style.getPropertyValue('--smooth-discounts-moss')).toBe('')
     expect(widget.style.getPropertyValue('--smooth-discounts-cream')).toBe('#FFFFFF80')
     expect(widget.style.getPropertyValue('--smooth-discounts-radius')).toBe('4px')
+  })
+
+  it('scrolls the row of tier boxes to the right to keep the box of the quantity in view, and back when it goes down', () => {
+    stubChipLayout({ chipWidth: 90, viewWidth: 250 })
+    renderPreview({ tiers: [{ minQty: 2, percentOff: 5 }, { minQty: 3, percentOff: 10 }, { minQty: 4, percentOff: 15 }, { minQty: 5, percentOff: 20 }] })
+    const row = document.querySelector('[data-tier-pricing-tiers]') as HTMLElement
+    expect(row.scrollLeft).toBe(0)
+    for (let step = 0; step < 6; step += 1) fireEvent.click(screen.getByRole('button', { name: 'Increase quantity' }))
+    expect(row.scrollLeft).toBe(6 * 90 - 250)
+    for (let step = 0; step < 6; step += 1) fireEvent.click(screen.getByRole('button', { name: 'Decrease quantity' }))
+    expect(row.scrollLeft).toBe(0)
   })
 })

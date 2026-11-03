@@ -26,3 +26,9 @@ declare module '*/loader/components.js' {
   export function parseComponentUrls(json: string | undefined): Record<string, string>
   export function loadComponentSet(options: { names: string[]; loadOne: (name: string) => Promise<unknown> }): Promise<Record<string, unknown>>
 }
+
+declare module '*/chipScroll.js' {
+  export const CHIP_SCROLL_TOOLS: unknown
+  export function computeScrollLeft(input: { chipLeft: number; chipWidth: number; viewLeft: number; viewWidth: number }): number
+  export function scrollActiveChipIntoView(input: { tiersEl: HTMLElement; tools: unknown }): void
+}
