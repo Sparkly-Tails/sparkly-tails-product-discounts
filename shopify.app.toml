@@ -7,11 +7,15 @@ embedded = true
 
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
-scopes = "read_products,write_products,write_discounts,read_discounts"
+scopes = "read_discounts,read_products,write_discounts,write_products,read_orders,read_all_orders,read_reports,write_pixels,read_customer_events"
 use_legacy_install_flow = true
 
 [webhooks]
 api_version = "2026-10"
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/orders/paid"
+  topics = [ "orders/paid" ]
 
 [auth]
 redirect_urls = [ "https://sparkly-tails-product-discounts.vercel.app/api/auth/callback" ]
