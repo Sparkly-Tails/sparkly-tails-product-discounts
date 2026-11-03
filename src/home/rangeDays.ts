@@ -1,4 +1,4 @@
-import { mapEach } from '@/metrics/readOrder'
+import { mapEach } from '@/metrics/mapEach'
 
 // Days are `YYYY-MM-DD` text with no time zone inside; the shop's time zone only decides which day it is today.
 

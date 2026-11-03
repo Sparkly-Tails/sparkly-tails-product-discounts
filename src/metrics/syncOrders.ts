@@ -3,7 +3,7 @@
 // Every outside step is handed in through `tools`; saving the same order again changes nothing.
 import type { OrdersPage } from '@/metrics/queryOrders'
 import type { SyncMarker } from '@/metrics/store'
-import { mapEach } from '@/metrics/readOrder'
+import { mapEach } from '@/metrics/mapEach'
 import type { BundleOrderRow, OrderFacts } from '@/metrics/types'
 
 const HOUR_MS = 3600 * 1000

@@ -4,6 +4,7 @@
 import { TIER_DISCOUNT_TITLE } from '@/lib/tierDiscount'
 import { roundMoney } from '@/metrics/addedRevenue'
 import { readJson } from '@/metrics/collectView'
+import { mapEach } from '@/metrics/mapEach'
 import type { OrderFacts, OrderLineFacts } from '@/metrics/types'
 
 type Unit = Record<string, unknown>
@@ -65,13 +66,6 @@ export function readTextAt({ order, path, tools }: { order: unknown; path: strin
 /** The order as facts, or null when any part of it is missing. */
 export function completeFacts({ facts }: { facts: Record<keyof OrderFacts, unknown> }): OrderFacts | null {
   return Object.values(facts).some((part) => part === null) ? null : (facts as unknown as OrderFacts)
-}
-
-/** Runs `run` on every item and gives the results in order; `run` gets the item and the shared context, so it needs no outside variable. */
-export function mapEach<Item, Result, Context>({ items, run, context }: { items: Item[]; run: (args: { item: Item; context: Context }) => Result; context: Context }): Result[] {
-  const results: Result[] = []
-  for (const item of items) results.push(run({ item, context }))
-  return results
 }
 
 export interface LineContext {
