@@ -5,9 +5,13 @@ import '@testing-library/jest-dom/vitest'
 import Home from '@/app/page'
 import { ensureTierDiscountSafely } from '@/lib/tierDiscount'
 import { getConfig } from '@/lib/config'
+import { ensureMetricsPixelSafely } from '@/metrics/ensurePixel'
+import { getRequestHost } from '@/lib/requestHost'
 
 vi.mock('@/lib/tierDiscount', () => ({ ensureTierDiscountSafely: vi.fn() }))
 vi.mock('@/lib/config', () => ({ getConfig: vi.fn() }))
+vi.mock('@/lib/requestHost', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/requestHost')>()), getRequestHost: vi.fn(async () => 'my-app.vercel.app') }))
+vi.mock('@/metrics/ensurePixel', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/metrics/ensurePixel')>()), ensureMetricsPixelSafely: vi.fn(async () => 'created') }))
 vi.mock('@/lib/shop', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/shop')>()), getShopTimezone: vi.fn(async () => 'UTC'), getShopCurrencyCode: vi.fn(async () => 'GBP') }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }))
 
@@ -22,6 +26,25 @@ describe('Home', () => {
     vi.mocked(ensureTierDiscountSafely).mockReset()
     vi.mocked(getConfig).mockReset()
     vi.mocked(getConfig).mockResolvedValue({ discounts: [] })
+    vi.mocked(ensureMetricsPixelSafely).mockClear()
+  })
+
+  it('makes sure the metrics pixel points at the address the page was opened on, after the tier discount', async () => {
+    const order: string[] = []
+    vi.mocked(ensureTierDiscountSafely).mockImplementation(async () => { order.push('tier'); return 'exists' })
+    vi.mocked(ensureMetricsPixelSafely).mockImplementation(async () => { order.push('pixel'); return 'created' })
+
+    await Home({ searchParams: noSearch })
+
+    expect(order).toEqual(['tier', 'pixel'])
+    expect(vi.mocked(ensureMetricsPixelSafely).mock.calls[0][0].collectUrl).toBe('https://my-app.vercel.app/collect/view')
+  })
+
+  it('has no address for the pixel when the request carries no usable host, and still renders', async () => {
+    vi.mocked(getRequestHost).mockResolvedValueOnce('')
+
+    await expect(Home({ searchParams: noSearch })).resolves.toBeTruthy()
+    expect(vi.mocked(ensureMetricsPixelSafely).mock.calls[0][0].collectUrl).toBeNull()
   })
 
   it('calls ensureTierDiscountSafely before it reads anything else', async () => {
