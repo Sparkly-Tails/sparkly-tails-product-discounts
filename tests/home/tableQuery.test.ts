@@ -165,3 +165,15 @@ describe('buildTableHref', () => {
     expect(roundTrip(link).search).toBe(text)
   })
 })
+
+describe('buildTableHref with the date range kept', () => {
+  it('adds the kept parameters to every address, and to the bare address', () => {
+    expect(buildTableHref({ query: { ...DEFAULT_QUERY, keep: 'range=last7' }, changes: { tab: 'active' } })).toBe('/?tab=active&range=last7')
+    expect(buildTableHref({ query: { ...DEFAULT_QUERY, keep: 'range=last7' }, changes: {} })).toBe('/?range=last7')
+  })
+
+  it('leaves the address as it was when nothing is kept', () => {
+    expect(buildTableHref({ query: DEFAULT_QUERY, changes: { tab: 'active' } })).toBe('/?tab=active')
+    expect(buildTableHref({ query: DEFAULT_QUERY, changes: {} })).toBe('/')
+  })
+})

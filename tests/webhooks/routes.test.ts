@@ -3,6 +3,8 @@ import { createHmac } from 'node:crypto'
 import { POST as uninstalled } from '@/app/webhooks/app/uninstalled/route'
 import { POST as scopesUpdate } from '@/app/webhooks/app/scopes_update/route'
 import { POST as compliance } from '@/app/webhooks/compliance/route'
+import { POST as ordersPaid } from '@/app/webhooks/orders/paid/route'
+import { recordOrder } from '@/metrics/recordOrder'
 import { deleteShopSessions } from '@/lib/sessions'
 import { refreshStoredScopes } from '@/lib/storedScopes'
 import { deleteShopMetrics } from '@/metrics/store'
@@ -10,7 +12,8 @@ import { deleteShopMetrics } from '@/metrics/store'
 vi.mock('@/lib/sessions', () => ({ deleteShopSessions: vi.fn(async () => {}), updateStoredScope: vi.fn(async () => {}) }))
 vi.mock('@/lib/storedScopes', () => ({ refreshStoredScopes: vi.fn(async () => {}) }))
 vi.mock('@/lib/db', () => ({ getDb: () => ({ marker: 'db' }) }))
-vi.mock('@/metrics/store', () => ({ deleteShopMetrics: vi.fn(async () => {}) }))
+vi.mock('@/metrics/store', () => ({ deleteShopMetrics: vi.fn(async () => {}), readLiveProducts: vi.fn(), saveBundleRows: vi.fn() }))
+vi.mock('@/metrics/recordOrder', () => ({ recordOrder: vi.fn(async () => 1) }))
 
 const SECRET = 'client-secret'
 const A = 'demo.myshopify.com'
@@ -29,6 +32,7 @@ beforeEach(() => {
   vi.mocked(deleteShopSessions).mockClear()
   vi.mocked(refreshStoredScopes).mockClear()
   vi.mocked(deleteShopMetrics).mockClear()
+  vi.mocked(recordOrder).mockClear()
 })
 
 describe('app/uninstalled', () => {
@@ -129,5 +133,34 @@ describe('compliance', () => {
   it('rejects a bad signature without touching the database', async () => {
     expect((await compliance(post(redactBody(A), 'shop/redact', 'AAAA'))).status).toBe(401)
     expect(deleteShopSessions).not.toHaveBeenCalled()
+  })
+})
+
+describe('orders/paid', () => {
+  const orderBody = JSON.stringify({ id: 5100200300400, line_items: [] })
+
+  it('records the order for the shop of the verified headers', async () => {
+    expect((await ordersPaid(post(orderBody, 'orders/paid'))).status).toBe(200)
+    expect(recordOrder).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(recordOrder).mock.calls[0][0]).toMatchObject({ body: orderBody, shop: A })
+  })
+
+  it('accepts the topic in the uppercase style the GraphQL API uses', async () => {
+    expect((await ordersPaid(post(orderBody, 'ORDERS_PAID'))).status).toBe(200)
+  })
+
+  it.each(['orders/create', 'app/uninstalled', 'orders/paid_x'])('refuses a delivery with the topic "%s" and records nothing', async (topic) => {
+    expect((await ordersPaid(post(orderBody, topic))).status).toBe(400)
+    expect(recordOrder).not.toHaveBeenCalled()
+  })
+
+  it('refuses a delivery with a wrong signature and records nothing', async () => {
+    expect((await ordersPaid(post(orderBody, 'orders/paid', 'bad-signature'))).status).toBe(401)
+    expect(recordOrder).not.toHaveBeenCalled()
+  })
+
+  it('answers 500 when the recording fails, so Shopify delivers the order again', async () => {
+    vi.mocked(recordOrder).mockRejectedValueOnce(new Error('db down'))
+    expect((await ordersPaid(post(orderBody, 'orders/paid'))).status).toBe(500)
   })
 })

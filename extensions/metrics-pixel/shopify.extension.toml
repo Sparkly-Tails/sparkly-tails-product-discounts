@@ -1,0 +1,30 @@
+api_version = "2025-10"
+
+[[extensions]]
+name = "Metrics pixel"
+handle = "metrics-pixel"
+uid = "124388e6-dab1-4391-7ea1-33cdce35512b35196645"
+type = "web_pixel_extension"
+runtime_context = "strict"
+description = "Counts product page views for the discount metrics on the app homepage."
+
+  [extensions.customer_privacy]
+  analytics = true
+  marketing = false
+  preferences = false
+  sale_of_data = "disabled"
+
+  [extensions.settings]
+  type = "object"
+
+    [extensions.settings.fields.collectUrl]
+    name = "Collect URL"
+    description = "The address of the app that receives the views."
+    type = "single_line_text_field"
+    validations = [ { name = "min", value = "1" } ]
+
+    [extensions.settings.fields.shop]
+    name = "Shop"
+    description = "The myshopify.com address of the shop the views belong to."
+    type = "single_line_text_field"
+    validations = [ { name = "min", value = "1" } ]
