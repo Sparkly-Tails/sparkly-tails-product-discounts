@@ -76,6 +76,37 @@ describe('WidgetPreview', () => {
     expect(screen.getByText('Flash sale starts in')).toBeInTheDocument()
   })
 
+  it('shows the price of the product above the widget, in the shop currency', () => {
+    renderPreview({ currencyCode: 'GBP' })
+    const price = screen.getByTestId('preview-price')
+    expect(price).toHaveTextContent('£28.00')
+    expect(price.querySelector('s')).toBeNull()
+    expect(price.compareDocumentPosition(document.querySelector('.smooth-discounts') as HTMLElement) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('shows the regular price struck and the discounted price once the quantity reaches a tier, and takes it back below', () => {
+    renderPreview()
+    const price = screen.getByTestId('preview-price')
+    fireEvent.click(screen.getByRole('button', { name: '3 × $75.60' }))
+    expect(price.querySelector('s')).toHaveTextContent('$28.00')
+    expect(price.textContent).toBe('Regular price$28.00Sale price$25.20')
+    fireEvent.click(screen.getByRole('button', { name: 'Decrease quantity' }))
+    expect(price.querySelector('s')).toBeNull()
+    expect(price).toHaveTextContent('$28.00')
+  })
+
+  it('follows the product chosen from the list', () => {
+    renderPreview()
+    fireEvent.change(screen.getByLabelText('Product previewing:'), { target: { value: '1' } })
+    expect(screen.getByTestId('preview-price')).toHaveTextContent('$40.00')
+  })
+
+  it('shows a price of zero in the shop currency while there is no product, so the preview does not jump when one is added', () => {
+    renderPreview({ products: [], currencyCode: 'GBP' })
+    expect(screen.getByTestId('preview-price')).toHaveTextContent('£0.00')
+    expect(screen.getByTestId('preview-price')).toHaveAttribute('data-placeholder', 'true')
+  })
+
   it('has a quantity picker that starts at 1 and raises or lowers the quantity, never below 1', () => {
     renderPreview()
     const input = screen.getByLabelText('Quantity') as HTMLInputElement

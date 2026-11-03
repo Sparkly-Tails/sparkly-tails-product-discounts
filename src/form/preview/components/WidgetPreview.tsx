@@ -2,9 +2,11 @@
 
 import { useEffect, useState } from 'react'
 import PreviewFrame from '@/form/preview/components/PreviewFrame'
+import PreviewPrice from '@/form/preview/components/PreviewPrice'
 import QuantityPicker from '@/form/preview/components/QuantityPicker'
 import WidgetView from '@/form/preview/components/WidgetView'
 import { buildPreviewModel, type PreviewProduct } from '@/form/preview/buildPreviewModel'
+import { pickPreviewPrice } from '@/form/preview/pickPreviewPrice'
 import type { FlashInput } from '@/form/preview/previewModel'
 import { PREVIEW_TOOLS } from '@/form/preview/previewTools'
 import { WIDGET_FUNCTIONS } from '@/form/preview/widgetFunctions'
@@ -36,15 +38,17 @@ export default function WidgetPreview({ products, tiers, flash, highDemand, styl
   }, [])
 
   const moneyFormat = `${readCurrencySymbol({ currencyCode })}{{amount}}`
+  const formatPreviewMoney = (amount: number) => WIDGET_FUNCTIONS.formatMoney(amount, moneyFormat)
   const model = buildPreviewModel({
     products, selectedIndex, tiers, flash, highDemand, quantity, timeZone, nowSeconds,
-    formatMoney: (amount) => WIDGET_FUNCTIONS.formatMoney(amount, moneyFormat),
+    formatMoney: formatPreviewMoney,
     tools: PREVIEW_TOOLS,
   })
+  const price = pickPreviewPrice({ viewModel: model.viewModel, placeholder: formatPreviewMoney(0) })
   const shownIndex = Math.min(selectedIndex, Math.max(products.length - 1, 0))
 
   return (
-    <PreviewFrame labels={products.map((product) => product.title)} selectedIndex={shownIndex} onSelectProduct={setSelectedIndex} controls={model.viewModel ? <QuantityPicker quantity={quantity} onChange={setQuantity} /> : null}>
+    <PreviewFrame labels={products.map((product) => product.title)} selectedIndex={shownIndex} onSelectProduct={setSelectedIndex} price={<PreviewPrice plainPrice={price.plainPrice} discountedPrice={price.discountedPrice} isPlaceholder={price.isPlaceholder} />} controls={model.viewModel ? <QuantityPicker quantity={quantity} onChange={setQuantity} /> : null}>
       {model.viewModel
         ? <WidgetView viewModel={model.viewModel} hasTiers={tiers.length > 0} widgetStyle={style} onPickQuantity={setQuantity} />
         : <p className="p-form-lg text-center text-form-body-md text-form-on-surface-variant">Add a product to see the preview</p>}

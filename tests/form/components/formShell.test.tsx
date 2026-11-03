@@ -44,9 +44,9 @@ describe('FormShell', () => {
     expect(header().querySelector('[data-testid="form-header-actions"]')).toBeNull()
   })
 
-  it('keeps the header in view while the form scrolls, on the page colour, with 8px of padding above and below', () => {
+  it('keeps the header in view while the form scrolls, white, out to the sides of the page and with 8px of padding above and below', () => {
     renderShell()
-    expect(header()).toHaveClass('sticky', 'top-0', 'bg-form-surface', 'py-2')
+    expect(header()).toHaveClass('sticky', 'top-0', 'bg-form-surface-container-lowest', '-mx-form-lg', 'px-form-lg', 'py-2')
     expect(header().className).not.toMatch(/(^|\s)p[tb]-/)
   })
 
