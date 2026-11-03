@@ -44,10 +44,10 @@ describe('FormShell', () => {
     expect(header().querySelector('[data-testid="form-header-actions"]')).toBeNull()
   })
 
-  it('keeps the header in view while the form scrolls, on the page colour, with no padding above it', () => {
+  it('keeps the header in view while the form scrolls, on the page colour, with 8px of padding above and below', () => {
     renderShell()
-    expect(header()).toHaveClass('sticky', 'top-0', 'bg-form-surface')
-    expect(header().className).not.toMatch(/(^|\s)pt-/)
+    expect(header()).toHaveClass('sticky', 'top-0', 'bg-form-surface', 'py-2')
+    expect(header().className).not.toMatch(/(^|\s)p[tb]-/)
   })
 
   it('puts the form in the 7-column column and the preview in the 5-column column', () => {
@@ -56,10 +56,11 @@ describe('FormShell', () => {
     expect(screen.getByText('preview content').parentElement).toHaveClass('lg:col-span-5')
   })
 
-  it('keeps the preview column in view while the form scrolls, below the header', () => {
+  // The header is 72px (8 + 16 + 4 + 36 + 8) and cards are 16px apart, so the preview sticks at 88px, level with where the form's cards start.
+  it('keeps the preview column in view while the form scrolls, 16px below the header', () => {
     renderShell()
     const previewColumn = screen.getByText('preview content').parentElement as HTMLElement
-    expect(previewColumn).toHaveClass('sticky', 'self-start', 'top-28')
+    expect(previewColumn).toHaveClass('sticky', 'self-start', 'top-22')
   })
 
   it('shows a notice between the header and the columns, and has no footer bar', () => {

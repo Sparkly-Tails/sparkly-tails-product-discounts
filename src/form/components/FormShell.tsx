@@ -24,7 +24,7 @@ export default function FormShell({
 }) {
   return (
     <div className="w-full space-y-form-md font-form text-form-on-surface">
-      <header data-testid="form-header" className="sticky top-0 z-10 bg-form-surface flex flex-col gap-form-xs pb-form-sm">
+      <header data-testid="form-header" className="sticky top-0 z-10 bg-form-surface flex flex-col gap-form-xs py-2">
         <nav aria-label="Breadcrumb" className="flex items-center gap-form-xs">
           <Link className="inline-flex items-center gap-1 text-form-label-sm text-form-on-surface-variant hover:text-form-on-surface transition-colors" href="/">
             <ArrowBackIcon className="text-[16px]" />
@@ -47,7 +47,7 @@ export default function FormShell({
       {notice}
       <div className="grid grid-cols-12 gap-form-lg items-start">
         <div className="col-span-12 lg:col-span-7 flex flex-col gap-form-md">{children}</div>
-        <div className="col-span-12 lg:col-span-5 sticky top-28 self-start flex flex-col gap-form-md">{preview}</div>
+        <div className="col-span-12 lg:col-span-5 sticky top-22 self-start flex flex-col gap-form-md">{preview}</div>
       </div>
     </div>
   )
