@@ -12,8 +12,12 @@ type Application = { type: string; title: string }
 const AUTOMATIC_TYPE = 'automatic'
 /** How the Admin API names the application types the webhook names otherwise. */
 const GRAPHQL_TYPES: Record<string, string> = { AutomaticDiscountApplication: AUTOMATIC_TYPE }
-/** The messages the discount Function gives each application: "15% off", "12.5% off" or "£12.00 each" (a test reads the Function to keep this true). */
-const TIER_MESSAGE_PATTERN = /^(\d+(\.\d+)?% off|£\d+\.\d{2} each)$/
+/**
+ * The messages the discount Function gives each application: "15% off", "12.5% off" or "Offer price" (a test reads the Function to
+ * keep this true). "£12.00 each" is the message a fixed price tier had before the Function worked in the customer's currency; orders
+ * placed then still carry it, so it is still recognised.
+ */
+const TIER_MESSAGE_PATTERN = /^(\d+(\.\d+)?% off|Offer price|£\d+\.\d{2} each)$/
 const AMOUNT_PATTERN = /^-?\d+(\.\d+)?$/
 const GID_PARTS_PATTERN = /^(number|string):\d{1,20}$/
 

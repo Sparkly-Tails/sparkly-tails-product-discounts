@@ -6,6 +6,7 @@ export const EXTENSION_SCRIPTS = [
   { entry: 'entries/paint.js', name: 'tier-pricing-paint.js' },
   { entry: 'entries/flash.js', name: 'tier-pricing-flash.js' },
   { entry: 'entries/siblings.js', name: 'tier-pricing-siblings.js' },
+  { entry: 'entries/currency.js', name: 'tier-pricing-currency.js' },
   // The script of the "Product card prices" app embed (blocks/card-prices.liquid), which has nothing to do with the tier block.
   { entry: 'entries/cards.js', name: 'card-prices.js' },
 ]

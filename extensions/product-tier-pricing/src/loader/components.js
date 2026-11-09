@@ -1,10 +1,11 @@
 // Which components one widget needs. The block hands over the address of every component in
 // data-component-urls (blocks/tier-pricing.liquid); the list of names is decided here from what the widget shows.
 
-/** The components every widget needs, plus the flash sale only when the widget has one. */
-export function listNeededComponents({ hasFlash }) {
+/** The components every widget needs, plus the flash sale only when the widget has one, and the currency only for a customer who sees another currency. */
+export function listNeededComponents({ hasFlash, isForeignCurrency }) {
   const names = ['model', 'paint']
   if (hasFlash) names.push('flash')
+  if (isForeignCurrency) names.push('currency')
   return names
 }
 

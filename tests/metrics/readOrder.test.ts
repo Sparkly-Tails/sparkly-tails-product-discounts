@@ -6,7 +6,7 @@ const fromWebhook = (body: string) => readWebhookOrder({ body, tools: READ_ORDER
 const fromGraphql = (node: unknown) => readGraphqlOrder({ node, tools: READ_ORDER_TOOLS })
 
 describe('isAppDiscount', () => {
-  it.each([['a percent tier', '15% off'], ['a percent with decimals', '12.5% off'], ['a fixed price tier', '£12.00 each']])('is an automatic discount with the message the discount Function gives: %s', (_name, title) => {
+  it.each([['a percent tier', '15% off'], ['a percent with decimals', '12.5% off'], ['a fixed or anchor price tier', 'Offer price'], ['a fixed price tier of an order placed before the message changed', '£12.00 each']])('is an automatic discount with the message the discount Function gives: %s', (_name, title) => {
     expect(isAppDiscount({ type: 'automatic', title })).toBe(true)
   })
 

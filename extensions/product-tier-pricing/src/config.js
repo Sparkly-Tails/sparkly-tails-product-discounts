@@ -25,6 +25,36 @@ export function isVariantAvailable({ soldOutVariantIds, variantId }) {
   return !soldOutVariantIds.includes(String(variantId))
 }
 
+/** The currency Shopify says the customer sees and its rate, as texts ('' when the page has none). Takes `window.Shopify`. */
+export function readShopifyCurrency(shopify) {
+  const currency = Object(Object(shopify).currency)
+  return { activeCurrency: String(currency.active || ''), rateText: String(currency.rate || '') }
+}
+
+/** True only when both currencies are known and differ; an unknown one keeps the shop's own way (nothing converted). */
+export function isForeignCurrency({ activeCurrency, shopCurrency }) {
+  return activeCurrency !== '' && shopCurrency !== '' && activeCurrency !== shopCurrency
+}
+
+/** A JSON text holding one string, as Liquid's json filter prints it; '' when it is not. */
+export function parseText(text) {
+  try {
+    const value = JSON.parse(text)
+    return typeof value === 'string' ? value : ''
+  } catch {
+    return ''
+  }
+}
+
+/** What the block and the page say about currency: the sample of the money filter, the rate, and whether the customer sees another currency than the shop's. */
+export function readContainerCurrency({ container, shopify, tools }) {
+  const { activeCurrency, rateText } = tools.readShopifyCurrency(shopify)
+  const shopCurrency = tools.parseText(container.dataset.shopCurrency)
+  return { rateText, moneySample: tools.parseText(container.dataset.moneySample), isForeignCurrency: tools.isForeignCurrency({ activeCurrency, shopCurrency }) }
+}
+
+export const CURRENCY_READERS = { readShopifyCurrency, isForeignCurrency, parseText }
+
 export function parseWidgetConfig(container) {
   const discount = JSON.parse(container.dataset.discount)
   const moneyFormat = JSON.parse(container.dataset.moneyFormat)
