@@ -123,6 +123,15 @@ fn split_discount_by_largest_remainder(discount_amount_total: f64, quantities: &
     pence_per_line
 }
 
+/// Converts a price stored in the shop currency into the customer's displayed
+/// currency. Shopify gives the cart line price and takes the discount amount in
+/// the displayed currency, so stored fixed and anchor prices must be converted
+/// before they are compared with them. Rounded to two decimals, the same way
+/// the storefront rounds the price it shows.
+fn convert_to_displayed_currency(shop_price: f64, currency_rate: f64) -> f64 {
+    (shop_price * currency_rate * 100.0).round() / 100.0
+}
+
 #[shopify_function]
 fn cart_lines_discounts_generate_run(
     input: schema::cart_lines_discounts_generate_run::Input,
@@ -140,6 +149,8 @@ fn cart_lines_discounts_generate_run(
         Some(metafield) => metafield.json_value(),
         None => return Ok(schema::CartLinesDiscountsGenerateRunResult { operations: vec![] }),
     };
+
+    let currency_rate = input.presentment_currency_rate().as_f64();
 
     let mut candidates = vec![];
 
@@ -207,7 +218,8 @@ fn cart_lines_discounts_generate_run(
             None => continue,
         };
 
-        if let Some(fixed_price) = tier.fixed_price {
+        if let Some(shop_fixed_price) = tier.fixed_price {
+            let fixed_price = convert_to_displayed_currency(shop_fixed_price, currency_rate);
             let discount_amount_total = ((line_unit_price - fixed_price) * total_quantity as f64 * 100.0).round() / 100.0;
             let discount_amount_total = discount_amount_total.max(0.0);
 
@@ -221,7 +233,7 @@ fn cart_lines_discounts_generate_run(
                     targets: vec![schema::ProductDiscountCandidateTarget::CartLine(
                         schema::CartLineTarget { id: id.clone(), quantity: None },
                     )],
-                    message: Some(format!("£{:.2} each", fixed_price)),
+                    message: Some("Offer price".to_string()),
                     value: schema::ProductDiscountCandidateValue::FixedAmount(
                         schema::ProductDiscountCandidateFixedAmount {
                             amount: Decimal(*pence as f64 / 100.0),
@@ -250,7 +262,8 @@ fn cart_lines_discounts_generate_run(
                         });
                     }
                 }
-                Some(anchor_price) => {
+                Some(shop_anchor_price) => {
+                    let anchor_price = convert_to_displayed_currency(shop_anchor_price, currency_rate);
                     let extra_units = (total_quantity - tier.min_qty) as f64;
                     let discount_amount_total = (line_unit_price * tier.min_qty as f64) - anchor_price
                         + extra_units * line_unit_price * (percent_off / 100.0);
@@ -307,6 +320,7 @@ mod tests {
         let result = run_function_with_input(
             cart_lines_discounts_generate_run,
             r#"{
+                "presentmentCurrencyRate": "1.0",
                 "cart": {
                     "lines": [
                         {
@@ -360,6 +374,7 @@ mod tests {
         let result = run_function_with_input(
             cart_lines_discounts_generate_run,
             r#"{
+                "presentmentCurrencyRate": "1.0",
                 "cart": {
                     "lines": [
                         {
@@ -399,6 +414,7 @@ mod tests {
         let result = run_function_with_input(
             cart_lines_discounts_generate_run,
             r#"{
+                "presentmentCurrencyRate": "1.0",
                 "cart": {
                     "lines": [
                         {
@@ -426,6 +442,7 @@ mod tests {
         let result = run_function_with_input(
             cart_lines_discounts_generate_run,
             r#"{
+                "presentmentCurrencyRate": "1.0",
                 "cart": {
                     "lines": [
                         {
@@ -465,6 +482,7 @@ mod tests {
         let result = run_function_with_input(
             cart_lines_discounts_generate_run,
             r#"{
+                "presentmentCurrencyRate": "1.0",
                 "cart": {
                     "lines": [
                         {
@@ -538,6 +556,7 @@ mod tests {
         let result = run_function_with_input(
             cart_lines_discounts_generate_run,
             r#"{
+                "presentmentCurrencyRate": "1.0",
                 "cart": {
                     "lines": [
                         {
@@ -591,6 +610,7 @@ mod tests {
         let result = run_function_with_input(
             cart_lines_discounts_generate_run,
             r#"{
+                "presentmentCurrencyRate": "1.0",
                 "cart": {
                     "lines": [
                         {
@@ -650,6 +670,7 @@ mod tests {
         let result = run_function_with_input(
             cart_lines_discounts_generate_run,
             r#"{
+                "presentmentCurrencyRate": "1.0",
                 "cart": {
                     "lines": [
                         {
@@ -696,6 +717,7 @@ mod tests {
         let result = run_function_with_input(
             cart_lines_discounts_generate_run,
             r#"{
+                "presentmentCurrencyRate": "1.0",
                 "cart": {
                     "lines": [
                         {
@@ -746,6 +768,7 @@ mod tests {
         let result = run_function_with_input(
             cart_lines_discounts_generate_run,
             r#"{
+                "presentmentCurrencyRate": "1.0",
                 "cart": {
                     "lines": [
                         {
@@ -811,6 +834,7 @@ mod tests {
         let result = run_function_with_input(
             cart_lines_discounts_generate_run,
             r#"{
+                "presentmentCurrencyRate": "1.0",
                 "cart": {
                     "lines": [
                         {
@@ -863,6 +887,7 @@ mod tests {
         let result = run_function_with_input(
             cart_lines_discounts_generate_run,
             r#"{
+                "presentmentCurrencyRate": "1.0",
                 "cart": {
                     "lines": [
                         {
@@ -907,6 +932,7 @@ mod tests {
         let result = run_function_with_input(
             cart_lines_discounts_generate_run,
             r#"{
+                "presentmentCurrencyRate": "1.0",
                 "cart": {
                     "lines": [
                         {
@@ -947,6 +973,7 @@ mod tests {
         let result = run_function_with_input(
             cart_lines_discounts_generate_run,
             r#"{
+                "presentmentCurrencyRate": "1.0",
                 "cart": {
                     "lines": [
                         {
@@ -1027,6 +1054,7 @@ mod tests {
         let result = run_function_with_input(
             cart_lines_discounts_generate_run,
             r#"{
+                "presentmentCurrencyRate": "1.0",
                 "cart": {
                     "lines": [
                         {
@@ -1121,6 +1149,7 @@ mod tests {
         let result = run_function_with_input(
             cart_lines_discounts_generate_run,
             r#"{
+                "presentmentCurrencyRate": "1.0",
                 "cart": {
                     "lines": [
                         {
@@ -1251,6 +1280,7 @@ mod tests {
         let result = run_function_with_input(
             cart_lines_discounts_generate_run,
             r#"{
+                "presentmentCurrencyRate": "1.0",
                 "cart": {
                     "lines": [
                         {
@@ -1332,6 +1362,7 @@ mod tests {
         let result = run_function_with_input(
             cart_lines_discounts_generate_run,
             r#"{
+                "presentmentCurrencyRate": "1.0",
                 "cart": {
                     "lines": [
                         {
@@ -1389,6 +1420,7 @@ mod tests {
         let result = run_function_with_input(
             cart_lines_discounts_generate_run,
             r#"{
+                "presentmentCurrencyRate": "1.0",
                 "cart": {
                     "lines": [
                         {
@@ -1441,6 +1473,7 @@ mod tests {
         let result = run_function_with_input(
             cart_lines_discounts_generate_run,
             r#"{
+                "presentmentCurrencyRate": "1.0",
                 "cart": {
                     "lines": [
                         {
@@ -1482,6 +1515,7 @@ mod tests {
         let result = run_function_with_input(
             cart_lines_discounts_generate_run,
             r#"{
+                "presentmentCurrencyRate": "1.0",
                 "cart": {
                     "lines": [
                         {
@@ -1532,6 +1566,7 @@ mod tests {
         let result = run_function_with_input(
             cart_lines_discounts_generate_run,
             r#"{
+                "presentmentCurrencyRate": "1.0",
                 "cart": {
                     "lines": [
                         {
@@ -1606,6 +1641,7 @@ mod tests {
         let result = run_function_with_input(
             cart_lines_discounts_generate_run,
             r#"{
+                "presentmentCurrencyRate": "1.0",
                 "cart": {
                     "lines": [
                         {
@@ -1645,6 +1681,7 @@ mod tests {
         let result = run_function_with_input(
             cart_lines_discounts_generate_run,
             r#"{
+                "presentmentCurrencyRate": "1.0",
                 "cart": {
                     "lines": [
                         {
@@ -1686,6 +1723,7 @@ mod tests {
         let result = run_function_with_input(
             cart_lines_discounts_generate_run,
             r#"{
+                "presentmentCurrencyRate": "1.0",
                 "cart": {
                     "lines": [
                         {
@@ -1736,6 +1774,7 @@ mod tests {
         let result = run_function_with_input(
             cart_lines_discounts_generate_run,
             r#"{
+                "presentmentCurrencyRate": "1.0",
                 "cart": {
                     "lines": [
                         {
@@ -1819,6 +1858,7 @@ mod tests {
         let result = run_function_with_input(
             cart_lines_discounts_generate_run,
             r#"{
+                "presentmentCurrencyRate": "1.0",
                 "cart": {
                     "lines": [
                         {
@@ -1892,6 +1932,7 @@ mod tests {
         let result = run_function_with_input(
             cart_lines_discounts_generate_run,
             r#"{
+                "presentmentCurrencyRate": "1.0",
                 "cart": {
                     "lines": [
                         {
@@ -2019,6 +2060,7 @@ mod tests {
     }
 
     const TWO_DISCOUNTS_INPUT: &str = r#"{
+        "presentmentCurrencyRate": "1.0",
         "cart": {
             "lines": [
                 {
@@ -2089,6 +2131,133 @@ mod tests {
         );
         let result = run_function_with_input(cart_lines_discounts_generate_run, &input)?;
         assert!(result.operations.is_empty());
+        Ok(())
+    }
+
+    // ---- displayed currency: stored fixed/anchor prices are in the shop currency,
+    // the cart's line price and Shopify's discount amount are in the customer's
+    // displayed currency, so stored prices are multiplied by presentmentCurrencyRate.
+
+    const PRESENTMENT_INPUT: &str = r#"{
+        "presentmentCurrencyRate": "__RATE__",
+        "cart": {
+            "lines": [
+                {
+                    "id": "gid://shopify/CartLine/0",
+                    "quantity": __QTY__,
+                    "cost": { "amountPerQuantity": { "amount": "__UNIT__" } },
+                    "merchandise": {
+                        "__typename": "ProductVariant",
+                        "id": "gid://shopify/ProductVariant/900",
+                        "product": { "id": "gid://shopify/Product/1" }
+                    }
+                }
+            ]
+        },
+        "shop": {
+            "metafield": {
+                "jsonValue": {
+                    "discounts": [
+                        {
+                            "status": "live",
+                            "members": [{ "productId": "gid://shopify/Product/1" }],
+                            "tiers": [__TIERS__]
+                        }
+                    ]
+                }
+            }
+        },
+        "discount": { "discountClasses": ["PRODUCT"] }
+    }"#;
+
+    fn run_presentment(rate: &str, unit: &str, quantity: i32, tiers: &str) -> Result<schema::CartLinesDiscountsGenerateRunResult> {
+        let input = PRESENTMENT_INPUT
+            .replace("__RATE__", rate)
+            .replace("__UNIT__", unit)
+            .replace("__QTY__", &quantity.to_string())
+            .replace("__TIERS__", tiers);
+        run_function_with_input(cart_lines_discounts_generate_run, &input)
+    }
+
+    fn read_first_amount(result: &schema::CartLinesDiscountsGenerateRunResult) -> f64 {
+        match &result.operations[0] {
+            schema::CartOperation::ProductDiscountsAdd(op) => match &op.candidates[0].value {
+                schema::ProductDiscountCandidateValue::FixedAmount(f) => f.amount.0,
+                _ => panic!("expected a FixedAmount value"),
+            },
+            _ => panic!("expected ProductDiscountsAdd"),
+        }
+    }
+
+    fn read_first_message(result: &schema::CartLinesDiscountsGenerateRunResult) -> Option<String> {
+        match &result.operations[0] {
+            schema::CartOperation::ProductDiscountsAdd(op) => op.candidates[0].message.clone(),
+            _ => panic!("expected ProductDiscountsAdd"),
+        }
+    }
+
+    #[test]
+    fn converts_a_fixed_price_tier_to_the_displayed_currency() -> Result<()> {
+        // shop price 1.99 shows as 2.79 at rate 1.4; stored fixed price 1.50 becomes 2.10;
+        // discount = (2.79 - 2.10) * 3 = 2.07 (unconverted it would be (2.79 - 1.50) * 3 = 3.87)
+        let result = run_presentment("1.4", "2.79", 3, r#"{ "minQty": 3, "fixedPrice": 1.50 }"#)?;
+        let amount = read_first_amount(&result);
+        assert!((amount - 2.07).abs() < 1e-9, "expected 2.07, got {}", amount);
+        Ok(())
+    }
+
+    #[test]
+    fn converts_an_anchor_price_tier_to_the_displayed_currency() -> Result<()> {
+        // shop price 2.00 shows as 2.80 at rate 1.4; stored anchor 8.50 becomes 11.90;
+        // discount = 2.80 * 5 - 11.90 = 2.10 (unconverted it would be 14.00 - 8.50 = 5.50)
+        let result = run_presentment("1.4", "2.80", 5, r#"{ "minQty": 5, "percentOff": 10.0, "anchorPrice": 8.50 }"#)?;
+        let amount = read_first_amount(&result);
+        assert!((amount - 2.10).abs() < 1e-9, "expected 2.10, got {}", amount);
+        Ok(())
+    }
+
+    #[test]
+    fn rounds_the_converted_fixed_price_to_two_decimals() -> Result<()> {
+        // stored 1.55 * 1.35 = 2.0925 -> 2.09; unit shows 2.99; discount = (2.99 - 2.09) * 2 = 1.80
+        let result = run_presentment("1.35", "2.99", 2, r#"{ "minQty": 2, "fixedPrice": 1.55 }"#)?;
+        let amount = read_first_amount(&result);
+        assert!((amount - 1.80).abs() < 1e-9, "expected 1.80, got {}", amount);
+        Ok(())
+    }
+
+    #[test]
+    fn leaves_prices_unchanged_at_a_rate_of_one() -> Result<()> {
+        let result = run_presentment("1.0", "1.99", 3, r#"{ "minQty": 3, "fixedPrice": 1.50 }"#)?;
+        let amount = read_first_amount(&result);
+        assert!((amount - 1.47).abs() < 1e-9, "expected 1.47, got {}", amount);
+        Ok(())
+    }
+
+    #[test]
+    fn words_a_fixed_price_message_without_a_currency_symbol() -> Result<()> {
+        let result = run_presentment("1.4", "2.79", 3, r#"{ "minQty": 3, "fixedPrice": 1.50 }"#)?;
+        assert_eq!(read_first_message(&result), Some("Offer price".to_string()));
+        Ok(())
+    }
+
+    #[test]
+    fn applies_no_fixed_discount_when_the_converted_price_is_not_below_the_line_price() -> Result<()> {
+        // stored 2.50 * 1.4 = 3.50 is above the displayed 2.79, so no markup candidate is emitted
+        let result = run_presentment("1.4", "2.79", 3, r#"{ "minQty": 3, "fixedPrice": 2.50 }"#)?;
+        assert!(result.operations.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn keeps_percent_tiers_unchanged_at_any_rate() -> Result<()> {
+        let result = run_presentment("1.4", "2.79", 3, r#"{ "minQty": 3, "percentOff": 10.0 }"#)?;
+        match &result.operations[0] {
+            schema::CartOperation::ProductDiscountsAdd(op) => match &op.candidates[0].value {
+                schema::ProductDiscountCandidateValue::Percentage(p) => assert_eq!(p.value.0, 10.0),
+                _ => panic!("expected a Percentage value"),
+            },
+            _ => panic!("expected ProductDiscountsAdd"),
+        }
         Ok(())
     }
 }

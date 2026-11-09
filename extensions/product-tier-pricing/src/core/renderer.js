@@ -7,6 +7,13 @@ export function createMoneyFormatter(moneyFormat) {
   return (amount) => formatMoney(amount, moneyFormat)
 }
 
+// The tiers and the money format to show: the widget's own, or, for a customer who sees another currency (its currency
+// component is then loaded), the same in that currency. Not usable when that currency cannot be worked out.
+export function readShownPrices({ currencyPart, config }) {
+  if (!currencyPart) return { isUsable: true, tiers: config.tiers, moneyFormat: config.moneyFormat }
+  return currencyPart.showInCurrency({ tiers: config.tiers, rateText: config.rateText, moneySample: config.moneySample })
+}
+
 // Builds the render cycle and wires the mix & match toggle (needs the
 // same last-fetched-cart state the render cycle owns). Returns `render`;
 // every other listener is wired from initTierPricing against it.
@@ -18,7 +25,7 @@ export function createRenderer(container, config, elements, loading) {
   const tierButtonsSignatureRef = { value: null }
   const lastKnownSelfQtyRef = { value: null }
   const variantStateRef = { value: config.initialVariantId }
-  const formatMoneyFn = createMoneyFormatter(config.moneyFormat)
+  let formatMoneyFn = createMoneyFormatter(config.moneyFormat)
   let lastCartItems = []
   let lastPricing = null
   let siblingsApi = null
@@ -53,8 +60,13 @@ export function createRenderer(container, config, elements, loading) {
     const parts = await loading.components
     if (!parts) return
 
+    const shown = readShownPrices({ currencyPart: parts.currency, config })
+    container.hidden = !shown.isUsable
+    if (!shown.isUsable) return
+    formatMoneyFn = createMoneyFormatter(shown.moneyFormat)
+
     const viewModel = parts.model.computeWidgetViewModel({
-      tiers: eligible ? config.tiers : [],
+      tiers: eligible ? shown.tiers : [],
       basePrice,
       otherQty,
       addingQty,

@@ -12,13 +12,14 @@ const COMPONENTS: Record<string, string> = {
   paint: 'tier-pricing-paint.js',
   flash: 'tier-pricing-flash.js',
   siblings: 'tier-pricing-siblings.js',
+  currency: 'tier-pricing-currency.js',
 }
 
 describe('the extension build list', () => {
   const scriptNames = EXTENSION_SCRIPTS.map((script: { name: string }) => script.name)
 
   it('builds exactly the scripts and stylesheets the blocks and the core script use', () => {
-    expect(scriptNames.sort()).toEqual(['card-prices.js', 'tier-pricing-flash.js', 'tier-pricing-model.js', 'tier-pricing-paint.js', 'tier-pricing-siblings.js', 'tier-pricing.js'])
+    expect(scriptNames.sort()).toEqual(['card-prices.js', 'tier-pricing-currency.js', 'tier-pricing-flash.js', 'tier-pricing-model.js', 'tier-pricing-paint.js', 'tier-pricing-siblings.js', 'tier-pricing.js'])
     expect(EXTENSION_STYLESHEETS.map((sheet: { name: string }) => sheet.name).sort()).toEqual(['card-prices.css', 'tier-pricing.css'])
   })
 

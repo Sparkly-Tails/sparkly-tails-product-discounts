@@ -1,5 +1,5 @@
 // Finds every widget on the page and starts it.
-import { parseWidgetConfig, queryWidgetElements } from '../config.js'
+import { CURRENCY_READERS, parseWidgetConfig, queryWidgetElements, readContainerCurrency } from '../config.js'
 import { listNeededComponents, loadComponentSet, parseComponentUrls } from '../loader/components.js'
 import { loadComponent } from '../loader/registry.js'
 import { createRenderer } from './renderer.js'
@@ -10,7 +10,7 @@ import { readSelectedVariantId, syncSelectedVariant, wireAddToCartForm, wireCart
 // one cannot be loaded: the widget then keeps the plain price the block rendered and the page does not break.
 function startLoadingComponents(container, config) {
   const urls = parseComponentUrls(container.dataset.componentUrls)
-  const names = listNeededComponents({ hasFlash: !!config.flash })
+  const names = listNeededComponents({ hasFlash: !!config.flash, isForeignCurrency: config.isForeignCurrency })
   const loadOne = (name) => loadComponent({ root: window, document, name, url: urls[name] })
   return {
     components: loadComponentSet({ names, loadOne }).catch(() => null),
@@ -20,7 +20,7 @@ function startLoadingComponents(container, config) {
 
 export function initTierPricing() {
   document.querySelectorAll('[data-smooth-discounts]').forEach((container) => {
-    const config = parseWidgetConfig(container)
+    const config = { ...parseWidgetConfig(container), ...readContainerCurrency({ container, shopify: window.Shopify, tools: CURRENCY_READERS }) }
     const elements = queryWidgetElements(container)
     const loading = startLoadingComponents(container, config)
     const render = createRenderer(container, config, elements, loading)

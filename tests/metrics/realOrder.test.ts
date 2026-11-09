@@ -46,8 +46,9 @@ describe('the messages of the discount Function', () => {
 
   it('are still the ones isAppDiscount recognises: if this fails, the Function changed its messages and the orders would stop counting', () => {
     expect(source).toContain('format!("{}% off", percent_off)')
-    expect(source).toContain('format!("£{:.2} each", fixed_price)')
+    expect(source).toContain('message: Some("Offer price".to_string())')
     expect(isAppDiscount({ type: 'automatic', title: `${15}% off` })).toBe(true)
+    expect(isAppDiscount({ type: 'automatic', title: 'Offer price' })).toBe(true)
     expect(isAppDiscount({ type: 'automatic', title: `£${(12).toFixed(2)} each` })).toBe(true)
   })
 })
