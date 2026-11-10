@@ -9,10 +9,10 @@ const SOURCE = path.resolve(__dirname, '../../extensions/product-tier-pricing/sr
 const css = readBuiltWidget()['bundle-popup.css'].replace(/\s+/g, ' ')
 const PREFIX = 'smooth-discounts-popup__'
 
-/** The class names the view writes: every `name: 'x'` of a node description in box.js and shell.js, plus the box element's own class. */
+/** The class names the view writes: every `name: 'x'` of a node description in box.js, parts.js and shell.js, plus the box element's own class. */
 const writtenNames = (): string[] => {
   const found = new Set<string>(['box'])
-  for (const file of ['box.js', 'shell.js']) {
+  for (const file of ['box.js', 'parts.js', 'shell.js']) {
     for (const match of fs.readFileSync(path.join(SOURCE, file), 'utf8').matchAll(/\bname: '([a-z-]+)'/g)) found.add(match[1])
   }
   return [...found]

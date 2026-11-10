@@ -5,9 +5,11 @@ export function loadPopupComponent({ win, urls, loadComponent }, name) {
   return loadComponent({ root: win, document: win.document, name, url: urls[name] })
 }
 
-/** The loaded components by name: the boxes, the UI (controller), its drawing and its arithmetic, plus the currency component only for a customer who sees another currency than the shop's. Rejects when one cannot be loaded, and the press then goes ahead. */
+const POPUP_NAMES = ['popupBoxes', 'popupUi', 'popupView', 'popupFacts', 'popupParts']
+
+/** The loaded components by name: the boxes, the UI (controller), its drawing, its parts and its arithmetic, plus the currency component only for a customer who sees another currency than the shop's. Rejects when one cannot be loaded, and the press then goes ahead. */
 export function loadPopupComponents({ win, config, tools }) {
-  const names = config.isForeignCurrency ? ['popupBoxes', 'popupUi', 'popupView', 'popupFacts', 'currency'] : ['popupBoxes', 'popupUi', 'popupView', 'popupFacts']
+  const names = config.isForeignCurrency ? POPUP_NAMES.concat('currency') : POPUP_NAMES
   const loadOne = tools.loadPopupComponent.bind(null, { win, urls: config.componentUrls, loadComponent: tools.loadComponent })
   return tools.loadComponentSet({ names, loadOne })
 }

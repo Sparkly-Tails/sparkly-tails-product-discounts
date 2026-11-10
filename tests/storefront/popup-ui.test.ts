@@ -3,7 +3,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { clearWidgetRegistry, readBuiltWidget } from '../helpers/builtWidget'
 
 /**
- * The pop-up (bundle-popup-ui.js, with the drawing bundle-popup-view.js and the arithmetic bundle-popup-facts.js it works with): the dialog, the
+ * The pop-up (bundle-popup-ui.js, with the drawing bundle-popup-view.js, the parts bundle-popup-parts.js and the arithmetic bundle-popup-facts.js it works with): the dialog, the
  * boxes, the list of items, the adding and the countdown. The built scripts are run on the page and openPopup is called the way the core script
  * calls it. The shop is a stub that keeps a cart.
  */
@@ -87,9 +87,9 @@ async function openBoxes({ boxes = [boxOf()], root = '/', moneyFormat = '£{{amo
   document.body.innerHTML = '<button name="checkout" type="submit">Check out</button>'
   const opener = document.querySelector('button[name="checkout"]') as HTMLElement
   opener.focus()
-  const { popupUi, popupView, popupFacts } = (window as unknown as { SmoothDiscounts: { components: { popupUi: { openPopup: (options: object) => Promise<Answer> }; popupView: object; popupFacts: object } } }).SmoothDiscounts.components
+  const components = (window as unknown as { SmoothDiscounts: { components: { popupUi: { openPopup: (options: object) => Promise<Answer> } } & Record<string, object> } }).SmoothDiscounts.components
   const answers: Answer[] = []
-  const promise = popupUi.openPopup({ win: window, boxes, root, accents, moneyFormat, opener, view: popupView, facts: popupFacts }).then((answer) => { answers.push(answer); return answer })
+  const promise = components.popupUi.openPopup({ win: window, boxes, root, accents, moneyFormat, opener, components }).then((answer) => { answers.push(answer); return answer })
   await settle()
   return { promise, dialog: document.querySelector('dialog') as HTMLDialogElement, opener, answers }
 }
@@ -109,7 +109,7 @@ beforeEach(() => {
   showModal.mockReset()
   ;(HTMLDialogElement.prototype as unknown as { showModal: () => void }).showModal = function showModalStub(this: HTMLDialogElement) { showModal(); this.setAttribute('open', '') }
   ;(HTMLDialogElement.prototype as unknown as { close: () => void }).close = function closeStub(this: HTMLDialogElement) { this.removeAttribute('open'); this.dispatchEvent(new Event('close')) }
-  for (const name of ['bundle-popup-facts.js', 'bundle-popup-view.js', 'bundle-popup-ui.js']) (0, eval)(built[name])
+  for (const name of ['bundle-popup-facts.js', 'bundle-popup-parts.js', 'bundle-popup-view.js', 'bundle-popup-ui.js']) (0, eval)(built[name])
 })
 
 afterEach(() => {
