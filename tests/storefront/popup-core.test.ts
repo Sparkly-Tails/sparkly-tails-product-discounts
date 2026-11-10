@@ -22,7 +22,7 @@ const discountOf = (overrides: Partial<Discount> = {}): Discount => ({ discountI
 const lineOf = (productId: number, variantId: number, quantity: number): CartLine => ({ product_id: productId, variant_id: variantId, quantity })
 
 const TUNA_FEED: Record<string, LiveVariant[] | 'fail'> = { tuna: [{ id: 1, title: 'Small', price: 169, available: true }, { id: 2, title: 'Large', price: 169, available: true }], salmon: [{ id: 3, title: 'Default Title', price: 169, available: true }] }
-const URLS = { popupBoxes: 'https://cdn.test/bundle-popup-boxes.js', popupUi: 'https://cdn.test/bundle-popup-ui.js', currency: 'https://cdn.test/tier-pricing-currency.js' }
+const URLS = { popupBoxes: 'https://cdn.test/bundle-popup-boxes.js', popupUi: 'https://cdn.test/bundle-popup-ui.js', popupView: 'https://cdn.test/bundle-popup-view.js', popupFacts: 'https://cdn.test/bundle-popup-facts.js', currency: 'https://cdn.test/tier-pricing-currency.js' }
 
 type CurrencyPage = { shopCurrency: string; activeCurrency: string; rate: string; sample: string }
 const GBP_PAGE: CurrencyPage = { shopCurrency: 'GBP', activeCurrency: 'GBP', rate: '1.0', sample: '£1,234.56' }
@@ -34,6 +34,9 @@ function embedHtml({ discounts, rootUrl, currency, urls }: { discounts: Discount
 }
 
 const fetchMock = vi.fn()
+/** Stand-ins for the drawing and the arithmetic components, which the core only hands over to the UI. */
+const VIEW = { name: 'view' }
+const FACTS = { name: 'facts' }
 const openPopup = vi.fn<(options: Record<string, unknown>) => Promise<Answer>>()
 const assign = vi.fn()
 const reload = vi.fn()
@@ -82,7 +85,7 @@ async function mountPage({ discounts = [discountOf()], lines = [lineOf(100, 1, 3
   const checkout = button ?? '<form action="/cart" method="post" id="cartform"><button type="submit" name="checkout" id="checkout">Check out</button></form>'
   document.body.innerHTML = `${checkout}${hasEmbed ? embedHtml({ discounts, rootUrl, currency, urls }) : ''}`
   document.getElementById('cartform')?.addEventListener('submit', (event) => { event.preventDefault(); submits += 1 })
-  if (hasUi) (window as unknown as { SmoothDiscounts: object }).SmoothDiscounts = { components: { popupUi: { openPopup } }, deferreds: {} }
+  if (hasUi) (window as unknown as { SmoothDiscounts: object }).SmoothDiscounts = { components: { popupUi: { openPopup }, popupView: VIEW, popupFacts: FACTS }, deferreds: {} }
   runPopupScripts({ built, components })
   await settle()
 }
@@ -154,8 +157,10 @@ describe('a bundle that is due', () => {
     await mountPage({ discounts: [discountOf({ style: { backgroundColor: '#aabbcc', cornerRadius: 8 } })], rootUrl: '/fr' })
     await pressCheckout()
     expect(openPopup).toHaveBeenCalledTimes(1)
-    const options = openPopup.mock.calls[0][0] as { boxes: Record<string, unknown>[]; root: string; accents: object; moneyFormat: string; opener: unknown }
+    const options = openPopup.mock.calls[0][0] as { boxes: Record<string, unknown>[]; root: string; accents: object; moneyFormat: string; opener: unknown; view: unknown; facts: unknown }
     expect(options.root).toBe('/fr')
+    expect(options.view).toBe(VIEW)
+    expect(options.facts).toBe(FACTS)
     expect(options.moneyFormat).toBe('£{{amount}}')
     expect(options.accents).toEqual({ moss: '#434625', cream: '#f3ecd9', sun: '#ffdc4c' })
     expect(options.opener).toBe(document.getElementById('checkout'))

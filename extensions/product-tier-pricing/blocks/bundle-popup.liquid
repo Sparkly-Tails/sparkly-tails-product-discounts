@@ -15,12 +15,16 @@
     {
       "popupBoxes": {{ 'bundle-popup-boxes.js' | asset_url | json }},
       "popupUi": {{ 'bundle-popup-ui.js' | asset_url | json }},
+      "popupView": {{ 'bundle-popup-view.js' | asset_url | json }},
+      "popupFacts": {{ 'bundle-popup-facts.js' | asset_url | json }},
       "currency": {{ 'tier-pricing-currency.js' | asset_url | json }}
     }
   {%- endcapture -%}
   {%- assign component_urls_json = component_urls_raw | strip | escape -%}
   {{ 'bundle-popup-boxes.js' | asset_url | preload_tag: as: 'script' }}
   {{ 'bundle-popup-ui.js' | asset_url | preload_tag: as: 'script' }}
+  {{ 'bundle-popup-view.js' | asset_url | preload_tag: as: 'script' }}
+  {{ 'bundle-popup-facts.js' | asset_url | preload_tag: as: 'script' }}
   <div
     data-smooth-discounts-popup
     hidden

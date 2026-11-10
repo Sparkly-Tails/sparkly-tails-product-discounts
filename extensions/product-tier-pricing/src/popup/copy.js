@@ -7,6 +7,7 @@ import { sortTiersByMinQty, withUnitAnchor } from '../tierMath.js'
 export const POPUP_TEXT = {
   fallbackTitle: 'Your bundle',
   close: 'Close',
+  add: 'Add',
   continue: 'Continue to checkout',
   unlocked: 'Tier unlocked',
   failed: 'We couldn\'t add that. Try again.',

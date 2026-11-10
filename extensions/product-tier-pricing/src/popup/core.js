@@ -45,13 +45,13 @@ export async function readDueBundles({ win, config, tools }) {
   return { due, lines: cart.items }
 }
 
-/** The boxes to show: `{ ui, moneyFormat, boxes }`, or null when no bundle is due. Fetches the cart now; the components, and through them the products, only when a bundle is due. */
+/** The boxes to show: `{ ui, view, facts, moneyFormat, boxes }`, or null when no bundle is due. Fetches the cart now; the components, and through them the products, only when a bundle is due. */
 export async function prepareBoxes({ win, config, tools }) {
   const { due, lines } = await tools.readDueBundles({ win, config, tools })
   if (due.length === 0) return null
   const components = await tools.loadPopupComponents({ win, config, tools })
   const prepared = await components.popupBoxes.prepareBoxes({ win, config, due, lines, currency: components.currency || null })
-  return { ...prepared, ui: components.popupUi }
+  return { ...prepared, ui: components.popupUi, view: components.popupView, facts: components.popupFacts }
 }
 
 /** A bundle set to "once per session" is remembered as shown. */
@@ -62,7 +62,7 @@ export function recordBox({ storage, tools }, box) {
 /** Opens the pop-up; each box is remembered as shown now, when it appears. Resolves with `{ action, didAdd }`. */
 export function showBoxes({ win, config, target, prepared, tools }) {
   prepared.boxes.forEach(tools.recordBox.bind(null, { storage: tools.readStorage({ win }), tools }))
-  return prepared.ui.openPopup({ win, boxes: prepared.boxes, root: config.rootUrl, accents: prepared.accents, moneyFormat: prepared.moneyFormat, opener: target })
+  return prepared.ui.openPopup({ win, boxes: prepared.boxes, root: config.rootUrl, accents: prepared.accents, moneyFormat: prepared.moneyFormat, opener: target, view: prepared.view, facts: prepared.facts })
 }
 
 /** What the customer decided; the pass-through answer when there is nothing to show. */

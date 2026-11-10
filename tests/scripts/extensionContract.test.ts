@@ -19,7 +19,7 @@ describe('the extension build list', () => {
   const scriptNames = EXTENSION_SCRIPTS.map((script: { name: string }) => script.name)
 
   it('builds exactly the scripts and stylesheets the blocks and the core script use', () => {
-    expect(scriptNames.sort()).toEqual(['bundle-popup-boxes.js', 'bundle-popup-ui.js', 'bundle-popup.js', 'card-prices-offer.js', 'card-prices.js', 'tier-pricing-currency.js', 'tier-pricing-flash.js', 'tier-pricing-model.js', 'tier-pricing-paint.js', 'tier-pricing-siblings.js', 'tier-pricing.js'])
+    expect(scriptNames.sort()).toEqual(['bundle-popup-boxes.js', 'bundle-popup-facts.js', 'bundle-popup-ui.js', 'bundle-popup-view.js', 'bundle-popup.js', 'card-prices-offer.js', 'card-prices.js', 'tier-pricing-currency.js', 'tier-pricing-flash.js', 'tier-pricing-model.js', 'tier-pricing-paint.js', 'tier-pricing-siblings.js', 'tier-pricing.js'])
     expect(EXTENSION_STYLESHEETS.map((sheet: { name: string }) => sheet.name).sort()).toEqual(['bundle-popup.css', 'card-prices.css', 'tier-pricing.css'])
   })
 
@@ -79,7 +79,7 @@ describe('the card prices embed and its components', () => {
 
 describe('the bundle pop-up embed and its components', () => {
   const block = read('blocks/bundle-popup.liquid')
-  const POPUP_COMPONENTS: Record<string, string> = { popupBoxes: 'bundle-popup-boxes.js', popupUi: 'bundle-popup-ui.js', currency: 'tier-pricing-currency.js' }
+  const POPUP_COMPONENTS: Record<string, string> = { popupBoxes: 'bundle-popup-boxes.js', popupUi: 'bundle-popup-ui.js', popupView: 'bundle-popup-view.js', popupFacts: 'bundle-popup-facts.js', currency: 'tier-pricing-currency.js' }
 
   it('hands the core script the address of every component, under the name the core asks for', () => {
     for (const [name, file] of Object.entries(POPUP_COMPONENTS)) expect(block).toContain(`"${name}": {{ '${file}' | asset_url | json }}`)
@@ -88,6 +88,8 @@ describe('the bundle pop-up embed and its components', () => {
   it('preloads the parts every press of Checkout needs', () => {
     expect(block).toContain("{{ 'bundle-popup-boxes.js' | asset_url | preload_tag: as: 'script' }}")
     expect(block).toContain("{{ 'bundle-popup-ui.js' | asset_url | preload_tag: as: 'script' }}")
+    expect(block).toContain("{{ 'bundle-popup-view.js' | asset_url | preload_tag: as: 'script' }}")
+    expect(block).toContain("{{ 'bundle-popup-facts.js' | asset_url | preload_tag: as: 'script' }}")
   })
 
   it('has each component\'s entry register it under that same name', () => {
