@@ -20,6 +20,8 @@ const SALMON = { productId: 'p1', variantId: 'v1', productTitle: 'Salmon Oil', v
 const CHEWS = { productId: 'p2', variantId: 'v2', productTitle: 'Joint Chews', variantTitle: '90 Chews', price: 40, imageUrl: null }
 const SAVED: FormValues = {
   name: 'Salmon Oil Volume Discount',
+  title: 'Salmon Oil bundle',
+  popupFrequency: 'session',
   members: [SALMON],
   pricingMode: 'percent',
   tiers: [{ minQty: 3, percentOff: 10 }],
@@ -27,7 +29,7 @@ const SAVED: FormValues = {
   style: DEFAULT_WIDGET_STYLE,
 }
 const SAVED_TIERS = { mode: 'percent' as const, percentTiers: [{ minQty: 3, percentOff: 10 }], fixedTiers: [] }
-const EMPTY: FormValues = { name: '', members: [], pricingMode: 'percent', tiers: [], flash: SAVED.flash, style: DEFAULT_WIDGET_STYLE }
+const EMPTY: FormValues = { name: '', title: '', popupFrequency: 'session', members: [], pricingMode: 'percent', tiers: [], flash: SAVED.flash, style: DEFAULT_WIDGET_STYLE }
 const EMPTY_TIERS = { mode: 'percent' as const, percentTiers: [], fixedTiers: [] }
 
 function renderForm(overrides: Partial<Parameters<typeof TierDiscountForm>[0]> = {}) {
@@ -73,9 +75,50 @@ describe('TierDiscountForm: what it shows', () => {
     expect(screen.getByLabelText('Tier 1 minimum quantity')).toHaveValue(3)
   })
 
-  it('has no Title field', () => {
+  it('shows the Title and the pop-up frequency, filled from the saved discount', () => {
+    renderForm({ initial: { ...SAVED, popupFrequency: 'checkout' } })
+    expect(screen.getByLabelText('Title')).toHaveValue('Salmon Oil bundle')
+    expect(screen.getByLabelText('Show the pop-up')).toHaveValue('checkout')
+  })
+})
+
+describe('TierDiscountForm: the Title follows the name until it is edited', () => {
+  it('on a new discount, typing a name fills the Title; after the Title is typed in, the name leaves it alone', () => {
+    renderForm({ initial: EMPTY, initialTiers: EMPTY_TIERS, mode: 'create' })
+    fireEvent.change(nameField(), { target: { value: 'Black Friday' } })
+    expect(screen.getByLabelText('Title')).toHaveValue('Black Friday')
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Tins mix' } })
+    fireEvent.change(nameField(), { target: { value: 'Black Friday 2' } })
+    expect(screen.getByLabelText('Title')).toHaveValue('Tins mix')
+  })
+
+  it('on a saved discount whose title differs from its name, a new name never changes the title', () => {
     renderForm()
-    expect(screen.queryByLabelText('Title')).toBeNull()
+    fireEvent.change(nameField(), { target: { value: 'Black Friday' } })
+    expect(screen.getByLabelText('Title')).toHaveValue('Salmon Oil bundle')
+  })
+
+  it('on a saved discount whose title is its name, the Title follows the name', () => {
+    renderForm({ initial: { ...SAVED, title: SAVED.name } })
+    fireEvent.change(nameField(), { target: { value: 'Black Friday' } })
+    expect(screen.getByLabelText('Title')).toHaveValue('Black Friday')
+  })
+
+  it('sends the title and the pop-up frequency with the form', async () => {
+    const { saveAction } = renderForm()
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Tins mix' } })
+    fireEvent.change(screen.getByLabelText('Show the pop-up'), { target: { value: 'checkout' } })
+    await act(async () => { fireEvent.click(saveBarButton('Save')) })
+    const formData = (saveAction.mock.calls[0] as unknown as [unknown, FormData])[1]
+    expect([formData.get('title'), formData.get('popupFrequency')]).toEqual(['Tins mix', 'checkout'])
+  })
+
+  it('takes the Title and the frequency back on Discard', () => {
+    renderForm()
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Tins mix' } })
+    fireEvent.change(screen.getByLabelText('Show the pop-up'), { target: { value: 'checkout' } })
+    fireEvent.click(saveBarButton('Discard'))
+    expect([(screen.getByLabelText('Title') as HTMLInputElement).value, (screen.getByLabelText('Show the pop-up') as HTMLSelectElement).value]).toEqual(['Salmon Oil bundle', 'session'])
   })
 })
 

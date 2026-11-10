@@ -70,6 +70,8 @@ export interface Discount {
   highDemand?: boolean
   /** The widget's look for this discount; absent on a discount saved before styles existed. */
   style?: WidgetStyle
+  /** How often the checkout pop-up shows this bundle; absent (saved before the pop-up) means once per session. */
+  popupFrequency?: 'session' | 'checkout'
 }
 
 export interface Config {

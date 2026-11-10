@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseDiscountForm, findFormProblem, readName, readPricingMode } from '@/form/parseDiscountForm'
+import { parseDiscountForm, findFormProblem, readName, readPricingMode, readTitle, readPopupFrequency } from '@/form/parseDiscountForm'
 import { PARSE_TOOLS } from '@/form/parseTools'
 import { DEFAULT_WIDGET_STYLE } from '@/lib/widgetStyle'
 
@@ -29,6 +29,8 @@ describe('parseDiscountForm: a good form', () => {
     expect(parse(VALID)).toEqual({
       values: {
         name: 'Salmon Oil Volume Discount',
+        title: '',
+        popupFrequency: 'session',
         members: [{ productId: 'gid://shopify/Product/1', variantId: 'gid://shopify/ProductVariant/10' }, { productId: 'gid://shopify/Product/2' }],
         pricingMode: 'percent',
         tiers: [{ minQty: 3, percentOff: 10, anchorPrice: 75.5 }, { minQty: 5, percentOff: 15 }],
@@ -99,6 +101,23 @@ describe('parseDiscountForm: a form that cannot be saved', () => {
 })
 
 describe('the small steps', () => {
+  it('readTitle trims the title and gives an empty text when it is missing', () => {
+    expect(readTitle({ formData: formWith({ title: '  Tins mix  ' }) })).toBe('Tins mix')
+    expect(readTitle({ formData: formWith({}) })).toBe('')
+  })
+
+  it('readPopupFrequency is checkout only for checkout; anything else, or nothing, is session', () => {
+    expect(readPopupFrequency({ formData: formWith({ popupFrequency: 'checkout' }) })).toBe('checkout')
+    expect(readPopupFrequency({ formData: formWith({ popupFrequency: 'session' }) })).toBe('session')
+    expect(readPopupFrequency({ formData: formWith({}) })).toBe('session')
+    expect(readPopupFrequency({ formData: formWith({ popupFrequency: 'weekly' }) })).toBe('session')
+  })
+
+  it('parseDiscountForm carries the title and the frequency', () => {
+    const result = parse({ ...VALID, title: ' Tins mix ', popupFrequency: 'checkout' })
+    expect('values' in result && [result.values.title, result.values.popupFrequency]).toEqual(['Tins mix', 'checkout'])
+  })
+
   it('readName trims and tolerates a missing name', () => {
     expect(readName({ formData: formWith({ name: ' x ' }) })).toBe('x')
     expect(readName({ formData: formWith({}) })).toBe('')
@@ -111,6 +130,6 @@ describe('the small steps', () => {
   })
 
   it('findFormProblem finds nothing wrong with good values', () => {
-    expect(findFormProblem({ values: { name: 'x', members: [{ productId: 'p' }], pricingMode: 'percent', tiers: [{ minQty: 1, percentOff: 5 }], flash: null, highDemand: false, style: DEFAULT_WIDGET_STYLE, goLive: false, takeOffline: false } })).toBeNull()
+    expect(findFormProblem({ values: { name: 'x', title: '', popupFrequency: 'session', members: [{ productId: 'p' }], pricingMode: 'percent', tiers: [{ minQty: 1, percentOff: 5 }], flash: null, highDemand: false, style: DEFAULT_WIDGET_STYLE, goLive: false, takeOffline: false } })).toBeNull()
   })
 })
