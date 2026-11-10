@@ -242,6 +242,27 @@ describe('what happens after the pop-up', () => {
     expect(openPopup).toHaveBeenCalledTimes(1)
   })
 
+  it('lets a Checkout press go through, with no second pop-up, while the page is still leaving after Continue (Review Focus 3, every-press bundle)', async () => {
+    await mountPage({ discounts: [discountOf({ popupFrequency: 'checkout' })] })
+    await pressCheckout()
+    expect(openPopup).toHaveBeenCalledTimes(1)
+
+    const wasStopped = await pressCheckout()
+
+    expect(openPopup).toHaveBeenCalledTimes(1)
+    expect(wasStopped).toBe(false)
+  })
+
+  it('opens the pop-up again for an every-press bundle when the page comes back from the history after Continue', async () => {
+    await mountPage({ discounts: [discountOf({ popupFrequency: 'checkout' })] })
+    await pressCheckout()
+
+    window.dispatchEvent(Object.assign(new Event('pageshow'), { persisted: true }))
+    await pressCheckout()
+
+    expect(openPopup).toHaveBeenCalledTimes(2)
+  })
+
   it('ignores a second press while the first is being worked out, then goes ahead once', async () => {
     let finish: (answer: Answer) => void = () => {}
     openPopup.mockReturnValue(new Promise<Answer>((resolve) => { finish = resolve }))

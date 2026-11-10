@@ -30,7 +30,7 @@ export function closeToCheckout({ state, event }) {
 
 /** The dialog has closed: the answer is given first, then everything the pop-up started is stopped and focus returns to the Checkout button. */
 export function finishPopup({ state }) {
-  state.resolve({ action: state.action, didAdd: state.didAdd })
+  state.resolve({ action: state.action, didAdd: state.didAdd || state.pendingAdds > 0 }) // an add still on its way counts: the cart is about to change
   state.win.clearInterval(state.timer)
   if (state.observer) state.observer.disconnect()
   state.dialog.remove()

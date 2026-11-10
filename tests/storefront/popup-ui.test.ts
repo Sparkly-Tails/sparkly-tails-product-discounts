@@ -422,6 +422,19 @@ describe('adding', () => {
     expect(addButtons(boxElements()[0])).toHaveLength(3)
   })
 
+  it('counts an add that is still on its way as an add, for Continue and for Close', async () => {
+    for (const [label, action] of [['Continue to checkout', 'continue'], ['Close', 'close']] as const) {
+      const opened = await openBoxes()
+      const answerRead = fetchMock.getMockImplementation() as (path: string, init?: object) => Promise<unknown>
+      fetchMock.mockImplementation((path: string, init?: object) => (/cart\/add\.js$/.test(path) ? new Promise(() => {}) : answerRead(path, init)))
+      await pressAndSettle(addButtons(boxElements()[0])[0])
+
+      await pressAndSettle(Array.from(opened.dialog.querySelectorAll('a, button')).find((element) => textOf(element) === label))
+
+      await expect(opened.promise).resolves.toEqual({ action, didAdd: true })
+    }
+  })
+
   it('resolves Continue with didAdd true after any successful add, and Close the same way', async () => {
     const continued = await openBoxes()
     await pressAndSettle(addButtons(boxElements()[0])[0])
@@ -436,6 +449,19 @@ describe('adding', () => {
 })
 
 describe('keyboard focus', () => {
+  it('keeps focus on the control when the box it is in becomes the expanded one as the list scrolls', async () => {
+    await openBoxes({ boxes: [boxOf(), secondBoxOf()] })
+    const quickAdd = boxElements()[1].querySelector('button[data-action="quick"]') as HTMLButtonElement
+    quickAdd.focus()
+    expect(document.activeElement).toBe(quickAdd)
+
+    ;(FakeObserver.last as FakeObserver).callback([{ target: boxElements()[0], intersectionRatio: 0.2 }, { target: boxElements()[1], intersectionRatio: 0.8 }])
+    await settle()
+
+    expect(boxElements()[1].dataset.expanded).toBe('true')
+    expect(document.activeElement).toBe(boxElements()[1].querySelector('button[data-action="quick"]'))
+  })
+
   it('keeps focus on the same Add button after the box is drawn again', async () => {
     await openBoxes()
     const button = addButtons(boxElements()[0])[1]

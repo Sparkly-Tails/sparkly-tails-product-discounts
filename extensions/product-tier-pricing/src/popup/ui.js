@@ -28,7 +28,7 @@ export function createState({ options, resolve, tools }) {
   const parts = options.view.buildDialog({ doc, boxCount: options.boxes.length, root: options.root })
   return {
     win: options.win, doc, view: options.view, facts: options.facts, root: options.root, moneyFormat: options.moneyFormat, opener: options.opener, resolve, dialog: parts.dialog, list: parts.list, closeButton: parts.closeButton,
-    views: options.boxes.map(tools.describeBox).map(tools.createView.bind(null, { doc, options })), ratios: options.boxes.map(tools.returnZero), expanded: 0, didAdd: false, action: 'close', timer: 0, observer: null,
+    views: options.boxes.map(tools.describeBox).map(tools.createView.bind(null, { doc, options })), ratios: options.boxes.map(tools.returnZero), expanded: 0, didAdd: false, pendingAdds: 0, action: 'close', timer: 0, observer: null,
   }
 }
 
@@ -59,10 +59,30 @@ export function repaintBoxes({ state, tools }) {
   state.views.filter(tools.isLive).forEach(tools.repaintBox.bind(null, { state, tools }))
 }
 
-/** Makes the box at `index` the expanded one and draws the boxes again. */
+/** Where keyboard focus is inside the boxes: `{ index, selector }` of the control (the empty selector for the box itself); null when it is elsewhere. */
+export function readFocusSpot({ state, tools }) {
+  const box = state.doc.activeElement.closest('[data-box]')
+  return box === null || !state.list.contains(box) ? null : { index: Number(box.dataset.index), selector: tools.readActiveSelector({ state, tools }) }
+}
+
+export function readActiveSelector({ state, tools }) {
+  const control = state.doc.activeElement.closest('[data-action]')
+  return control === null ? '' : tools.buildControlSelector({ control })
+}
+
+/** Gives focus back to the spot the boxes were drawn over (a control that is gone leaves it on its box), without scrolling the list. */
+export function restoreFocusSpot({ state, spot }) {
+  const view = state.views[spot.index]
+  const target = (spot.selector && view.element.querySelector(spot.selector)) || view.element
+  target.focus({ preventScroll: true })
+}
+
+/** Makes the box at `index` the expanded one and draws the boxes again, so that focus stays where it was (the boxes are drawn again as the list scrolls). */
 export function expandBox({ state, index, tools }) {
+  const spot = tools.readFocusSpot({ state, tools })
   state.expanded = index
   tools.repaintBoxes({ state, tools })
+  if (spot !== null && !state.views[spot.index].isGone) tools.restoreFocusSpot({ state, spot })
 }
 
 /** Moves focus to the control with `selector` in the box, or to the box itself when the control is gone, so a keyboard user does not lose their place when the box is drawn again. */
@@ -88,6 +108,7 @@ export function showBox({ state, control, tools }) {
 }
 
 export function applyAddResult({ state, view, added, cart }) {
+  state.pendingAdds -= 1
   state.didAdd = state.didAdd || added.ok
   view.failed = !added.ok
   if (cart !== null) {
@@ -101,6 +122,7 @@ export async function runAdd({ state, control, picks, tools }) {
   const view = tools.readControlView({ state, control })
   if (view.isBusy || picks.length === 0) return
   view.isBusy = true
+  state.pendingAdds += 1
   const added = await tools.addItems({ win: state.win, root: state.root, picks })
   const cart = await tools.readCartUnits({ win: state.win, root: state.root, members: view.box.members })
   tools.applyAddResult({ state, view, added, cart })
@@ -200,7 +222,7 @@ export function openPopup(tools, options) {
 
 export const UI_TOOLS = {
   ...DIALOG_TOOLS,
-  addItems: addItems.bind(null, ADD_TOOLS), readCartUnits: readCartUnits.bind(null, ADD_TOOLS), returnZero, isLive, describeBox, createView, createState, readBoxFacts, readSecondsLeft, paintBox, repaintBox, repaintBoxes, expandBox, focusBox, scrollBoxIntoView,
+  addItems: addItems.bind(null, ADD_TOOLS), readCartUnits: readCartUnits.bind(null, ADD_TOOLS), returnZero, isLive, describeBox, createView, createState, readBoxFacts, readSecondsLeft, paintBox, repaintBox, repaintBoxes, readFocusSpot, readActiveSelector, restoreFocusSpot, expandBox, focusBox, scrollBoxIntoView,
   buildControlSelector, showBox, applyAddResult, runAdd, addOne, addMissing, isCounting, removeBox, tickBox, tickBoxes, readMostVisible, recordSighting, handleSightings, watchView, watchBoxes, appendBox, showDialog,
   startPopup, actions: { add: addOne, quick: addMissing, view: showBox, continue: closeToCheckout, close: closeDialog },
 }

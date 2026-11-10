@@ -75,20 +75,25 @@ export function returnPass() {
   return PASS_ANSWER
 }
 
-export function applyAnswer({ win, target, answer, rootUrl, tools }) {
-  if (answer.action === 'continue') tools.sendToCheckout({ win, target, didAdd: answer.didAdd, rootUrl, tools })
-  else tools.closePopup({ win, didAdd: answer.didAdd })
+/** Continue carries the stopped press on, and the "let this one through" flag stays up from then on: the page is still on screen while it leaves, and a second press
+ * must go through as the theme made it, never open a second pop-up. Closing leaves the next press to start afresh. */
+export function applyAnswer({ win, target, answer, rootUrl, state, tools }) {
+  if (answer.action !== 'continue') return tools.closePopup({ win, didAdd: answer.didAdd })
+  state.isBypassing = true
+  tools.sendToCheckout({ win, target, didAdd: answer.didAdd, rootUrl, tools })
 }
 
-/** Carries the stopped press on while the "let this one through" flag is up, then lets the next press start afresh. */
 export function finishPress({ win, target, answer, rootUrl, state, tools }) {
-  state.isBypassing = true
   try {
-    tools.applyAnswer({ win, target, answer, rootUrl, tools })
+    tools.applyAnswer({ win, target, answer, rootUrl, state, tools })
   } finally {
-    state.isBypassing = false
     state.isBusy = false
   }
+}
+
+/** The page is shown again from the history (the customer came back from checkout): its next Checkout press may open the pop-up. */
+export function resetBypass({ state }, event) {
+  if (event.persisted) state.isBypassing = false
 }
 
 /** One stopped press, from the wait for the cart to its end. */
@@ -118,6 +123,7 @@ export function attachPress({ win, tools }) {
   if (config === null || config.index.discounts.length === 0) return
   const state = { isBusy: false, isBypassing: false }
   win.document.addEventListener('click', tools.handlePress.bind(null, { win, config, state, tools }), true)
+  win.addEventListener('pageshow', tools.resetBypass.bind(null, { state }))
 }
 
 /** Starts the pop-up on a page: nothing happens when the embed is off or no discount is live. */
@@ -132,5 +138,5 @@ export function startPopup({ win, tools }) {
 export const POPUP_TOOLS = {
   ...BUDGET_TOOLS, ...CONFIG_TOOLS, ...DUE_TOOLS, ...RESUME_TOOLS,
   fetchJson, returnNothing, loadPopupComponent, loadPopupComponents, loadComponent, loadComponentSet, buildRootPath, recordShown,
-  readStorage, readDueBundles, findCheckoutTarget, isCheckoutPress, prepareBoxes, recordBox, showBoxes, readAnswer, returnPass, applyAnswer, finishPress, runPress, beginPress, handlePress, attachPress, startPopup,
+  readStorage, readDueBundles, findCheckoutTarget, isCheckoutPress, prepareBoxes, recordBox, showBoxes, readAnswer, returnPass, applyAnswer, finishPress, resetBypass, runPress, beginPress, handlePress, attachPress, startPopup,
 }
