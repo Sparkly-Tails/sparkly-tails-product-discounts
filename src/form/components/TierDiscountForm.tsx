@@ -12,7 +12,7 @@ import SaveMessage from '@/form/components/SaveMessage'
 import ProductsCard from '@/form/components/ProductsCard'
 import TiersCard, { type TiersInitial } from '@/form/components/TiersCard'
 import WidgetPreview from '@/form/preview/components/WidgetPreview'
-import { buildComparable, buildPreviewFlash, buildPreviewProducts, canSaveValues, isFormDirty, pickBasePrice, type FormValues } from '@/form/formValues'
+import { buildComparable, buildPreviewFlash, buildPreviewProducts, canSaveValues, isFormDirty, isTitleEdited, pickBasePrice, pickTitleAfterNameChange, type FormValues } from '@/form/formValues'
 import { pricesUniform } from '@/lib/pricesUniform'
 
 /** What a save sends back when it did not go through; a save that did go through leaves the page. */
@@ -46,6 +46,8 @@ export default function TierDiscountForm({
 }) {
   const [values, setValues] = useState(initial)
   const [discardCount, setDiscardCount] = useState(0)
+  // Until the title is written by hand it follows the name.
+  const [hasEditedTitle, setHasEditedTitle] = useState(isTitleEdited({ name: initial.name, title: initial.title }))
   const [saveState, formAction, isSaving] = useActionState(saveAction, null)
   const isDirty = isFormDirty({ initial, current: values, tools: { buildComparable } })
   const formRef = useRef<HTMLFormElement>(null)
@@ -54,6 +56,7 @@ export default function TierDiscountForm({
 
   function resetValues() {
     setValues(initial)
+    setHasEditedTitle(isTitleEdited({ name: initial.name, title: initial.title }))
     setDiscardCount((count) => count + 1)
   }
 
@@ -88,7 +91,14 @@ export default function TierDiscountForm({
           }
         >
           <Fragment key={discardCount}>
-            <DetailsCard initialName={initial.name} onNameChange={(name) => setValues((current) => ({ ...current, name }))} />
+            <DetailsCard
+              initialName={initial.name}
+              onNameChange={(name) => setValues((current) => ({ ...current, name, title: pickTitleAfterNameChange({ name, title: current.title, isTitleEdited: hasEditedTitle }) }))}
+              title={values.title}
+              onTitleChange={(title) => { setHasEditedTitle(true); setValues((current) => ({ ...current, title })) }}
+              initialPopupFrequency={initial.popupFrequency}
+              onPopupFrequencyChange={(popupFrequency) => setValues((current) => ({ ...current, popupFrequency }))}
+            />
             <ProductsCard initialMembers={initial.members} currencyCode={currencyCode} excludeDiscountId={excludeDiscountId} onMembersChange={(members) => setValues((current) => ({ ...current, members }))} />
             <TiersCard
               allowPriceBasedModes={pricesUniform(values.members.map((member) => member.price))}

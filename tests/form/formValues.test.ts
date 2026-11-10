@@ -107,3 +107,18 @@ describe('pickBasePrice', () => {
     expect(pickBasePrice({ members: [] })).toBeNull()
   })
 })
+
+import { isTitleEdited, pickTitleAfterNameChange } from '@/form/formValues'
+
+describe('isTitleEdited and pickTitleAfterNameChange', () => {
+  it('a blank title, or one equal to the name, has not been edited', () => {
+    expect(isTitleEdited({ name: 'BFCM', title: '' })).toBe(false)
+    expect(isTitleEdited({ name: 'BFCM', title: 'BFCM' })).toBe(false)
+    expect(isTitleEdited({ name: 'BFCM', title: 'Tins mix' })).toBe(true)
+  })
+
+  it('the title follows the name until it has been edited', () => {
+    expect(pickTitleAfterNameChange({ name: 'New', title: 'Old', isTitleEdited: false })).toBe('New')
+    expect(pickTitleAfterNameChange({ name: 'New', title: 'Tins mix', isTitleEdited: true })).toBe('Tins mix')
+  })
+})

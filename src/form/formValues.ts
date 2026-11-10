@@ -36,6 +36,16 @@ export function buildComparable({ values }: { values: FormValues }): string {
   })
 }
 
+/** True when the title was written by hand: it is not blank and not just the name. */
+export function isTitleEdited({ name, title }: { name: string; title: string }): boolean {
+  return title !== '' && title !== name
+}
+
+/** The title after the name changed: it follows the name until it has been edited by hand. */
+export function pickTitleAfterNameChange({ name, title, isTitleEdited: edited }: { name: string; title: string; isTitleEdited: boolean }): string {
+  return edited ? title : name
+}
+
 export function isFormDirty({ initial, current, tools }: {
   initial: FormValues
   current: FormValues
