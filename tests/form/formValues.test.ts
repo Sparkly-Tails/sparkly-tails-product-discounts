@@ -4,6 +4,8 @@ import { isFormDirty, buildComparable, buildPreviewProducts, canSaveValues, buil
 
 const SAVED: FormValues = {
   name: 'Salmon Oil Volume Discount',
+  title: 'Salmon Oil bundle',
+  popupFrequency: 'session',
   members: [{ productId: 'p1', variantId: 'v1', productTitle: 'Salmon Oil', variantTitle: '16 fl oz', price: 28, imageUrl: null }],
   pricingMode: 'percent',
   tiers: [{ minQty: 3, percentOff: 10 }, { minQty: 5, percentOff: 15, anchorPrice: 100 }],
@@ -20,6 +22,11 @@ describe('isFormDirty', () => {
 
   it('is dirty when the name changes', () => {
     expect(dirty({ name: 'Other' })).toBe(true)
+  })
+
+  it('is dirty when the title or the pop-up frequency changes', () => {
+    expect(dirty({ title: 'Other title' })).toBe(true)
+    expect(dirty({ popupFrequency: 'checkout' })).toBe(true)
   })
 
   it('is dirty when a product is added or removed', () => {
@@ -98,5 +105,20 @@ describe('pickBasePrice', () => {
   it('is the price of the first product, or nothing without a product', () => {
     expect(pickBasePrice({ members: SAVED.members })).toBe(28)
     expect(pickBasePrice({ members: [] })).toBeNull()
+  })
+})
+
+import { isTitleEdited, pickTitleAfterNameChange } from '@/form/formValues'
+
+describe('isTitleEdited and pickTitleAfterNameChange', () => {
+  it('a blank title, or one equal to the name, has not been edited', () => {
+    expect(isTitleEdited({ name: 'BFCM', title: '' })).toBe(false)
+    expect(isTitleEdited({ name: 'BFCM', title: 'BFCM' })).toBe(false)
+    expect(isTitleEdited({ name: 'BFCM', title: 'Tins mix' })).toBe(true)
+  })
+
+  it('the title follows the name until it has been edited', () => {
+    expect(pickTitleAfterNameChange({ name: 'New', title: 'Old', isTitleEdited: false })).toBe('New')
+    expect(pickTitleAfterNameChange({ name: 'New', title: 'Tins mix', isTitleEdited: true })).toBe('Tins mix')
   })
 })

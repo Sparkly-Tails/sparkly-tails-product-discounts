@@ -101,11 +101,11 @@ describe('saving a new discount', () => {
     expect(redirect).not.toHaveBeenCalled()
   })
 
-  it('creates a draft titled with its name, with the parsed tiers, and goes to its page', async () => {
+  it('creates a draft with the title of the form and the pop-up frequency, with the parsed tiers, and goes to its page', async () => {
     const { saveSpy } = setup()
-    await save(form())
+    await save(form({ title: 'Soup sale', popupFrequency: 'checkout' }))
     expect(saveSpy).toHaveBeenCalledWith({
-      discounts: [{ discountId: expect.stringMatching(/^disc_/), name: 'Soup', title: 'Soup', status: 'draft', pricingMode: 'percent', members: [{ productId: P1 }], tiers: [{ minQty: 5, percentOff: 10 }], style: { backgroundColor: '#F5EFE1', cornerRadius: 12 } }],
+      discounts: [{ discountId: expect.stringMatching(/^disc_/), name: 'Soup', title: 'Soup sale', popupFrequency: 'checkout', status: 'draft', pricingMode: 'percent', members: [{ productId: P1 }], tiers: [{ minQty: 5, percentOff: 10 }], style: { backgroundColor: '#F5EFE1', cornerRadius: 12 } }],
     })
     expect(redirect).toHaveBeenCalledWith(expect.stringMatching(/^\/discounts\/disc_/))
   })

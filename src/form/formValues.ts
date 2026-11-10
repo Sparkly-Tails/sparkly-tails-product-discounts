@@ -9,6 +9,10 @@ import type { WidgetStyle } from '@/lib/widgetStyle'
 
 export interface FormValues {
   name: string
+  /** The customer-facing title (blank means the storefront shows the name). */
+  title: string
+  /** How often the checkout pop-up shows the bundle. */
+  popupFrequency: 'session' | 'checkout'
   members: SelectedMember[]
   pricingMode: PricingMode
   /** The complete tiers of the chosen mode. */
@@ -22,12 +26,24 @@ export interface FormValues {
 export function buildComparable({ values }: { values: FormValues }): string {
   return JSON.stringify({
     name: values.name,
+    title: values.title,
+    popupFrequency: values.popupFrequency,
     members: values.members.map((member) => ({ productId: member.productId, variantId: member.variantId })),
     pricingMode: values.pricingMode,
     tiers: values.tiers.map((tier) => ({ minQty: tier.minQty, percentOff: tier.percentOff, fixedPrice: tier.fixedPrice, anchorPrice: tier.anchorPrice })),
     flash: values.flash.enabled ? values.flash : { enabled: false, highDemand: values.flash.highDemand },
     style: values.style,
   })
+}
+
+/** True when the title was written by hand: it is not blank and not just the name. */
+export function isTitleEdited({ name, title }: { name: string; title: string }): boolean {
+  return title !== '' && title !== name
+}
+
+/** The title after the name changed: it follows the name until it has been edited by hand. */
+export function pickTitleAfterNameChange({ name, title, isTitleEdited: edited }: { name: string; title: string; isTitleEdited: boolean }): string {
+  return edited ? title : name
 }
 
 export function isFormDirty({ initial, current, tools }: {

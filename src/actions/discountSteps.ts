@@ -99,7 +99,7 @@ export async function syncRecordOf(discount: Discount, previousRecordId: string 
   const recordId = await syncDiscountRecord({
     query: shopifyQuery,
     discountId: discount.discountId,
-    title: discount.title,
+    title: discount.title || discount.name,
     status: discount.status,
     flash: discount.flash ? { startsAt: discount.flash.startsAt, endsAt: discount.flash.endsAt } : undefined,
     shopifyDiscountId: previousRecordId,

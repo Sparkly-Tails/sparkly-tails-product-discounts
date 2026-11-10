@@ -42,14 +42,14 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.clearAllMocks() })
 
 describe('the Edit page: the saved discount in the form', () => {
-  it('shows the name as the heading and in its field, the product, the tier and no Title field', async () => {
+  it('shows the name as the heading and in its field, the product, the tier and the saved title', async () => {
     await renderPage(baseDiscount)
     expect(screen.getByRole('heading', { level: 1, name: 'Soup' })).toBeInTheDocument()
     expect(screen.getByLabelText('Internal name')).toHaveValue('Soup')
     expect(screen.getByRole('button', { name: 'Remove Tuna Soup' })).toBeInTheDocument()
     expect(screen.getByLabelText('Tier 1 minimum quantity')).toHaveValue(5)
     expect(screen.getByLabelText('Tier 1 percent off')).toHaveValue(10)
-    expect(screen.queryByLabelText('Title')).toBeNull()
+    expect(screen.getByLabelText('Title')).toHaveValue(baseDiscount.title)
     expect(screen.queryByText('Resulting prices')).toBeNull()
   })
 
