@@ -11,7 +11,7 @@ export const CARD_COMPONENTS = ['card-prices-offer.js', 'tier-pricing-currency.j
 export const CARD_CORE = 'card-prices.js'
 
 /** The components of the bundle pop-up embed: its boxes, controller, drawing and facts components, and the widget's currency component it shares. */
-export const POPUP_COMPONENTS = ['bundle-popup-boxes.js', 'bundle-popup-ui.js', 'bundle-popup-view.js', 'bundle-popup-facts.js', 'tier-pricing-currency.js']
+export const POPUP_COMPONENTS = ['bundle-popup-boxes.js', 'bundle-popup-ui.js', 'bundle-popup-view.js', 'bundle-popup-facts.js', 'bundle-popup-parts.js', 'tier-pricing-currency.js']
 export const POPUP_CORE = 'bundle-popup.js'
 
 export type BuiltWidget = Record<string, string>

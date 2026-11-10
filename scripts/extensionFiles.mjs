@@ -11,12 +11,13 @@ export const EXTENSION_SCRIPTS = [
   { entry: 'entries/cards.js', name: 'card-prices.js' },
   // The offer part of that script, which it loads on every page that has the embed.
   { entry: 'entries/card-offer.js', name: 'card-prices-offer.js' },
-  // The script of the "Bundle pop-up" app embed (blocks/bundle-popup.liquid), and the four components it loads when a bundle is due (the boxes with their items, the pop-up's controller, its drawing, and the arithmetic of a box).
+  // The script of the "Bundle pop-up" app embed (blocks/bundle-popup.liquid), and the five components it loads when a bundle is due (the boxes with their items, the pop-up's controller, its drawing, the arithmetic of a box, and the parts of a box).
   { entry: 'entries/popup.js', name: 'bundle-popup.js' },
   { entry: 'entries/popup-boxes.js', name: 'bundle-popup-boxes.js' },
   { entry: 'entries/popup-ui.js', name: 'bundle-popup-ui.js' },
   { entry: 'entries/popup-view.js', name: 'bundle-popup-view.js' },
   { entry: 'entries/popup-facts.js', name: 'bundle-popup-facts.js' },
+  { entry: 'entries/popup-parts.js', name: 'bundle-popup-parts.js' },
 ]
 
 export const EXTENSION_STYLESHEETS = [

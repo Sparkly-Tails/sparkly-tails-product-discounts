@@ -1,6 +1,6 @@
 // The pop-up (the controller): keeps the state of each box, answers the dialog's events, adds to the cart, counts down the flash sales, and answers with
-// what the customer decided. The dialog and the boxes are drawn by the view component (`options.view`, see box.js); what a box shows and does (what is
-// missing, Quick auto-fill, the tier chips, its look) is worked out by the facts component (`options.facts`, see facts.js). The page's window and the
+// what the customer decided. The dialog and the boxes are drawn by the view component (`options.components.popupView`, see box.js); what a box shows and does (what is
+// missing, Quick auto-fill, the tier chips, its look) is worked out by the facts component (`options.components.popupFacts`, see facts.js). The page's window and the
 // functions it calls come in as arguments (the entry hands over the tools).
 import { ADD_TOOLS, addItems, readCartUnits } from './add.js'
 import { DIALOG_TOOLS, closeDialog, closeToCheckout } from './dialog.js'
@@ -19,15 +19,16 @@ export function describeBox(box, index) {
 
 /** A box as the pop-up keeps it: its data, its element, the units and cart lines now, and whether an add failed or is on its way. */
 export function createView({ doc, options }, { box, index }) {
-  const look = options.facts.readLook({ box, creamFallback: options.accents.cream })
-  return { box, element: options.view.createBox({ doc, index, look, accents: options.accents }), index, units: box.units, lines: box.lines, failed: false, isBusy: false, isGone: false }
+  const look = options.components.popupFacts.readLook({ box, creamFallback: options.accents.cream })
+  return { box, element: options.components.popupView.createBox({ doc, index, look, accents: options.accents }), index, units: box.units, lines: box.lines, quantities: {}, showAll: false, failed: false, isBusy: false, isGone: false }
 }
 
 export function createState({ options, resolve, tools }) {
   const doc = options.win.document
-  const parts = options.view.buildDialog({ doc, boxCount: options.boxes.length, root: options.root })
+  const parts = options.components.popupView.buildDialog({ doc, root: options.root })
   return {
-    win: options.win, doc, view: options.view, facts: options.facts, root: options.root, moneyFormat: options.moneyFormat, opener: options.opener, resolve, dialog: parts.dialog, list: parts.list, closeButton: parts.closeButton,
+    actions: Object.assign({}, tools.actions, options.components.popupParts.actions),
+    win: options.win, doc, view: options.components.popupView, facts: options.components.popupFacts, parts: options.components.popupParts, root: options.root, moneyFormat: options.moneyFormat, opener: options.opener, resolve, dialog: parts.dialog, list: parts.list, closeButton: parts.closeButton,
     views: options.boxes.map(tools.describeBox).map(tools.createView.bind(null, { doc, options })), ratios: options.boxes.map(tools.returnZero), expanded: 0, didAdd: false, pendingAdds: 0, action: 'close', timer: 0, observer: null,
   }
 }
@@ -45,9 +46,9 @@ export function readSecondsLeft({ state, view }) {
 /** Draws the box at `index` again from its state. */
 export function paintBox({ state, index, tools }) {
   const view = state.views[index]
-  const { box, units, lines, failed } = view
+  const { box, units, lines, failed, quantities, showAll } = view
   state.view.paintBox({
-    doc: state.doc, element: view.element, box, units, lines, failed, facts: tools.readBoxFacts({ state, view }), isExpanded: index === state.expanded, moneyFormat: state.moneyFormat, secondsLeft: tools.readSecondsLeft({ state, view }),
+    doc: state.doc, element: view.element, box, units, lines, failed, quantities, showAll, facts: tools.readBoxFacts({ state, view }), parts: state.parts, isExpanded: index === state.expanded, moneyFormat: state.moneyFormat, secondsLeft: tools.readSecondsLeft({ state, view }),
   })
 }
 
@@ -126,13 +127,19 @@ export async function runAdd({ state, control, picks, tools }) {
   const added = await tools.addItems({ win: state.win, root: state.root, picks })
   const cart = await tools.readCartUnits({ win: state.win, root: state.root, members: view.box.members })
   tools.applyAddResult({ state, view, added, cart })
+  tools.clearPicked({ view, picks, added, tools })
   view.isBusy = false
   tools.paintBox({ state, index: view.index, tools })
   tools.focusBox({ view, selector: tools.buildControlSelector({ control }) })
 }
 
-export function addOne({ state, control, tools }) {
-  return tools.runAdd({ state, control, picks: [{ variantId: control.dataset.variant, quantity: 1 }], tools })
+export function clearQuantity(quantities, pick) {
+  delete quantities[pick.variantId]
+}
+
+/** The units chosen for the items that were added go back to 1; after a failed add they stay. */
+export function clearPicked({ view, picks, added, tools }) {
+  if (added.ok) picks.forEach(tools.clearQuantity.bind(null, view.quantities))
 }
 
 /** Quick auto-fill: the units that complete the box, in one request. */
@@ -215,7 +222,7 @@ export function startPopup({ options, tools }, resolve) {
   tools.showDialog({ state: tools.createState({ options, resolve, tools }), tools })
 }
 
-/** Opens the pop-up for `boxes`; resolves `{ action: 'continue' | 'close', didAdd }` when the customer is done. `root` is the shop's root link, `opener` the Checkout control to give focus back to, `view` the drawing component. */
+/** Opens the pop-up for `boxes`; resolves `{ action: 'continue' | 'close', didAdd }` when the customer is done. `root` is the shop's root link, `opener` the Checkout control to give focus back to, `components` the loaded components (popupView, popupFacts and popupParts are used). */
 export function openPopup(tools, options) {
   return new Promise(tools.startPopup.bind(null, { options, tools }))
 }
@@ -223,6 +230,6 @@ export function openPopup(tools, options) {
 export const UI_TOOLS = {
   ...DIALOG_TOOLS,
   addItems: addItems.bind(null, ADD_TOOLS), readCartUnits: readCartUnits.bind(null, ADD_TOOLS), returnZero, isLive, describeBox, createView, createState, readBoxFacts, readSecondsLeft, paintBox, repaintBox, repaintBoxes, readFocusSpot, readActiveSelector, restoreFocusSpot, expandBox, focusBox, scrollBoxIntoView,
-  buildControlSelector, showBox, applyAddResult, runAdd, addOne, addMissing, isCounting, removeBox, tickBox, tickBoxes, readMostVisible, recordSighting, handleSightings, watchView, watchBoxes, appendBox, showDialog,
-  startPopup, actions: { add: addOne, quick: addMissing, view: showBox, continue: closeToCheckout, close: closeDialog },
+  buildControlSelector, showBox, applyAddResult, runAdd, clearQuantity, clearPicked, addMissing, isCounting, removeBox, tickBox, tickBoxes, readMostVisible, recordSighting, handleSightings, watchView, watchBoxes, appendBox, showDialog,
+  startPopup, actions: { quick: addMissing, view: showBox, continue: closeToCheckout, close: closeDialog },
 }

@@ -5,17 +5,21 @@ import { sortTiersByMinQty, withUnitAnchor } from '../tierMath.js'
 
 /** The words that never change; the ones with a number in them are built by the functions below. */
 export const POPUP_TEXT = {
+  eyebrow: '🎯 Unclaimed Bundle Savings',
+  heading: 'Wait, complete your bundle to unlock instant savings',
+  intro: 'You are only a few units away from triggering volume discount rates on qualifying items.',
   fallbackTitle: 'Your bundle',
-  close: 'Close',
+  close: 'Close dialog',
+  closeSymbol: '×',
+  listLabel: 'Eligible items in this bundle — add any to qualify',
+  rate: 'Tier rate: ',
+  less: 'One fewer',
+  more: 'One more',
   add: 'Add',
   continue: 'Continue to checkout',
   unlocked: 'Tier unlocked',
   failed: 'We couldn\'t add that. Try again.',
   flashBar: '⚡ TIER 1 FLASH SALE ENDS IN',
-}
-
-export function buildHeadingText({ boxCount }) {
-  return boxCount === 1 ? 'Complete your bundle' : 'Complete your bundles'
 }
 
 /** The box heading: the discount's title, or "Your bundle" when the index has none. */
@@ -65,6 +69,25 @@ export function buildQuickAddText({ tier, missing, formatMoneyText }) {
 
 export function buildViewText({ count }) {
   return 'View & mix eligible products (' + count + ' available)'
+}
+
+/** "Showing 4 of 12 eligible items". */
+export function buildShowingText({ shown, total }) {
+  return 'Showing ' + shown + ' of ' + total + ' eligible items'
+}
+
+/** The button under the list of items: how many more it lists, or "Show fewer" once it lists them all. */
+export function buildMoreText({ count, isOpen }) {
+  return isOpen ? 'Show fewer' : 'Show ' + count + ' more'
+}
+
+export function buildEntryText(entry) {
+  return entry.quantity + '× ' + entry.label
+}
+
+/** "2× Tuna, 1× Salmon (5 more needed for discount)": what the customer has of the bundle, on a contracted box. */
+export function buildPreviewText({ entries, missing }) {
+  return entries.map(buildEntryText).join(', ') + ' (' + missing + ' more needed for discount)'
 }
 
 /** "(+£4.95)": what Quick auto-fill adds to the cart. */

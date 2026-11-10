@@ -1,5 +1,6 @@
 /* The pre-checkout bundle pop-up. It reads the same custom properties as the widget (cream, moss, sun, radius), each with the
-   widget's own default, so a discount's style reaches the pop-up too. The theme's fonts are kept: no font is set here but "inherit". */
+   widget's own default, so a discount's style reaches the pop-up too. The body text keeps the theme's font ("inherit"); only the heading and
+   the box titles use a serif that every device already has. Nothing is loaded from outside. */
 
 .smooth-discounts-popup__dialog {
   --popup-cream: var(--smooth-discounts-cream, #f3ecd9);
@@ -8,21 +9,26 @@
   --popup-radius: var(--smooth-discounts-radius, 16px);
   --popup-ink: var(--color-text-main, #2a2a22);
   --popup-muted: var(--color-secondary-text-main, #5b5c4e);
-  --popup-line: var(--color-borders-main, #ddd6c2);
+  --popup-line: var(--color-borders-main, #e6dfd5);
+  --popup-paper: #faf8f5;
+  --popup-brown: #8b4816;
   --popup-sand: color-mix(in srgb, var(--popup-line) 60%, var(--popup-cream));
+  --popup-night: color-mix(in srgb, var(--popup-moss) 55%, #000);
+  --popup-serif: Georgia, "Times New Roman", serif;
   --popup-ease: cubic-bezier(0.4, 0, 0.2, 1);
   box-sizing: border-box;
-  width: min(34rem, calc(100% - 2rem));
+  width: 1000px;
+  max-width: calc(100% - 2rem);
   max-height: calc(100dvh - 2rem);
   margin: auto;
   padding: 0; /* a click on the backdrop lands on the dialog itself, so the content sits in the panel and the dialog has no padding of its own */
   border: 0;
-  border-radius: var(--popup-radius);
-  background: #fff;
+  border-radius: calc(var(--popup-radius) * 1.5);
+  background: var(--popup-paper);
   color: var(--popup-ink);
   font-family: inherit;
   overflow: hidden;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
 }
 
 .smooth-discounts-popup__dialog[open] {
@@ -51,6 +57,7 @@ html:has(.smooth-discounts-popup__dialog[open]) {
 }
 
 .smooth-discounts-popup__panel {
+  position: relative;
   display: flex;
   flex-direction: column;
   flex: 1 1 auto;
@@ -58,32 +65,25 @@ html:has(.smooth-discounts-popup__dialog[open]) {
   max-height: inherit;
 }
 
-.smooth-discounts-popup__header {
+/* The round close button stays in the corner while the boxes scroll. */
+.smooth-discounts-popup__close {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  z-index: 2;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 1rem 1.25rem;
-  border-bottom: 1px solid var(--popup-line);
-}
-
-.smooth-discounts-popup__heading {
-  margin: 0;
-  font-family: inherit;
-  font-size: 1.25rem;
-  font-weight: 700;
-  line-height: 1.25;
-}
-
-.smooth-discounts-popup__close {
-  flex: none;
-  padding: 0.4rem 0.75rem;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
   border: 1px solid var(--popup-line);
-  border-radius: 999px;
-  background: transparent;
+  border-radius: 50%;
+  background: #fff;
   color: var(--popup-muted);
   font: inherit;
-  font-size: 0.875rem;
+  font-size: 1.375rem;
+  line-height: 1;
   cursor: pointer;
 }
 
@@ -91,49 +91,82 @@ html:has(.smooth-discounts-popup__dialog[open]) {
   background: var(--popup-sand);
 }
 
-/* The boxes scroll; the header above and the footer below stay where they are. */
+/* The header scrolls with the boxes. */
 .smooth-discounts-popup__list {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 1.25rem;
   flex: 1 1 auto;
   min-height: 0;
-  padding: 1rem 1.25rem;
+  padding: 2rem 2rem 1.25rem;
   overflow-y: auto;
   overscroll-behavior: contain;
 }
 
+.smooth-discounts-popup__header {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding-right: 3rem;
+}
+
+.smooth-discounts-popup__eyebrow {
+  margin: 0;
+  padding: 0.3rem 0.8rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--popup-sun) 35%, #fff);
+  color: var(--popup-brown);
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+
+.smooth-discounts-popup__heading {
+  margin: 0;
+  font-family: var(--popup-serif);
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.smooth-discounts-popup__intro {
+  margin: 0;
+  color: var(--popup-muted);
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
 .smooth-discounts-popup__footer {
-  padding: 0.875rem 1.25rem;
+  padding: 0.875rem 2rem max(0.875rem, env(safe-area-inset-bottom));
   border-top: 1px solid var(--popup-line);
   background: #fff;
 }
 
 .smooth-discounts-popup__continue {
   display: block;
-  padding: 0.8rem 1rem;
-  border-radius: calc(var(--popup-radius) * 0.75);
-  background: var(--popup-moss);
-  color: #fff;
+  padding: 0.5rem 1rem;
+  color: var(--popup-moss);
   font-weight: 700;
   text-align: center;
-  text-decoration: none;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
 }
 
 .smooth-discounts-popup__continue:hover {
-  filter: brightness(1.12);
+  text-decoration-thickness: 2px;
 }
 
-/* One bundle. The background and corners come from the discount's style; the inline custom properties win over the defaults. */
+/* One bundle: a white card. The cream of the discount's style is the panel inside it; the inline custom properties win over the defaults. */
 .smooth-discounts-popup__box {
   position: relative;
   display: flex;
+  flex: none; /* the list scrolls; a box never shrinks to fit */
   flex-direction: column;
-  gap: 0.5rem;
-  padding: 1rem;
+  gap: 1rem;
+  padding: 1.25rem;
   border: 1px solid var(--popup-line);
-  border-radius: var(--smooth-discounts-radius, 16px);
-  background: var(--smooth-discounts-cream, #f3ecd9);
+  border-radius: var(--popup-radius);
+  background: #fff;
   color: var(--popup-ink);
   overflow: hidden;
   scroll-margin: 0.75rem;
@@ -145,105 +178,217 @@ html:has(.smooth-discounts-popup__dialog[open]) {
 }
 
 .smooth-discounts-popup__box:focus-visible {
-  outline: 2px solid var(--smooth-discounts-moss, #434625);
+  outline: 2px solid var(--popup-moss);
   outline-offset: 2px;
 }
 
 .smooth-discounts-popup__box[data-expanded="true"] {
-  border-color: var(--smooth-discounts-moss, #434625);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+  border-color: var(--popup-moss);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
 }
 
 .smooth-discounts-popup__box[data-expanded="false"] {
-  gap: 0.35rem;
-  padding: 0.75rem 1rem;
+  gap: 0.75rem;
+  flex-flow: row wrap;
+  align-items: center;
 }
 
 /* The flash sale bar runs edge to edge across the top of its box. */
 .smooth-discounts-popup__flash {
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 0.25rem 0.75rem;
-  margin: -1rem -1rem 0.25rem;
-  padding: 0.5rem 1rem;
-  background: var(--smooth-discounts-moss, #434625);
+  margin: -1.25rem -1.25rem 0;
+  padding: 0.6rem 1.25rem;
+  background: var(--popup-night);
   color: #fff;
   font-size: 0.75rem;
   font-weight: 700;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
 .smooth-discounts-popup__countdown {
-  color: var(--smooth-discounts-sun, #ffdc4c);
+  padding: 0.2rem 0.6rem;
+  border-radius: 0.375rem;
+  background: rgba(255, 255, 255, 0.14);
+  color: var(--popup-sun);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 0.9375rem;
   font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+}
+
+/* The cream panel: title and badge, where the customer stands, the rail, the tier chips. */
+.smooth-discounts-popup__summary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  flex: 1 1 100%;
+  min-width: 0;
+  padding: 1rem 1.25rem;
+  border-radius: calc(var(--popup-radius) * 0.75);
+  background: var(--popup-cream);
+}
+
+.smooth-discounts-popup__head {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.smooth-discounts-popup__dot {
+  flex: none;
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: 50%;
+  background: var(--popup-moss);
 }
 
 .smooth-discounts-popup__title {
   margin: 0;
-  font-family: inherit;
-  font-size: 1.0625rem;
+  font-family: var(--popup-serif);
+  font-size: 1.375rem;
   font-weight: 700;
-  line-height: 1.3;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
 }
 
 .smooth-discounts-popup__badge {
-  align-self: flex-start;
-  margin: 0;
-  padding: 0.15rem 0.6rem;
+  flex: none;
+  margin: 0 0 0 auto;
+  padding: 0.2rem 0.7rem;
   border-radius: 999px;
-  background: var(--smooth-discounts-sun, #ffdc4c);
-  color: var(--smooth-discounts-moss, #434625);
+  background: var(--popup-sun);
+  color: var(--popup-moss);
   font-size: 0.75rem;
   font-weight: 700;
 }
 
 .smooth-discounts-popup__status {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
   margin: 0;
-  color: var(--popup-muted);
+  color: var(--popup-brown);
   font-size: 0.9375rem;
+  font-weight: 600;
   line-height: 1.4;
 }
 
-.smooth-discounts-popup__chips {
+.smooth-discounts-popup__status::before {
+  content: "↓";
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--popup-brown) 16%, transparent);
+  font-size: 0.8125rem;
+  line-height: 1;
+}
+
+/* The progress rail and the milestones under it. */
+.smooth-discounts-popup__rail {
+  display: flex;
+  flex-direction: column;
+}
+
+.smooth-discounts-popup__track {
+  height: 0.5rem;
+  border-radius: 999px;
+  background: var(--popup-sand);
+  overflow: hidden;
+}
+
+.smooth-discounts-popup__fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--popup-moss);
+  transition: width 0.3s var(--popup-ease);
+}
+
+.smooth-discounts-popup__milestones {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.4rem;
+  justify-content: space-between;
+  gap: 0.25rem 0.75rem;
+  margin: 0.4rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.smooth-discounts-popup__milestone {
+  color: var(--popup-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.smooth-discounts-popup__milestone[data-state="done"] {
+  color: var(--popup-ink);
+}
+
+.smooth-discounts-popup__milestone[data-state="current"],
+.smooth-discounts-popup__milestone[data-state="target"] {
+  color: var(--popup-moss);
+  font-weight: 700;
+}
+
+.smooth-discounts-popup__milestone[data-state="current"] {
+  text-decoration: underline;
+  text-underline-offset: 0.25em;
+}
+
+.smooth-discounts-popup__chips {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+  gap: 0.5rem;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
 .smooth-discounts-popup__chip {
-  padding: 0.25rem 0.65rem;
+  padding: 0.4rem 0.65rem;
   border: 1px solid var(--popup-line);
-  border-radius: calc(var(--smooth-discounts-radius, 16px) * 0.5);
+  border-radius: calc(var(--popup-radius) * 0.5);
   background: #fff;
   color: var(--popup-muted);
   font-size: 0.8125rem;
+  text-align: center;
   white-space: nowrap;
 }
 
 .smooth-discounts-popup__chip[data-chip="applied"],
 .smooth-discounts-popup__chip[data-chip="exact"] {
-  border-color: var(--smooth-discounts-moss, #434625);
-  background: var(--smooth-discounts-moss, #434625);
+  border-color: var(--popup-moss);
+  background: var(--popup-moss);
   color: #fff;
 }
 
 .smooth-discounts-popup__chip[data-chip="progress"],
 .smooth-discounts-popup__chip[data-chip="offer"] {
-  border-color: var(--smooth-discounts-moss, #434625);
-  color: var(--smooth-discounts-moss, #434625);
+  border-color: var(--popup-moss);
+  color: var(--popup-moss);
 }
 
 .smooth-discounts-popup__chip[data-chip="highest"] {
-  border-color: var(--smooth-discounts-sun, #ffdc4c);
-  background: var(--smooth-discounts-sun, #ffdc4c);
-  color: var(--smooth-discounts-moss, #434625);
+  border-color: var(--popup-sun);
+  background: var(--popup-sun);
+  color: var(--popup-moss);
+}
+
+.smooth-discounts-popup__label {
+  margin: 0;
+  color: var(--popup-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 .smooth-discounts-popup__items {
@@ -252,78 +397,116 @@ html:has(.smooth-discounts-popup__dialog[open]) {
   margin: 0;
   padding: 0;
   list-style: none;
-  border-radius: calc(var(--smooth-discounts-radius, 16px) * 0.75);
+  border: 1px solid var(--popup-line);
+  border-radius: calc(var(--popup-radius) * 0.75);
   background: #fff;
   overflow: hidden;
 }
 
 .smooth-discounts-popup__item {
   display: grid;
-  grid-template-columns: 3rem minmax(0, 1fr) auto;
-  grid-template-areas:
-    "picture name add"
-    "picture price add"
-    "picture count add";
+  grid-template-columns: 3.5rem minmax(0, 1fr) auto auto;
   align-items: center;
-  gap: 0 0.75rem;
-  padding: 0.6rem 0.75rem;
+  gap: 0.5rem 1rem;
+  padding: 0.75rem 1rem;
 }
 
 .smooth-discounts-popup__item + .smooth-discounts-popup__item {
   border-top: 1px solid var(--popup-line);
 }
 
-.smooth-discounts-popup__picture {
-  grid-area: picture;
-  width: 3rem;
-  height: 3rem;
-  border-radius: calc(var(--smooth-discounts-radius, 16px) * 0.5);
+.smooth-discounts-popup__picture,
+.smooth-discounts-popup__tile {
+  display: block;
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: calc(var(--popup-radius) * 0.5);
   object-fit: cover;
   background: var(--popup-sand);
 }
 
+.smooth-discounts-popup__info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.smooth-discounts-popup__line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.5rem;
+}
+
 .smooth-discounts-popup__name {
-  grid-area: name;
-  font-size: 0.9375rem;
-  font-weight: 600;
+  font-size: 1rem;
+  font-weight: 700;
   line-height: 1.3;
   overflow-wrap: anywhere;
 }
 
-.smooth-discounts-popup__price {
-  grid-area: price;
+.smooth-discounts-popup__count {
+  padding: 0.1rem 0.55rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--popup-moss) 12%, #fff);
+  color: var(--popup-moss);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.smooth-discounts-popup__rate {
   color: var(--popup-muted);
   font-size: 0.8125rem;
 }
 
-.smooth-discounts-popup__count {
-  grid-area: count;
-  color: var(--smooth-discounts-moss, #434625);
-  font-size: 0.75rem;
-  font-weight: 600;
+/* The − 1 + control. */
+.smooth-discounts-popup__stepper {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--popup-line);
+  border-radius: 999px;
+  background: #fff;
 }
 
-.smooth-discounts-popup__count:empty {
-  display: none;
+.smooth-discounts-popup__step {
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--popup-ink);
+  font: inherit;
+  font-size: 1.125rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.smooth-discounts-popup__step:hover {
+  background: var(--popup-sand);
+}
+
+.smooth-discounts-popup__quantity {
+  min-width: 1.75rem;
+  font-weight: 700;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
 }
 
 .smooth-discounts-popup__add,
 .smooth-discounts-popup__quick-button,
 .smooth-discounts-popup__quick-add {
-  padding: 0.5rem 0.9rem;
+  padding: 0.55rem 1.1rem;
   border: 0;
   border-radius: 999px;
-  background: var(--smooth-discounts-moss, #434625);
+  background: var(--popup-moss);
   color: #fff;
   font: inherit;
   font-size: 0.875rem;
   font-weight: 700;
   cursor: pointer;
   transition: filter 0.2s var(--popup-ease);
-}
-
-.smooth-discounts-popup__add {
-  grid-area: add;
 }
 
 .smooth-discounts-popup__add:hover,
@@ -336,78 +519,188 @@ html:has(.smooth-discounts-popup__dialog[open]) {
 .smooth-discounts-popup__quick-button:focus-visible,
 .smooth-discounts-popup__quick-add:focus-visible,
 .smooth-discounts-popup__view:focus-visible,
+.smooth-discounts-popup__more:focus-visible,
+.smooth-discounts-popup__step:focus-visible,
 .smooth-discounts-popup__close:focus-visible,
 .smooth-discounts-popup__continue:focus-visible {
-  outline: 2px solid var(--smooth-discounts-moss, #434625);
+  outline: 2px solid var(--popup-moss);
   outline-offset: 2px;
 }
 
-/* Quick auto-fill: a sand strip under the items. */
+/* "Showing 4 of 12 eligible items" with the button that lists more. */
+.smooth-discounts-popup__paging {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.25rem 1rem;
+  color: var(--popup-muted);
+  font-size: 0.875rem;
+}
+
+.smooth-discounts-popup__more {
+  padding: 0.25rem 0.5rem;
+  border: 0;
+  background: transparent;
+  color: var(--popup-moss);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.smooth-discounts-popup__more[aria-expanded="false"]::after {
+  content: " ⌄";
+}
+
+.smooth-discounts-popup__more[aria-expanded="true"]::after {
+  content: " ⌃";
+}
+
+/* Quick auto-fill: a banner under the items. */
 .smooth-discounts-popup__quick {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 0.5rem 0.75rem;
-  padding: 0.6rem 0.75rem;
-  border-radius: calc(var(--smooth-discounts-radius, 16px) * 0.75);
+  gap: 0.5rem 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: calc(var(--popup-radius) * 0.75);
   background: var(--popup-sand);
-  font-size: 0.875rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
 }
 
-/* A contracted box: its two buttons sit side by side under the words. */
+/* A contracted box: what the customer has, then its two buttons. */
+.smooth-discounts-popup__preview {
+  flex: 1 1 100%;
+  margin: 0;
+  overflow: hidden;
+  color: var(--popup-muted);
+  font-size: 0.875rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .smooth-discounts-popup__view {
-  padding: 0.5rem 0.9rem;
-  border: 1px solid var(--smooth-discounts-moss, #434625);
+  flex: 1 1 18rem;
+  padding: 0.55rem 1.1rem;
+  border: 1px solid var(--popup-moss);
   border-radius: 999px;
   background: transparent;
-  color: var(--smooth-discounts-moss, #434625);
+  color: var(--popup-moss);
   font: inherit;
   font-size: 0.875rem;
   font-weight: 700;
   cursor: pointer;
 }
 
+.smooth-discounts-popup__view::after {
+  content: " ⌄";
+}
+
 .smooth-discounts-popup__view:hover {
   background: var(--popup-sand);
 }
 
-.smooth-discounts-popup__box[data-expanded="false"] .smooth-discounts-popup__view,
-.smooth-discounts-popup__box[data-expanded="false"] .smooth-discounts-popup__quick-add {
-  align-self: stretch;
+.smooth-discounts-popup__quick-add {
+  flex: 1 1 18rem;
 }
 
 .smooth-discounts-popup__error {
+  flex: 1 1 100%;
   margin: 0;
   padding: 0.5rem 0.75rem;
-  border-radius: calc(var(--smooth-discounts-radius, 16px) * 0.5);
+  border-radius: calc(var(--popup-radius) * 0.5);
   background: #fdecea;
   color: #8a1c13;
   font-size: 0.875rem;
 }
 
-@media (max-width: 480px) {
-  /* A phone: the pop-up takes the whole width and a little less than the whole height. */
+@media (max-width: 640px) {
+  /* A phone: the pop-up is the whole screen. */
   .smooth-discounts-popup__dialog {
     width: 100%;
     max-width: 100%;
-    max-height: calc(100dvh - 1rem);
-    margin: auto 0 0;
-    border-bottom-left-radius: 0;
-    border-bottom-right-radius: 0;
+    height: 100dvh;
+    max-height: 100dvh;
+    margin: 0;
+    border-radius: 0;
+  }
+
+  .smooth-discounts-popup__close {
+    top: 0.75rem;
+    right: 0.75rem;
   }
 
   .smooth-discounts-popup__list {
-    padding: 0.75rem 1rem;
+    gap: 1rem;
+    padding: 1.25rem 1rem 1rem;
+  }
+
+  .smooth-discounts-popup__header {
+    padding-right: 2.75rem;
+  }
+
+  .smooth-discounts-popup__heading {
+    font-size: 1.5rem;
+  }
+
+  .smooth-discounts-popup__footer {
+    padding-right: 1rem;
+    padding-left: 1rem;
+  }
+
+  .smooth-discounts-popup__box {
+    padding: 1rem;
+  }
+
+  .smooth-discounts-popup__flash {
+    margin: -1rem -1rem 0;
+    padding-right: 1rem;
+    padding-left: 1rem;
+  }
+
+  .smooth-discounts-popup__summary {
+    padding: 0.875rem 1rem;
+  }
+
+  .smooth-discounts-popup__head {
+    flex-wrap: wrap;
+  }
+
+  .smooth-discounts-popup__chips {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .smooth-discounts-popup__badge {
+    margin-left: 0;
   }
 
   .smooth-discounts-popup__item {
-    grid-template-columns: 2.5rem minmax(0, 1fr) auto;
+    grid-template-columns: 3rem minmax(0, 1fr) auto;
   }
 
-  .smooth-discounts-popup__picture {
-    width: 2.5rem;
-    height: 2.5rem;
+  .smooth-discounts-popup__picture,
+  .smooth-discounts-popup__tile {
+    width: 3rem;
+    height: 3rem;
+  }
+
+  .smooth-discounts-popup__info {
+    grid-column: 2 / 4;
+  }
+
+  .smooth-discounts-popup__stepper {
+    grid-column: 1 / 3;
+    justify-self: start;
+  }
+
+  .smooth-discounts-popup__add {
+    grid-column: 3;
+  }
+
+  .smooth-discounts-popup__quick-button {
+    flex: 1 1 100%;
   }
 }
 
@@ -417,6 +710,7 @@ html:has(.smooth-discounts-popup__dialog[open]) {
   }
 
   .smooth-discounts-popup__box,
+  .smooth-discounts-popup__fill,
   .smooth-discounts-popup__add,
   .smooth-discounts-popup__quick-button,
   .smooth-discounts-popup__quick-add {
