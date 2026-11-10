@@ -9,6 +9,8 @@ export const EXTENSION_SCRIPTS = [
   { entry: 'entries/currency.js', name: 'tier-pricing-currency.js' },
   // The script of the "Product card prices" app embed (blocks/card-prices.liquid), which has nothing to do with the tier block.
   { entry: 'entries/cards.js', name: 'card-prices.js' },
+  // The offer part of that script, which it loads on every page that has the embed.
+  { entry: 'entries/card-offer.js', name: 'card-prices-offer.js' },
 ]
 
 export const EXTENSION_STYLESHEETS = [
