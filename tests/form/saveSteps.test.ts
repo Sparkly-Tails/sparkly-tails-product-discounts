@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   pickStatus, readLiveMembers, buildDiscountFields, readRecordId, keepRecordId, buildNewDiscount, mergeDiscount, replaceDiscount, listRemovedProducts,
-  isWindowChanged, isWindowCheckNeeded, describeSaveError, pickSavedTitle,
+  isWindowChanged, isWindowCheckNeeded, describeSaveError,
 } from '@/form/saveSteps'
 import type { ParsedDiscount } from '@/form/parseDiscountForm'
 import type { Discount } from '@/lib/config'
@@ -86,11 +86,11 @@ describe('buildNewDiscount', () => {
 })
 
 describe('mergeDiscount', () => {
-  const tools = { pickStatus, buildDiscountFields, readRecordId, keepRecordId, pickSavedTitle }
+  const tools = { pickStatus, buildDiscountFields, readRecordId, keepRecordId }
 
-  it('changes what the form holds and keeps the id, the title and the status', () => {
-    const merged = mergeDiscount({ existing: EXISTING, values: VALUES, tools })
-    expect(merged).toMatchObject({ discountId: 'disc_1', name: 'Black Friday', title: 'Old customer title', status: 'live', members: VALUES.members, tiers: VALUES.tiers })
+  it('changes what the form holds and keeps the id and the status', () => {
+    const merged = mergeDiscount({ existing: EXISTING, values: { ...VALUES, title: 'Black Friday sale' }, tools })
+    expect(merged).toMatchObject({ discountId: 'disc_1', name: 'Black Friday', title: 'Black Friday sale', status: 'live', members: VALUES.members, tiers: VALUES.tiers })
   })
 
   it('keeps the Shopify discount of the flash sale when the sale stays', () => {
@@ -105,19 +105,12 @@ describe('mergeDiscount', () => {
   })
 })
 
-describe('pickSavedTitle', () => {
-  it('is the title of the form when it has one, else the title the discount already had', () => {
-    expect(pickSavedTitle({ title: 'New', existingTitle: 'Old' })).toBe('New')
-    expect(pickSavedTitle({ title: '', existingTitle: 'Old' })).toBe('Old')
-  })
-})
-
 describe('mergeDiscount: the title', () => {
-  const tools = { pickStatus, buildDiscountFields, readRecordId, keepRecordId, pickSavedTitle }
+  const tools = { pickStatus, buildDiscountFields, readRecordId, keepRecordId }
 
-  it('takes a new title from the form and keeps the old one when the form has none', () => {
+  it('takes the title of the form, and a cleared title becomes blank (the storefront then shows the name)', () => {
     expect(mergeDiscount({ existing: EXISTING, values: { ...VALUES, title: 'New' }, tools }).title).toBe('New')
-    expect(mergeDiscount({ existing: EXISTING, values: { ...VALUES, title: '' }, tools }).title).toBe('Old customer title')
+    expect(mergeDiscount({ existing: EXISTING, values: { ...VALUES, title: '' }, tools }).title).toBe('')
   })
 })
 

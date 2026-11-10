@@ -4,7 +4,7 @@ import { SAVE_TOOLS } from '@/form/saveTools'
 describe('SAVE_TOOLS', () => {
   it('has every step as a function, so the save has nothing missing at run time', () => {
     for (const [name, step] of Object.entries(SAVE_TOOLS)) expect(typeof step, name).toBe('function')
-    expect(Object.keys(SAVE_TOOLS)).toHaveLength(47)
+    expect(Object.keys(SAVE_TOOLS)).toHaveLength(46)
   })
 
   it('makes a new discount id that starts with disc_ and is different each time', () => {

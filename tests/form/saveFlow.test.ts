@@ -76,12 +76,12 @@ describe('saveDiscountFlow: a new discount', () => {
 })
 
 describe('saveDiscountFlow: an existing discount', () => {
-  it('keeps its place, its id, its title and its status, and changes what the form holds', async () => {
+  it('keeps its place, its id and its status, and changes what the form holds, the title included', async () => {
     const { tools, saved } = buildTools({ discounts: [OTHER, EXISTING] })
-    const result = await flow.saveDiscountFlow({ discountId: 'disc_1', values: { ...VALUES, flash: null }, tools })
+    const result = await flow.saveDiscountFlow({ discountId: 'disc_1', values: { ...VALUES, title: 'Black Friday sale', flash: null }, tools })
     expect(result).toEqual({ ok: true, discountId: 'disc_1' })
     expect(saved[0].discounts[0]).toEqual(OTHER)
-    expect(saved[0].discounts[1]).toMatchObject({ discountId: 'disc_1', name: 'Black Friday', title: 'Old customer title', status: 'live', members: [{ productId: 'p1' }] })
+    expect(saved[0].discounts[1]).toMatchObject({ discountId: 'disc_1', name: 'Black Friday', title: 'Black Friday sale', status: 'live', members: [{ productId: 'p1' }] })
   })
 
   it('updates the Shopify discount, then the config, then the storefront, and clears the products that were removed', async () => {
