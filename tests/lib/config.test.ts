@@ -134,7 +134,7 @@ describe('saveConfig', () => {
 
     const [, variables] = shopIdSpy.mock.calls[2] as [string, { metafields: { key: string; value: string }[] }]
     const written = variables.metafields.find((metafield) => metafield.key === METAFIELD_KEYS.cardIndex)
-    expect(JSON.parse(written!.value)).toEqual({ discounts: [{ tiers: [{ minQty: 3, percentOff: 10 }], members: [{ productId: '7', handle: 'tuna-soup', variantIds: null }], flash: null }] })
+    expect(JSON.parse(written!.value)).toEqual({ discounts: [{ discountId: 'a', title: 'A', popupFrequency: 'session', tiers: [{ minQty: 3, percentOff: 10 }], members: [{ productId: '7', handle: 'tuna-soup', variantIds: null }], flash: null }] })
     expect(shopIdSpy).toHaveBeenCalledTimes(3)
   })
 
