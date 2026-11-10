@@ -19,7 +19,7 @@ describe('the extension build list', () => {
   const scriptNames = EXTENSION_SCRIPTS.map((script: { name: string }) => script.name)
 
   it('builds exactly the scripts and stylesheets the blocks and the core script use', () => {
-    expect(scriptNames.sort()).toEqual(['card-prices.js', 'tier-pricing-currency.js', 'tier-pricing-flash.js', 'tier-pricing-model.js', 'tier-pricing-paint.js', 'tier-pricing-siblings.js', 'tier-pricing.js'])
+    expect(scriptNames.sort()).toEqual(['card-prices-offer.js', 'card-prices.js', 'tier-pricing-currency.js', 'tier-pricing-flash.js', 'tier-pricing-model.js', 'tier-pricing-paint.js', 'tier-pricing-siblings.js', 'tier-pricing.js'])
     expect(EXTENSION_STYLESHEETS.map((sheet: { name: string }) => sheet.name).sort()).toEqual(['card-prices.css', 'tier-pricing.css'])
   })
 
@@ -55,6 +55,22 @@ describe('the tier block and the components', () => {
 
   it('has each component\'s entry register it under that same name', () => {
     for (const [name, file] of Object.entries(COMPONENTS)) {
+      const entry = EXTENSION_SCRIPTS.find((script: { name: string }) => script.name === file)
+      expect(read(`src/${entry?.entry}`)).toContain(`name: '${name}'`)
+    }
+  })
+})
+
+describe('the card prices embed and its components', () => {
+  const block = read('blocks/card-prices.liquid')
+  const CARD_COMPONENTS: Record<string, string> = { cardOffer: 'card-prices-offer.js', currency: 'tier-pricing-currency.js' }
+
+  it('hands the core script the address of every component, under the name the core asks for', () => {
+    for (const [name, file] of Object.entries(CARD_COMPONENTS)) expect(block).toContain(`"${name}": {{ '${file}' | asset_url | json }}`)
+  })
+
+  it('has each component\'s entry register it under that same name', () => {
+    for (const [name, file] of Object.entries(CARD_COMPONENTS)) {
       const entry = EXTENSION_SCRIPTS.find((script: { name: string }) => script.name === file)
       expect(read(`src/${entry?.entry}`)).toContain(`name: '${name}'`)
     }
