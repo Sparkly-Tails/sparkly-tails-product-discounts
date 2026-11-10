@@ -2,7 +2,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { readBuiltWidget } from '../helpers/builtWidget'
+import { clearWidgetRegistry, readBuiltWidget, runCardScripts } from '../helpers/builtWidget'
 import { METAFIELD_KEYS, METAFIELD_NAMESPACE } from '@/lib/metafieldNames'
 
 /**
@@ -36,10 +36,17 @@ const cardHtml = (handle: string, price = '£1.69') => `
     </div>
   </li>`
 
-function embedHtml(discounts: Discount[], rootUrl = '/') {
+const URLS = { cardOffer: 'https://cdn.test/card-prices-offer.js', currency: 'https://cdn.test/tier-pricing-currency.js' }
+/** What the page says about currency: the shop's own, the one the customer sees with its rate, and a sample of the theme's money filter in it. */
+type CurrencyPage = { shopCurrency: string; activeCurrency: string; rate: string; sample: string }
+const GBP_PAGE: CurrencyPage = { shopCurrency: 'GBP', activeCurrency: 'GBP', rate: '1.0', sample: '£1,234.56' }
+const CAD_PAGE: CurrencyPage = { shopCurrency: 'GBP', activeCurrency: 'CAD', rate: '1.35', sample: 'CA$1,234.56' }
+
+function embedHtml(discounts: Discount[], rootUrl = '/', currency?: CurrencyPage) {
   const index = JSON.stringify({ discounts })
   const attribute = (text: string) => text.replace(/&/g, '&amp;').replace(/'/g, '&#39;').replace(/"/g, '&quot;')
-  return `<div data-smooth-discounts-cards hidden data-index="${attribute(index)}" data-money-format="${attribute(JSON.stringify('£{{amount}}'))}" data-root-url="${attribute(JSON.stringify(rootUrl))}"></div>`
+  const currencyAttributes = currency ? ` data-shop-currency="${attribute(JSON.stringify(currency.shopCurrency))}" data-money-sample="${attribute(JSON.stringify(currency.sample))}"` : ''
+  return `<div data-smooth-discounts-cards hidden data-index="${attribute(index)}" data-money-format="${attribute(JSON.stringify('£{{amount}}'))}" data-root-url="${attribute(JSON.stringify(rootUrl))}" data-component-urls="${attribute(JSON.stringify(URLS))}"${currencyAttributes}></div>`
 }
 
 const fetchMock = vi.fn()
@@ -58,11 +65,15 @@ async function settle() {
   await vi.advanceTimersByTimeAsync(0)
 }
 
-async function mountPage({ cards, discounts, rootUrl, extra = '', feed = productFeed }: { cards: string; discounts: Discount[]; rootUrl?: string; extra?: string; feed?: Record<string, Variant[] | 'fail'> }) {
+type MountOptions = { cards: string; discounts: Discount[]; rootUrl?: string; extra?: string; feed?: Record<string, Variant[] | 'fail'>; currency?: CurrencyPage; components?: string[] }
+
+/** The page, then the card scripts. By default every component is already on the page; `components` says which are, so a test can leave the loading to the core script. */
+async function mountPage({ cards, discounts, rootUrl, extra = '', feed = productFeed, currency, components }: MountOptions) {
   vi.useFakeTimers({ now: NOW_SECONDS * 1000 })
   stubFeed(feed)
-  document.body.innerHTML = `${extra}<ul>${cards}</ul>${embedHtml(discounts, rootUrl)}`
-  ;(0, eval)(built['card-prices.js'])
+  if (currency) (window as unknown as { Shopify: object }).Shopify = { currency: { active: currency.activeCurrency, rate: currency.rate } }
+  document.body.innerHTML = `${extra}<ul>${cards}</ul>${embedHtml(discounts, rootUrl, currency)}`
+  runCardScripts({ built, components })
   await settle()
 }
 
@@ -78,6 +89,9 @@ afterEach(() => {
   vi.useRealTimers()
   vi.unstubAllGlobals()
   document.body.innerHTML = ''
+  document.head.innerHTML = ''
+  clearWidgetRegistry()
+  delete (window as unknown as { Shopify?: object }).Shopify
 })
 
 describe('a card of a discounted product', () => {
@@ -349,7 +363,86 @@ describe('card-prices.liquid', () => {
     expect(block).toContain("data-root-url='{{ routes.root_url | json | escape }}'")
   })
 
-  it('prints nothing when there is no index or the shop sells in a currency other than its own', () => {
-    expect(block).toMatch(/card_index != blank and cart\.currency\.iso_code == shop\.currency/)
+  it('prints nothing when there is no index, and no longer when the customer sees another currency', () => {
+    expect(block).toMatch(/\{%- if card_index != blank -%\}/)
+    expect(block).not.toContain('iso_code')
+  })
+
+  it('hands the script the shop\'s currency, a sample of the money filter in the customer\'s currency, and the address of each component', () => {
+    expect(block).toContain("data-shop-currency='{{ shop.currency | json | escape }}'")
+    expect(block).toContain("data-money-sample='{{ 123456 | money | json | escape }}'")
+    expect(block).toContain("\"cardOffer\": {{ 'card-prices-offer.js' | asset_url | json }}")
+    expect(block).toContain("\"currency\": {{ 'tier-pricing-currency.js' | asset_url | json }}")
+    expect(block).toContain("data-component-urls='{{ component_urls_json }}'")
+  })
+
+  it('preloads the offer component, which every page with the embed needs', () => {
+    expect(block).toContain("{{ 'card-prices-offer.js' | asset_url | preload_tag: as: 'script' }}")
+  })
+})
+
+describe('in the currency the customer sees', () => {
+  const scriptFor = (url: string) => Array.from(document.head.querySelectorAll('script')).find((script) => script.src === url) as HTMLScriptElement | undefined
+  const priced = (price: number) => ({ tuna: [{ id: 1, price, available: true }] })
+
+  it('works out a fixed price tier in that currency: the stored price times the rate, to two decimals', async () => {
+    await mountPage({ cards: cardHtml('tuna'), discounts: [discountOf([memberOf('tuna')])], currency: CAD_PAGE, feed: priced(228) })
+    const card = cardOf('tuna')
+    expect(text('.smooth-discounts-card__was', card)).toBe('CA$2.28')
+    expect(text('.smooth-discounts-card__from', card)).toBe('From CA$2.09')
+    expect(text('.smooth-discounts-card__tag', card)).toBe('Buy 16+ for CA$2.09')
+  })
+
+  it('leaves a percentage tier as it is, and only writes the amounts in that currency', async () => {
+    const tiers = [{ minQty: 2, percentOff: 10 }, { minQty: 5, percentOff: 25 }]
+    await mountPage({ cards: cardHtml('tuna'), discounts: [discountOf([memberOf('tuna')], { tiers })], currency: CAD_PAGE, feed: priced(2000) })
+    expect(text('.smooth-discounts-card__was', cardOf('tuna'))).toBe('CA$20.00')
+    expect(text('.smooth-discounts-card__from', cardOf('tuna'))).toBe('From CA$15.00')
+  })
+
+  it('shows no offer when the converted price is no saving on the live price', async () => {
+    await mountPage({ cards: cardHtml('tuna'), discounts: [discountOf([memberOf('tuna')])], currency: CAD_PAGE, feed: priced(200) })
+    expect(document.querySelector('.smooth-discounts-card__from')).toBeNull()
+  })
+
+  it('does not load the currency component, or change anything, for a customer who sees the shop\'s currency', async () => {
+    await mountPage({ cards: cardHtml('tuna'), discounts: [discountOf([memberOf('tuna')])], currency: GBP_PAGE, components: [] })
+    expect(scriptFor(URLS.cardOffer)).toBeDefined()
+    expect(scriptFor(URLS.currency)).toBeUndefined()
+  })
+
+  it('loads the currency component, with the offer component, for a customer who sees another currency', async () => {
+    await mountPage({ cards: cardHtml('tuna'), discounts: [discountOf([memberOf('tuna')])], currency: CAD_PAGE, components: [] })
+    expect(scriptFor(URLS.cardOffer)).toBeDefined()
+    expect(scriptFor(URLS.currency)).toBeDefined()
+  })
+
+  it('waits for its components, which arrive after the core script, and then paints', async () => {
+    await mountPage({ cards: cardHtml('tuna'), discounts: [discountOf([memberOf('tuna')])], currency: CAD_PAGE, feed: priced(228), components: [] })
+    expect(fetchMock).not.toHaveBeenCalled()
+    for (const name of ['card-prices-offer.js', 'tier-pricing-currency.js']) (0, eval)(built[name])
+    await settle()
+    expect(text('.smooth-discounts-card__from', cardOf('tuna'))).toBe('From CA$2.09')
+  })
+
+  it('leaves the cards alone, and asks for no prices, when the rate cannot be read', async () => {
+    await mountPage({ cards: cardHtml('tuna'), discounts: [discountOf([memberOf('tuna')])], currency: { ...CAD_PAGE, rate: 'abc' } })
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(document.querySelector('.smooth-discounts-card__from')).toBeNull()
+  })
+
+  it('leaves the cards alone when the money sample holds no amount', async () => {
+    await mountPage({ cards: cardHtml('tuna'), discounts: [discountOf([memberOf('tuna')])], currency: { ...CAD_PAGE, sample: 'n/a' } })
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(document.querySelector('.smooth-discounts-card__from')).toBeNull()
+  })
+
+  it('leaves the cards alone, and does not break the page, when a component cannot be loaded', async () => {
+    await mountPage({ cards: cardHtml('tuna'), discounts: [discountOf([memberOf('tuna')])], currency: CAD_PAGE, components: [] })
+    scriptFor(URLS.currency)!.dispatchEvent(new Event('error'))
+    await settle()
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(document.querySelector('.smooth-discounts-card__from')).toBeNull()
+    expect(cardOf('tuna').querySelector('.price')).not.toBeNull()
   })
 })

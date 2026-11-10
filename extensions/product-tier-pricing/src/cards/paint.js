@@ -1,16 +1,9 @@
 // Puts the offer on a card: the theme's own price is hidden and replaced by the struck price, "From £x" and a tag.
 // The new price line takes the classes of the theme's price, so it is set in the theme's own type.
 
-const MARK = 'smoothDiscountsCard'
+import { markCard } from './mark.js'
+
 const POSITIONED_VALUES = ['relative', 'absolute', 'fixed', 'sticky']
-
-export function isMarked({ root }) {
-  return root.dataset[MARK] !== undefined
-}
-
-export function markCard({ root, state }) {
-  root.dataset[MARK] = state
-}
 
 /** One element with its text and class (a new element of the same document as `priceElement`). */
 export function createTextElement({ document, tag, className, text }) {
@@ -65,4 +58,4 @@ export function paintCard({ target, offer, moneyFormat, tools }) {
   tools.markCard({ root, state: 'on' })
 }
 
-export const PAINT_TOOLS = { isMarked, markCard, createTextElement, buildPriceBlock, findMediaElement, prepareMedia, placeTag, paintCard }
+export const PAINT_TOOLS = { markCard, createTextElement, buildPriceBlock, findMediaElement, prepareMedia, placeTag, paintCard }

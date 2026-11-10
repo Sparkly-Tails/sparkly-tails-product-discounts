@@ -3,33 +3,6 @@
 import { flashPhase } from '../flash.js'
 import { formatMoney, sortTiersByMinQty, unitPriceAtTier } from '../tierMath.js'
 
-const EMPTY_INDEX = { discounts: [] }
-
-/** The index the embed printed, or an empty one when it is missing or damaged: a card then keeps its plain price. */
-export function parseCardIndex({ text }) {
-  try {
-    const index = JSON.parse(text)
-    return Array.isArray(index.discounts) ? index : EMPTY_INDEX
-  } catch {
-    return EMPTY_INDEX
-  }
-}
-
-export function addMemberEntry({ entries, discount }, member) {
-  entries.set(member.handle, { ...member, discount })
-}
-
-export function addDiscountEntries({ entries, tools }, discount) {
-  discount.members.forEach(tools.addMemberEntry.bind(null, { entries, discount }))
-}
-
-/** Every product of every discount, by its handle: `{ handle, productId, variantIds, discount }`. */
-export function mapEntriesByHandle({ index, tools }) {
-  const entries = new Map()
-  index.discounts.forEach(tools.addDiscountEntries.bind(null, { entries, tools }))
-  return entries
-}
-
 /** A flash sale shows only while it runs; a regular discount (no window) always does. */
 export function isDiscountRunning({ flash, nowSeconds, tools }) {
   return flash === null || tools.flashPhase({ nowSeconds, startsAtUnix: flash.startsAtUnix, endsAtUnix: flash.endsAtUnix }) === 'running'
@@ -84,7 +57,6 @@ export function keepSavingOffer({ offer }) {
 export const OFFER_TOOLS = {
   flashPhase, sortTiersByMinQty, unitPriceAtTier, formatMoney,
   isDiscountRunning, isEligibleVariant, listEligibleVariants, pickTopTier, listCardPrices, pickCheapestOffer, buildOffer, keepLowerOffer, keepSavingOffer,
-  addMemberEntry, addDiscountEntries, mapEntriesByHandle,
 }
 
 /** `{ basePrice, salePrice, quantity }` for a card, or null when it should keep its price. `variants` come from /products/<handle>.js. */

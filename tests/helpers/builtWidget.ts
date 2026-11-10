@@ -6,6 +6,10 @@ import { inject } from 'vitest'
 export const WIDGET_COMPONENTS = ['tier-pricing-model.js', 'tier-pricing-paint.js', 'tier-pricing-flash.js', 'tier-pricing-siblings.js', 'tier-pricing-currency.js']
 export const WIDGET_CORE = 'tier-pricing.js'
 
+/** The components of the card prices embed: its own offer component, and the widget's currency component it shares. */
+export const CARD_COMPONENTS = ['card-prices-offer.js', 'tier-pricing-currency.js']
+export const CARD_CORE = 'card-prices.js'
+
 export type BuiltWidget = Record<string, string>
 
 /** The scripts and stylesheets built for this test run (see buildWidgetGlobalSetup.ts), by file name. */
@@ -19,6 +23,11 @@ export function readBuiltWidget(): BuiltWidget {
 /** Runs the built scripts in the page's global scope: the components, then the core script that uses them. */
 export function runWidgetScripts({ built, components = WIDGET_COMPONENTS }: { built: BuiltWidget; components?: string[] }): void {
   for (const name of [...components, WIDGET_CORE]) (0, eval)(built[name])
+}
+
+/** Runs the built card scripts in the page's global scope: the components, then the core script that uses them. */
+export function runCardScripts({ built, components = CARD_COMPONENTS }: { built: BuiltWidget; components?: string[] }): void {
+  for (const name of [...components, CARD_CORE]) (0, eval)(built[name])
 }
 
 /** Forgets the components a test registered, so the next one starts from a page that has none. */
