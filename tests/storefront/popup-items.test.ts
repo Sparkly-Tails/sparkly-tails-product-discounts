@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { listEligibleItems, isCompletable, chooseQuickFill, sumQuickFillCost, ITEM_TOOLS } from '../../extensions/product-tier-pricing/src/popup/items.js'
+import { listEligibleItems, isCompletable, chooseQuickFill, sumQuickFillCost, readSharedPrice, LIST_TOOLS, FILL_TOOLS } from '../../extensions/product-tier-pricing/src/popup/items.js'
+
+const ITEM_TOOLS = { ...LIST_TOOLS, ...FILL_TOOLS }
 
 type LiveVariant = { id: number; title: string; price: number; available: boolean; featured_image?: { src: string } | null }
 const productOf = (handle: string, title: string, variants: LiveVariant[], featuredImage: string | null = null) => ({ handle, title, featured_image: featuredImage, variants })
@@ -98,5 +100,17 @@ describe('sumQuickFillCost', () => {
     const items = [{ variantId: 'A', price: 1.63 }, { variantId: 'C', price: 1.69 }]
     expect(sumQuickFillCost({ picks: [{ variantId: 'A', quantity: 2 }, { variantId: 'C', quantity: 1 }], items, tools: ITEM_TOOLS })).toBe(4.95)
     expect(sumQuickFillCost({ picks: [], items, tools: ITEM_TOOLS })).toBe(0)
+  })
+})
+
+describe('readSharedPrice', () => {
+  it('is the price the items share, in any availability', () => {
+    expect(readSharedPrice({ items: [{ price: 1.69 }, { price: 1.69 }], tools: ITEM_TOOLS })).toBe(1.69)
+    expect(readSharedPrice({ items: [{ price: 1.69 }], tools: ITEM_TOOLS })).toBe(1.69)
+  })
+
+  it('is null when the prices differ, or there are no items, so no chips are shown', () => {
+    expect(readSharedPrice({ items: [{ price: 1.69 }, { price: 1.79 }], tools: ITEM_TOOLS })).toBeNull()
+    expect(readSharedPrice({ items: [], tools: ITEM_TOOLS })).toBeNull()
   })
 })

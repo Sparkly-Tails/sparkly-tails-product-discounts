@@ -19,22 +19,23 @@ export function isDiscountRunning({ discount, nowSeconds, tools }) {
 }
 
 /** True for "at every checkout press", or when this session has not seen the bundle yet. */
-export function isShowAgain({ discount, storage, tools }) {
-  return discount.popupFrequency === 'checkout' || !tools.isShown({ storage, key: tools.buildShownKey({ discount }) })
+export function isShowAgain({ discount, shownKey, storage, tools }) {
+  return discount.popupFrequency === 'checkout' || !tools.isShown({ storage, key: shownKey })
 }
 
-export function isDiscountDue({ discount, units, firstTierQty, nowSeconds, storage, tools }) {
-  return tools.isBundleIncomplete({ units, firstTierQty }) && tools.isDiscountRunning({ discount, nowSeconds, tools }) && tools.isShowAgain({ discount, storage, tools })
+export function isDiscountDue({ discount, units, firstTierQty, shownKey, nowSeconds, storage, tools }) {
+  return tools.isBundleIncomplete({ units, firstTierQty }) && tools.isDiscountRunning({ discount, nowSeconds, tools }) && tools.isShowAgain({ discount, shownKey, storage, tools })
 }
 
-/** The discount as a one-item list with its units and first tier when it is due, else an empty list. */
+/** The discount as a one-item list with its units, first tier and "shown" key when it is due, else an empty list. */
 export function describeDueBundle({ lines, nowSeconds, storage, tools }, discount) {
   const units = tools.countBundleUnits({ lines, members: discount.members, tools })
   const firstTierQty = tools.readFirstTierQty({ tiers: discount.tiers })
-  return tools.isDiscountDue({ discount, units, firstTierQty, nowSeconds, storage, tools }) ? [{ discount, units, firstTierQty }] : []
+  const shownKey = tools.buildShownKey({ discount })
+  return tools.isDiscountDue({ discount, units, firstTierQty, shownKey, nowSeconds, storage, tools }) ? [{ discount, units, firstTierQty, shownKey }] : []
 }
 
-/** The bundles to show, in the index's order: `[{ discount, units, firstTierQty }]`. */
+/** The bundles to show, in the index's order: `[{ discount, units, firstTierQty, shownKey }]`. */
 export function listDueBundles({ discounts, lines, nowSeconds, storage, tools }) {
   return discounts.flatMap(tools.describeDueBundle.bind(null, { lines, nowSeconds, storage, tools }))
 }

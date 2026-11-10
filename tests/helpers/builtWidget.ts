@@ -10,6 +10,10 @@ export const WIDGET_CORE = 'tier-pricing.js'
 export const CARD_COMPONENTS = ['card-prices-offer.js', 'tier-pricing-currency.js']
 export const CARD_CORE = 'card-prices.js'
 
+/** The components of the bundle pop-up embed: its boxes and UI components, and the widget's currency component it shares. */
+export const POPUP_COMPONENTS = ['bundle-popup-boxes.js', 'bundle-popup-ui.js', 'tier-pricing-currency.js']
+export const POPUP_CORE = 'bundle-popup.js'
+
 export type BuiltWidget = Record<string, string>
 
 /** The scripts and stylesheets built for this test run (see buildWidgetGlobalSetup.ts), by file name. */
@@ -28,6 +32,11 @@ export function runWidgetScripts({ built, components = WIDGET_COMPONENTS }: { bu
 /** Runs the built card scripts in the page's global scope: the components, then the core script that uses them. */
 export function runCardScripts({ built, components = CARD_COMPONENTS }: { built: BuiltWidget; components?: string[] }): void {
   for (const name of [...components, CARD_CORE]) (0, eval)(built[name])
+}
+
+/** Runs the built pop-up scripts in the page's global scope: the components, then the core script that uses them. */
+export function runPopupScripts({ built, components = POPUP_COMPONENTS }: { built: BuiltWidget; components?: string[] }): void {
+  for (const name of [...components, POPUP_CORE]) (0, eval)(built[name])
 }
 
 /** Forgets the components a test registered, so the next one starts from a page that has none. */

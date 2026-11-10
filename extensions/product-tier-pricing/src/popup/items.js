@@ -118,7 +118,23 @@ export function sumQuickFillCost({ picks, items, tools }) {
   return Math.round(picks.map(tools.buildPickCost.bind(null, { items, tools })).reduce(tools.addAmount, 0) * 100) / 100
 }
 
-export const ITEM_TOOLS = {
-  isMemberVariant, readImageUrl, buildItemLabel, buildItem, listMemberItems, listEligibleItems, isItemAvailable, isCompletable, readLineVariantId, findItemOfVariant,
-  hasVariantId, isDefined, isNotIn, orderQuickFillItems, buildPick, hasQuantity, chooseQuickFill, readItemPrice, buildPickCost, addAmount, sumQuickFillCost,
+export function hasPrice({ price }, item) {
+  return item.price === price
 }
+
+/** The price all the items have, or null when they differ or there are none: only then is one plain price known for the bundle's chips and saving. */
+export function readSharedPrice({ items, tools }) {
+  const first = items.length === 0 ? null : items[0].price
+  return items.every(tools.hasPrice.bind(null, { price: first })) ? first : null
+}
+
+/** What listing a bundle's items needs; the core script uses this much. */
+export const LIST_TOOLS = {
+  isMemberVariant, readImageUrl, buildItemLabel, buildItem, listMemberItems, listEligibleItems, isItemAvailable, isCompletable, hasPrice, readSharedPrice,
+}
+
+/** What Quick auto-fill needs; the UI component uses this much. */
+export const FILL_TOOLS = {
+  readLineVariantId, hasVariantId, findItemOfVariant, isDefined, isNotIn, isItemAvailable, orderQuickFillItems, buildPick, hasQuantity, chooseQuickFill, readItemPrice, buildPickCost, addAmount, sumQuickFillCost,
+}
+

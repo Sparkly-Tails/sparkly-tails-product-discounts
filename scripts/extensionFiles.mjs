@@ -11,11 +11,16 @@ export const EXTENSION_SCRIPTS = [
   { entry: 'entries/cards.js', name: 'card-prices.js' },
   // The offer part of that script, which it loads on every page that has the embed.
   { entry: 'entries/card-offer.js', name: 'card-prices-offer.js' },
+  // The script of the "Bundle pop-up" app embed (blocks/bundle-popup.liquid), and the two components it loads when a bundle is due (the boxes with their items, and the pop-up).
+  { entry: 'entries/popup.js', name: 'bundle-popup.js' },
+  { entry: 'entries/popup-boxes.js', name: 'bundle-popup-boxes.js' },
+  { entry: 'entries/popup-ui.js', name: 'bundle-popup-ui.js' },
 ]
 
 export const EXTENSION_STYLESHEETS = [
   { entry: 'tier-pricing.css', name: 'tier-pricing.css' },
   { entry: 'card-prices.css', name: 'card-prices.css' },
+  { entry: 'bundle-popup.css', name: 'bundle-popup.css' },
 ]
 
 // Shopify flags an app block script over this many bytes (AssetSizeAppBlockJavaScript); the build refuses one.

@@ -19,8 +19,8 @@ describe('the extension build list', () => {
   const scriptNames = EXTENSION_SCRIPTS.map((script: { name: string }) => script.name)
 
   it('builds exactly the scripts and stylesheets the blocks and the core script use', () => {
-    expect(scriptNames.sort()).toEqual(['card-prices-offer.js', 'card-prices.js', 'tier-pricing-currency.js', 'tier-pricing-flash.js', 'tier-pricing-model.js', 'tier-pricing-paint.js', 'tier-pricing-siblings.js', 'tier-pricing.js'])
-    expect(EXTENSION_STYLESHEETS.map((sheet: { name: string }) => sheet.name).sort()).toEqual(['card-prices.css', 'tier-pricing.css'])
+    expect(scriptNames.sort()).toEqual(['bundle-popup-boxes.js', 'bundle-popup-ui.js', 'bundle-popup.js', 'card-prices-offer.js', 'card-prices.js', 'tier-pricing-currency.js', 'tier-pricing-flash.js', 'tier-pricing-model.js', 'tier-pricing-paint.js', 'tier-pricing-siblings.js', 'tier-pricing.js'])
+    expect(EXTENSION_STYLESHEETS.map((sheet: { name: string }) => sheet.name).sort()).toEqual(['bundle-popup.css', 'card-prices.css', 'tier-pricing.css'])
   })
 
   it('keeps Shopify\'s limit of 10,000 bytes for a script', () => {
@@ -32,7 +32,7 @@ describe('the extension build list', () => {
   })
 
   it('has each block name a script and a stylesheet that the build produces', () => {
-    for (const block of ['blocks/tier-pricing.liquid', 'blocks/card-prices.liquid']) {
+    for (const block of ['blocks/tier-pricing.liquid', 'blocks/card-prices.liquid', 'blocks/bundle-popup.liquid']) {
       const schema = JSON.parse(read(block).split('{% schema %}')[1].split('{% endschema %}')[0])
       expect(scriptNames).toContain(schema.javascript)
       expect(EXTENSION_STYLESHEETS.map((sheet: { name: string }) => sheet.name)).toContain(schema.stylesheet)
@@ -73,6 +73,33 @@ describe('the card prices embed and its components', () => {
     for (const [name, file] of Object.entries(CARD_COMPONENTS)) {
       const entry = EXTENSION_SCRIPTS.find((script: { name: string }) => script.name === file)
       expect(read(`src/${entry?.entry}`)).toContain(`name: '${name}'`)
+    }
+  })
+})
+
+describe('the bundle pop-up embed and its components', () => {
+  const block = read('blocks/bundle-popup.liquid')
+  const POPUP_COMPONENTS: Record<string, string> = { popupBoxes: 'bundle-popup-boxes.js', popupUi: 'bundle-popup-ui.js', currency: 'tier-pricing-currency.js' }
+
+  it('hands the core script the address of every component, under the name the core asks for', () => {
+    for (const [name, file] of Object.entries(POPUP_COMPONENTS)) expect(block).toContain(`"${name}": {{ '${file}' | asset_url | json }}`)
+  })
+
+  it('preloads the parts every press of Checkout needs', () => {
+    expect(block).toContain("{{ 'bundle-popup-boxes.js' | asset_url | preload_tag: as: 'script' }}")
+    expect(block).toContain("{{ 'bundle-popup-ui.js' | asset_url | preload_tag: as: 'script' }}")
+  })
+
+  it('has each component\'s entry register it under that same name', () => {
+    for (const [name, file] of Object.entries(POPUP_COMPONENTS)) {
+      const entry = EXTENSION_SCRIPTS.find((script: { name: string }) => script.name === file)
+      expect(read(`src/${entry?.entry}`)).toContain(`name: '${name}'`)
+    }
+  })
+
+  it('prints the three colour settings under the names the script reads', () => {
+    for (const [attribute, setting] of [['data-moss-color', 'moss_color'], ['data-cream-color', 'cream_color'], ['data-sun-color', 'sun_color']]) {
+      expect(block).toContain(`${attribute}='{{ block.settings.${setting} | json | escape }}'`)
     }
   })
 })
