@@ -12,7 +12,7 @@ import {
 } from '@/form/saveFlow'
 import {
   buildDiscountFields, buildNewDiscount, describeSaveError, isWindowChanged, isWindowCheckNeeded, keepRecordId, listRemovedProducts, mergeDiscount,
-  pickStatus, readLiveMembers, readRecordId, replaceDiscount,
+  pickSavedTitle, pickStatus, readLiveMembers, readRecordId, replaceDiscount,
 } from '@/form/saveSteps'
 
 export const SAVE_TOOLS: SaveTools = {
@@ -36,6 +36,7 @@ export const SAVE_TOOLS: SaveTools = {
   keepRecordId,
   buildNewDiscount,
   mergeDiscount,
+  pickSavedTitle,
   replaceDiscount,
   listRemovedProducts,
   isWindowChanged,

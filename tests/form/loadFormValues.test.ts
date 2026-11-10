@@ -64,6 +64,12 @@ describe('buildFormValues', () => {
     expect(initialTiers.mode).toBe('percent')
   })
 
+  it('fills the title and the pop-up frequency; a discount saved before the pop-up gets once per session', () => {
+    const before = buildFormValues({ discount: PERCENT, memberInfo: [SALMON], tools }).values
+    expect([before.title, before.popupFrequency]).toEqual(['Old title', 'session'])
+    expect(buildFormValues({ discount: { ...PERCENT, popupFrequency: 'checkout' }, memberInfo: [SALMON], tools }).values.popupFrequency).toBe('checkout')
+  })
+
   it('fills the Design card from the saved style, or with its defaults for a discount saved before styles existed', () => {
     const style = { backgroundColor: '#FFFFFF', cornerRadius: 4 }
     expect(buildFormValues({ discount: { ...PERCENT, style }, memberInfo: [SALMON], tools }).values.style).toEqual(style)

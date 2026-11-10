@@ -54,6 +54,8 @@ export function buildFormValues({ discount, memberInfo, tools }: {
   return {
     values: {
       name: discount.name,
+      title: discount.title,
+      popupFrequency: discount.popupFrequency ?? 'session',
       members: tools.buildSelectedMembers({ memberInfo }),
       pricingMode: discount.pricingMode,
       tiers: discount.tiers,

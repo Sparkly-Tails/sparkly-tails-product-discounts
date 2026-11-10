@@ -4,6 +4,8 @@ import { isFormDirty, buildComparable, buildPreviewProducts, canSaveValues, buil
 
 const SAVED: FormValues = {
   name: 'Salmon Oil Volume Discount',
+  title: 'Salmon Oil bundle',
+  popupFrequency: 'session',
   members: [{ productId: 'p1', variantId: 'v1', productTitle: 'Salmon Oil', variantTitle: '16 fl oz', price: 28, imageUrl: null }],
   pricingMode: 'percent',
   tiers: [{ minQty: 3, percentOff: 10 }, { minQty: 5, percentOff: 15, anchorPrice: 100 }],
@@ -20,6 +22,11 @@ describe('isFormDirty', () => {
 
   it('is dirty when the name changes', () => {
     expect(dirty({ name: 'Other' })).toBe(true)
+  })
+
+  it('is dirty when the title or the pop-up frequency changes', () => {
+    expect(dirty({ title: 'Other title' })).toBe(true)
+    expect(dirty({ popupFrequency: 'checkout' })).toBe(true)
   })
 
   it('is dirty when a product is added or removed', () => {

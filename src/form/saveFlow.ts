@@ -45,6 +45,7 @@ export interface SaveTools extends ShopClaimTools {
   keepRecordId: typeof Steps.keepRecordId
   buildNewDiscount: typeof Steps.buildNewDiscount
   mergeDiscount: typeof Steps.mergeDiscount
+  pickSavedTitle: typeof Steps.pickSavedTitle
   replaceDiscount: typeof Steps.replaceDiscount
   listRemovedProducts: typeof Steps.listRemovedProducts
   isWindowChanged: typeof Steps.isWindowChanged

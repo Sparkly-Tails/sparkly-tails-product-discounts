@@ -14,8 +14,8 @@ export function readLiveMembers({ discount }: { discount: Discount | undefined }
 }
 
 /** The parts of a discount the form decides (a flash sale or High Demand that is off is left out). */
-export function buildDiscountFields({ values }: { values: ParsedDiscount }): Pick<Discount, 'pricingMode' | 'members' | 'tiers' | 'flash' | 'highDemand' | 'style'> {
-  return { pricingMode: values.pricingMode, members: values.members, tiers: values.tiers, flash: values.flash ?? undefined, highDemand: values.highDemand || undefined, style: values.style }
+export function buildDiscountFields({ values }: { values: ParsedDiscount }): Pick<Discount, 'pricingMode' | 'members' | 'tiers' | 'flash' | 'highDemand' | 'style' | 'popupFrequency'> {
+  return { pricingMode: values.pricingMode, members: values.members, tiers: values.tiers, flash: values.flash ?? undefined, highDemand: values.highDemand || undefined, style: values.style, popupFrequency: values.popupFrequency }
 }
 
 /** The id of the Shopify discount that stands for the flash sale, if the discount has one. */
@@ -28,7 +28,12 @@ export function keepRecordId({ flash, previousRecordId }: { flash: FlashSale | u
   return flash && previousRecordId ? { ...flash, shopifyDiscountId: previousRecordId } : flash
 }
 
-/** A new discount: a draft (live with Go live) whose customer-facing title is its own name. */
+/** The title to save: the form's when it has one, else the title the discount already had. */
+export function pickSavedTitle({ title, existingTitle }: { title: string; existingTitle: string }): string {
+  return title || existingTitle
+}
+
+/** A new discount: a draft (live with Go live) with the customer-facing title of the form (blank stays blank; the storefront then shows the name). */
 export function buildNewDiscount({ values, discountId, tools }: {
   values: ParsedDiscount
   discountId: string
@@ -37,21 +42,22 @@ export function buildNewDiscount({ values, discountId, tools }: {
   return {
     discountId,
     name: values.name,
-    title: values.name,
+    title: values.title,
     status: tools.pickStatus({ goLive: values.goLive, takeOffline: values.takeOffline, current: 'draft' }),
     ...tools.buildDiscountFields({ values }),
   }
 }
 
-/** An existing discount with what the form decides replaced; its id, its title and its Shopify discount stay. */
+/** An existing discount with what the form decides replaced; its id and its Shopify discount stay, and so does its title unless the form has a new one. */
 export function mergeDiscount({ existing, values, tools }: {
   existing: Discount
   values: ParsedDiscount
-  tools: { pickStatus: typeof pickStatus; buildDiscountFields: typeof buildDiscountFields; readRecordId: typeof readRecordId; keepRecordId: typeof keepRecordId }
+  tools: { pickStatus: typeof pickStatus; buildDiscountFields: typeof buildDiscountFields; readRecordId: typeof readRecordId; keepRecordId: typeof keepRecordId; pickSavedTitle: typeof pickSavedTitle }
 }): Discount {
   return {
     ...existing,
     name: values.name,
+    title: tools.pickSavedTitle({ title: values.title, existingTitle: existing.title }),
     status: tools.pickStatus({ goLive: values.goLive, takeOffline: values.takeOffline, current: existing.status }),
     ...tools.buildDiscountFields({ values }),
     flash: tools.keepRecordId({ flash: values.flash ?? undefined, previousRecordId: tools.readRecordId({ discount: existing }) }),

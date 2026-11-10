@@ -20,6 +20,8 @@ const SALMON = { productId: 'p1', variantId: 'v1', productTitle: 'Salmon Oil', v
 const CHEWS = { productId: 'p2', variantId: 'v2', productTitle: 'Joint Chews', variantTitle: '90 Chews', price: 40, imageUrl: null }
 const SAVED: FormValues = {
   name: 'Salmon Oil Volume Discount',
+  title: 'Salmon Oil bundle',
+  popupFrequency: 'session',
   members: [SALMON],
   pricingMode: 'percent',
   tiers: [{ minQty: 3, percentOff: 10 }],
@@ -27,7 +29,7 @@ const SAVED: FormValues = {
   style: DEFAULT_WIDGET_STYLE,
 }
 const SAVED_TIERS = { mode: 'percent' as const, percentTiers: [{ minQty: 3, percentOff: 10 }], fixedTiers: [] }
-const EMPTY: FormValues = { name: '', members: [], pricingMode: 'percent', tiers: [], flash: SAVED.flash, style: DEFAULT_WIDGET_STYLE }
+const EMPTY: FormValues = { name: '', title: '', popupFrequency: 'session', members: [], pricingMode: 'percent', tiers: [], flash: SAVED.flash, style: DEFAULT_WIDGET_STYLE }
 const EMPTY_TIERS = { mode: 'percent' as const, percentTiers: [], fixedTiers: [] }
 
 function renderForm(overrides: Partial<Parameters<typeof TierDiscountForm>[0]> = {}) {

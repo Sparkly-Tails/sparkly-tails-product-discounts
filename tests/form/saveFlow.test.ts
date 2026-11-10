@@ -9,7 +9,7 @@ import type { SaveTools } from '@/form/saveFlow'
 
 const FLASH = { startsAt: '2026-11-27T09:00', endsAt: '2026-11-30T23:59', showTeaser: true }
 const VALUES: ParsedDiscount = {
-  name: 'Black Friday', members: [{ productId: 'p1' }], pricingMode: 'percent', tiers: [{ minQty: 3, percentOff: 10 }], flash: null, highDemand: false, style: DEFAULT_WIDGET_STYLE, goLive: false, takeOffline: false,
+  name: 'Black Friday', title: '', popupFrequency: 'session', members: [{ productId: 'p1' }], pricingMode: 'percent', tiers: [{ minQty: 3, percentOff: 10 }], flash: null, highDemand: false, style: DEFAULT_WIDGET_STYLE, goLive: false, takeOffline: false,
 }
 const OTHER: Discount = { discountId: 'disc_other', name: 'Other', title: 'Other', status: 'draft', pricingMode: 'percent', members: [{ productId: 'p9' }], tiers: [{ minQty: 2, percentOff: 5 }] }
 const EXISTING: Discount = {
@@ -45,11 +45,11 @@ function buildTools(config: Config, overrides: Partial<Record<keyof SaveTools, u
 }
 
 describe('saveDiscountFlow: a new discount', () => {
-  it('is saved as a draft titled with its name, with no Shopify discount and nothing on the storefront', async () => {
+  it('is saved as a draft with the title of the form, with no Shopify discount and nothing on the storefront', async () => {
     const { tools, calls, saved } = buildTools({ discounts: [OTHER] })
-    const result = await flow.saveDiscountFlow({ discountId: undefined, values: VALUES, tools })
+    const result = await flow.saveDiscountFlow({ discountId: undefined, values: { ...VALUES, title: 'Tins mix' }, tools })
     expect(result).toEqual({ ok: true, discountId: 'disc_new' })
-    expect(saved[0].discounts).toEqual([OTHER, expect.objectContaining({ discountId: 'disc_new', name: 'Black Friday', title: 'Black Friday', status: 'draft' })])
+    expect(saved[0].discounts).toEqual([OTHER, expect.objectContaining({ discountId: 'disc_new', name: 'Black Friday', title: 'Tins mix', status: 'draft' })])
     expect(calls).not.toContain('syncRecordOf')
     expect(calls).not.toContain('syncDiscountMetafields')
   })

@@ -6,6 +6,10 @@ import type { WidgetStyle } from '@/lib/widgetStyle'
 /** What the form says, before anything is checked against the shop. */
 export interface ParsedDiscount {
   name: string
+  /** The customer-facing title; blank when the person left it empty. */
+  title: string
+  /** How often the checkout pop-up shows the bundle. */
+  popupFrequency: 'session' | 'checkout'
   members: DiscountMember[]
   pricingMode: 'percent' | 'fixed'
   tiers: Tier[]
@@ -30,12 +34,23 @@ export interface ParseTools extends StyleTools {
   parseHighDemandFromForm: (options: { formData: FormData }) => boolean
   parseStyleFromForm: typeof parseStyleFromForm
   readName: typeof readName
+  readTitle: typeof readTitle
+  readPopupFrequency: typeof readPopupFrequency
   readPricingMode: typeof readPricingMode
   findFormProblem: typeof findFormProblem
 }
 
 export function readName({ formData }: { formData: FormData }): string {
   return String(formData.get('name') ?? '').trim()
+}
+
+export function readTitle({ formData }: { formData: FormData }): string {
+  return String(formData.get('title') ?? '').trim()
+}
+
+/** Only an explicit "checkout" shows the pop-up at every Checkout press; anything else is once per session. */
+export function readPopupFrequency({ formData }: { formData: FormData }): 'session' | 'checkout' {
+  return formData.get('popupFrequency') === 'checkout' ? 'checkout' : 'session'
 }
 
 export function readPricingMode({ formData }: { formData: FormData }): 'percent' | 'fixed' {
@@ -57,6 +72,8 @@ export function parseDiscountForm({ formData, tools }: { formData: FormData; too
   const pricingMode = tools.readPricingMode({ formData })
   const values: ParsedDiscount = {
     name: tools.readName({ formData }),
+    title: tools.readTitle({ formData }),
+    popupFrequency: tools.readPopupFrequency({ formData }),
     members: tools.parseMembersFromForm(formData),
     pricingMode,
     tiers: tools.parseTiersFromForm(formData, pricingMode),
