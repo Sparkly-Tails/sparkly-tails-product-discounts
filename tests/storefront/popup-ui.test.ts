@@ -97,6 +97,8 @@ async function openBoxes({ boxes = [boxOf()], root = '/', moneyFormat = '£{{amo
 const boxElements = () => Array.from(document.querySelectorAll('dialog [data-box]')) as HTMLElement[]
 const textOf = (element: Element | null | undefined) => (element?.textContent ?? '').replace(/\s+/g, ' ').trim()
 const buttonByText = (scope: ParentNode, text: string) => Array.from(scope.querySelectorAll('button')).find((button) => textOf(button).includes(text)) as HTMLButtonElement | undefined
+const closeButton = (scope: ParentNode) => scope.querySelector('[data-action="close"]') as HTMLButtonElement
+const controlOf = (scope: ParentNode, action: string, variantId: string) => scope.querySelector(`button[data-action="${action}"][data-variant="${variantId}"]`) as HTMLButtonElement
 const addButtons = (scope: ParentNode) => Array.from(scope.querySelectorAll('button[data-action="add"]')) as HTMLButtonElement[]
 const pressAndSettle = async (button: Element | undefined) => { (button as HTMLElement).click(); await settle() }
 
@@ -126,32 +128,34 @@ describe('the dialog', () => {
     expect(showModal).toHaveBeenCalledTimes(1)
     expect(dialog.hasAttribute('open')).toBe(true)
     const heading = document.getElementById(dialog.getAttribute('aria-labelledby') as string)
-    expect(textOf(heading)).toBe('Complete your bundles')
-    expect(buttonByText(dialog, 'Close')).toBeDefined()
+    expect(textOf(heading)).toBe('Wait, complete your bundle to unlock instant savings')
+    expect(closeButton(dialog).getAttribute('aria-label')).toBe('Close dialog')
     expect(boxElements()).toHaveLength(2)
     const link = Array.from(dialog.querySelectorAll('a, button')).find((element) => textOf(element) === 'Continue to checkout') as HTMLElement
     expect(link).toBeDefined()
     expect(dialog.querySelector('[data-box]')!.compareDocumentPosition(link) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
-  it('names the heading in the singular for one box', async () => {
+  it('shows the eyebrow, the heading and the intro of the design above the boxes, the same for one box or several', async () => {
     const { dialog } = await openBoxes()
 
-    expect(textOf(document.getElementById(dialog.getAttribute('aria-labelledby') as string))).toBe('Complete your bundle')
+    expect(textOf(dialog.querySelector('.smooth-discounts-popup__eyebrow'))).toBe('🎯 Unclaimed Bundle Savings')
+    expect(textOf(dialog.querySelector('.smooth-discounts-popup__intro'))).toBe('You are only a few units away from triggering volume discount rates on qualifying items.')
+    expect(dialog.querySelector('.smooth-discounts-popup__header')!.compareDocumentPosition(dialog.querySelector('[data-box]')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
   it('moves focus into the dialog, and back to the Checkout button when it closes', async () => {
     const { dialog, opener, promise } = await openBoxes()
 
     expect(dialog.contains(document.activeElement)).toBe(true)
-    await pressAndSettle(buttonByText(dialog, 'Close'))
+    await pressAndSettle(closeButton(dialog))
     await promise
     expect(document.activeElement).toBe(opener)
   })
 
   it('resolves { action: "close" } for the close button, Escape and a click on the backdrop, and takes the dialog off the page', async () => {
     const byButton = await openBoxes()
-    await pressAndSettle(buttonByText(byButton.dialog, 'Close'))
+    await pressAndSettle(closeButton(byButton.dialog))
     await expect(byButton.promise).resolves.toEqual({ action: 'close', didAdd: false })
     expect(document.querySelector('dialog')).toBeNull()
 
@@ -187,7 +191,7 @@ describe('the dialog', () => {
   it('stops watching the boxes and the clock when it closes', async () => {
     const { dialog, promise } = await openBoxes({ boxes: [boxOf({ flash: { startsAtUnix: NOW_SECONDS - 10, endsAtUnix: NOW_SECONDS + 500 } })] })
 
-    await pressAndSettle(buttonByText(dialog, 'Close'))
+    await pressAndSettle(closeButton(dialog))
     await promise
 
     expect(FakeObserver.last?.disconnected).toBe(true)
@@ -242,8 +246,9 @@ describe('expanded and contracted boxes', () => {
     expect(Array.from(first.querySelectorAll('[data-chip]')).map(textOf)).toEqual(['1 × £1.69', '3 × £5.07', '8 × £13.04', '16 × £24.80'])
     const rows = Array.from(first.querySelectorAll('[data-item]'))
     expect(rows.map((row) => textOf(row.querySelector('[data-name]')))).toEqual(['Tuna – Small', 'Tuna – Large', 'Salmon'])
-    expect(textOf(rows[0].querySelector('[data-price]'))).toBe('£1.69')
+    expect(textOf(rows[0].querySelector('[data-rate]'))).toBe('Tier rate: £1.63/ea')
     expect(textOf(rows[0].querySelector('[data-count]'))).toBe('3 in cart')
+    expect(rows[1].querySelector('[data-count]')).toBeNull()
     expect(rows[0].querySelector('img')?.getAttribute('src')).toBe('https://cdn.test/tuna.jpg')
     expect(rows[2].querySelector('img')).toBeNull()
     expect(first.textContent).toContain('⚡ Quick auto-fill: Add 5 more items')
@@ -280,6 +285,150 @@ describe('expanded and contracted boxes', () => {
     await pressAndSettle(buttonByText(boxElements()[1], 'View & mix'))
     await pressAndSettle(buttonByText(boxElements()[0], 'View & mix eligible products (3 available)'))
     expect(boxElements().map((element) => element.dataset.expanded)).toEqual(['true', 'false'])
+  })
+})
+
+describe('the progress rail', () => {
+  it('fills the rail as far as the units are of the first tier, with the milestones under it', async () => {
+    await openBoxes()
+    const [first] = boxElements()
+
+    expect(first.querySelector('[data-progress]')?.getAttribute('style')).toBe('width:38%')
+    const milestones = Array.from(first.querySelectorAll('.smooth-discounts-popup__milestone'))
+    expect(milestones.map(textOf)).toEqual(['1 item', '3 in cart', '8 items (Tier 1)', '16 items (Tier 2)'])
+    expect(milestones.map((milestone) => milestone.getAttribute('data-state'))).toEqual(['done', 'current', 'target', 'later'])
+  })
+
+  it('shows the rail in a contracted box too', async () => {
+    await openBoxes({ boxes: [boxOf(), secondBoxOf()] })
+    const second = boxElements()[1]
+
+    expect(second.querySelector('[data-progress]')?.getAttribute('style')).toBe('width:40%')
+    expect(Array.from(second.querySelectorAll('.smooth-discounts-popup__milestone')).map(textOf)).toEqual(['1 item', '2 in cart', '5 items (Tier 1)'])
+  })
+
+  it('moves the rail on after an add', async () => {
+    await openBoxes()
+
+    await pressAndSettle(addButtons(boxElements()[0])[0])
+
+    expect(boxElements()[0].querySelector('[data-progress]')?.getAttribute('style')).toBe('width:50%')
+  })
+})
+
+describe('the quantity of an item', () => {
+  it('starts at 1 on every row, between a "one fewer" and a "one more" button', async () => {
+    await openBoxes()
+    const rows = Array.from(boxElements()[0].querySelectorAll('[data-item]'))
+
+    expect(rows.map((row) => textOf(row.querySelector('[data-quantity]')))).toEqual(['1', '1', '1'])
+    expect(controlOf(boxElements()[0], 'minus', '12').getAttribute('aria-label')).toBe('One fewer: Tuna – Large')
+    expect(controlOf(boxElements()[0], 'plus', '12').getAttribute('aria-label')).toBe('One more: Tuna – Large')
+  })
+
+  it('goes up and down with the buttons, never below 1 and never above 99', async () => {
+    await openBoxes()
+    const quantityOf = () => textOf(boxElements()[0].querySelector('[data-item="12"] [data-quantity]'))
+
+    await pressAndSettle(controlOf(boxElements()[0], 'plus', '12'))
+    await pressAndSettle(controlOf(boxElements()[0], 'plus', '12'))
+    expect(quantityOf()).toBe('3')
+    await pressAndSettle(controlOf(boxElements()[0], 'minus', '12'))
+    expect(quantityOf()).toBe('2')
+    await pressAndSettle(controlOf(boxElements()[0], 'minus', '12'))
+    await pressAndSettle(controlOf(boxElements()[0], 'minus', '12'))
+    expect(quantityOf()).toBe('1')
+    for (let press = 0; press < 100; press += 1) controlOf(boxElements()[0], 'plus', '12').click()
+    expect(quantityOf()).toBe('99')
+  })
+
+  it('does not change the other rows, and puts nothing in the cart', async () => {
+    await openBoxes()
+
+    await pressAndSettle(controlOf(boxElements()[0], 'plus', '12'))
+
+    expect(textOf(boxElements()[0].querySelector('[data-item="11"] [data-quantity]'))).toBe('1')
+    expect(network.posts).toEqual([])
+  })
+
+  it('keeps focus on the button that was pressed', async () => {
+    await openBoxes()
+    controlOf(boxElements()[0], 'plus', '12').focus()
+
+    await pressAndSettle(controlOf(boxElements()[0], 'plus', '12'))
+
+    expect(document.activeElement).toBe(controlOf(boxElements()[0], 'plus', '12'))
+  })
+
+  it('adds that many units of the item in one request, then sets the number back to 1', async () => {
+    await openBoxes()
+    await pressAndSettle(controlOf(boxElements()[0], 'plus', '12'))
+    await pressAndSettle(controlOf(boxElements()[0], 'plus', '12'))
+
+    await pressAndSettle(controlOf(boxElements()[0], 'add', '12'))
+
+    expect(network.posts).toEqual([{ path: '/cart/add.js', body: { items: [{ id: 12, quantity: 3 }] } }])
+    expect(boxElements()[0].textContent).toContain('Currently 6 units selected • Add 2 more')
+    expect(textOf(boxElements()[0].querySelector('[data-item="12"] [data-quantity]'))).toBe('1')
+  })
+
+  it('keeps the number when the add fails, so the customer can try again', async () => {
+    await openBoxes()
+    network.addStatus = 422
+    await pressAndSettle(controlOf(boxElements()[0], 'plus', '12'))
+
+    await pressAndSettle(controlOf(boxElements()[0], 'add', '12'))
+
+    expect(textOf(boxElements()[0].querySelector('[data-item="12"] [data-quantity]'))).toBe('2')
+  })
+})
+
+describe('the list of eligible items', () => {
+  const manyItems = [itemOf(11, 100, 'Tuna – Small'), itemOf(12, 100, 'Tuna – Large'), itemOf(13, 200, 'Salmon'), itemOf(15, 200, 'Trout'), itemOf(16, 200, 'Cod'), itemOf(17, 200, 'Hake')]
+
+  it('lists the first four items with how many of how many it shows, and "Show 2 more"', async () => {
+    await openBoxes({ boxes: [boxOf({ items: manyItems })] })
+    const [first] = boxElements()
+
+    expect(first.querySelectorAll('[data-item]')).toHaveLength(4)
+    expect(first.textContent).toContain('Showing 4 of 6 eligible items')
+    expect(textOf(first.querySelector('.smooth-discounts-popup__label'))).toBe('Eligible items in this bundle — add any to qualify')
+    expect(buttonByText(first, 'Show 2 more')).toBeDefined()
+  })
+
+  it('lists all of them after "Show 2 more", and four again after "Show fewer"', async () => {
+    await openBoxes({ boxes: [boxOf({ items: manyItems })] })
+
+    await pressAndSettle(buttonByText(boxElements()[0], 'Show 2 more'))
+    expect(boxElements()[0].querySelectorAll('[data-item]')).toHaveLength(6)
+    expect(boxElements()[0].textContent).toContain('Showing 6 of 6 eligible items')
+
+    await pressAndSettle(buttonByText(boxElements()[0], 'Show fewer'))
+    expect(boxElements()[0].querySelectorAll('[data-item]')).toHaveLength(4)
+  })
+
+  it('keeps focus on the "Show more" button after it is pressed', async () => {
+    await openBoxes({ boxes: [boxOf({ items: manyItems })] })
+    buttonByText(boxElements()[0], 'Show 2 more')!.focus()
+
+    await pressAndSettle(buttonByText(boxElements()[0], 'Show 2 more'))
+
+    expect(document.activeElement).toBe(boxElements()[0].querySelector('[data-action="reveal"]'))
+  })
+
+  it('has no paging row for four items or fewer', async () => {
+    await openBoxes()
+
+    expect(boxElements()[0].querySelector('[data-action="reveal"]')).toBeNull()
+    expect(boxElements()[0].textContent).not.toContain('Showing')
+  })
+})
+
+describe('what a contracted box shows of the cart', () => {
+  it('lists the items in the cart and how many more are needed', async () => {
+    await openBoxes({ boxes: [boxOf(), secondBoxOf()] })
+
+    expect(textOf(boxElements()[1].querySelector('.smooth-discounts-popup__preview'))).toBe('2× Chew (3 more needed for discount)')
   })
 })
 
@@ -423,13 +572,13 @@ describe('adding', () => {
   })
 
   it('counts an add that is still on its way as an add, for Continue and for Close', async () => {
-    for (const [label, action] of [['Continue to checkout', 'continue'], ['Close', 'close']] as const) {
+    for (const [selector, action] of [['[data-action="continue"]', 'continue'], ['[data-action="close"]', 'close']] as const) {
       const opened = await openBoxes()
       const answerRead = fetchMock.getMockImplementation() as (path: string, init?: object) => Promise<unknown>
       fetchMock.mockImplementation((path: string, init?: object) => (/cart\/add\.js$/.test(path) ? new Promise(() => {}) : answerRead(path, init)))
       await pressAndSettle(addButtons(boxElements()[0])[0])
 
-      await pressAndSettle(Array.from(opened.dialog.querySelectorAll('a, button')).find((element) => textOf(element) === label))
+      await pressAndSettle(opened.dialog.querySelector(selector) as HTMLElement)
 
       await expect(opened.promise).resolves.toEqual({ action, didAdd: true })
     }
@@ -443,7 +592,7 @@ describe('adding', () => {
 
     const closed = await openBoxes()
     await pressAndSettle(addButtons(boxElements()[0])[0])
-    await pressAndSettle(buttonByText(closed.dialog, 'Close'))
+    await pressAndSettle(closeButton(closed.dialog))
     await expect(closed.promise).resolves.toEqual({ action: 'close', didAdd: true })
   })
 })
@@ -521,7 +670,7 @@ describe('the look and the words', () => {
     const first = boxElements()[0]
 
     expect(first.textContent).toContain('1.63 €/ea')
-    expect(textOf(first.querySelector('[data-price]'))).toBe('1.69 €')
+    expect(textOf(first.querySelector('[data-rate]'))).toBe('Tier rate: 1.63 €/ea')
     expect(first.textContent).toContain('(+8.45 €)')
   })
 

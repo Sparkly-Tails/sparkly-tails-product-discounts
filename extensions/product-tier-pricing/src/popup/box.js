@@ -1,6 +1,6 @@
 // One box of the pop-up, drawn from its data (the view component). The words come from copy.js; nothing here reads the page: the document, the amount
 // writer and the functions it calls come in as arguments. A box is drawn again whole after every change (the page is small). `input` is what
-// the controller (ui.js) hands over: { doc, element, box, units, lines, failed, facts, parts, isExpanded, moneyFormat, secondsLeft }, `parts` being the parts component (parts.js).
+// the controller (ui.js) hands over: { doc, element, box, units, lines, failed, facts, parts, quantities, showAll, isExpanded, moneyFormat, secondsLeft }, `parts` being the parts component (parts.js).
 import { POPUP_TEXT } from './copy.js'
 import { formatMoney } from '../tierMath.js'
 import { formatFlashCountdown } from '../flash.js'
@@ -21,6 +21,10 @@ export function buildTitle({ make, box, tools }) {
   return make({ tag: 'h3', name: 'title', text: tools.buildBoxTitle({ title: box.title }) })
 }
 
+export function buildDot({ make }) {
+  return make({ tag: 'span', name: 'dot' })
+}
+
 export function buildBadge({ make, facts, tools }) {
   return make({ tag: 'p', name: 'badge', text: tools.buildBadgeText({ tier: facts.tier, mode: facts.mode }) })
 }
@@ -35,15 +39,26 @@ export function buildError({ make, failed }) {
   return failed ? make({ tag: 'p', name: 'error', text: POPUP_TEXT.failed, attrs: [['role', 'alert']] }) : null
 }
 
+/** The tier chips, in an expanded box only. */
+export function buildExpandedChips(context) {
+  return context.isExpanded ? context.parts.buildChips(context) : null
+}
+
+/** The cream panel of a box: its title with the badge, where the customer stands, the progress rail, and the tier chips of an expanded box. */
+export function buildSummary(context) {
+  const { make, parts, tools } = context
+  const head = make({ tag: 'div', name: 'head', kids: [tools.buildDot(context), tools.buildTitle(context), tools.buildBadge(context)] })
+  return make({ tag: 'div', name: 'summary', kids: [head, tools.buildStatus(context), parts.buildRail(context), tools.buildExpandedChips(context)] })
+}
+
 export function buildFullNodes(context) {
   const tools = context.tools
-  const head = [tools.buildFlashBar(context), tools.buildTitle(context), tools.buildBadge(context), tools.buildStatus(context), context.parts.buildChips(context)]
-  return head.concat(context.parts.buildAddParts(context), [tools.buildError(context)])
+  return [tools.buildFlashBar(context), tools.buildSummary(context)].concat(context.parts.buildAddParts(context), [tools.buildError(context)])
 }
 
 export function buildShortNodes(context) {
   const tools = context.tools
-  return [tools.buildTitle(context), tools.buildBadge(context), tools.buildStatus(context)].concat(context.parts.buildViewParts(context), [tools.buildError(context)])
+  return [tools.buildSummary(context)].concat(context.parts.buildViewParts(context), [tools.buildError(context)])
 }
 
 export function buildBoxNodes(context) {
@@ -74,5 +89,5 @@ export function setCountdown(tools, { element, secondsLeft }) {
 }
 
 export const BOX_VIEW_TOOLS = {
-  formatMoney, formatFlashCountdown, setText, applyBoxLook, formatAmount, buildFlashBar, buildTitle, buildBadge, buildStatus, buildError, buildFullNodes, buildShortNodes, buildBoxNodes,
+  formatMoney, formatFlashCountdown, setText, applyBoxLook, formatAmount, buildFlashBar, buildTitle, buildDot, buildBadge, buildStatus, buildError, buildExpandedChips, buildSummary, buildFullNodes, buildShortNodes, buildBoxNodes,
 }

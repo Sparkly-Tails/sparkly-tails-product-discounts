@@ -65,7 +65,7 @@ declare module '*/popup/items.js' {
 }
 
 declare module '*/popup/copy.js' {
-  export const buildHeadingText: PopupCall
+  export const POPUP_TEXT: Record<string, string>
   export const buildBoxTitle: PopupCall
   export const buildBadgeText: PopupCall
   export const buildIncentiveText: PopupCall
@@ -74,6 +74,9 @@ declare module '*/popup/copy.js' {
   export const buildQuickAddText: PopupCall
   export const buildViewText: PopupCall
   export const buildCostText: PopupCall
+  export const buildShowingText: PopupCall
+  export const buildMoreText: PopupCall
+  export const buildPreviewText: PopupCall
   export const buildChips: PopupCall
   export const readTierMode: PopupCall
   export const COPY_TOOLS: unknown

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from 'vitest'
 import {
-  buildHeadingText, buildBoxTitle, buildBadgeText, buildIncentiveText, buildQuickLabelText, buildQuickButtonText, buildQuickAddText, buildViewText, buildCostText, buildChips, readTierMode, COPY_TOOLS,
+  POPUP_TEXT, buildBoxTitle, buildBadgeText, buildIncentiveText, buildQuickLabelText, buildQuickButtonText, buildQuickAddText, buildViewText, buildCostText, buildShowingText, buildMoreText, buildPreviewText, buildChips, readTierMode, COPY_TOOLS,
 } from '../../extensions/product-tier-pricing/src/popup/copy.js'
 import { readBoxLook, applyBoxLook, LOOK_TOOLS } from '../../extensions/product-tier-pricing/src/popup/look.js'
 
@@ -10,9 +10,20 @@ const FIXED_TIER = { minQty: 8, fixedPrice: 1.63 }
 const PERCENT_TIER = { minQty: 3, percentOff: 15 }
 
 describe('the texts', () => {
-  it('heads one box "Complete your bundle" and several "Complete your bundles"', () => {
-    expect(buildHeadingText({ boxCount: 1 })).toBe('Complete your bundle')
-    expect(buildHeadingText({ boxCount: 2 })).toBe('Complete your bundles')
+  it('has the header words of the design: the eyebrow, the heading and the intro, the same for one box or several', () => {
+    expect(POPUP_TEXT.eyebrow).toBe('🎯 Unclaimed Bundle Savings')
+    expect(POPUP_TEXT.heading).toBe('Wait, complete your bundle to unlock instant savings')
+    expect(POPUP_TEXT.intro).toBe('You are only a few units away from triggering volume discount rates on qualifying items.')
+  })
+
+  it('writes how many of the eligible items are listed, and the button that lists more or fewer', () => {
+    expect(buildShowingText({ shown: 4, total: 12 })).toBe('Showing 4 of 12 eligible items')
+    expect(buildMoreText({ count: 8, isOpen: false })).toBe('Show 8 more')
+    expect(buildMoreText({ count: 8, isOpen: true })).toBe('Show fewer')
+  })
+
+  it('writes what the customer has of the bundle and how many more are needed', () => {
+    expect(buildPreviewText({ entries: [{ label: 'Tuna', quantity: 2 }, { label: 'Salmon', quantity: 1 }], missing: 5 })).toBe('2× Tuna, 1× Salmon (5 more needed for discount)')
   })
 
   it('titles a box by its title, or "Your bundle" when the index has none (Review Focus 1)', () => {

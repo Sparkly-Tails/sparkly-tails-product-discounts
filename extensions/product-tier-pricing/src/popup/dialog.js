@@ -14,7 +14,7 @@ export function readControlView({ state, control }) {
 export function handleClick({ state, tools }, event) {
   if (event.target === state.dialog) state.dialog.close()
   const control = event.target.closest('[data-action]')
-  if (control !== null) tools.actions[control.dataset.action]({ state, control, event, tools })
+  if (control !== null) state.actions[control.dataset.action]({ state, control, event, tools })
 }
 
 export function closeDialog({ state }) {
