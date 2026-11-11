@@ -2,18 +2,23 @@
    widget's own default, so a discount's style reaches the pop-up too. The body text keeps the theme's font ("inherit"); only the heading and
    the box titles use a serif that every device already has. Nothing is loaded from outside. */
 
-.smooth-discounts-popup__dialog {
+/* The look of a bundle is set on its own box (its custom properties), so the colours are worked out again on every box, not only on the dialog. */
+.smooth-discounts-popup__dialog,
+.smooth-discounts-popup__box {
   --popup-cream: var(--smooth-discounts-cream, #f3ecd9);
   --popup-moss: var(--smooth-discounts-moss, #2c3822);
   --popup-sun: var(--smooth-discounts-sun, #eae3d2);
   --popup-radius: var(--smooth-discounts-radius, 16px);
+  --popup-sand: color-mix(in srgb, var(--popup-line) 60%, var(--popup-cream));
+  --popup-night: color-mix(in srgb, var(--popup-moss) 55%, #000);
+}
+
+.smooth-discounts-popup__dialog {
   --popup-ink: var(--color-text-main, #2a2a22);
   --popup-muted: var(--color-secondary-text-main, #5b5c4e);
   --popup-line: var(--color-borders-main, #e6dfd5);
   --popup-paper: #faf8f5;
   --popup-brown: #8b4816;
-  --popup-sand: color-mix(in srgb, var(--popup-line) 60%, var(--popup-cream));
-  --popup-night: color-mix(in srgb, var(--popup-moss) 55%, #000);
   --popup-serif: Georgia, "Times New Roman", serif;
   --popup-ease: cubic-bezier(0.4, 0, 0.2, 1);
   box-sizing: border-box;
@@ -233,6 +238,11 @@ html:has(.smooth-discounts-popup__dialog[open]) {
   padding: 1rem 1.25rem;
   border-radius: calc(var(--popup-radius) * 0.75);
   background: var(--popup-cream);
+}
+
+/* The full-row basis is for a contracted box, whose parts sit in a row; in an expanded box (a column) it would stretch the panel past its content. */
+.smooth-discounts-popup__box[data-expanded="true"] .smooth-discounts-popup__summary {
+  flex: none;
 }
 
 .smooth-discounts-popup__head {
@@ -464,7 +474,7 @@ html:has(.smooth-discounts-popup__dialog[open]) {
   list-style: none;
   border: 1px solid var(--popup-line);
   border-radius: calc(var(--popup-radius) * 0.75);
-  background: #fff;
+  background: color-mix(in srgb, var(--popup-cream) 30%, #fff);
   overflow: hidden;
 }
 
@@ -474,6 +484,11 @@ html:has(.smooth-discounts-popup__dialog[open]) {
   align-items: center;
   gap: 0.5rem 1rem;
   padding: 0.75rem 1rem;
+  transition: background-color 0.2s var(--popup-ease);
+}
+
+.smooth-discounts-popup__item:hover {
+  background: color-mix(in srgb, var(--popup-cream) 70%, #fff);
 }
 
 .smooth-discounts-popup__item + .smooth-discounts-popup__item {
@@ -735,6 +750,18 @@ html:has(.smooth-discounts-popup__dialog[open]) {
 
   .smooth-discounts-popup__chips {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .smooth-discounts-popup__milestones {
+    flex-wrap: nowrap;
+    gap: 0.25rem;
+  }
+
+  .smooth-discounts-popup__milestone {
+    flex: 1 1 0;
+    min-width: 0;
+    font-size: 0.8125rem;
+    overflow-wrap: anywhere;
   }
 
   .smooth-discounts-popup__badge {
