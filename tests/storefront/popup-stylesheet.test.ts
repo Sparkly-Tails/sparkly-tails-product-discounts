@@ -36,8 +36,8 @@ describe('the classes the view writes', () => {
 describe('the look', () => {
   it('uses the widget\'s custom properties with the widget\'s defaults', () => {
     expect(css).toMatch(/var\(--smooth-discounts-cream,\s*#f3ecd9\)/i)
-    expect(css).toMatch(/var\(--smooth-discounts-moss,\s*#434625\)/i)
-    expect(css).toMatch(/var\(--smooth-discounts-sun,\s*#ffdc4c\)/i)
+    expect(css).toMatch(/var\(--smooth-discounts-moss,\s*#2c3822\)/i)
+    expect(css).toMatch(/var\(--smooth-discounts-sun,\s*#eae3d2\)/i)
     expect(css).toMatch(/var\(--smooth-discounts-radius,\s*16px\)/i)
   })
 

@@ -316,21 +316,51 @@ html:has(.smooth-discounts-popup__dialog[open]) {
 .smooth-discounts-popup__milestones {
   display: flex;
   flex-wrap: wrap;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 0.25rem 0.75rem;
-  margin: 0.4rem 0 0;
+  margin: 0.6rem 0 0;
   padding: 0;
   list-style: none;
 }
 
 .smooth-discounts-popup__milestone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
   color: var(--popup-muted);
   font-size: 1rem;
   font-weight: 600;
+  text-align: center;
+}
+
+/* The small circle holding the quantity: filled once reached, ringed for where the customer is, grey for the first tier, faint for the rest. */
+.smooth-discounts-popup__marker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-width: 1.75rem;
+  height: 1.75rem;
+  padding: 0 0.3rem;
+  border: 2px solid var(--popup-line);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--popup-muted);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  line-height: 1;
 }
 
 .smooth-discounts-popup__milestone[data-state="done"] {
   color: var(--popup-ink);
+}
+
+.smooth-discounts-popup__milestone[data-state="done"] .smooth-discounts-popup__marker {
+  border-color: var(--popup-moss);
+  background: var(--popup-moss);
+  color: #fff;
 }
 
 .smooth-discounts-popup__milestone[data-state="current"],
@@ -339,7 +369,21 @@ html:has(.smooth-discounts-popup__dialog[open]) {
   font-weight: 700;
 }
 
-.smooth-discounts-popup__milestone[data-state="current"] {
+.smooth-discounts-popup__milestone[data-state="current"] .smooth-discounts-popup__marker {
+  border-color: var(--popup-moss);
+  color: var(--popup-moss);
+}
+
+.smooth-discounts-popup__milestone[data-state="target"] .smooth-discounts-popup__marker {
+  border-color: var(--popup-muted);
+  color: var(--popup-ink);
+}
+
+.smooth-discounts-popup__milestone[data-state="later"] .smooth-discounts-popup__marker {
+  opacity: 0.6;
+}
+
+.smooth-discounts-popup__milestone[data-state="current"] .smooth-discounts-popup__caption {
   text-decoration: underline;
   text-underline-offset: 0.25em;
 }

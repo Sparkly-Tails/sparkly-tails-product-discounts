@@ -96,6 +96,7 @@ async function openBoxes({ boxes = [boxOf()], root = '/', moneyFormat = '£{{amo
 
 const boxElements = () => Array.from(document.querySelectorAll('dialog [data-box]')) as HTMLElement[]
 const textOf = (element: Element | null | undefined) => (element?.textContent ?? '').replace(/\s+/g, ' ').trim()
+const captionOf = (milestone: Element) => textOf(milestone.querySelector('.smooth-discounts-popup__caption'))
 const buttonByText = (scope: ParentNode, text: string) => Array.from(scope.querySelectorAll('button')).find((button) => textOf(button).includes(text)) as HTMLButtonElement | undefined
 const closeButton = (scope: ParentNode) => scope.querySelector('[data-action="close"]') as HTMLButtonElement
 const controlOf = (scope: ParentNode, action: string, variantId: string) => scope.querySelector(`button[data-action="${action}"][data-variant="${variantId}"]`) as HTMLButtonElement
@@ -295,8 +296,17 @@ describe('the progress rail', () => {
 
     expect(first.querySelector('[data-progress]')?.getAttribute('style')).toBe('width:38%')
     const milestones = Array.from(first.querySelectorAll('.smooth-discounts-popup__milestone'))
-    expect(milestones.map(textOf)).toEqual(['1 item', '3 in cart', '8 items (Tier 1)', '16 items (Tier 2)'])
+    expect(milestones.map(captionOf)).toEqual(['1 item', '3 in cart', '8 items (Tier 1)', '16 items (Tier 2)'])
     expect(milestones.map((milestone) => milestone.getAttribute('data-state'))).toEqual(['done', 'current', 'target', 'later'])
+  })
+
+  it('puts a small numbered circle with the quantity above each milestone label', async () => {
+    await openBoxes()
+    const [first] = boxElements()
+
+    const markers = Array.from(first.querySelectorAll('.smooth-discounts-popup__milestone > .smooth-discounts-popup__marker'))
+    expect(markers.map(textOf)).toEqual(['1', '3', '8', '16'])
+    expect(markers.map((marker) => marker.getAttribute('aria-hidden'))).toEqual(['true', 'true', 'true', 'true'])
   })
 
   it('shows the rail in a contracted box too', async () => {
@@ -304,7 +314,7 @@ describe('the progress rail', () => {
     const second = boxElements()[1]
 
     expect(second.querySelector('[data-progress]')?.getAttribute('style')).toBe('width:40%')
-    expect(Array.from(second.querySelectorAll('.smooth-discounts-popup__milestone')).map(textOf)).toEqual(['1 item', '2 in cart', '5 items (Tier 1)'])
+    expect(Array.from(second.querySelectorAll('.smooth-discounts-popup__milestone')).map(captionOf)).toEqual(['1 item', '2 in cart', '5 items (Tier 1)'])
   })
 
   it('moves the rail on after an add', async () => {

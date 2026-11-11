@@ -14,8 +14,11 @@ export function readQuantity({ quantities, variantId }) {
   return stored === undefined ? 1 : stored
 }
 
+/** One stop under the rail: a small circle with the quantity (hidden from screen readers, the caption already says it) above the caption. */
 export function buildMilestone(make, milestone) {
-  return make({ tag: 'li', name: 'milestone', text: milestone.label, attrs: [['data-state', milestone.state]] })
+  const marker = make({ tag: 'span', name: 'marker', text: String(milestone.qty), attrs: [['aria-hidden', 'true']] })
+  const caption = make({ tag: 'span', name: 'caption', text: milestone.label })
+  return make({ tag: 'li', name: 'milestone', attrs: [['data-state', milestone.state]], kids: [marker, caption] })
 }
 
 /** The progress rail with the milestones under it. */
