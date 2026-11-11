@@ -427,6 +427,26 @@ html:has(.smooth-discounts-popup__dialog[open]) {
   color: var(--popup-moss);
 }
 
+/* The chip of the customer's units is greyed; the chip of the first tier is the sun colour, warmed. The tag is a smaller word after the price. */
+.smooth-discounts-popup__chip[data-tag="current"] {
+  border-color: var(--popup-muted);
+  background: color-mix(in srgb, var(--popup-moss) 12%, #fff);
+  color: var(--popup-ink);
+  font-weight: 700;
+}
+
+.smooth-discounts-popup__chip[data-tag="tier"] {
+  border-color: var(--popup-sun);
+  background: color-mix(in srgb, var(--popup-sun) 35%, #fff);
+  color: var(--popup-brown);
+  font-weight: 700;
+}
+
+.smooth-discounts-popup__tag {
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
 .smooth-discounts-popup__label {
   margin: 0;
   color: var(--popup-muted);

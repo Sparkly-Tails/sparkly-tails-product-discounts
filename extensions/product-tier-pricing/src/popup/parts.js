@@ -28,13 +28,23 @@ export function buildRail({ make, facts, tools }) {
   return make({ tag: 'div', name: 'rail', kids: [track, make({ tag: 'ol', name: 'milestones', kids: facts.milestones.map(tools.buildMilestone.bind(null, make)) })] })
 }
 
-export function buildChip(make, chip) {
-  return make({ tag: 'li', name: 'chip', text: chip.label, attrs: [['data-chip', chip.tone]] })
+/** 'current' for the chip of the customer's units, 'tier' for the chip of the first tier, else ''. */
+export function readChipTag({ units, firstQty }, chip) {
+  if (chip.qty === units) return 'current'
+  return chip.qty === firstQty ? 'tier' : ''
 }
 
-/** The tier chips, or nothing when the bundle has no single plain price. */
-export function buildChipList({ make, facts, tools }) {
-  return facts.chips.length === 0 ? null : make({ tag: 'ul', name: 'chips', kids: facts.chips.map(tools.buildChip.bind(null, make)) })
+/** A tier chip: its price text, then "(Current)" or "(Tier 1)" in a smaller word when it is the customer's units or the first tier. */
+export function buildChip({ make, units, firstQty, tools }, chip) {
+  const key = tools.readChipTag({ units, firstQty }, chip)
+  const tag = key === '' ? null : make({ tag: 'span', name: 'tag', text: ' ' + POPUP_TEXT[key] })
+  return make({ tag: 'li', name: 'chip', text: chip.label, attrs: [['data-chip', chip.tone], ['data-tag', key]], kids: [tag] })
+}
+
+/** The tier chips, or nothing when the bundle has no price to work them out from. */
+export function buildChipList({ make, facts, units, tools }) {
+  const kids = facts.chips.map(tools.buildChip.bind(null, { make, units, firstQty: facts.tier.minQty, tools }))
+  return facts.chips.length === 0 ? null : make({ tag: 'ul', name: 'chips', kids })
 }
 
 /** The item's picture, or an empty tile when it has none. */
@@ -170,6 +180,6 @@ export function addRow(own, { state, control, tools }) {
 }
 
 export const PARTS_TOOLS = {
-  buildQuickLabelText, buildQuickButtonText, buildQuickAddText, buildViewText, buildPreviewText, buildShowingText, buildMoreText, readQuantity, buildMilestone, buildRail, buildChip, buildChipList, buildPicture, buildCount,
+  buildQuickLabelText, buildQuickButtonText, buildQuickAddText, buildViewText, buildPreviewText, buildShowingText, buildMoreText, readQuantity, buildMilestone, buildRail, readChipTag, buildChip, buildChipList, buildPicture, buildCount,
   buildStepButton, buildStepper, buildItemRow, listVisibleRows, buildItemList, buildMoreRow, buildPagingParts, buildQuickRow, buildPreview, buildViewButton, buildQuickAdd, updateQuantity,
 }

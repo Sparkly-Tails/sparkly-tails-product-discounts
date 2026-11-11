@@ -244,7 +244,7 @@ describe('expanded and contracted boxes', () => {
     expect(textOf(first.querySelector('h3'))).toBe('Tins mix')
     expect(first.textContent).toContain('Tier 1 at 8 items')
     expect(first.textContent).toContain('Currently 3 units selected • Add 5 more to unlock £1.63/ea (Save £0.48 on these items!)')
-    expect(Array.from(first.querySelectorAll('[data-chip]')).map(textOf)).toEqual(['1 × £1.69', '3 × £5.07', '8 × £13.04', '16 × £24.80'])
+    expect(Array.from(first.querySelectorAll('[data-chip]')).map(textOf)).toEqual(['1 × £1.69', '3 × £5.07 (Current)', '8 × £13.04 (Tier 1)', '16 × £24.80'])
     const rows = Array.from(first.querySelectorAll('[data-item]'))
     expect(rows.map((row) => textOf(row.querySelector('[data-name]')))).toEqual(['Tuna – Small', 'Tuna – Large', 'Salmon'])
     expect(textOf(rows[0].querySelector('[data-rate]'))).toBe('Tier rate: £1.63/ea')
@@ -257,13 +257,22 @@ describe('expanded and contracted boxes', () => {
     expect(buttonByText(first, 'Add 5 & unlock tier')).toBeDefined()
   })
 
-  it('shows the percentage wording and no chips for a percentage bundle whose items cost different amounts', async () => {
-    await openBoxes({ boxes: [secondBoxOf({ basePrice: null })] })
+  it('tags only the chip of the customer\'s units and the chip of the first tier', async () => {
+    await openBoxes({ boxes: [boxOf({ units: 1, lines: [lineOf(100, 11, 1)] })] })
+    const [first] = boxElements()
+
+    expect(Array.from(first.querySelectorAll('[data-chip]')).map(textOf)).toEqual(['1 × £1.69 (Current)', '8 × £13.04 (Tier 1)', '16 × £24.80'])
+    expect(Array.from(first.querySelectorAll('[data-chip]')).map((chip) => chip.getAttribute('data-tag'))).toEqual(['current', 'tier', ''])
+  })
+
+  it('shows the percentage wording, and chips worked out from the cheapest item, for a percentage bundle whose items cost different amounts', async () => {
+    const mixed = secondBoxOf({ basePrice: null, items: [itemOf(21, 300, 'Chew', 3), itemOf(22, 300, 'Bone', 2)] })
+    await openBoxes({ boxes: [mixed] })
     const [only] = boxElements()
 
     expect(only.textContent).toContain('Unlock 10% off at 5 units')
     expect(only.textContent).toContain('2 of 5 items selected • Add 3 more to unlock 10% off the whole bundle')
-    expect(only.querySelectorAll('[data-chip]')).toHaveLength(0)
+    expect(Array.from(only.querySelectorAll('[data-chip]')).map(textOf)).toEqual(['1 × £2.00', '2 × £4.00 (Current)', '5 × £9.00 (Tier 1)'])
   })
 
   it('shows a contracted box as its title, badge, incentive and the two buttons, with no items', async () => {
@@ -496,7 +505,7 @@ describe('adding', () => {
     expect(network.reads).toEqual(['/cart.js'])
     const after = boxElements()[0]
     expect(after.textContent).toContain('Currently 4 units selected • Add 4 more to unlock £1.63/ea')
-    expect(Array.from(after.querySelectorAll('[data-chip]')).map(textOf)).toContain('4 × £6.76')
+    expect(Array.from(after.querySelectorAll('[data-chip]')).map(textOf)).toContain('4 × £6.76 (Current)')
     expect(textOf(after.querySelectorAll('[data-item]')[1].querySelector('[data-count]'))).toBe('1 in cart')
     expect(after.textContent).toContain('Add 4 & unlock tier')
   })

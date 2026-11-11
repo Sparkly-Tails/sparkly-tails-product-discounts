@@ -21,7 +21,7 @@ export function readFacts(tools, { box, units, lines, moneyFormat }) {
   const cost = tools.sumQuickFillCost({ picks, items: box.items, tools })
   return {
     tier, mode: tools.readTierMode({ tier }), missing, available, picks, cost, costText: tools.buildCostText({ cost, formatMoneyText }),
-    chips: tools.buildChips({ tiers: box.tiers, basePrice: box.basePrice, units, formatMoneyText, tools }),
+    chips: tools.buildChips({ tiers: box.tiers, basePrice: tools.readLowestPrice({ items: box.items, tools }), units, formatMoneyText, tools }),
     progress: tools.readProgress({ units, firstQty: box.firstTierQty }), milestones: tools.buildMilestones({ tiers: box.tiers, units, tools }),
     rows: available.map(tools.buildRow.bind(null, { lines, tier, formatMoneyText, tools })), preview: tools.listCartEntries({ items: box.items, lines, tools }),
   }
