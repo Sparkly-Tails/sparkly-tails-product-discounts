@@ -128,6 +128,15 @@ export function readSharedPrice({ items, tools }) {
   return items.every(tools.hasPrice.bind(null, { price: first })) ? first : null
 }
 
+export function pickLower(lowest, item) {
+  return item.price < lowest ? item.price : lowest
+}
+
+/** The lowest price among the items, or null when there are none: the price the tier chips are worked out from when the items' prices differ. */
+export function readLowestPrice({ items, tools }) {
+  return items.length === 0 ? null : items.reduce(tools.pickLower, items[0].price)
+}
+
 /** What listing a bundle's items needs; the core script uses this much. */
 export const LIST_TOOLS = {
   isMemberVariant, readImageUrl, buildItemLabel, buildItem, listMemberItems, listEligibleItems, isItemAvailable, isCompletable, hasPrice, readSharedPrice,
@@ -135,6 +144,6 @@ export const LIST_TOOLS = {
 
 /** What Quick auto-fill needs; the UI component uses this much. */
 export const FILL_TOOLS = {
-  readLineVariantId, hasVariantId, findItemOfVariant, isDefined, isNotIn, isItemAvailable, orderQuickFillItems, buildPick, hasQuantity, chooseQuickFill, readItemPrice, buildPickCost, addAmount, sumQuickFillCost,
+  readLineVariantId, hasVariantId, findItemOfVariant, isDefined, isNotIn, isItemAvailable, orderQuickFillItems, buildPick, hasQuantity, chooseQuickFill, readItemPrice, buildPickCost, addAmount, sumQuickFillCost, pickLower, readLowestPrice,
 }
 

@@ -92,6 +92,11 @@ describe('buildChips', () => {
   it('shows no chips when the plain price is not known', () => {
     expect(chipsFor({ basePrice: null })).toEqual([])
   })
+
+  it('has the words of the two tags', () => {
+    expect(POPUP_TEXT.current).toBe('(Current)')
+    expect(POPUP_TEXT.tier).toBe('(Tier 1)')
+  })
 })
 
 describe('readBoxLook', () => {

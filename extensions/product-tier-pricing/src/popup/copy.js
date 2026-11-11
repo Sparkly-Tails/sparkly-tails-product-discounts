@@ -17,6 +17,8 @@ export const POPUP_TEXT = {
   more: 'One more',
   add: 'Add',
   continue: 'Continue to checkout',
+  current: '(Current)',
+  tier: '(Tier 1)',
   unlocked: 'Tier unlocked',
   failed: 'We couldn\'t add that. Try again.',
   flashBar: '⚡ TIER 1 FLASH SALE ENDS IN',
@@ -105,7 +107,7 @@ export function isKeptChip({ quantities }, chip) {
   return quantities.includes(chip.qty)
 }
 
-/** The widget's tier chips ("8 × £13.04": the total for that quantity), cut down to the four a box shows. None when the plain price is unknown. */
+/** The widget's tier chips ("8 × £13.04": the total for that quantity), cut down to the four a box shows. None when no price is known. */
 export function buildChips({ tiers, basePrice, units, formatMoneyText, tools }) {
   if (basePrice === null) return []
   const quantities = tools.listChipQuantities({ tiers, units, tools })

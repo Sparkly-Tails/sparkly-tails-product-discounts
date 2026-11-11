@@ -36,8 +36,8 @@ describe('the classes the view writes', () => {
 describe('the look', () => {
   it('uses the widget\'s custom properties with the widget\'s defaults', () => {
     expect(css).toMatch(/var\(--smooth-discounts-cream,\s*#f3ecd9\)/i)
-    expect(css).toMatch(/var\(--smooth-discounts-moss,\s*#434625\)/i)
-    expect(css).toMatch(/var\(--smooth-discounts-sun,\s*#ffdc4c\)/i)
+    expect(css).toMatch(/var\(--smooth-discounts-moss,\s*#2c3822\)/i)
+    expect(css).toMatch(/var\(--smooth-discounts-sun,\s*#eae3d2\)/i)
     expect(css).toMatch(/var\(--smooth-discounts-radius,\s*16px\)/i)
   })
 
@@ -48,6 +48,20 @@ describe('the look', () => {
     const mono = 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace'
     for (const match of css.matchAll(/font-family:\s*([^;}]+)/g)) expect(['inherit', serif, mono.replace(/ /g, '')]).toContain(match[1].trim().replace(/ /g, ''))
     expect(css).toMatch(/--popup-serif:\s*Georgia, "Times New Roman", serif;/)
+  })
+
+  it('lets each bundle\'s own colour reach its box, by declaring the colour aliases on the box as well as on the dialog', () => {
+    expect(css).toMatch(/\.smooth-discounts-popup__box[^{]*\{[^}]*--popup-cream:\s*var\(--smooth-discounts-cream,\s*#f3ecd9\)/)
+    expect(css).toMatch(/\.smooth-discounts-popup__box[^{]*\{[^}]*--popup-sand:/)
+  })
+
+  it('paints the list of items in the bundle\'s own colour, 70% lighter, and a hovered row 30% lighter', () => {
+    expect(css).toMatch(/\.smooth-discounts-popup__items\s*\{[^}]*background:\s*color-mix\(in srgb,\s*var\(--popup-cream\) 30%,\s*#fff\)/)
+    expect(css).toMatch(/\.smooth-discounts-popup__item:hover\s*\{[^}]*background:\s*color-mix\(in srgb,\s*var\(--popup-cream\) 70%,\s*#fff\)/)
+  })
+
+  it('keeps the cream panel of an expanded box as tall as its content, not stretched by the full-row basis meant for a contracted box', () => {
+    expect(css).toMatch(/\.smooth-discounts-popup__box\[data-expanded=["']?true["']?\]\s+\.smooth-discounts-popup__summary\s*\{[^}]*flex:\s*none/)
   })
 
   it('is 1000px wide on a wide screen, and never wider than the screen', () => {
@@ -62,6 +76,12 @@ describe('the look', () => {
     expect(phone).toMatch(/\.smooth-discounts-popup__dialog\s*\{[^}]*width:\s*100%/)
     expect(phone).toMatch(/\.smooth-discounts-popup__dialog\s*\{[^}]*height:\s*100dvh/)
     expect(phone).toMatch(/\.smooth-discounts-popup__dialog\s*\{[^}]*border-radius:\s*0/)
+  })
+
+  it('keeps the milestones of the rail in one row on a phone, each taking an equal share and letting its caption wrap', () => {
+    const phone = css.slice(css.search(/@media\s*\(max-width:\s*640px\)/))
+    expect(phone).toMatch(/\.smooth-discounts-popup__milestones\s*\{[^}]*flex-wrap:\s*nowrap/)
+    expect(phone).toMatch(/\.smooth-discounts-popup__milestone\s*\{[^}]*flex:\s*1 1 0/)
   })
 
   it('keeps a box from shrinking inside the scrolling list, so the list scrolls instead of the box clipping its items', () => {

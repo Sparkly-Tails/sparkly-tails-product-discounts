@@ -60,6 +60,7 @@ declare module '*/popup/items.js' {
   export const chooseQuickFill: PopupCall
   export const sumQuickFillCost: PopupCall
   export const readSharedPrice: PopupCall
+  export const readLowestPrice: PopupCall
   export const LIST_TOOLS: Record<string, unknown>
   export const FILL_TOOLS: Record<string, unknown>
 }
