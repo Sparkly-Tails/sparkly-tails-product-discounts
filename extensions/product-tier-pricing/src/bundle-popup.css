@@ -4,8 +4,8 @@
 
 .smooth-discounts-popup__dialog {
   --popup-cream: var(--smooth-discounts-cream, #f3ecd9);
-  --popup-moss: var(--smooth-discounts-moss, #434625);
-  --popup-sun: var(--smooth-discounts-sun, #ffdc4c);
+  --popup-moss: var(--smooth-discounts-moss, #2c3822);
+  --popup-sun: var(--smooth-discounts-sun, #eae3d2);
   --popup-radius: var(--smooth-discounts-radius, 16px);
   --popup-ink: var(--color-text-main, #2a2a22);
   --popup-muted: var(--color-secondary-text-main, #5b5c4e);
@@ -132,7 +132,7 @@ html:has(.smooth-discounts-popup__dialog[open]) {
 .smooth-discounts-popup__intro {
   margin: 0;
   color: var(--popup-muted);
-  font-size: 1rem;
+  font-size: 1.5rem;
   line-height: 1.5;
 }
 
@@ -170,7 +170,9 @@ html:has(.smooth-discounts-popup__dialog[open]) {
   color: var(--popup-ink);
   overflow: hidden;
   scroll-margin: 0.75rem;
-  transition: border-color 0.2s var(--popup-ease), box-shadow 0.2s var(--popup-ease);
+  transition:
+    border-color 0.2s var(--popup-ease),
+    box-shadow 0.2s var(--popup-ease);
 }
 
 .smooth-discounts-popup__box:focus {
@@ -250,7 +252,7 @@ html:has(.smooth-discounts-popup__dialog[open]) {
 .smooth-discounts-popup__title {
   margin: 0;
   font-family: var(--popup-serif);
-  font-size: 1.375rem;
+  font-size: 1.475rem;
   font-weight: 700;
   line-height: 1.25;
   overflow-wrap: anywhere;
@@ -263,7 +265,7 @@ html:has(.smooth-discounts-popup__dialog[open]) {
   border-radius: 999px;
   background: var(--popup-sun);
   color: var(--popup-moss);
-  font-size: 0.75rem;
+  font-size: 1rem;
   font-weight: 700;
 }
 
@@ -273,8 +275,7 @@ html:has(.smooth-discounts-popup__dialog[open]) {
   gap: 0.5rem;
   margin: 0;
   color: var(--popup-brown);
-  font-size: 0.9375rem;
-  font-weight: 600;
+  font-size: 1.3rem;
   line-height: 1.4;
 }
 
@@ -324,7 +325,7 @@ html:has(.smooth-discounts-popup__dialog[open]) {
 
 .smooth-discounts-popup__milestone {
   color: var(--popup-muted);
-  font-size: 0.75rem;
+  font-size: 1rem;
   font-weight: 600;
 }
 
@@ -440,8 +441,7 @@ html:has(.smooth-discounts-popup__dialog[open]) {
 }
 
 .smooth-discounts-popup__name {
-  font-size: 1rem;
-  font-weight: 700;
+  font-size: 1.3rem;
   line-height: 1.3;
   overflow-wrap: anywhere;
 }
@@ -457,7 +457,7 @@ html:has(.smooth-discounts-popup__dialog[open]) {
 
 .smooth-discounts-popup__rate {
   color: var(--popup-muted);
-  font-size: 0.8125rem;
+  font-size: 1rem;
 }
 
 /* The − 1 + control. */
@@ -488,6 +488,7 @@ html:has(.smooth-discounts-popup__dialog[open]) {
 }
 
 .smooth-discounts-popup__quantity {
+  font-size: 1rem;
   min-width: 1.75rem;
   font-weight: 700;
   text-align: center;
