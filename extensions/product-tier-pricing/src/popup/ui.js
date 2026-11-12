@@ -3,7 +3,7 @@
 // missing, Quick auto-fill, the tier chips, its look) is worked out by the facts component (`options.components.popupFacts`, see facts.js). The page's window and the
 // functions it calls come in as arguments (the entry hands over the tools).
 import { ADD_TOOLS, addItems, readCartUnits } from './add.js'
-import { DIALOG_TOOLS, closeDialog, closeToCheckout } from './dialog.js'
+import { DIALOG_TOOLS, closeToCheckout } from './dialog.js'
 
 export function returnZero() {
   return 0
@@ -25,7 +25,7 @@ export function createView({ doc, options }, { box, index }) {
 
 export function createState({ options, resolve, tools }) {
   const doc = options.win.document
-  const parts = options.components.popupView.buildDialog({ doc, root: options.root })
+  const parts = options.components.popupView.buildDialog({ doc })
   return {
     actions: Object.assign({}, tools.actions, options.components.popupParts.actions),
     win: options.win, doc, view: options.components.popupView, facts: options.components.popupFacts, parts: options.components.popupParts, root: options.root, moneyFormat: options.moneyFormat, opener: options.opener, resolve, dialog: parts.dialog, list: parts.list, closeButton: parts.closeButton,
@@ -231,5 +231,5 @@ export const UI_TOOLS = {
   ...DIALOG_TOOLS,
   addItems: addItems.bind(null, ADD_TOOLS), readCartUnits: readCartUnits.bind(null, ADD_TOOLS), returnZero, isLive, describeBox, createView, createState, readBoxFacts, readSecondsLeft, paintBox, repaintBox, repaintBoxes, readFocusSpot, readActiveSelector, restoreFocusSpot, expandBox, focusBox, scrollBoxIntoView,
   buildControlSelector, showBox, applyAddResult, runAdd, clearQuantity, clearPicked, addMissing, isCounting, removeBox, tickBox, tickBoxes, readMostVisible, recordSighting, handleSightings, watchView, watchBoxes, appendBox, showDialog,
-  startPopup, actions: { quick: addMissing, view: showBox, continue: closeToCheckout, close: closeDialog },
+  startPopup, actions: { quick: addMissing, view: showBox, continue: closeToCheckout },
 }

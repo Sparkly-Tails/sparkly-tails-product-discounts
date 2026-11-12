@@ -17,11 +17,7 @@ export function handleClick({ state, tools }, event) {
   if (control !== null) state.actions[control.dataset.action]({ state, control, event, tools })
 }
 
-export function closeDialog({ state }) {
-  state.dialog.close()
-}
-
-/** The Continue link: the customer goes on to checkout (the link itself is not followed, the core script does that). */
+/** The close button: the customer goes on to checkout (the core script does that once the answer is given). Escape and the backdrop close with `action` left at 'close'. */
 export function closeToCheckout({ state, event }) {
   event.preventDefault()
   state.action = 'continue'
@@ -37,4 +33,4 @@ export function finishPopup({ state }) {
   state.opener.focus()
 }
 
-export const DIALOG_TOOLS = { handleCancel, readControlView, handleClick, closeDialog, closeToCheckout, finishPopup }
+export const DIALOG_TOOLS = { handleCancel, readControlView, handleClick, closeToCheckout, finishPopup }

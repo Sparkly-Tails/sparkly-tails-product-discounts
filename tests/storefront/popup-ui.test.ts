@@ -98,7 +98,12 @@ const boxElements = () => Array.from(document.querySelectorAll('dialog [data-box
 const textOf = (element: Element | null | undefined) => (element?.textContent ?? '').replace(/\s+/g, ' ').trim()
 const captionOf = (milestone: Element) => textOf(milestone.querySelector('.smooth-discounts-popup__caption'))
 const buttonByText = (scope: ParentNode, text: string) => Array.from(scope.querySelectorAll('button')).find((button) => textOf(button).includes(text)) as HTMLButtonElement | undefined
-const closeButton = (scope: ParentNode) => scope.querySelector('[data-action="close"]') as HTMLButtonElement
+const closeButton = (scope: ParentNode) => scope.querySelector('.smooth-discounts-popup__close') as HTMLButtonElement
+/** Escape: the dialog's own "cancel" event, which closes the pop-up and stays on the page. */
+const pressEscape = async (dialog: HTMLElement) => {
+  dialog.dispatchEvent(new Event('cancel', { cancelable: true }))
+  await settle()
+}
 const controlOf = (scope: ParentNode, action: string, variantId: string) => scope.querySelector(`button[data-action="${action}"][data-variant="${variantId}"]`) as HTMLButtonElement
 const addButtons = (scope: ParentNode) => Array.from(scope.querySelectorAll('button[data-action="add"]')) as HTMLButtonElement[]
 const pressAndSettle = async (button: Element | undefined) => { (button as HTMLElement).click(); await settle() }
@@ -123,7 +128,7 @@ afterEach(() => {
 })
 
 describe('the dialog', () => {
-  it('opens a modal dialog labelled by its heading, with a close button, the boxes and the Continue link under them', async () => {
+  it('opens a modal dialog labelled by its heading, with a close button and the boxes, and no footer or Continue link', async () => {
     const { dialog } = await openBoxes({ boxes: [boxOf(), secondBoxOf()] })
 
     expect(showModal).toHaveBeenCalledTimes(1)
@@ -132,9 +137,9 @@ describe('the dialog', () => {
     expect(textOf(heading)).toBe('Wait, complete your bundle to unlock instant savings')
     expect(closeButton(dialog).getAttribute('aria-label')).toBe('Close dialog')
     expect(boxElements()).toHaveLength(2)
-    const link = Array.from(dialog.querySelectorAll('a, button')).find((element) => textOf(element) === 'Continue to checkout') as HTMLElement
-    expect(link).toBeDefined()
-    expect(dialog.querySelector('[data-box]')!.compareDocumentPosition(link) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(dialog.querySelector('.smooth-discounts-popup__footer')).toBeNull()
+    expect(dialog.querySelector('.smooth-discounts-popup__continue')).toBeNull()
+    expect(Array.from(dialog.querySelectorAll('a, button')).some((element) => textOf(element) === 'Continue to checkout')).toBe(false)
   })
 
   it('shows the eyebrow, the heading and the intro of the design above the boxes, the same for one box or several', async () => {
@@ -154,15 +159,16 @@ describe('the dialog', () => {
     expect(document.activeElement).toBe(opener)
   })
 
-  it('resolves { action: "close" } for the close button, Escape and a click on the backdrop, and takes the dialog off the page', async () => {
+  it('resolves { action: "continue" } for the close button, which carries the customer on to checkout, and takes the dialog off the page', async () => {
     const byButton = await openBoxes()
     await pressAndSettle(closeButton(byButton.dialog))
-    await expect(byButton.promise).resolves.toEqual({ action: 'close', didAdd: false })
+    await expect(byButton.promise).resolves.toEqual({ action: 'continue', didAdd: false })
     expect(document.querySelector('dialog')).toBeNull()
+  })
 
+  it('resolves { action: "close" } for Escape and a click on the backdrop, which stay on the page', async () => {
     const byEscape = await openBoxes()
-    byEscape.dialog.dispatchEvent(new Event('cancel', { cancelable: true }))
-    await settle()
+    await pressEscape(byEscape.dialog)
     await expect(byEscape.promise).resolves.toEqual({ action: 'close', didAdd: false })
 
     const byBackdrop = await openBoxes()
@@ -179,14 +185,6 @@ describe('the dialog', () => {
 
     expect(answers).toEqual([])
     expect(dialog.hasAttribute('open')).toBe(true)
-  })
-
-  it('resolves { action: "continue", didAdd: false } for the Continue link when nothing was added', async () => {
-    const { dialog, promise } = await openBoxes()
-
-    await pressAndSettle(buttonByText(dialog, 'Continue to checkout') ?? (Array.from(dialog.querySelectorAll('a')).find((link) => textOf(link) === 'Continue to checkout') as HTMLElement))
-
-    await expect(promise).resolves.toEqual({ action: 'continue', didAdd: false })
   })
 
   it('stops watching the boxes and the clock when it closes', async () => {
@@ -474,14 +472,14 @@ describe('the flash sale', () => {
     expect(textOf(document.querySelector('[data-countdown]'))).toBe('01 : 12')
   })
 
-  it('takes the box off when its countdown reaches zero, and leaves the others and the Continue link', async () => {
+  it('takes the box off when its countdown reaches zero, and leaves the others and the close button', async () => {
     const { dialog } = await openBoxes({ boxes: [boxOf({ flash }), secondBoxOf()] })
     expect(boxElements()).toHaveLength(2)
 
     await vi.advanceTimersByTimeAsync(3000)
 
     expect(boxElements().map((element) => textOf(element.querySelector('h3')))).toEqual(['Treats'])
-    expect(textOf(dialog)).toContain('Continue to checkout')
+    expect(closeButton(dialog)).not.toBeNull()
   })
 
   it('keeps counting a flash sale box that is contracted, and removes it on time', async () => {
@@ -565,7 +563,7 @@ describe('adding', () => {
     expect(boxElements()[0].textContent).toContain('We couldn\'t add that. Try again.')
     expect(network.reads).toEqual(['/cart.js'])
     expect(boxElements()[0].textContent).toContain('Currently 3 units selected')
-    await pressAndSettle(Array.from(dialog.querySelectorAll('a, button')).find((element) => textOf(element) === 'Continue to checkout'))
+    await pressAndSettle(closeButton(dialog))
     await expect(promise).resolves.toEqual({ action: 'continue', didAdd: false })
   })
 
@@ -590,28 +588,29 @@ describe('adding', () => {
     expect(addButtons(boxElements()[0])).toHaveLength(3)
   })
 
-  it('counts an add that is still on its way as an add, for Continue and for Close', async () => {
-    for (const [selector, action] of [['[data-action="continue"]', 'continue'], ['[data-action="close"]', 'close']] as const) {
+  it('counts an add that is still on its way as an add, for the close button and for Escape', async () => {
+    for (const action of ['continue', 'close'] as const) {
       const opened = await openBoxes()
       const answerRead = fetchMock.getMockImplementation() as (path: string, init?: object) => Promise<unknown>
       fetchMock.mockImplementation((path: string, init?: object) => (/cart\/add\.js$/.test(path) ? new Promise(() => {}) : answerRead(path, init)))
       await pressAndSettle(addButtons(boxElements()[0])[0])
 
-      await pressAndSettle(opened.dialog.querySelector(selector) as HTMLElement)
+      if (action === 'continue') await pressAndSettle(closeButton(opened.dialog))
+      else await pressEscape(opened.dialog)
 
       await expect(opened.promise).resolves.toEqual({ action, didAdd: true })
     }
   })
 
-  it('resolves Continue with didAdd true after any successful add, and Close the same way', async () => {
+  it('resolves the close button with didAdd true after any successful add, and Escape the same way', async () => {
     const continued = await openBoxes()
     await pressAndSettle(addButtons(boxElements()[0])[0])
-    await pressAndSettle(Array.from(continued.dialog.querySelectorAll('a, button')).find((element) => textOf(element) === 'Continue to checkout'))
+    await pressAndSettle(closeButton(continued.dialog))
     await expect(continued.promise).resolves.toEqual({ action: 'continue', didAdd: true })
 
     const closed = await openBoxes()
     await pressAndSettle(addButtons(boxElements()[0])[0])
-    await pressAndSettle(closeButton(closed.dialog))
+    await pressEscape(closed.dialog)
     await expect(closed.promise).resolves.toEqual({ action: 'close', didAdd: true })
   })
 })

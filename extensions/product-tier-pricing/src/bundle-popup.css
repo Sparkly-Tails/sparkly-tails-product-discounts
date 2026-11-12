@@ -17,7 +17,6 @@
   --popup-ink: var(--color-text-main, #2a2a22);
   --popup-muted: var(--color-secondary-text-main, #5b5c4e);
   --popup-line: var(--color-borders-main, #e6dfd5);
-  --popup-paper: #faf8f5;
   --popup-brown: #8b4816;
   --popup-serif: Georgia, "Times New Roman", serif;
   --popup-ease: cubic-bezier(0.4, 0, 0.2, 1);
@@ -29,7 +28,7 @@
   padding: 0; /* a click on the backdrop lands on the dialog itself, so the content sits in the panel and the dialog has no padding of its own */
   border: 0;
   border-radius: calc(var(--popup-radius) * 1.5);
-  background: var(--popup-paper);
+  background: var(--popup-sun);
   color: var(--popup-ink);
   font-family: inherit;
   overflow: hidden;
@@ -139,26 +138,6 @@ html:has(.smooth-discounts-popup__dialog[open]) {
   color: var(--popup-muted);
   font-size: 1.5rem;
   line-height: 1.5;
-}
-
-.smooth-discounts-popup__footer {
-  padding: 0.875rem 2rem max(0.875rem, env(safe-area-inset-bottom));
-  border-top: 1px solid var(--popup-line);
-  background: #fff;
-}
-
-.smooth-discounts-popup__continue {
-  display: block;
-  padding: 0.5rem 1rem;
-  color: var(--popup-moss);
-  font-weight: 700;
-  text-align: center;
-  text-decoration: underline;
-  text-underline-offset: 0.2em;
-}
-
-.smooth-discounts-popup__continue:hover {
-  text-decoration-thickness: 2px;
 }
 
 /* One bundle: a white card. The cream of the discount's style is the panel inside it; the inline custom properties win over the defaults. */
@@ -345,7 +324,12 @@ html:has(.smooth-discounts-popup__dialog[open]) {
   text-align: center;
 }
 
-/* The small circle holding the quantity: filled once reached, ringed for where the customer is, grey for the first tier, faint for the rest. */
+/* Every caption is bold, whatever the state of its stop. */
+.smooth-discounts-popup__caption {
+  font-weight: 700;
+}
+
+/* The small circle holding the quantity: solid once reached and for where the customer is, grey-ringed for the next tier, faint for the rest. */
 .smooth-discounts-popup__marker {
   display: inline-flex;
   align-items: center;
@@ -367,7 +351,8 @@ html:has(.smooth-discounts-popup__dialog[open]) {
   color: var(--popup-ink);
 }
 
-.smooth-discounts-popup__milestone[data-state="done"] .smooth-discounts-popup__marker {
+.smooth-discounts-popup__milestone[data-state="done"] .smooth-discounts-popup__marker,
+.smooth-discounts-popup__milestone[data-state="current"] .smooth-discounts-popup__marker {
   border-color: var(--popup-moss);
   background: var(--popup-moss);
   color: #fff;
@@ -375,12 +360,6 @@ html:has(.smooth-discounts-popup__dialog[open]) {
 
 .smooth-discounts-popup__milestone[data-state="current"],
 .smooth-discounts-popup__milestone[data-state="target"] {
-  color: var(--popup-moss);
-  font-weight: 700;
-}
-
-.smooth-discounts-popup__milestone[data-state="current"] .smooth-discounts-popup__marker {
-  border-color: var(--popup-moss);
   color: var(--popup-moss);
 }
 
@@ -391,11 +370,6 @@ html:has(.smooth-discounts-popup__dialog[open]) {
 
 .smooth-discounts-popup__milestone[data-state="later"] .smooth-discounts-popup__marker {
   opacity: 0.6;
-}
-
-.smooth-discounts-popup__milestone[data-state="current"] .smooth-discounts-popup__caption {
-  text-decoration: underline;
-  text-underline-offset: 0.25em;
 }
 
 .smooth-discounts-popup__chips {
@@ -413,7 +387,7 @@ html:has(.smooth-discounts-popup__dialog[open]) {
   border-radius: calc(var(--popup-radius) * 0.5);
   background: #fff;
   color: var(--popup-muted);
-  font-size: 0.8125rem;
+  font-size: 0.9344rem; /* 0.8125rem + 15% */
   text-align: center;
   white-space: nowrap;
 }
@@ -460,7 +434,7 @@ html:has(.smooth-discounts-popup__dialog[open]) {
 .smooth-discounts-popup__label {
   margin: 0;
   color: var(--popup-muted);
-  font-size: 0.75rem;
+  font-size: 0.8625rem; /* 0.75rem + 15% */
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -601,8 +575,7 @@ html:has(.smooth-discounts-popup__dialog[open]) {
 .smooth-discounts-popup__view:focus-visible,
 .smooth-discounts-popup__more:focus-visible,
 .smooth-discounts-popup__step:focus-visible,
-.smooth-discounts-popup__close:focus-visible,
-.smooth-discounts-popup__continue:focus-visible {
+.smooth-discounts-popup__close:focus-visible {
   outline: 2px solid var(--popup-moss);
   outline-offset: 2px;
 }
@@ -646,7 +619,7 @@ html:has(.smooth-discounts-popup__dialog[open]) {
   padding: 0.75rem 1rem;
   border-radius: calc(var(--popup-radius) * 0.75);
   background: var(--popup-sand);
-  font-size: 0.9375rem;
+  font-size: 1.0781rem; /* 0.9375rem + 15% */
   font-weight: 600;
 }
 
@@ -714,7 +687,7 @@ html:has(.smooth-discounts-popup__dialog[open]) {
 
   .smooth-discounts-popup__list {
     gap: 1rem;
-    padding: 1.25rem 1rem 1rem;
+    padding: 1.25rem 1rem max(1rem, env(safe-area-inset-bottom));
   }
 
   .smooth-discounts-popup__header {
@@ -723,11 +696,6 @@ html:has(.smooth-discounts-popup__dialog[open]) {
 
   .smooth-discounts-popup__heading {
     font-size: 1.5rem;
-  }
-
-  .smooth-discounts-popup__footer {
-    padding-right: 1rem;
-    padding-left: 1rem;
   }
 
   .smooth-discounts-popup__box {
@@ -750,6 +718,11 @@ html:has(.smooth-discounts-popup__dialog[open]) {
 
   .smooth-discounts-popup__chips {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* Two chips to a row leave little width, so the text wraps rather than being cut off. */
+  .smooth-discounts-popup__chip {
+    white-space: normal;
   }
 
   .smooth-discounts-popup__milestones {
