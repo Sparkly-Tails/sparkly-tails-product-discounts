@@ -1,10 +1,10 @@
-# Settings page: one store-wide design, and four new settings panels
+# Settings page: one store-wide design, and three new settings panels
 
 Date: 2026-11-12. Status: draft for the owner's approval; nothing is built. Design source: Stitch project 6370617737489629500, screen 7ae58b97ac4748d6be1f2825b2d0eee7 ("Settings - Smooth Discounts"); screenshot in `docs/superpowers/specs/assets/settings-page/settings-design.jpg`.
 
 ## Intent
 
-Today every discount carries its own look (background colour, corner radius) and its own pop-up frequency, set in the discount form. The owner wants one look for the whole store, set once, and a Settings page to hold it together with the store-wide behaviour of the storefront widget and the pre-checkout pop-up. The Settings page is a milestone: it replaces the per-discount design, and adds Impression Frequency, Stacking, Urgency and Theme Integration panels that do not exist in the app yet.
+Today every discount carries its own look (background colour, corner radius) and its own pop-up frequency, set in the discount form. The owner wants one look for the whole store, set once, and a Settings page to hold it together with the store-wide behaviour of the storefront widget and the pre-checkout pop-up. The Settings page is a milestone: it replaces the per-discount design, and adds Impression Frequency, Stacking and Theme Integration panels that do not exist in the app yet.
 
 ## What the owner decided
 
@@ -13,7 +13,8 @@ Today every discount carries its own look (background colour, corner radius) and
 3. The discount form **keeps its widget preview**; it shows that discount's products, tiers and flash window painted with the global design.
 4. The Settings page follows the Stitch design and has **its own design preview**: the widget with mock data (3 products, 3 tiers), and the pre-checkout pop-up as **placeholder areas only**, so the owner can see how the colours work together.
 5. Store the settings **where it loads fastest** (the app or the database; the owner leaves the choice to me).
-6. **Impression Frequency, Stacking, Urgency & Micro-Interactions and Theme Integration** are all new; this milestone builds the panels and the code behind them.
+6. **Impression Frequency, Stacking and Theme Integration** are all new; this milestone builds the panels and the code behind them.
+7. **The Urgency & Micro-Interactions panel is removed** (2026-11-12): no countdown-animation switch and no milestone-celebration switch. The flash countdown keeps ticking every second as it does today, and nothing is added for celebrations.
 
 ## What I found (repo and docs, read 2026-11-12 on `origin/dev` at 51bdb8b)
 
@@ -28,7 +29,7 @@ Today every discount carries its own look (background colour, corner radius) and
 
 ## Goals
 
-- One Settings page, reachable from the homepage, with the five panels of the design; one Save bar (as the discount form has) that saves everything on the page.
+- One Settings page, reachable from the homepage, with four panels of the design (Appearance, Impression Frequency, Stacking, Theme Integration); one Save bar (as the discount form has) that saves everything on the page.
 - The design applies to every discount at once: saving the Settings page changes the widget and the pop-up on the storefront without touching any product.
 - Every setting on the page does something real on the storefront or at checkout.
 - Old per-discount values are gone from the form, the code, the stored config and the product metafields.
@@ -37,6 +38,7 @@ Today every discount carries its own look (background colour, corner radius) and
 
 - No per-discount design, frequency or overrides of any kind.
 - No theme name or version ("Live in Dawn v15.0" in the design): it needs `read_themes`, a new scope merchants would have to approve.
+- No Urgency & Micro-Interactions panel and no switches for the countdown or a milestone pulse (owner's decision).
 - No typography presets, price display format, custom CSS accordion or metrics box (empty in the design).
 - No translations (English only, as the widget).
 - No change to how tiers are calculated.
@@ -79,12 +81,7 @@ Shopify decides combining by **discount class** (order, product, shipping), not 
 - The panel says that two discounts combine only if **both** allow it: the other discount must allow combining in Shopify Admin too; the app can set only its own side.
 - The checkboxes start from the **current** state of the shared record in Shopify (all three false today, because it is created with no `combinesWith`), not from the design's mock defaults, so deploying changes nothing until the owner saves.
 
-### 4. Urgency & Micro-Interactions
-
-- **Countdown timer animation** (on by default): on, the flash countdown ticks every second as today; off, the bar shows the fixed end time instead of a ticking timer (my recommendation, awaiting the owner's answer in "For the owner").
-- **Milestone celebration** (on by default): on, a short pulse plays on the tier chip and rail when the customer's units reach a new tier, in the widget and in the pop-up. Off, nothing plays. `prefers-reduced-motion` turns it off in any case.
-
-### 5. Shopify Theme Integration
+### 4. Shopify Theme Integration
 
 A status panel with no setting to save. For the product-page widget block, the card-prices embed and the bundle pop-up embed it shows **Active** or **Not active** on the live theme, from `shopify.app.extensions()` (needs no scope), and a deep link to the theme editor to add the block or turn the embed on (URL format from Shopify's deep-linking docs, with the app's `client_id`). If the status cannot be read, the panel says so and shows the links.
 
@@ -96,8 +93,8 @@ A status panel with no setting to save. For the product-page widget block, the c
 ## Data
 
 - **Where:** a new shop metafield `tier_settings` (JSON, key added to `METAFIELD_KEYS` next to `tier_config`), written by the Settings save, read by `getConfig`-style code in the admin and by Liquid in both blocks. No database table. Reason: the storefront needs no request to read it, the admin read joins a query it already makes, and the database has a recorded cold-start cost. Not measured.
-- **Shape (my calls on the names):** `{ design: { accentColor, backgroundColor, cornerRadius, flashTone }, popup: { frequency }, stacking: { orderDiscounts, shippingDiscounts, productDiscounts }, urgency: { countdown, celebration } }`. A missing or invalid value reads as its default.
-- **Blocks:** the widget block and the pop-up embed print the design as the existing `--smooth-discounts-*` variables, plus `data-` attributes for the urgency toggles and the frequency; they stop reading a discount's `style`. The theme-editor settings `moss_color` and `cream_color` are removed from both block schemas (the global design replaces them); `sun_color` and `custom_css` stay.
+- **Shape (my calls on the names):** `{ design: { accentColor, backgroundColor, cornerRadius, flashTone }, popup: { frequency }, stacking: { orderDiscounts, shippingDiscounts, productDiscounts } }`. A missing or invalid value reads as its default.
+- **Blocks:** the widget block and the pop-up embed print the design as the existing `--smooth-discounts-*` variables, plus a `data-` attribute for the frequency; they stop reading a discount's `style`. The theme-editor settings `moss_color` and `cream_color` are removed from both block schemas (the global design replaces them); `sun_color` and `custom_css` stay.
 - **Card index:** loses `style` and `popupFrequency`.
 
 ## Removing the old values
@@ -107,9 +104,7 @@ A status panel with no setting to save. For the product-page widget block, the c
 
 ## For the owner (answers that change what is built)
 
-1. **Countdown animation off.** The flash bar reads "Flash sale ends in 04 : 18 : 49" and redraws every second (widget `core/wiring.js`, pop-up `popup/ui.js`). What should the bar show when the switch is off? My recommendation: the fixed end time in the shop's time zone ("Flash sale ends 28 Nov, 21:00"), which stays true without a timer. Other readings: the time left as of page load (it goes wrong the longer the page stays open), or hours and minutes only, redrawn each minute.
-
-Answered: "Always prioritize highest tier" is dropped; the stacking labels follow Shopify's classes (see the Stacking panel).
+None open. Answered: "Always prioritize highest tier" is dropped; the stacking labels follow Shopify's classes (see the Stacking panel); the Urgency panel is removed.
 
 ## Calls I made (to check while reading)
 
@@ -118,14 +113,13 @@ Answered: "Always prioritize highest tier" is dropped; the stacking labels follo
 3. The theme-editor colour settings `moss_color` and `cream_color` go; `sun_color` and `custom_css` stay.
 4. The colour picker with transparency is reused for the background; the accent is a solid colour.
 5. The names of the stored fields and of the `/settings` route.
-6. Milestone celebration is a CSS pulse, off under reduced motion.
-7. The cleanup of old values runs on the first Settings save (nothing runs at deploy).
-8. The Settings link sits in the homepage header.
-9. The theme panel shows block status only, no theme name.
+6. The cleanup of old values runs on the first Settings save (nothing runs at deploy).
+7. The Settings link sits in the homepage header.
+8. The theme panel shows block status only, no theme name.
 
 ## What is left to the builder
 
-The exact Liquid and the CSS variable for the flash tone, how the urgency toggles reach the scripts without passing 10,000 bytes (the pop-up core has 45 bytes to spare; components are the place), the exact deep-link URLs, how the shared and flash records are updated and kept in step (one query of all records of the Function), the mock data, and the tests.
+The exact Liquid and the CSS variable for the flash tone, how the frequency setting reaches the pop-up script without passing 10,000 bytes (the pop-up core has 45 bytes to spare; components are the place), the exact deep-link URLs, how the shared and flash records are updated and kept in step (one query of all records of the Function), the mock data, and the tests.
 
 ## Verification
 
@@ -133,7 +127,7 @@ Tests first, in the existing styles:
 - Settings: parse and read with defaults; a bad colour or radius falls back; saving writes Shopify first and the metafield after; a refused stacking write saves nothing.
 - Stacking: each class checkbox sets the matching `combinesWith` field on the shared record and the flash records; the panel starts from the record's current state; `productDiscounts` stays true and the box is locked while a flash sale exists.
 - Removal: no `style` or `popupFrequency` in the form, the card index, the product metafield or the saved config after the cleanup.
-- Blocks and scripts: the Liquid prints the global variables and attributes and nothing from a discount's style; the pop-up uses the global frequency; the countdown ticks or not by the toggle; the pulse plays on a tier change only when on; sizes under 10,000 bytes.
+- Blocks and scripts: the Liquid prints the global variables and attributes and nothing from a discount's style; the pop-up uses the global frequency; sizes under 10,000 bytes.
 - Previews: the form preview paints the global design; the Settings preview repaints on every control; the pop-up preview has no real content.
 - On the demo store (the owner types the storefront password in their own terminal tab): a design change reaches a product page and the pop-up; the stacking boxes change the record in Shopify Admin; the theme panel reads the blocks' status.
 
@@ -148,7 +142,7 @@ Tests first, in the existing styles:
 1. Settings data: type, defaults, read and write, with tests.
 2. The Settings page with the design panel and its previews.
 3. Blocks and scripts read the global design; the per-discount look is removed from the form, the card index and the metafields; the cleanup.
-4. Impression Frequency, then Urgency.
+4. Impression Frequency.
 5. Stacking (Shopify records).
 6. Theme Integration.
 7. Demo-store check, then the PRs (each at most 200 changed lines without tests, as the project's plans do); the owner merges and deploys.
