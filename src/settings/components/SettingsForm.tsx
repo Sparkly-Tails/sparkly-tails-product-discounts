@@ -1,0 +1,64 @@
+'use client'
+
+import { useActionState, useState } from 'react'
+import FormShell from '@/form/components/FormShell'
+import SaveBar from '@/form/components/SaveBar'
+import AppearancePanel from '@/settings/components/AppearancePanel'
+import type { SettingsSaveResult } from '@/settings/runSettingsSave'
+import { isSettingsDirty, type SettingsFormValues } from '@/settings/settingsFormValues'
+
+const MESSAGE_STYLES = {
+  saved: { role: 'status', className: 'text-form-body-md text-form-on-surface-variant' },
+  refused: { role: 'alert', className: 'text-form-body-md text-form-error' },
+}
+
+// What a save said: nothing before the first one; an error stays as an alert, a save that went through as a status.
+function SettingsMessage({ result }: { result: SettingsSaveResult | null }) {
+  if (!result) return null
+  const style = result.ok ? MESSAGE_STYLES.saved : MESSAGE_STYLES.refused
+  return <p role={style.role} className={style.className}>{result.message}</p>
+}
+
+// The Settings page: the panels in the left column, one Save bar for the whole page (as the discount form has).
+// It keeps the values to know when something is unsaved, and takes everything back on Discard.
+export default function SettingsForm({ initial, saveAction }: {
+  initial: SettingsFormValues
+  saveAction: (state: SettingsSaveResult | null, formData: FormData) => Promise<SettingsSaveResult>
+}) {
+  const [values, setValues] = useState(initial)
+  const [saved, setSaved] = useState(initial)
+  const [formRevision, setFormRevision] = useState(0)
+
+  async function submit(state: SettingsSaveResult | null, formData: FormData) {
+    const result = await saveAction(state, formData)
+    if (result.ok) setSaved(values)
+    return result
+  }
+
+  const [result, formAction, isSaving] = useActionState(submit, null)
+  const isDirty = isSettingsDirty({ saved, current: values })
+
+  function resetChanges() {
+    setValues(saved)
+    setFormRevision((revision) => revision + 1)
+  }
+
+  return (
+    <>
+      <SaveBar id="settings-save-bar" isVisible={isDirty} canSave={!isSaving} onSave={() => document.forms.namedItem('settings')?.requestSubmit()} onDiscard={resetChanges} />
+      <form name="settings" action={formAction}>
+        {Object.entries(values).map(([name, value]) => <input key={name} type="hidden" name={name} value={value} />)}
+        <FormShell breadcrumbLabel="Settings" heading="Settings" actions={null} notice={<SettingsMessage result={result} />} preview={null}>
+          <AppearancePanel
+            key={formRevision}
+            accentColor={values.accentColor}
+            backgroundColor={values.backgroundColor}
+            cornerRadius={values.cornerRadius}
+            flashTone={values.flashTone}
+            onChange={(field, value) => setValues((current) => ({ ...current, [field]: value }))}
+          />
+        </FormShell>
+      </form>
+    </>
+  )
+}
