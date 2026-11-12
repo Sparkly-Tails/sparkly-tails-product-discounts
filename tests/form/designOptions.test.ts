@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { DEFAULT_WIDGET_STYLE } from '@/lib/widgetStyle'
+import { DEFAULT_DESIGN } from '@/settings/design'
 import { PALETTE_COLORS, BACKGROUND_COLORS, isHexColor, formatHexColor } from '@/form/designOptions'
 
 describe('the colour choices of the design', () => {
@@ -9,7 +9,7 @@ describe('the colour choices of the design', () => {
 
   it('offers the seven background colours, Warm Sand among them', () => {
     expect(BACKGROUND_COLORS.map((color) => color.label)).toEqual(['Off White', 'Soft Gray', 'Warm Sand', 'Light Beige', 'Muted Slate', 'White', 'Dark Graphite'])
-    expect(BACKGROUND_COLORS.find((color) => color.hex === DEFAULT_WIDGET_STYLE.backgroundColor)?.label).toBe('Warm Sand')
+    expect(BACKGROUND_COLORS.find((color) => color.hex === DEFAULT_DESIGN.backgroundColor)?.label).toBe('Warm Sand')
   })
 
   it('writes every colour as seven characters in capitals', () => {

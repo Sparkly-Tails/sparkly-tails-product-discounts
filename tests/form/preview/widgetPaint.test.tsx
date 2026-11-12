@@ -6,8 +6,9 @@ import { buildPreviewModel } from '@/form/preview/buildPreviewModel'
 import { PREVIEW_TOOLS } from '@/form/preview/previewTools'
 import { WIDGET_FUNCTIONS } from '@/form/preview/widgetFunctions'
 import type { PreviewTier } from '@/form/tierRows'
-import { DEFAULT_WIDGET_STYLE } from '@/lib/widgetStyle'
 import { readBuiltWidget, runWidgetScripts } from '../../helpers/builtWidget'
+
+const DEFAULT_PAINT = { backgroundColor: '#F5EFE1', cornerRadius: 12 }
 
 /**
  * The preview paints what the widget's functions decide. This runs the real
@@ -64,7 +65,7 @@ function renderPreview({ nowSeconds, quantity, tiers, flash, highDemand }: Scena
       buildFlashWindow: () => flash,
     },
   })
-  const { container } = render(<WidgetView viewModel={viewModel!} hasTiers={tiers.length > 0} widgetStyle={DEFAULT_WIDGET_STYLE} onPickQuantity={() => {}} />)
+  const { container } = render(<WidgetView viewModel={viewModel!} hasTiers={tiers.length > 0} widgetStyle={DEFAULT_PAINT} onPickQuantity={() => {}} />)
   return container.querySelector('.smooth-discounts') as HTMLElement
 }
 

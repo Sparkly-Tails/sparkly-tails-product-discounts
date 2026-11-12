@@ -134,7 +134,7 @@ describe('saveConfig', () => {
 
     const [, variables] = shopIdSpy.mock.calls[2] as [string, { metafields: { key: string; value: string }[] }]
     const written = variables.metafields.find((metafield) => metafield.key === METAFIELD_KEYS.cardIndex)
-    expect(JSON.parse(written!.value)).toEqual({ discounts: [{ discountId: 'a', title: 'A', popupFrequency: 'session', tiers: [{ minQty: 3, percentOff: 10 }], members: [{ productId: '7', handle: 'tuna-soup', variantIds: null }], flash: null }] })
+    expect(JSON.parse(written!.value)).toEqual({ discounts: [{ discountId: 'a', title: 'A', tiers: [{ minQty: 3, percentOff: 10 }], members: [{ productId: '7', handle: 'tuna-soup', variantIds: null }], flash: null }] })
     expect(shopIdSpy).toHaveBeenCalledTimes(3)
   })
 
@@ -207,6 +207,32 @@ describe('pricesUniform', () => {
 
   it('is false when any price differs', () => {
     expect(pricesUniform([1.49, 1.59])).toBe(false)
+  })
+})
+
+describe('a config saved before the Settings page', () => {
+  beforeEach(() => vi.restoreAllMocks())
+  const OLD_DISCOUNT = { discountId: 'disc_1', name: 'Tuna', title: 'Tuna', status: 'live', pricingMode: 'percent', members: [{ productId: 'gid://shopify/Product/1' }], tiers: [{ minQty: 5, percentOff: 10 }], style: { backgroundColor: '#FFFFFF', cornerRadius: 4 }, popupFrequency: 'checkout' }
+
+  it('loads without error and without the per-discount look and pop-up frequency', async () => {
+    vi.spyOn(shopifyClient, 'shopifyQuery').mockResolvedValue({ shop: { metafield: { value: JSON.stringify({ discounts: [OLD_DISCOUNT] }) } } })
+    const config = await getConfig()
+    expect(config.discounts).toHaveLength(1)
+    expect(config.discounts[0]).not.toHaveProperty('style')
+    expect(config.discounts[0]).not.toHaveProperty('popupFrequency')
+    expect(config.discounts[0].name).toBe('Tuna')
+  })
+
+  it('is written back without them', async () => {
+    const spy = vi.spyOn(shopifyClient, 'shopifyQuery')
+    spy.mockResolvedValueOnce({ shop: { id: 'gid://shopify/Shop/1' } })
+    spy.mockResolvedValueOnce({ nodes: [{ id: 'gid://shopify/Product/1', handle: 'tuna' }] })
+    spy.mockResolvedValueOnce({ metafieldsSet: { userErrors: [] } })
+    await saveConfig({ discounts: [OLD_DISCOUNT] } as unknown as Config)
+    const [, variables] = spy.mock.calls[2] as [string, { metafields: { key: string; value: string }[] }]
+    const written = variables.metafields.find((metafield) => metafield.key === METAFIELD_KEYS.tierConfig)
+    expect(written!.value).not.toMatch(/style|popupFrequency/)
+    expect(JSON.parse(written!.value).discounts[0].name).toBe('Tuna')
   })
 })
 

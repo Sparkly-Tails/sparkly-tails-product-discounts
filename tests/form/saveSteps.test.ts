@@ -5,18 +5,15 @@ import {
 } from '@/form/saveSteps'
 import type { ParsedDiscount } from '@/form/parseDiscountForm'
 import type { Discount } from '@/lib/config'
-import { DEFAULT_WIDGET_STYLE } from '@/lib/widgetStyle'
 
 const VALUES: ParsedDiscount = {
   name: 'Black Friday',
   title: '',
-  popupFrequency: 'session',
   members: [{ productId: 'p1' }],
   pricingMode: 'percent',
   tiers: [{ minQty: 3, percentOff: 10 }],
   flash: null,
   highDemand: false,
-  style: DEFAULT_WIDGET_STYLE,
   goLive: false,
   takeOffline: false,
 }
@@ -45,8 +42,9 @@ describe('readLiveMembers', () => {
 
 describe('buildDiscountFields', () => {
   it('takes the products, mode, tiers, flash sale and High Demand from the form', () => {
-    expect(buildDiscountFields({ values: VALUES })).toEqual({ pricingMode: 'percent', members: VALUES.members, tiers: VALUES.tiers, flash: undefined, highDemand: undefined, style: DEFAULT_WIDGET_STYLE, popupFrequency: 'session' })
-    expect(buildDiscountFields({ values: { ...VALUES, popupFrequency: 'checkout' } }).popupFrequency).toBe('checkout')
+    expect(buildDiscountFields({ values: VALUES })).toEqual({ pricingMode: 'percent', members: VALUES.members, tiers: VALUES.tiers, flash: undefined, highDemand: undefined })
+    expect(Object.keys(buildDiscountFields({ values: VALUES }))).not.toEqual(expect.arrayContaining(['style']))
+    expect(buildDiscountFields({ values: VALUES })).not.toHaveProperty('popupFrequency')
     const withBoth = buildDiscountFields({ values: { ...VALUES, flash: { startsAt: 'a', endsAt: 'b', showTeaser: true }, highDemand: true } })
     expect(withBoth.flash).toEqual({ startsAt: 'a', endsAt: 'b', showTeaser: true })
     expect(withBoth.highDemand).toBe(true)

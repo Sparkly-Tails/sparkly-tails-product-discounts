@@ -14,6 +14,7 @@ vi.mock('@/lib/shop', async (importOriginal) => ({
   getShopTimezone: vi.fn(async () => 'Europe/London'),
   getShopCurrencyCode: vi.fn(async () => 'GBP'),
 }))
+vi.mock('@/settings/settingsStore', () => ({ getStoreSettings: vi.fn(async () => ({ design: { accentColor: '#112233', backgroundColor: '#FFFFFF', cornerRadius: 8, flashTone: 'olive-night' }, popup: { frequency: 'session' } })) }))
 vi.mock('@/actions/saveDiscount', () => ({ saveDiscount: vi.fn(async () => null) }))
 vi.mock('@/actions/discountActions', () => ({ deleteDiscount: vi.fn(async () => {}) }))
 vi.mock('@/actions/memberPickerActions', () => ({
@@ -91,6 +92,15 @@ describe('the Edit page: the saved discount in the form', () => {
   it('is not found for a discount that does not exist', async () => {
     config.discounts = []
     await expect(DiscountPage({ params: Promise.resolve({ discountId: 'disc_1' }) })).rejects.toThrow('NEXT_NOT_FOUND')
+  })
+})
+
+describe('the Edit page: the store-wide design', () => {
+  it('paints the preview with the design saved on the Settings page', async () => {
+    await renderPage(baseDiscount)
+    const widget = document.querySelector('.smooth-discounts') as HTMLElement
+    expect(widget.style.getPropertyValue('--smooth-discounts-moss')).toBe('#112233')
+    expect(widget.style.getPropertyValue('--smooth-discounts-radius')).toBe('8px')
   })
 })
 
