@@ -67,20 +67,21 @@ One store-wide choice, replacing the discount form's "Show the pop-up" select: *
 
 ### 3. Discount Combination & Stacking
 
-Three checkboxes that set what the shared tier discount (and the flash records) allow to combine with. They map to Shopify's `combinesWith`:
+Shopify decides combining by **discount class** (order, product, shipping), not by "coupon" or "automatic"; so the panel has one checkbox per class, with labels and help text that say what Shopify does (owner's decision, 2026-11-12: "align labels and explanation to how Shopify works"). They set `combinesWith` on the shared tier discount and on every flash record:
 
-| Checkbox in the design | What it sets (my reading of the docs) |
-|---|---|
-| Allow stacking with Shopify standard manual coupon codes | `orderDiscounts` and `productDiscounts` true |
-| Allow combining with automatic free shipping promotions | `shippingDiscounts` true |
-| Always prioritize highest tier discount rate if the customer qualifies for multiple promotions | See "For the owner" below |
+| Checkbox | Sets | Help text (my wording) |
+|---|---|---|
+| Order discounts | `orderDiscounts` | Discounts on the whole order, such as a code that takes 10% off the order. Allow them to apply together with your tier discounts. |
+| Shipping discounts | `shippingDiscounts` | Free or reduced shipping, from a code or an automatic discount. Allow them to apply together with your tier discounts. |
+| Product discounts | `productDiscounts` | Other discounts on products. Shopify applies one product discount per cart line, so these can only apply to other lines. Always on, and locked, while a flash sale exists, because flash sales need it. |
 
-- The panel states that a coupon combines only if the coupon also allows it in Shopify Admin; the app can set only its own side.
-- `productDiscounts` is never switched off while a flash sale exists (see anti-goals); unchecking the first box turns off `orderDiscounts` only.
+- The design's third checkbox ("Always prioritize highest tier discount rate", owner's decision: **dropped**) is not built.
+- The panel says that two discounts combine only if **both** allow it: the other discount must allow combining in Shopify Admin too; the app can set only its own side.
+- The checkboxes start from the **current** state of the shared record in Shopify (all three false today, because it is created with no `combinesWith`), not from the design's mock defaults, so deploying changes nothing until the owner saves.
 
 ### 4. Urgency & Micro-Interactions
 
-- **Countdown timer animation** (on by default): on, the flash countdown ticks every second; off, it shows the time left as of page load and does not tick.
+- **Countdown timer animation** (on by default): on, the flash countdown ticks every second as today; off, the bar shows the fixed end time instead of a ticking timer (my recommendation, awaiting the owner's answer in "For the owner").
 - **Milestone celebration** (on by default): on, a short pulse plays on the tier chip and rail when the customer's units reach a new tier, in the widget and in the pop-up. Off, nothing plays. `prefers-reduced-motion` turns it off in any case.
 
 ### 5. Shopify Theme Integration
@@ -95,7 +96,7 @@ A status panel with no setting to save. For the product-page widget block, the c
 ## Data
 
 - **Where:** a new shop metafield `tier_settings` (JSON, key added to `METAFIELD_KEYS` next to `tier_config`), written by the Settings save, read by `getConfig`-style code in the admin and by Liquid in both blocks. No database table. Reason: the storefront needs no request to read it, the admin read joins a query it already makes, and the database has a recorded cold-start cost. Not measured.
-- **Shape (my calls on the names):** `{ design: { accentColor, backgroundColor, cornerRadius, flashTone }, popup: { frequency }, stacking: { couponCodes, freeShipping, highestTier }, urgency: { countdown, celebration } }`. A missing or invalid value reads as its default.
+- **Shape (my calls on the names):** `{ design: { accentColor, backgroundColor, cornerRadius, flashTone }, popup: { frequency }, stacking: { orderDiscounts, shippingDiscounts, productDiscounts }, urgency: { countdown, celebration } }`. A missing or invalid value reads as its default.
 - **Blocks:** the widget block and the pop-up embed print the design as the existing `--smooth-discounts-*` variables, plus `data-` attributes for the urgency toggles and the frequency; they stop reading a discount's `style`. The theme-editor settings `moss_color` and `cream_color` are removed from both block schemas (the global design replaces them); `sun_color` and `custom_css` stay.
 - **Card index:** loses `style` and `popupFrequency`.
 
@@ -106,9 +107,9 @@ A status panel with no setting to save. For the product-page widget block, the c
 
 ## For the owner (answers that change what is built)
 
-1. **"Always prioritize highest tier discount rate"** has no meaning I can build truthfully. Within a discount the Function already applies the highest tier reached, and a product cannot be in two live discounts. Against other discounts, Shopify decides which product discount wins on a line, and I have not found what rule it uses. Drop the checkbox, or say what it should do.
-2. **Countdown animation off** means, in my reading, a static time left as of page load. If you want it hidden, or an end date shown instead, say so.
-3. **The coupon and free-shipping checkboxes** are class-based in Shopify (order, product, shipping), not "coupon" and "automatic": the first allows any order and product discount to combine, the second any shipping discount. Keep the design's labels with an explanatory line (my plan), or relabel by class?
+1. **Countdown animation off.** The flash bar reads "Flash sale ends in 04 : 18 : 49" and redraws every second (widget `core/wiring.js`, pop-up `popup/ui.js`). What should the bar show when the switch is off? My recommendation: the fixed end time in the shop's time zone ("Flash sale ends 28 Nov, 21:00"), which stays true without a timer. Other readings: the time left as of page load (it goes wrong the longer the page stays open), or hours and minutes only, redrawn each minute.
+
+Answered: "Always prioritize highest tier" is dropped; the stacking labels follow Shopify's classes (see the Stacking panel).
 
 ## Calls I made (to check while reading)
 
@@ -130,7 +131,7 @@ The exact Liquid and the CSS variable for the flash tone, how the urgency toggle
 
 Tests first, in the existing styles:
 - Settings: parse and read with defaults; a bad colour or radius falls back; saving writes Shopify first and the metafield after; a refused stacking write saves nothing.
-- Stacking: each checkbox sets the intended `combinesWith` on the shared record and the flash records; `productDiscounts` stays true while a flash sale exists.
+- Stacking: each class checkbox sets the matching `combinesWith` field on the shared record and the flash records; the panel starts from the record's current state; `productDiscounts` stays true and the box is locked while a flash sale exists.
 - Removal: no `style` or `popupFrequency` in the form, the card index, the product metafield or the saved config after the cleanup.
 - Blocks and scripts: the Liquid prints the global variables and attributes and nothing from a discount's style; the pop-up uses the global frequency; the countdown ticks or not by the toggle; the pulse plays on a tier change only when on; sizes under 10,000 bytes.
 - Previews: the form preview paints the global design; the Settings preview repaints on every control; the pop-up preview has no real content.
