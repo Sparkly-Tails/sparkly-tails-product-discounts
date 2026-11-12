@@ -4,6 +4,7 @@ import { useActionState, useState } from 'react'
 import FormShell from '@/form/components/FormShell'
 import SaveBar from '@/form/components/SaveBar'
 import AppearancePanel from '@/settings/components/AppearancePanel'
+import FrequencyPanel from '@/settings/components/FrequencyPanel'
 import PopupPlaceholderPreview from '@/settings/components/PopupPlaceholderPreview'
 import SettingsWidgetPreview from '@/settings/components/SettingsWidgetPreview'
 import type { SettingsSaveResult } from '@/settings/runSettingsSave'
@@ -80,6 +81,7 @@ export default function SettingsForm({ initial, currencyCode, initialNowSeconds,
             flashTone={values.flashTone}
             onChange={(field, value) => setValues((current) => ({ ...current, [field]: value }))}
           />
+          <FrequencyPanel frequency={values.frequency} onChange={(frequency) => setValues((current) => ({ ...current, frequency }))} />
         </FormShell>
       </form>
     </>
