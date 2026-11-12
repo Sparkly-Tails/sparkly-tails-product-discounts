@@ -2,9 +2,8 @@ import type { CSSProperties } from 'react'
 import FlashBarView from '@/form/preview/components/FlashBarView'
 import PriceRowView from '@/form/preview/components/PriceRowView'
 import TierCardView from '@/form/preview/components/TierCardView'
-import { buildWidgetStyleVars } from '@/form/preview/previewModel'
+import { buildWidgetStyleVars, type WidgetPaint } from '@/form/preview/previewModel'
 import type { WidgetViewModel } from '@/form/preview/widgetTypes'
-import type { WidgetStyle } from '@/lib/widgetStyle'
 
 // The storefront widget, painted from what the widget's own functions decided,
 // in the markup of tier-pricing.liquid and with its stylesheet. The Mix & match
@@ -16,7 +15,7 @@ export default function WidgetView({ viewModel, hasTiers, widgetStyle, onPickQua
   viewModel: WidgetViewModel
   hasTiers: boolean
   /** The discount's style: set on the widget as the same CSS variables the storefront block sets. */
-  widgetStyle: WidgetStyle
+  widgetStyle: WidgetPaint
   onPickQuantity: (quantity: number) => void
 }) {
   const hasChrome = hasTiers && viewModel.showChrome

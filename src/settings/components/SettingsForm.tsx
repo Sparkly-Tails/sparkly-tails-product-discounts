@@ -4,6 +4,8 @@ import { useActionState, useState } from 'react'
 import FormShell from '@/form/components/FormShell'
 import SaveBar from '@/form/components/SaveBar'
 import AppearancePanel from '@/settings/components/AppearancePanel'
+import PopupPlaceholderPreview from '@/settings/components/PopupPlaceholderPreview'
+import SettingsWidgetPreview from '@/settings/components/SettingsWidgetPreview'
 import type { SettingsSaveResult } from '@/settings/runSettingsSave'
 import { isSettingsDirty, type SettingsFormValues } from '@/settings/settingsFormValues'
 
@@ -21,13 +23,17 @@ function SettingsMessage({ result }: { result: SettingsSaveResult | null }) {
 
 // The Settings page: the panels in the left column, one Save bar for the whole page (as the discount form has).
 // It keeps the values to know when something is unsaved, and takes everything back on Discard.
-export default function SettingsForm({ initial, saveAction }: {
+export default function SettingsForm({ initial, currencyCode, initialNowSeconds, saveAction }: {
   initial: SettingsFormValues
+  currencyCode: string
+  /** The time the page was made, so the preview's first paint matches the server's. */
+  initialNowSeconds: number
   saveAction: (state: SettingsSaveResult | null, formData: FormData) => Promise<SettingsSaveResult>
 }) {
   const [values, setValues] = useState(initial)
   const [saved, setSaved] = useState(initial)
   const [formRevision, setFormRevision] = useState(0)
+  const [isFlashShown, setIsFlashShown] = useState(false)
 
   async function submit(state: SettingsSaveResult | null, formData: FormData) {
     const result = await saveAction(state, formData)
@@ -48,7 +54,24 @@ export default function SettingsForm({ initial, saveAction }: {
       <SaveBar id="settings-save-bar" isVisible={isDirty} canSave={!isSaving} onSave={() => document.forms.namedItem('settings')?.requestSubmit()} onDiscard={resetChanges} />
       <form name="settings" action={formAction}>
         {Object.entries(values).map(([name, value]) => <input key={name} type="hidden" name={name} value={value} />)}
-        <FormShell breadcrumbLabel="Settings" heading="Settings" actions={null} notice={<SettingsMessage result={result} />} preview={null}>
+        <FormShell breadcrumbLabel="Settings" heading="Settings" actions={null}
+          notice={<SettingsMessage result={result} />}
+          preview={
+            <>
+              <SettingsWidgetPreview
+                accentColor={values.accentColor}
+                backgroundColor={values.backgroundColor}
+                cornerRadius={values.cornerRadius}
+                flashTone={values.flashTone}
+                isFlashShown={isFlashShown}
+                onFlashShownChange={setIsFlashShown}
+                currencyCode={currencyCode}
+                initialNowSeconds={initialNowSeconds}
+              />
+              <PopupPlaceholderPreview accentColor={values.accentColor} backgroundColor={values.backgroundColor} cornerRadius={values.cornerRadius} flashTone={values.flashTone} />
+            </>
+          }
+        >
           <AppearancePanel
             key={formRevision}
             accentColor={values.accentColor}
