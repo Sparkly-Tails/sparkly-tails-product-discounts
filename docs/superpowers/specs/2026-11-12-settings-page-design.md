@@ -93,7 +93,7 @@ A status panel with no setting to save. For the product-page widget block, the c
 ## Data
 
 - **Where:** a new shop metafield `tier_settings` (JSON, key added to `METAFIELD_KEYS` next to `tier_config`), written by the Settings save, read by `getConfig`-style code in the admin and by Liquid in both blocks. No database table. Reason: the storefront needs no request to read it, the admin read joins a query it already makes, and the database has a recorded cold-start cost. Not measured.
-- **Shape (my calls on the names):** `{ design: { accentColor, backgroundColor, cornerRadius, flashTone }, popup: { frequency }, stacking: { orderDiscounts, shippingDiscounts, productDiscounts } }`. A missing or invalid value reads as its default.
+- **Shape (my calls on the names):** `{ design: { accentColor, backgroundColor, cornerRadius, flashTone }, popup: { frequency } }`. A missing or invalid value reads as its default. **Stacking is not stored here**: Shopify's discount records (`combinesWith`) are its source of truth, so the panel reads and writes them directly (corrected 2026-11-12 in the plan).
 - **Blocks:** the widget block and the pop-up embed print the design as the existing `--smooth-discounts-*` variables, plus a `data-` attribute for the frequency; they stop reading a discount's `style`. The theme-editor settings `moss_color` and `cream_color` are removed from both block schemas (the global design replaces them); `sun_color` and `custom_css` stay.
 - **Card index:** loses `style` and `popupFrequency`.
 
