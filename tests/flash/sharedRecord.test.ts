@@ -5,11 +5,15 @@ import type { ShopifyQuery } from '@/flash/shopifyRecord'
 const TIER_FUNCTION = { id: 'fn-tier', handle: 'product-discount' }
 const OTHER_FUNCTION = { id: 'fn-other', handle: 'other-discount' }
 
-function node(options: { id: string; functionId: string; isFlash?: boolean; combines?: boolean }) {
+function node(options: { id: string; functionId: string; isFlash?: boolean; combines?: boolean; order?: boolean; shipping?: boolean }) {
   return {
     id: options.id,
     flash: options.isFlash ? { id: 'meta' } : null,
-    discount: { __typename: 'DiscountAutomaticApp', combinesWith: { productDiscounts: options.combines ?? false }, appDiscountType: { functionId: options.functionId } },
+    discount: {
+      __typename: 'DiscountAutomaticApp',
+      combinesWith: { productDiscounts: options.combines ?? false, orderDiscounts: options.order ?? false, shippingDiscounts: options.shipping ?? false },
+      appDiscountType: { functionId: options.functionId },
+    },
   }
 }
 
@@ -27,9 +31,16 @@ describe('allowSharedCombining', () => {
   it('turns on product-discount combining on the shared tier record and says it updated', async () => {
     const query = fakeQuery([node({ id: 'gid://shopify/DiscountAutomaticNode/1', functionId: 'fn-tier' })])
     expect(await run(query)).toBe('updated')
-    const [text, variables] = query.mock.calls[1] as unknown as [string, { id: string }]
-    expect(text).toContain('productDiscounts: true')
-    expect(variables).toEqual({ id: 'gid://shopify/DiscountAutomaticNode/1' })
+    const [text, variables] = query.mock.calls[1] as unknown as [string, unknown]
+    expect(text).toContain('discountAutomaticAppUpdate')
+    expect(variables).toEqual({ id: 'gid://shopify/DiscountAutomaticNode/1', combinesWith: { orderDiscounts: false, shippingDiscounts: false, productDiscounts: true } })
+  })
+
+  it('keeps the order and shipping choices the shared record already has when it turns product combining on', async () => {
+    const query = fakeQuery([node({ id: 'gid://shopify/DiscountAutomaticNode/1', functionId: 'fn-tier', order: true, shipping: true })])
+    await run(query)
+    const [, variables] = query.mock.calls[1] as unknown as [string, { combinesWith: unknown }]
+    expect(variables.combinesWith).toEqual({ orderDiscounts: true, shippingDiscounts: true, productDiscounts: true })
   })
 
   it('does nothing when the shared record already combines', async () => {
@@ -59,19 +70,20 @@ describe('allowSharedCombining', () => {
 
 describe('flattenRecordNode, findSharedRecord and findFunctionId', () => {
   it('flattens a Shopify node to plain values, leaving the shared key empty for a flash record', () => {
-    expect(flattenRecordNode({ node: node({ id: 'a', functionId: 'fn-tier', combines: true }), tools: SHARED_RECORD_TOOLS })).toEqual({ id: 'a', sharedKey: 'fn-tier', state: 'true' })
-    expect(flattenRecordNode({ node: node({ id: 'b', functionId: 'fn-tier', isFlash: true }), tools: SHARED_RECORD_TOOLS })).toEqual({ id: 'b', sharedKey: '', state: 'false' })
+    expect(flattenRecordNode({ node: node({ id: 'a', functionId: 'fn-tier', combines: true }), tools: SHARED_RECORD_TOOLS })).toEqual({ id: 'a', functionId: 'fn-tier', sharedKey: 'fn-tier', state: 'true', orderDiscounts: false, shippingDiscounts: false, productDiscounts: true })
+    expect(flattenRecordNode({ node: node({ id: 'b', functionId: 'fn-tier', isFlash: true }), tools: SHARED_RECORD_TOOLS })).toEqual({ id: 'b', functionId: 'fn-tier', sharedKey: '', state: 'false', orderDiscounts: false, shippingDiscounts: false, productDiscounts: false })
   })
 
   it('treats a node without Function details (a code discount of an app) as no Function and not combining', () => {
     const bare = { id: 'c', flash: null, discount: {} }
-    expect(flattenRecordNode({ node: bare, tools: SHARED_RECORD_TOOLS })).toEqual({ id: 'c', sharedKey: '', state: 'false' })
+    expect(flattenRecordNode({ node: bare, tools: SHARED_RECORD_TOOLS })).toEqual({ id: 'c', functionId: '', sharedKey: '', state: 'false', orderDiscounts: false, shippingDiscounts: false, productDiscounts: false })
   })
 
   it('picks the first shared record of the Function, or reports a missing one', () => {
+    const flags = { orderDiscounts: false, shippingDiscounts: false, productDiscounts: false }
     const nodes = [
-      { id: 'a', sharedKey: '', state: 'false' as const },
-      { id: 'b', sharedKey: 'fn-tier', state: 'false' as const },
+      { id: 'a', functionId: 'fn-tier', sharedKey: '', state: 'false' as const, ...flags },
+      { id: 'b', functionId: 'fn-tier', sharedKey: 'fn-tier', state: 'false' as const, ...flags },
     ]
     expect(findSharedRecord({ nodes, functionId: 'fn-tier' }).id).toBe('b')
     expect(findSharedRecord({ nodes, functionId: 'other' }).state).toBe('missing')
