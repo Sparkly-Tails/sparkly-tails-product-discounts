@@ -16,7 +16,6 @@ export const POPUP_TEXT = {
   less: 'One fewer',
   more: 'One more',
   add: 'Add',
-  continue: 'Continue to checkout',
   current: '(Current)',
   tier: '(Tier 1)',
   unlocked: 'Tier unlocked',

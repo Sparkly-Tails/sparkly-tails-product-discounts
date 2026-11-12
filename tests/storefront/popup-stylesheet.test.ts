@@ -20,7 +20,7 @@ const writtenNames = (): string[] => {
 
 describe('the classes the view writes', () => {
   it('finds the classes it checks (so this test cannot pass by finding none)', () => {
-    expect(writtenNames()).toEqual(expect.arrayContaining(['dialog', 'box', 'chip', 'item', 'flash', 'error', 'continue', 'quick-add']))
+    expect(writtenNames()).toEqual(expect.arrayContaining(['dialog', 'box', 'chip', 'item', 'flash', 'error', 'close', 'quick-add']))
   })
 
   it('has a rule for each of them', () => {
@@ -82,6 +82,36 @@ describe('the look', () => {
     const phone = css.slice(css.search(/@media\s*\(max-width:\s*640px\)/))
     expect(phone).toMatch(/\.smooth-discounts-popup__milestones\s*\{[^}]*flex-wrap:\s*nowrap/)
     expect(phone).toMatch(/\.smooth-discounts-popup__milestone\s*\{[^}]*flex:\s*1 1 0/)
+  })
+
+  it('paints the pop-up window in the sun colour', () => {
+    expect(css).toMatch(/\.smooth-discounts-popup__dialog\s*\{[^}]*background:\s*var\(--popup-sun\)/)
+  })
+
+  it('writes the chips, the Quick banner and the list label 15% larger than they were', () => {
+    const sizeOf = (name: string): number => Number(css.match(new RegExp('\\.smooth-discounts-popup__' + name + '\\s*\\{[^}]*?font-size:\\s*([\\d.]+)rem'))![1])
+    expect(sizeOf('chip')).toBeCloseTo(0.8125 * 1.15, 3)
+    expect(sizeOf('quick')).toBeCloseTo(0.9375 * 1.15, 3)
+    expect(sizeOf('label')).toBeCloseTo(0.75 * 1.15, 3)
+  })
+
+  it('writes every rail caption bold and never underlined', () => {
+    expect(css).toMatch(/\.smooth-discounts-popup__caption\s*\{[^}]*font-weight:\s*700/)
+    expect(css).not.toMatch(/__caption[^{]*\{[^}]*text-decoration/)
+  })
+
+  it('fills the ball of the stop the customer is at, like the reached ones, with light text', () => {
+    expect(css).toMatch(/__milestone\[data-state=["']?current["']?\]\s+\.smooth-discounts-popup__marker[^{]*\{[^}]*background:\s*var\(--popup-moss\)[^}]*color:\s*#fff/)
+  })
+
+  it('has no footer and no Continue link', () => {
+    expect(css).not.toContain('__footer')
+    expect(css).not.toContain('__continue')
+  })
+
+  it('lets a tier chip wrap on a phone, so its larger text and "(Current)" tag are never cut off', () => {
+    const phone = css.slice(css.search(/@media\s*\(max-width:\s*640px\)/))
+    expect(phone).toMatch(/\.smooth-discounts-popup__chip\s*\{[^}]*white-space:\s*normal/)
   })
 
   it('keeps a box from shrinking inside the scrolling list, so the list scrolls instead of the box clipping its items', () => {
