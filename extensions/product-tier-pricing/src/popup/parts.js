@@ -109,11 +109,12 @@ export function buildQuickRow(context) {
   return make({ tag: 'div', name: 'quick', kids: [make({ tag: 'span', text: label }), button] })
 }
 
-/** The list of items, its paging and the Quick auto-fill row of an expanded box; nothing once the first tier is reached. */
+/** The list of items and its paging of an expanded box, kept once the first tier is reached so more can be added; the Quick auto-fill row only while units are missing. */
 export function buildAddParts(tools, input) {
   const context = { ...input, tools }
   const head = [context.make({ tag: 'p', name: 'label', text: POPUP_TEXT.listLabel }), tools.buildItemList(context)]
-  return input.facts.missing === 0 ? [] : head.concat(tools.buildPagingParts(context), [tools.buildQuickRow(context)])
+  const quick = input.facts.missing === 0 ? [] : [tools.buildQuickRow(context)]
+  return head.concat(tools.buildPagingParts(context), quick)
 }
 
 export function buildPreview({ make, facts, tools }) {

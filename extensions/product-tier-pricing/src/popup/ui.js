@@ -204,6 +204,11 @@ export function appendBox({ state }, view) {
   state.list.appendChild(view.element)
 }
 
+/** Slides the tier chips of the box to the chip of the customer's units; only once the dialog is shown, as a row that is not on the page has no size. */
+export function slideBoxChips({ state }, view) {
+  state.view.slideChips({ element: view.element, start: 0 })
+}
+
 /** Puts the boxes in the list and the dialog on the page, opens it as a modal, and starts the clock and the watching. */
 export function showDialog({ state, tools }) {
   state.views.forEach(tools.appendBox.bind(null, { state }))
@@ -213,6 +218,7 @@ export function showDialog({ state, tools }) {
   state.dialog.addEventListener('cancel', tools.handleCancel.bind(null, { state }))
   state.dialog.addEventListener('close', tools.finishPopup.bind(null, { state }), { once: true })
   state.dialog.showModal()
+  state.views.forEach(tools.slideBoxChips.bind(null, { state }))
   state.closeButton.focus()
   state.timer = state.win.setInterval(tools.tickBoxes.bind(null, { state, tools }), 1000)
   state.observer = tools.watchBoxes({ state, tools })
@@ -230,6 +236,6 @@ export function openPopup(tools, options) {
 export const UI_TOOLS = {
   ...DIALOG_TOOLS,
   addItems: addItems.bind(null, ADD_TOOLS), readCartUnits: readCartUnits.bind(null, ADD_TOOLS), returnZero, isLive, describeBox, createView, createState, readBoxFacts, readSecondsLeft, paintBox, repaintBox, repaintBoxes, readFocusSpot, readActiveSelector, restoreFocusSpot, expandBox, focusBox, scrollBoxIntoView,
-  buildControlSelector, showBox, applyAddResult, runAdd, clearQuantity, clearPicked, addMissing, isCounting, removeBox, tickBox, tickBoxes, readMostVisible, recordSighting, handleSightings, watchView, watchBoxes, appendBox, showDialog,
+  buildControlSelector, showBox, applyAddResult, runAdd, clearQuantity, clearPicked, addMissing, isCounting, removeBox, tickBox, tickBoxes, readMostVisible, recordSighting, handleSightings, watchView, watchBoxes, appendBox, slideBoxChips, showDialog,
   startPopup, actions: { quick: addMissing, view: showBox, continue: closeToCheckout },
 }

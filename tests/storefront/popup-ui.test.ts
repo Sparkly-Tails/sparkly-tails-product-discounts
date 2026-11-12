@@ -142,10 +142,12 @@ describe('the dialog', () => {
     expect(Array.from(dialog.querySelectorAll('a, button')).some((element) => textOf(element) === 'Continue to checkout')).toBe(false)
   })
 
-  it('shows the eyebrow, the heading and the intro of the design above the boxes, the same for one box or several', async () => {
+  it('shows the heading and the intro of the design above the boxes, with no eyebrow tag above the heading, the same for one box or several', async () => {
     const { dialog } = await openBoxes()
 
-    expect(textOf(dialog.querySelector('.smooth-discounts-popup__eyebrow'))).toBe('🎯 Unclaimed Bundle Savings')
+    expect(dialog.querySelector('.smooth-discounts-popup__eyebrow')).toBeNull()
+    expect(dialog.textContent).not.toContain('Unclaimed Bundle Savings')
+    expect(textOf(dialog.querySelector('.smooth-discounts-popup__heading'))).toBe('Wait, complete your bundle to unlock instant savings')
     expect(textOf(dialog.querySelector('.smooth-discounts-popup__intro'))).toBe('You are only a few units away from triggering volume discount rates on qualifying items.')
     expect(dialog.querySelector('.smooth-discounts-popup__header')!.compareDocumentPosition(dialog.querySelector('[data-box]')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
@@ -528,7 +530,7 @@ describe('adding', () => {
     expect(network.posts).toHaveLength(1)
   })
 
-  it('adds all the missing units in one request with several items when Quick auto-fill is pressed, and shows "Tier unlocked"', async () => {
+  it('adds all the missing units in one request with several items when Quick auto-fill is pressed, and shows "Tier unlocked" with the items still listed', async () => {
     await openBoxes()
 
     await pressAndSettle(buttonByText(boxElements()[0], 'Add 5 & unlock tier'))
@@ -539,9 +541,27 @@ describe('adding', () => {
     expect(network.posts[0].body.items.length).toBeGreaterThan(1)
     const after = boxElements()[0]
     expect(after.textContent).toContain('Tier unlocked')
-    expect(addButtons(after)).toHaveLength(0)
+    expect(addButtons(after).length).toBeGreaterThan(0)
     expect(buttonByText(after, 'unlock tier')).toBeUndefined()
     expect(buttonByText(after, 'Quick-add')).toBeUndefined()
+  })
+
+  it('keeps the box expanded, with its items and their Add buttons, when an Add reaches the first tier, so more can be added', async () => {
+    await openBoxes({ boxes: [boxOf({ units: 7, lines: [lineOf(100, 11, 7)] })], cart: { 11: 7 } })
+    const before = boxElements()[0]
+    expect(addButtons(before).length).toBeGreaterThan(0)
+
+    await pressAndSettle(addButtons(before)[0])
+
+    const after = boxElements()[0]
+    expect(after.textContent).toContain('Tier unlocked')
+    expect(after.dataset.expanded).toBe('true')
+    expect(after.querySelectorAll('[data-item]').length).toBeGreaterThan(0)
+    expect(addButtons(after).length).toBeGreaterThan(0)
+    expect(after.querySelector('[data-action="quick"]')).toBeNull()
+    await pressAndSettle(addButtons(after)[0])
+    expect(network.posts).toHaveLength(2)
+    expect(boxElements()[0].dataset.expanded).toBe('true')
   })
 
   it('also unlocks a contracted box from its Quick-add button', async () => {
@@ -698,5 +718,54 @@ describe('the look and the words', () => {
     expect(boxElements()[0].querySelector('h3 img')).toBeNull()
     expect(textOf(boxElements()[0].querySelector('h3'))).toBe('<img src=x onerror=alert(1)>')
     expect(boxElements()[0].querySelector('[data-name] b')).toBeNull()
+  })
+})
+
+
+describe('the tier chips', () => {
+  const scrollTo = vi.fn()
+  const CHIP_ROW_LEFT = 10
+  const CURRENT_CHIP_LEFT = 310
+  const rectOf = (left: number) => ({ left, right: left, top: 0, bottom: 0, width: 0, height: 0, x: left, y: 0, toJSON: () => ({}) })
+  const chipRows = () => Array.from(document.querySelectorAll('.smooth-discounts-popup__chips')) as HTMLElement[]
+
+  beforeEach(() => {
+    scrollTo.mockReset()
+    ;(Element.prototype as unknown as { scrollTo: typeof scrollTo }).scrollTo = scrollTo
+    vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function mockRect(this: Element) {
+      if (this.matches('.smooth-discounts-popup__chips')) return rectOf(CHIP_ROW_LEFT)
+      return this.matches('[data-tag="current"]') ? rectOf(CURRENT_CHIP_LEFT) : rectOf(0)
+    })
+  })
+
+  afterEach(() => {
+    delete (Element.prototype as unknown as { scrollTo?: unknown }).scrollTo
+    vi.restoreAllMocks()
+  })
+
+  it('slides the chip of the customer\'s units to the left edge of the row when the pop-up opens', async () => {
+    await openBoxes()
+
+    expect(scrollTo).toHaveBeenLastCalledWith({ left: CURRENT_CHIP_LEFT - CHIP_ROW_LEFT, behavior: 'auto' })
+    // Slid again once the dialog is shown: before that the row has no size on the page, so sliding it would do nothing.
+    expect(scrollTo.mock.invocationCallOrder.at(-1)).toBeGreaterThan(showModal.mock.invocationCallOrder[0])
+  })
+
+  it('slides again after units change, starting from where the row was scrolled rather than from its start', async () => {
+    await openBoxes()
+    Object.defineProperty(chipRows()[0], 'scrollLeft', { value: 120, configurable: true })
+    scrollTo.mockReset()
+
+    await pressAndSettle(addButtons(boxElements()[0])[0])
+
+    expect(scrollTo.mock.calls[0][0]).toEqual({ left: 120, behavior: 'instant' })
+    expect(scrollTo).toHaveBeenLastCalledWith({ left: CURRENT_CHIP_LEFT - CHIP_ROW_LEFT, behavior: 'auto' })
+  })
+
+  it('does nothing for a contracted box, which has no chips', async () => {
+    await openBoxes({ boxes: [boxOf(), secondBoxOf()] })
+
+    expect(chipRows()).toHaveLength(1)
+    expect(scrollTo.mock.calls.every((call) => call[0].behavior === 'instant' || call[0].behavior === 'auto')).toBe(true)
   })
 })

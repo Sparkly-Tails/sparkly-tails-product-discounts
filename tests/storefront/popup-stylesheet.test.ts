@@ -88,9 +88,12 @@ describe('the look', () => {
     expect(css).toMatch(/\.smooth-discounts-popup__dialog\s*\{[^}]*background:\s*var\(--popup-sun\)/)
   })
 
-  it('writes the chips, the Quick banner and the list label 15% larger than they were', () => {
+  it('writes the tier chips at 1rem', () => {
+    expect(css).toMatch(/\.smooth-discounts-popup__chip\s*\{[^}]*?font-size:\s*1rem/)
+  })
+
+  it('writes the Quick banner and the list label 15% larger than they were', () => {
     const sizeOf = (name: string): number => Number(css.match(new RegExp('\\.smooth-discounts-popup__' + name + '\\s*\\{[^}]*?font-size:\\s*([\\d.]+)rem'))![1])
-    expect(sizeOf('chip')).toBeCloseTo(0.8125 * 1.15, 3)
     expect(sizeOf('quick')).toBeCloseTo(0.9375 * 1.15, 3)
     expect(sizeOf('label')).toBeCloseTo(0.75 * 1.15, 3)
   })
@@ -109,9 +112,31 @@ describe('the look', () => {
     expect(css).not.toContain('__continue')
   })
 
-  it('lets a tier chip wrap on a phone, so its larger text and "(Current)" tag are never cut off', () => {
+  it('paints no background on the summary panel, so the window colour shows through', () => {
+    expect(css).toMatch(/\.smooth-discounts-popup__summary\s*\{/)
+    expect(css).not.toMatch(/\.smooth-discounts-popup__summary\s*\{[^}]*background/)
+  })
+
+  it('has no eyebrow tag above the heading', () => {
+    expect(css).not.toContain('__eyebrow')
+  })
+
+  it('lays the tier chips in one row that scrolls sideways when they do not fit, sliding smoothly', () => {
+    expect(css).toMatch(/\.smooth-discounts-popup__chips\s*\{[^}]*display:\s*flex/)
+    expect(css).toMatch(/\.smooth-discounts-popup__chips\s*\{[^}]*overflow-x:\s*auto/)
+    expect(css).toMatch(/\.smooth-discounts-popup__chips\s*\{[^}]*scroll-behavior:\s*smooth/)
+    expect(css).toMatch(/\.smooth-discounts-popup__chip\s*\{[^}]*flex:\s*1 0/)
+  })
+
+  it('keeps the chips in that one row on a phone, never wrapping them into a grid or their text onto two lines', () => {
     const phone = css.slice(css.search(/@media\s*\(max-width:\s*640px\)/))
-    expect(phone).toMatch(/\.smooth-discounts-popup__chip\s*\{[^}]*white-space:\s*normal/)
+    expect(phone).not.toMatch(/\.smooth-discounts-popup__chips\s*\{[^}]*grid-template-columns/)
+    expect(phone).not.toMatch(/\.smooth-discounts-popup__chip\s*\{[^}]*white-space:\s*normal/)
+  })
+
+  it('stops the chips sliding for people who ask for reduced motion', () => {
+    const reduced = css.slice(css.search(/@media\s*\(prefers-reduced-motion:\s*reduce\)/))
+    expect(reduced).toMatch(/scroll-behavior:\s*auto/)
   })
 
   it('keeps a box from shrinking inside the scrolling list, so the list scrolls instead of the box clipping its items', () => {

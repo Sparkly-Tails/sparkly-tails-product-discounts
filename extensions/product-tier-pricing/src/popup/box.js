@@ -6,6 +6,7 @@ import { formatMoney } from '../tierMath.js'
 import { formatFlashCountdown } from '../flash.js'
 import { setText } from '../dom.js'
 import { applyBoxLook } from './look.js'
+import { SLIDE_TOOLS } from './slide.js'
 
 export function formatAmount({ moneyFormat, tools }, amount) {
   return tools.formatMoney(amount, moneyFormat)
@@ -69,7 +70,9 @@ export function buildBoxNodes(context) {
 export function paintBox(tools, input) {
   const context = { ...input, make: tools.makeNode.bind(null, { doc: input.doc, tools }), formatText: tools.formatAmount.bind(null, { moneyFormat: input.moneyFormat, tools }), tools }
   input.element.dataset.expanded = String(input.isExpanded)
+  const start = tools.readRowStart({ element: input.element })
   input.element.replaceChildren(...tools.buildBoxNodes(context).filter(tools.isNode))
+  tools.slideChips(tools, { element: input.element, start })
 }
 
 /** The empty element of a box, with `look` (see look.js) set on it once. */
@@ -89,5 +92,5 @@ export function setCountdown(tools, { element, secondsLeft }) {
 }
 
 export const BOX_VIEW_TOOLS = {
-  formatMoney, formatFlashCountdown, setText, applyBoxLook, formatAmount, buildFlashBar, buildTitle, buildDot, buildBadge, buildStatus, buildError, buildExpandedChips, buildSummary, buildFullNodes, buildShortNodes, buildBoxNodes,
+  ...SLIDE_TOOLS, formatMoney, formatFlashCountdown, setText, applyBoxLook, formatAmount, buildFlashBar, buildTitle, buildDot, buildBadge, buildStatus, buildError, buildExpandedChips, buildSummary, buildFullNodes, buildShortNodes, buildBoxNodes,
 }
