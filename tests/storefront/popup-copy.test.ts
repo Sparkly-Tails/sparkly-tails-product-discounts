@@ -10,8 +10,8 @@ const FIXED_TIER = { minQty: 8, fixedPrice: 1.63 }
 const PERCENT_TIER = { minQty: 3, percentOff: 15 }
 
 describe('the texts', () => {
-  it('has the header words of the design: the eyebrow, the heading and the intro, the same for one box or several', () => {
-    expect(POPUP_TEXT.eyebrow).toBe('🎯 Unclaimed Bundle Savings')
+  it('has the header words of the design: the heading and the intro, with no eyebrow tag above them, the same for one box or several', () => {
+    expect(POPUP_TEXT).not.toHaveProperty('eyebrow')
     expect(POPUP_TEXT.heading).toBe('Wait, complete your bundle to unlock instant savings')
     expect(POPUP_TEXT.intro).toBe('You are only a few units away from triggering volume discount rates on qualifying items.')
   })

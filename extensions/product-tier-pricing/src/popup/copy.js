@@ -5,7 +5,6 @@ import { sortTiersByMinQty, withUnitAnchor } from '../tierMath.js'
 
 /** The words that never change; the ones with a number in them are built by the functions below. */
 export const POPUP_TEXT = {
-  eyebrow: '🎯 Unclaimed Bundle Savings',
   heading: 'Wait, complete your bundle to unlock instant savings',
   intro: 'You are only a few units away from triggering volume discount rates on qualifying items.',
   fallbackTitle: 'Your bundle',

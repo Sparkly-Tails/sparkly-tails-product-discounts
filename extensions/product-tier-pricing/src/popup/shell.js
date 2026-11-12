@@ -1,4 +1,4 @@
-// The frame of the pop-up (the view component): the dialog with its round close button, its header (eyebrow, heading, intro), and the list the boxes go in. The close button is also the way on to checkout.
+// The frame of the pop-up (the view component): the dialog with its round close button, its header (heading, intro), and the list the boxes go in. The close button is also the way on to checkout.
 import { POPUP_TEXT } from './copy.js'
 
 const HEADING_ID = 'smooth-discounts-popup-heading'
@@ -7,10 +7,10 @@ export function buildCloseButton({ make }) {
   return make({ tag: 'button', name: 'close', text: POPUP_TEXT.closeSymbol, attrs: [['type', 'button'], ['aria-label', POPUP_TEXT.close], ['data-action', 'continue']] })
 }
 
-/** The header that scrolls with the boxes: a small label, the heading (which names the dialog) and a line of explanation. */
+/** The header that scrolls with the boxes: the heading (which names the dialog) and a line of explanation. */
 export function buildHeader({ make }) {
   const heading = make({ tag: 'h2', name: 'heading', text: POPUP_TEXT.heading, attrs: [['id', HEADING_ID]] })
-  return make({ tag: 'div', name: 'header', kids: [make({ tag: 'p', name: 'eyebrow', text: POPUP_TEXT.eyebrow }), heading, make({ tag: 'p', name: 'intro', text: POPUP_TEXT.intro })] })
+  return make({ tag: 'div', name: 'header', kids: [heading, make({ tag: 'p', name: 'intro', text: POPUP_TEXT.intro })] })
 }
 
 /** `{ dialog, list, closeButton }`. */

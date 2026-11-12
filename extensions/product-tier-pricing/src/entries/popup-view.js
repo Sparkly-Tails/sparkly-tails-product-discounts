@@ -4,6 +4,7 @@ import { buildBoxTitle, buildBadgeText, buildIncentiveText, buildFixedIncentive,
 import { NODE_TOOLS } from '../popup/node.js'
 import { pickHexColor, setBoxProperty, hasPropertyValue } from '../popup/look.js'
 import { buildDialog, SHELL_TOOLS } from '../popup/shell.js'
+import { slideChips } from '../popup/slide.js'
 import { registerComponent } from '../loader/registry.js'
 
 const VIEW_TOOLS = {
@@ -14,5 +15,5 @@ const VIEW_TOOLS = {
 registerComponent({
   root: window,
   name: 'popupView',
-  api: { buildDialog: buildDialog.bind(null, VIEW_TOOLS), createBox: createBox.bind(null, VIEW_TOOLS), paintBox: paintBox.bind(null, VIEW_TOOLS), setCountdown: setCountdown.bind(null, VIEW_TOOLS) },
+  api: { buildDialog: buildDialog.bind(null, VIEW_TOOLS), createBox: createBox.bind(null, VIEW_TOOLS), paintBox: paintBox.bind(null, VIEW_TOOLS), setCountdown: setCountdown.bind(null, VIEW_TOOLS), slideChips: slideChips.bind(null, VIEW_TOOLS) },
 })
