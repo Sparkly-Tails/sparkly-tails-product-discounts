@@ -1,5 +1,5 @@
-// The look of one box, read the way the widget reads it: the discount's own style wins, then the embed's setting, then the
-// stylesheet's default. The index is text, so a colour and a radius are checked again here before they can reach CSS.
+// The look of a box: the store-wide design the embed printed (the Settings page), or the stylesheet's default for a value
+// that is missing. The embed's attributes are text, so a colour and a radius are checked again here before they can reach CSS.
 const HEX_COLOR = /^#(?:[0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$/
 const MAX_RADIUS = 24
 
@@ -19,12 +19,11 @@ export function isCornerRadius(value) {
   return Number.isInteger(value) && value >= 0 && value <= MAX_RADIUS
 }
 
-/** `{ background, radius }` of a box: the discount's style, else the embed's cream colour; the radius is null when the style has none that is usable. */
-export function readBoxLook({ style, creamFallback, tools }) {
-  const given = Object(style)
+/** `{ background, radius }` of a box, from the embed's background colour and corner radius; each is empty (`''`, `null`) when it is not usable. */
+export function readBoxLook({ accents, tools }) {
   return {
-    background: tools.pickHexColor({ candidates: [given.backgroundColor, creamFallback] }),
-    radius: tools.isCornerRadius(given.cornerRadius) ? given.cornerRadius : null,
+    background: tools.pickHexColor({ candidates: [accents.cream] }),
+    radius: tools.isCornerRadius(accents.radius) ? accents.radius : null,
   }
 }
 
@@ -36,13 +35,14 @@ export function setBoxProperty({ box }, pair) {
   box.style.setProperty(pair[0], pair[1])
 }
 
-/** Sets the widget's custom properties on the box element; a value that is empty (no radius, a colour that was not usable) is left unset, so the stylesheet's default applies. */
+/** Sets the widget's custom properties on the box element, the flash bar tone included; a value that is empty (no radius, a colour that was not usable) is left unset, so the stylesheet's default applies. */
 export function applyBoxLook({ box, look, accents, tools }) {
   const properties = [
     ['--smooth-discounts-cream', look.background],
     ['--smooth-discounts-radius', look.radius === null ? '' : look.radius + 'px'],
     ['--smooth-discounts-moss', tools.pickHexColor({ candidates: [accents.moss] })],
     ['--smooth-discounts-sun', tools.pickHexColor({ candidates: [accents.sun] })],
+    ['--smooth-discounts-flash-dark', tools.pickHexColor({ candidates: [accents.night] })],
   ]
   properties.filter(hasPropertyValue).forEach(tools.setBoxProperty.bind(null, { box }))
 }

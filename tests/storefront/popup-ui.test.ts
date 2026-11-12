@@ -16,7 +16,7 @@ type Item = { variantId: string; productId: string; handle: string; label: strin
 type Line = { product_id: number; variant_id: number; quantity: number }
 type Box = {
   title: string; tiers: object[]; units: number; firstTierQty: number; items: Item[]; flash: { startsAtUnix: number; endsAtUnix: number } | null
-  style: object | null; members: { productId: string; handle: string; variantIds: string[] | null }[]; basePrice: number | null; lines: Line[]; shownKey: string; popupFrequency: string
+  members: { productId: string; handle: string; variantIds: string[] | null }[]; basePrice: number | null; lines: Line[]; shownKey: string
 }
 type Answer = { action: 'continue' | 'close'; didAdd: boolean }
 
@@ -27,8 +27,8 @@ const PRODUCT_OF_VARIANT: Record<number, number> = { 11: 100, 12: 100, 13: 200, 
 const boxOf = (overrides: Partial<Box> = {}): Box => ({
   title: 'Tins mix', tiers: FIXED_TIERS, units: 3, firstTierQty: 8,
   items: [itemOf(11, 100, 'Tuna – Small'), itemOf(12, 100, 'Tuna – Large'), itemOf(13, 200, 'Salmon'), itemOf(14, 200, 'Sold out one', 1.69, false)],
-  flash: null, style: {}, members: [{ productId: '100', handle: 'tuna', variantIds: null }, { productId: '200', handle: 'salmon', variantIds: null }],
-  basePrice: 1.69, lines: [lineOf(100, 11, 3)], shownKey: 'key-1', popupFrequency: 'session', ...overrides,
+  flash: null, members: [{ productId: '100', handle: 'tuna', variantIds: null }, { productId: '200', handle: 'salmon', variantIds: null }],
+  basePrice: 1.69, lines: [lineOf(100, 11, 3)], shownKey: 'key-1', ...overrides,
 })
 const secondBoxOf = (overrides: Partial<Box> = {}) => boxOf({
   title: 'Treats', tiers: PERCENT_TIERS, units: 2, firstTierQty: 5, basePrice: 2, lines: [lineOf(300, 21, 2)],
@@ -82,7 +82,7 @@ async function settle() {
 type OpenOptions = { boxes?: Box[]; root?: string; moneyFormat?: string; accents?: object; cart?: Record<number, number> }
 type Opened = { promise: Promise<Answer>; dialog: HTMLDialogElement; opener: HTMLElement; answers: Answer[] }
 
-async function openBoxes({ boxes = [boxOf()], root = '/', moneyFormat = '£{{amount}}', accents = { moss: '#434625', cream: '#f3ecd9', sun: '#ffdc4c' }, cart = { 11: 3 } }: OpenOptions = {}): Promise<Opened> {
+async function openBoxes({ boxes = [boxOf()], root = '/', moneyFormat = '£{{amount}}', accents = { moss: '#434625', cream: '#f3ecd9', sun: '#ffdc4c', night: '#2b2d17', radius: 12 }, cart = { 11: 3 } }: OpenOptions = {}): Promise<Opened> {
   network = startNetwork({ ...cart })
   document.body.innerHTML = '<button name="checkout" type="submit">Check out</button>'
   const opener = document.querySelector('button[name="checkout"]') as HTMLElement
@@ -684,23 +684,25 @@ describe('the look and the words', () => {
     expect(textOf(boxElements()[0].querySelector('h3'))).toBe('Your bundle')
   })
 
-  it('gives each box the look of its own discount: two styles, two backgrounds', async () => {
-    await openBoxes({ boxes: [boxOf({ style: { backgroundColor: '#112233', cornerRadius: 8 } }), secondBoxOf({ style: { backgroundColor: '#AABBCC' } })] })
-    const [first, second] = boxElements()
+  it('gives every box the store\'s look: background, corner radius, accents and flash tone', async () => {
+    await openBoxes({ boxes: [boxOf(), secondBoxOf()], accents: { moss: '#434625', cream: '#aabbcc', sun: '#ffdc4c', night: '#1b3a2d', radius: 8 } })
 
-    expect(first.style.getPropertyValue('--smooth-discounts-cream')).toBe('#112233')
-    expect(first.style.getPropertyValue('--smooth-discounts-radius')).toBe('8px')
-    expect(second.style.getPropertyValue('--smooth-discounts-cream')).toBe('#AABBCC')
-    expect(second.style.getPropertyValue('--smooth-discounts-radius')).toBe('')
-    expect(first.style.getPropertyValue('--smooth-discounts-moss')).toBe('#434625')
-    expect(first.style.getPropertyValue('--smooth-discounts-sun')).toBe('#FFDC4C')
+    for (const element of boxElements()) {
+      expect(element.style.getPropertyValue('--smooth-discounts-cream')).toBe('#AABBCC')
+      expect(element.style.getPropertyValue('--smooth-discounts-radius')).toBe('8px')
+      expect(element.style.getPropertyValue('--smooth-discounts-moss')).toBe('#434625')
+      expect(element.style.getPropertyValue('--smooth-discounts-sun')).toBe('#FFDC4C')
+      expect(element.style.getPropertyValue('--smooth-discounts-flash-dark')).toBe('#1B3A2D')
+    }
   })
 
-  it('falls back to the embed colour for a style that is missing or unsafe', async () => {
-    await openBoxes({ boxes: [boxOf({ style: null }), secondBoxOf({ style: { backgroundColor: 'red;}body{display:none', cornerRadius: 99 } })] })
+  it('leaves out an unsafe colour and a radius out of range, so the stylesheet default applies', async () => {
+    await openBoxes({ accents: { moss: '#434625', cream: 'red;}body{display:none', sun: '#ffdc4c', night: 'blue', radius: 99 } })
 
-    expect(boxElements().map((element) => element.style.getPropertyValue('--smooth-discounts-cream'))).toEqual(['#F3ECD9', '#F3ECD9'])
-    expect(boxElements()[1].style.getPropertyValue('--smooth-discounts-radius')).toBe('')
+    const [element] = boxElements()
+    expect(element.style.getPropertyValue('--smooth-discounts-cream')).toBe('')
+    expect(element.style.getPropertyValue('--smooth-discounts-radius')).toBe('')
+    expect(element.style.getPropertyValue('--smooth-discounts-flash-dark')).toBe('')
   })
 
   it('writes every amount in the money format it was given', async () => {

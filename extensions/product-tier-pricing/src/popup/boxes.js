@@ -3,7 +3,7 @@
 // bundle is due. Pure of the page's own state: the window, the config and the functions come in as arguments.
 import { convertDiscount, isShownUsable, readShownDiscount, showIndexInCurrency } from '../cards/entries.js'
 import { parseText } from '../config.js'
-import { readAccents } from './config.js'
+import { parseNumber, readAccents } from './config.js'
 import { fetchJson, returnNothing } from './fetch.js'
 import { LIST_TOOLS } from './items.js'
 import { buildRootPath } from './path.js'
@@ -56,8 +56,8 @@ export function buildBox({ products, lines, tools }, entry) {
   const discount = entry.discount
   const items = tools.listEligibleItems({ products, members: discount.members, tools })
   const box = {
-    title: discount.title, tiers: discount.tiers, units: entry.units, firstTierQty: entry.firstTierQty, items, flash: discount.flash, style: discount.style,
-    members: discount.members, basePrice: tools.readSharedPrice({ items, tools }), lines, shownKey: entry.shownKey, popupFrequency: discount.popupFrequency,
+    title: discount.title, tiers: discount.tiers, units: entry.units, firstTierQty: entry.firstTierQty, items, flash: discount.flash,
+    members: discount.members, basePrice: tools.readSharedPrice({ items, tools }), lines, shownKey: entry.shownKey,
   }
   return tools.isCompletable({ items }) ? [box] : []
 }
@@ -83,5 +83,5 @@ export async function prepareBoxes(tools, { win, config, due, lines, currency })
 
 export const BOX_TOOLS = {
   ...LIST_TOOLS, fetchJson, returnNothing, readAccents, parseText, buildRootPath, convertDiscount, isShownUsable, readShownDiscount, showIndexInCurrency,
-  listProductHandles, buildHandlePair, loadProduct, loadProducts, showEntryInCurrency, isEntryUsable, buildBox, listBoxes, assembleBoxes,
+  parseNumber, listProductHandles, buildHandlePair, loadProduct, loadProducts, showEntryInCurrency, isEntryUsable, buildBox, listBoxes, assembleBoxes,
 }

@@ -14,6 +14,7 @@ export function readPopupConfig({ doc, shopify, tools }) {
   return {
     index: tools.parseCardIndex({ text: element.dataset.index }),
     moneyFormat: tools.parseText(element.dataset.moneyFormat),
+    frequency: tools.parseText(element.dataset.frequency),
     rootUrl: tools.parseText(element.dataset.rootUrl),
     componentUrls: tools.parseComponentUrls(element.dataset.componentUrls),
     element,
@@ -23,11 +24,23 @@ export function readPopupConfig({ doc, shopify, tools }) {
 
 export const CONFIG_TOOLS = { readPopupConfig, parseText, parseCardIndex, parseComponentUrls, readContainerCurrency, currencyReaders: CURRENCY_READERS }
 
-/** The three colour settings of the embed, as the widget block has them: the accents and the fallback for a box's own background. */
+/** The corner radius the embed printed, as a number; null when it is not one. */
+export function parseNumber(text) {
+  try {
+    const value = JSON.parse(text)
+    return typeof value === 'number' ? value : null
+  } catch {
+    return null
+  }
+}
+
+/** The store-wide look the embed printed (colours as text, the radius as a number), and the sun colour from the embed's own setting. */
 export function readAccents({ element, tools }) {
   return {
     moss: tools.parseText(element.dataset.mossColor),
     cream: tools.parseText(element.dataset.creamColor),
     sun: tools.parseText(element.dataset.sunColor),
+    night: tools.parseText(element.dataset.nightColor),
+    radius: tools.parseNumber(element.dataset.radius),
   }
 }

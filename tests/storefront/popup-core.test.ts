@@ -11,14 +11,14 @@ const built = readBuiltWidget()
 const NOW_SECONDS = 1_800_000_000
 
 type Member = { productId: string; handle: string; variantIds: string[] | null }
-type Discount = { discountId?: string; title?: string; popupFrequency?: 'session' | 'checkout'; tiers: object[]; members: Member[]; flash: { startsAtUnix: number; endsAtUnix: number } | null; style?: object }
+type Discount = { discountId?: string; title?: string; tiers: object[]; members: Member[]; flash: { startsAtUnix: number; endsAtUnix: number } | null }
 type LiveVariant = { id: number; title?: string; price: number; available: boolean }
 type CartLine = { product_id: number; variant_id: number; quantity: number }
 type Answer = { action: 'continue' | 'close'; didAdd: boolean }
 
 const FIXED_TIERS = [{ minQty: 8, fixedPrice: 1.63 }, { minQty: 16, fixedPrice: 1.55 }]
 const memberOf = (handle: string, productId = '100', variantIds: string[] | null = null): Member => ({ productId, handle, variantIds })
-const discountOf = (overrides: Partial<Discount> = {}): Discount => ({ discountId: 'gid://shopify/DiscountAutomaticNode/1', title: 'Tins mix', popupFrequency: 'session', tiers: FIXED_TIERS, members: [memberOf('tuna')], flash: null, ...overrides })
+const discountOf = (overrides: Partial<Discount> = {}): Discount => ({ discountId: 'gid://shopify/DiscountAutomaticNode/1', title: 'Tins mix', tiers: FIXED_TIERS, members: [memberOf('tuna')], flash: null, ...overrides })
 const lineOf = (productId: number, variantId: number, quantity: number): CartLine => ({ product_id: productId, variant_id: variantId, quantity })
 
 const TUNA_FEED: Record<string, LiveVariant[] | 'fail'> = { tuna: [{ id: 1, title: 'Small', price: 169, available: true }, { id: 2, title: 'Large', price: 169, available: true }], salmon: [{ id: 3, title: 'Default Title', price: 169, available: true }] }
@@ -29,8 +29,8 @@ const GBP_PAGE: CurrencyPage = { shopCurrency: 'GBP', activeCurrency: 'GBP', rat
 
 const attribute = (text: string) => text.replace(/&/g, '&amp;').replace(/'/g, '&#39;').replace(/"/g, '&quot;')
 
-function embedHtml({ discounts, rootUrl, currency, urls }: { discounts: Discount[]; rootUrl: string; currency: CurrencyPage; urls: object }) {
-  return `<div data-smooth-discounts-popup hidden data-index="${attribute(JSON.stringify({ discounts }))}" data-money-format="${attribute(JSON.stringify('£{{amount}}'))}" data-root-url="${attribute(JSON.stringify(rootUrl))}" data-shop-currency="${attribute(JSON.stringify(currency.shopCurrency))}" data-money-sample="${attribute(JSON.stringify(currency.sample))}" data-component-urls="${attribute(JSON.stringify(urls))}" data-moss-color="${attribute(JSON.stringify('#434625'))}" data-cream-color="${attribute(JSON.stringify('#f3ecd9'))}" data-sun-color="${attribute(JSON.stringify('#ffdc4c'))}"></div>`
+function embedHtml({ discounts, rootUrl, currency, urls, frequency }: { discounts: Discount[]; rootUrl: string; currency: CurrencyPage; urls: object; frequency: string }) {
+  return `<div data-smooth-discounts-popup hidden data-index="${attribute(JSON.stringify({ discounts }))}" data-money-format="${attribute(JSON.stringify('£{{amount}}'))}" data-root-url="${attribute(JSON.stringify(rootUrl))}" data-shop-currency="${attribute(JSON.stringify(currency.shopCurrency))}" data-money-sample="${attribute(JSON.stringify(currency.sample))}" data-component-urls="${attribute(JSON.stringify(urls))}" data-moss-color="${attribute(JSON.stringify('#434625'))}" data-cream-color="${attribute(JSON.stringify('#f3ecd9'))}" data-night-color="${attribute(JSON.stringify('#2b2d17'))}" data-radius="12" data-frequency="${attribute(JSON.stringify(frequency))}" data-sun-color="${attribute(JSON.stringify('#ffdc4c'))}"></div>`
 }
 
 const fetchMock = vi.fn()
@@ -73,18 +73,18 @@ async function settle() {
 
 type MountOptions = {
   discounts?: Discount[]; lines?: CartLine[]; feed?: Record<string, LiveVariant[] | 'fail'>; cartMode?: CartMode; rootUrl?: string; currency?: CurrencyPage
-  button?: string; hasEmbed?: boolean; hasUi?: boolean; urls?: object; components?: string[]
+  button?: string; hasEmbed?: boolean; hasUi?: boolean; urls?: object; components?: string[]; frequency?: 'session' | 'checkout'
 }
 
 /** A cart page with a Checkout button in a form, the embed, and the scripts. The UI component is `openPopup` unless `hasUi` is false. */
-async function mountPage({ discounts = [discountOf()], lines = [lineOf(100, 1, 3)], feed = TUNA_FEED, cartMode = 'ok', rootUrl = '/', currency = GBP_PAGE, button, hasEmbed = true, hasUi = true, urls = URLS, components = ['bundle-popup-boxes.js', 'tier-pricing-currency.js'] }: MountOptions = {}) {
+async function mountPage({ discounts = [discountOf()], lines = [lineOf(100, 1, 3)], feed = TUNA_FEED, cartMode = 'ok', rootUrl = '/', currency = GBP_PAGE, button, hasEmbed = true, hasUi = true, urls = URLS, components = ['bundle-popup-boxes.js', 'tier-pricing-currency.js'], frequency = 'session' }: MountOptions = {}) {
   removeAddedListeners()
   clearWidgetRegistry()
   vi.useFakeTimers({ now: NOW_SECONDS * 1000 })
   stubNetwork({ lines, feed, cartMode })
   if (currency.activeCurrency !== currency.shopCurrency) (window as unknown as { Shopify: object }).Shopify = { currency: { active: currency.activeCurrency, rate: currency.rate } }
   const checkout = button ?? '<form action="/cart" method="post" id="cartform"><button type="submit" name="checkout" id="checkout">Check out</button></form>'
-  document.body.innerHTML = `${checkout}${hasEmbed ? embedHtml({ discounts, rootUrl, currency, urls }) : ''}`
+  document.body.innerHTML = `${checkout}${hasEmbed ? embedHtml({ discounts, rootUrl, currency, urls, frequency }) : ''}`
   document.getElementById('cartform')?.addEventListener('submit', (event) => { event.preventDefault(); submits += 1 })
   if (hasUi) (window as unknown as { SmoothDiscounts: object }).SmoothDiscounts = { components: { popupUi: { openPopup }, popupView: VIEW, popupFacts: FACTS, popupParts: PARTS }, deferreds: {} }
   runPopupScripts({ built, components })
@@ -155,7 +155,7 @@ describe('when the pop-up has nothing to do', () => {
 
 describe('a bundle that is due', () => {
   it('opens the pop-up with one box holding what the UI needs', async () => {
-    await mountPage({ discounts: [discountOf({ style: { backgroundColor: '#aabbcc', cornerRadius: 8 } })], rootUrl: '/fr' })
+    await mountPage({ rootUrl: '/fr' })
     await pressCheckout()
     expect(openPopup).toHaveBeenCalledTimes(1)
     const options = openPopup.mock.calls[0][0] as { boxes: Record<string, unknown>[]; root: string; accents: object; moneyFormat: string; opener: unknown; components: Record<string, unknown> }
@@ -164,22 +164,21 @@ describe('a bundle that is due', () => {
     expect(options.components.popupFacts).toBe(FACTS)
     expect(options.components.popupParts).toBe(PARTS)
     expect(options.moneyFormat).toBe('£{{amount}}')
-    expect(options.accents).toEqual({ moss: '#434625', cream: '#f3ecd9', sun: '#ffdc4c' })
+    expect(options.accents).toEqual({ moss: '#434625', cream: '#f3ecd9', sun: '#ffdc4c', night: '#2b2d17', radius: 12 })
     expect(options.opener).toBe(document.getElementById('checkout'))
     expect(options.boxes).toHaveLength(1)
-    expect(options.boxes[0]).toMatchObject({ title: 'Tins mix', units: 3, firstTierQty: 8, basePrice: 1.69, flash: null, style: { backgroundColor: '#aabbcc', cornerRadius: 8 } })
+    expect(options.boxes[0]).toMatchObject({ title: 'Tins mix', units: 3, firstTierQty: 8, basePrice: 1.69, flash: null })
     expect((options.boxes[0].items as { variantId: string }[]).map((item) => item.variantId)).toEqual(['1', '2'])
     expect(options.boxes[0].lines).toEqual([lineOf(100, 1, 3)])
     expect(submits).toBe(1)
   })
 
-  it('gives a box of a stale index (no id, title, frequency or style) no title and the first product\'s key (Review Focus 1)', async () => {
+  it('gives a box of a stale index (no id or title) no title and the first product\'s key (Review Focus 1)', async () => {
     const stale = { tiers: FIXED_TIERS, members: [memberOf('tuna')], flash: null } as Discount
     await mountPage({ discounts: [stale] })
     await pressCheckout()
-    const box = (openPopup.mock.calls[0][0] as { boxes: { title?: string; style?: unknown }[] }).boxes[0]
+    const box = (openPopup.mock.calls[0][0] as { boxes: { title?: string }[] }).boxes[0]
     expect(box.title ?? '').toBe('')
-    expect(box.style).toBeUndefined()
     expect(window.sessionStorage.getItem('smoothDiscountsPopup:p100')).not.toBeNull()
   })
 
@@ -191,10 +190,20 @@ describe('a bundle that is due', () => {
     expect(openPopup).toHaveBeenCalledTimes(1)
     expect(submits).toBe(1)
     window.sessionStorage.clear()
-    await mountPage({ discounts: [discountOf({ popupFrequency: 'checkout' })] })
+    await mountPage({ frequency: 'checkout' })
     await pressCheckout()
     await pressCheckout()
     expect(openPopup).toHaveBeenCalledTimes(3)
+  })
+
+  it('remembers nothing in the session when the store shows the pop-up at every press, and remembers the bundle otherwise', async () => {
+    await mountPage({ frequency: 'checkout' })
+    await pressCheckout()
+    expect(window.sessionStorage.length).toBe(0)
+
+    await mountPage()
+    await pressCheckout()
+    expect(window.sessionStorage.getItem('smoothDiscountsPopup:gid://shopify/DiscountAutomaticNode/1')).not.toBeNull()
   })
 
   it('does not count a flash sale that ended between page load and the press (Review Focus 4)', async () => {
@@ -245,7 +254,7 @@ describe('what happens after the pop-up', () => {
   })
 
   it('lets a Checkout press go through, with no second pop-up, while the page is still leaving after Continue (Review Focus 3, every-press bundle)', async () => {
-    await mountPage({ discounts: [discountOf({ popupFrequency: 'checkout' })] })
+    await mountPage({ frequency: 'checkout' })
     await pressCheckout()
     expect(openPopup).toHaveBeenCalledTimes(1)
 
@@ -256,7 +265,7 @@ describe('what happens after the pop-up', () => {
   })
 
   it('opens the pop-up again for an every-press bundle when the page comes back from the history after Continue', async () => {
-    await mountPage({ discounts: [discountOf({ popupFrequency: 'checkout' })] })
+    await mountPage({ frequency: 'checkout' })
     await pressCheckout()
 
     window.dispatchEvent(Object.assign(new Event('pageshow'), { persisted: true }))
@@ -300,7 +309,7 @@ describe('what happens after the pop-up', () => {
     expect(reload).toHaveBeenCalledTimes(1)
     expect(submits).toBe(0)
     openPopup.mockResolvedValue({ action: 'close', didAdd: false })
-    await mountPage({ discounts: [discountOf({ popupFrequency: 'checkout' })] })
+    await mountPage({ frequency: 'checkout' })
     await pressCheckout()
     expect(reload).toHaveBeenCalledTimes(1)
     expect(submits).toBe(0)

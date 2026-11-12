@@ -10,7 +10,7 @@
   --popup-sun: var(--smooth-discounts-sun, #eae3d2);
   --popup-radius: var(--smooth-discounts-radius, 16px);
   --popup-sand: color-mix(in srgb, var(--popup-line) 60%, var(--popup-cream));
-  --popup-night: color-mix(in srgb, var(--popup-moss) 55%, #000);
+  --popup-night: var(--smooth-discounts-flash-dark, color-mix(in srgb, var(--popup-moss) 55%, #000));
 }
 
 .smooth-discounts-popup__dialog {
