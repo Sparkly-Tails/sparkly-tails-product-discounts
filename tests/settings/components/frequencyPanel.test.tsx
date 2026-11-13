@@ -29,7 +29,7 @@ describe('FrequencyPanel', () => {
 
 describe('the Settings form with the frequency panel', () => {
   it('sends the chosen frequency with the form', () => {
-    const { container } = render(<SettingsForm initial={flattenSettings({ settings: DEFAULT_SETTINGS })} currencyCode="USD" initialNowSeconds={1_800_000_000} saveAction={async () => ({ ok: true, message: '' })} />)
+    const { container } = render(<SettingsForm initial={flattenSettings({ settings: DEFAULT_SETTINGS, stacking: { orderDiscounts: false, shippingDiscounts: false, productDiscounts: false } })} hasFlash={false} currencyCode="USD" initialNowSeconds={1_800_000_000} saveAction={async () => ({ ok: true, message: '' })} />)
     expect(container.querySelector('input[type="hidden"][name="frequency"]')).toHaveValue('session')
     fireEvent.click(screen.getByRole('radio', { name: 'At every cart-to-checkout press until the tier is unlocked' }))
     expect(container.querySelector('input[type="hidden"][name="frequency"]')).toHaveValue('checkout')
