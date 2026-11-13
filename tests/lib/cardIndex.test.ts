@@ -50,7 +50,7 @@ describe('buildCardIndexValue', () => {
 
   it('has the tiers as they are, and only the fields a card needs', async () => {
     const index = await read([live({ name: 'Admin label', title: 'Customer title', members: [{ productId: 'gid://shopify/Product/1' }] })])
-    expect(index.discounts[0]).toEqual({ discountId: 'disc_1', title: 'Customer title', popupFrequency: 'session', tiers: [{ minQty: 8, fixedPrice: 1.63 }, { minQty: 16, fixedPrice: 1.55 }], members: [{ productId: '1', handle: 'product-1', variantIds: null }], flash: null })
+    expect(index.discounts[0]).toEqual({ discountId: 'disc_1', title: 'Customer title', tiers: [{ minQty: 8, fixedPrice: 1.63 }, { minQty: 16, fixedPrice: 1.55 }], members: [{ productId: '1', handle: 'product-1', variantIds: null }], flash: null })
   })
 
   it('carries the discount id, as saved (the pop-up remembers per discount that it was shown)', async () => {
@@ -66,22 +66,11 @@ describe('buildCardIndexValue', () => {
     expect(index.discounts.map((entry) => entry.title)).toEqual(['Customer title', 'Admin label'])
   })
 
-  it('carries the pop-up frequency: once per session unless the discount says every checkout press', async () => {
-    const index = await read([
-      live({ discountId: 'a', members: [{ productId: 'gid://shopify/Product/1' }] }),
-      live({ discountId: 'b', popupFrequency: 'checkout', members: [{ productId: 'gid://shopify/Product/1' }] }),
-    ])
-    expect(index.discounts.map((entry) => entry.popupFrequency)).toEqual(['session', 'checkout'])
-  })
-
-  it('carries the look as background colour and corner radius only, and leaves the key out when the discount has none', async () => {
-    const style = { backgroundColor: '#AABBCC', cornerRadius: 8, extra: 'x' } as unknown as Discount['style']
-    const index = await read([
-      live({ discountId: 'a', style, members: [{ productId: 'gid://shopify/Product/1' }] }),
-      live({ discountId: 'b', members: [{ productId: 'gid://shopify/Product/1' }] }),
-    ])
-    expect(index.discounts[0].style).toEqual({ backgroundColor: '#AABBCC', cornerRadius: 8 })
-    expect('style' in index.discounts[1]).toBe(false)
+  it('has no look and no pop-up frequency: the store-wide Settings decide both, even for a discount that still carries the old values', async () => {
+    const old = { style: { backgroundColor: '#AABBCC', cornerRadius: 8 }, popupFrequency: 'checkout' } as unknown as Partial<Discount>
+    const index = await read([live({ discountId: 'a', ...old, members: [{ productId: 'gid://shopify/Product/1' }] })])
+    expect(Object.keys(index.discounts[0]).sort()).toEqual(['discountId', 'flash', 'members', 'tiers', 'title'])
+    expect(JSON.stringify(index)).not.toMatch(/style|popupFrequency/)
   })
 
   it('groups the variants of a product, in the order they were added', async () => {

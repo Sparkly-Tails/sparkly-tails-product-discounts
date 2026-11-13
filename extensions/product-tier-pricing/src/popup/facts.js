@@ -27,9 +27,9 @@ export function readFacts(tools, { box, units, lines, moneyFormat }) {
   }
 }
 
-/** The look of a box: `{ background, radius }` (see look.js). */
-export function readLook(tools, { box, creamFallback }) {
-  return tools.readBoxLook({ style: box.style, creamFallback, tools })
+/** The look of every box: `{ background, radius }` from the store-wide design in the embed's accents (see look.js). */
+export function readLook(tools, { accents }) {
+  return tools.readBoxLook({ accents, tools })
 }
 
 export const FACTS_TOOLS = { ...COPY_TOOLS, ...FILL_TOOLS, ...LOOK_TOOLS, ...MILESTONE_TOOLS, ...ROW_TOOLS, formatMoney, sortTiersByMinQty, readTierMode, buildChips, buildCostText, readBoxLook, formatAmount }

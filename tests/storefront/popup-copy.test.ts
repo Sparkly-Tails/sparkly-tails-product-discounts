@@ -100,47 +100,40 @@ describe('buildChips', () => {
 })
 
 describe('readBoxLook', () => {
-  const look = (style: unknown, creamFallback = '#F3ECD9') => readBoxLook({ style, creamFallback, tools: LOOK_TOOLS })
+  const look = (accents: object) => readBoxLook({ accents, tools: LOOK_TOOLS })
 
-  it('takes the discount\'s own colour (upper-cased) and radius', () => {
-    expect(look({ backgroundColor: '#aabbcc', cornerRadius: 8 })).toEqual({ background: '#AABBCC', radius: 8 })
+  it('takes the store\'s background (upper-cased) and corner radius from the embed', () => {
+    expect(look({ cream: '#aabbcc', radius: 8 })).toEqual({ background: '#AABBCC', radius: 8 })
   })
 
   it('accepts a colour with transparency', () => {
-    expect(look({ backgroundColor: '#AABBCC80', cornerRadius: 0 })).toEqual({ background: '#AABBCC80', radius: 0 })
+    expect(look({ cream: '#AABBCC80', radius: 0 })).toEqual({ background: '#AABBCC80', radius: 0 })
   })
 
-  it('falls back to the embed colour for a colour that is not a whole hex code', () => {
-    for (const bad of ['red', '#12', 'url(x)', '#GGGGGG', '#abc', '', 5, null]) expect(look({ backgroundColor: bad, cornerRadius: 4 }).background).toBe('#F3ECD9')
+  it('gives no colour for one that is not a whole hex code', () => {
+    for (const bad of ['red', '#12', 'url(x)', '#GGGGGG', '#abc', '', 5, null]) expect(look({ cream: bad, radius: 4 }).background).toBe('')
   })
 
   it('has no radius for one out of range or not a whole number', () => {
-    for (const bad of [30, -1, '12', 1.5, null]) expect(look({ backgroundColor: '#aabbcc', cornerRadius: bad }).radius).toBeNull()
-  })
-
-  it('works without any style (Review Focus 1): the embed colour and no radius', () => {
-    expect(look(undefined)).toEqual({ background: '#F3ECD9', radius: null })
-  })
-
-  it('gives no colour at all when neither the style nor the embed colour is a hex code', () => {
-    expect(look({ backgroundColor: 'red' }, 'blue').background).toBe('')
+    for (const bad of [30, -1, '12', 1.5, null, undefined]) expect(look({ cream: '#aabbcc', radius: bad }).radius).toBeNull()
   })
 })
 
 describe('applyBoxLook', () => {
-  const apply = (look: { background: string; radius: number | null }, accents = { moss: '#434625', sun: '#ffdc4c' }) => {
+  const apply = (look: { background: string; radius: number | null }, accents: object = { moss: '#434625', sun: '#ffdc4c', night: '#2b2d17' }) => {
     const box = document.createElement('div')
     applyBoxLook({ box, look, accents, tools: LOOK_TOOLS })
     return (name: string) => box.style.getPropertyValue(name)
   }
+  const NAMES = ['--smooth-discounts-cream', '--smooth-discounts-radius', '--smooth-discounts-moss', '--smooth-discounts-sun', '--smooth-discounts-flash-dark']
 
-  it('sets the widget\'s four custom properties on the box', () => {
+  it('sets the widget\'s five custom properties on the box, the flash tone included', () => {
     const read = apply({ background: '#AABBCC', radius: 8 })
-    expect([read('--smooth-discounts-cream'), read('--smooth-discounts-radius'), read('--smooth-discounts-moss'), read('--smooth-discounts-sun')]).toEqual(['#AABBCC', '8px', '#434625', '#FFDC4C'])
+    expect(NAMES.map(read)).toEqual(['#AABBCC', '8px', '#434625', '#FFDC4C', '#2B2D17'])
   })
 
   it('sets no radius for a null radius, and nothing for a colour that is not a hex code', () => {
-    const read = apply({ background: '', radius: null }, { moss: 'red', sun: '#ffdc4c' })
-    expect([read('--smooth-discounts-cream'), read('--smooth-discounts-radius'), read('--smooth-discounts-moss'), read('--smooth-discounts-sun')]).toEqual(['', '', '', '#FFDC4C'])
+    const read = apply({ background: '', radius: null }, { moss: 'red', sun: '#ffdc4c', night: 'blue' })
+    expect(NAMES.map(read)).toEqual(['', '', '', '#FFDC4C', ''])
   })
 })

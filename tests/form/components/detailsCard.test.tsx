@@ -36,20 +36,10 @@ describe('DetailsCard', () => {
     expect(onTitleChange).toHaveBeenCalledWith('Tins mix')
   })
 
-  it('shows a "Show the pop-up" select named "popupFrequency" with its two choices, set from the initial value', () => {
-    render(<DetailsCard initialName="" initialPopupFrequency="checkout" />)
-    const select = screen.getByLabelText('Show the pop-up')
-    expect(select).toHaveAttribute('name', 'popupFrequency')
-    expect(select).toHaveValue('checkout')
-    expect(Array.from((select as HTMLSelectElement).options).map((option) => [option.value, option.textContent])).toEqual([['session', 'Once per session'], ['checkout', 'At every checkout press']])
-  })
-
-  it('shows once per session when no frequency is given, and reports a new choice', () => {
-    const onPopupFrequencyChange = vi.fn()
-    render(<DetailsCard initialName="" onPopupFrequencyChange={onPopupFrequencyChange} />)
-    expect(screen.getByLabelText('Show the pop-up')).toHaveValue('session')
-    fireEvent.change(screen.getByLabelText('Show the pop-up'), { target: { value: 'checkout' } })
-    expect(onPopupFrequencyChange).toHaveBeenCalledWith('checkout')
+  it('has no pop-up frequency choice: how often the pop-up shows is a store-wide setting', () => {
+    render(<DetailsCard initialName="" />)
+    expect(screen.queryByLabelText('Show the pop-up')).toBeNull()
+    expect(document.querySelector('[name="popupFrequency"]')).toBeNull()
   })
 
   it('requires a name', () => {

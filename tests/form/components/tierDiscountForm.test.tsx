@@ -4,7 +4,7 @@ import { render, screen, cleanup, fireEvent, act, within } from '@testing-librar
 import '@testing-library/jest-dom/vitest'
 import TierDiscountForm from '@/form/components/TierDiscountForm'
 import type { FormValues } from '@/form/formValues'
-import { DEFAULT_WIDGET_STYLE } from '@/lib/widgetStyle'
+import { DEFAULT_DESIGN } from '@/settings/design'
 
 const push = vi.hoisted(() => vi.fn())
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push }) }))
@@ -21,15 +21,13 @@ const CHEWS = { productId: 'p2', variantId: 'v2', productTitle: 'Joint Chews', v
 const SAVED: FormValues = {
   name: 'Salmon Oil Volume Discount',
   title: 'Salmon Oil bundle',
-  popupFrequency: 'session',
   members: [SALMON],
   pricingMode: 'percent',
   tiers: [{ minQty: 3, percentOff: 10 }],
   flash: { enabled: false, startsAt: '', endsAt: '', showTeaser: true, highDemand: false },
-  style: DEFAULT_WIDGET_STYLE,
 }
 const SAVED_TIERS = { mode: 'percent' as const, percentTiers: [{ minQty: 3, percentOff: 10 }], fixedTiers: [] }
-const EMPTY: FormValues = { name: '', title: '', popupFrequency: 'session', members: [], pricingMode: 'percent', tiers: [], flash: SAVED.flash, style: DEFAULT_WIDGET_STYLE }
+const EMPTY: FormValues = { name: '', title: '', members: [], pricingMode: 'percent', tiers: [], flash: SAVED.flash }
 const EMPTY_TIERS = { mode: 'percent' as const, percentTiers: [], fixedTiers: [] }
 
 function renderForm(overrides: Partial<Parameters<typeof TierDiscountForm>[0]> = {}) {
@@ -38,7 +36,7 @@ function renderForm(overrides: Partial<Parameters<typeof TierDiscountForm>[0]> =
     <TierDiscountForm
       breadcrumbLabel="Edit Discount" heading="Salmon Oil Volume Discount" badge="Draft" mode="edit"
       initial={SAVED} initialTiers={SAVED_TIERS} currencyCode="USD" shopTimezone="UTC" nowLocal="2026-10-30T12:00"
-      initialNowSeconds={NOW} status="draft" saveAction={saveAction} {...overrides}
+      initialNowSeconds={NOW} design={DEFAULT_DESIGN} status="draft" saveAction={saveAction} {...overrides}
     />,
   )
   return { saveAction, ...view }
@@ -69,16 +67,15 @@ describe('TierDiscountForm: what it shows', () => {
 
   it('shows every card, filled from the saved discount, and the preview', () => {
     renderForm()
-    for (const name of ['Details', 'Flash sale', 'Products & variants', 'Tiers', 'Design', 'Preview']) expect(screen.getByRole('heading', { level: 2, name })).toBeInTheDocument()
+    for (const name of ['Details', 'Flash sale', 'Products & variants', 'Tiers', 'Preview']) expect(screen.getByRole('heading', { level: 2, name })).toBeInTheDocument()
     expect(nameField()).toHaveValue('Salmon Oil Volume Discount')
     expect(screen.getByText('Salmon Oil')).toBeInTheDocument()
     expect(screen.getByLabelText('Tier 1 minimum quantity')).toHaveValue(3)
   })
 
-  it('shows the Title and the pop-up frequency, filled from the saved discount', () => {
-    renderForm({ initial: { ...SAVED, popupFrequency: 'checkout' } })
+  it('shows the Title, filled from the saved discount', () => {
+    renderForm()
     expect(screen.getByLabelText('Title')).toHaveValue('Salmon Oil bundle')
-    expect(screen.getByLabelText('Show the pop-up')).toHaveValue('checkout')
   })
 })
 
@@ -104,21 +101,19 @@ describe('TierDiscountForm: the Title follows the name until it is edited', () =
     expect(screen.getByLabelText('Title')).toHaveValue('Black Friday')
   })
 
-  it('sends the title and the pop-up frequency with the form', async () => {
+  it('sends the title with the form', async () => {
     const { saveAction } = renderForm()
     fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Tins mix' } })
-    fireEvent.change(screen.getByLabelText('Show the pop-up'), { target: { value: 'checkout' } })
     await act(async () => { fireEvent.click(saveBarButton('Save')) })
     const formData = (saveAction.mock.calls[0] as unknown as [unknown, FormData])[1]
-    expect([formData.get('title'), formData.get('popupFrequency')]).toEqual(['Tins mix', 'checkout'])
+    expect(formData.get('title')).toBe('Tins mix')
   })
 
-  it('takes the Title and the frequency back on Discard', () => {
+  it('takes the Title back on Discard', () => {
     renderForm()
     fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Tins mix' } })
-    fireEvent.change(screen.getByLabelText('Show the pop-up'), { target: { value: 'checkout' } })
     fireEvent.click(saveBarButton('Discard'))
-    expect([(screen.getByLabelText('Title') as HTMLInputElement).value, (screen.getByLabelText('Show the pop-up') as HTMLSelectElement).value]).toEqual(['Salmon Oil bundle', 'session'])
+    expect((screen.getByLabelText('Title') as HTMLInputElement).value).toBe('Salmon Oil bundle')
   })
 })
 
@@ -287,44 +282,11 @@ describe('TierDiscountForm: the preview follows the form', () => {
 })
 
 describe('TierDiscountForm: the order of the cards', () => {
-  it('has Details, the products, the tiers, the flash sale and the design, in that order', () => {
+  it('has Details, the products, the tiers and the flash sale, in that order', () => {
     renderForm()
-    const cards = ['Details', 'Products & variants', 'Tiers', 'Flash sale', 'Design']
+    const cards = ['Details', 'Products & variants', 'Tiers', 'Flash sale']
     const shown = screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent ?? '').filter((name) => cards.includes(name))
     expect(shown).toEqual(cards)
-  })
-})
-
-describe('TierDiscountForm: the style', () => {
-  it('sends the two style values of the Design card to the save action, the defaults when it was left alone', async () => {
-    const { saveAction } = renderForm()
-    await act(async () => { fireEvent.submit(theForm()) })
-    const formData = (saveAction.mock.calls[0] as unknown as [unknown, FormData])[1]
-    expect([formData.get('style-backgroundColor'), formData.get('style-cornerRadius')]).toEqual(['#F5EFE1', '12'])
-    expect(formData.has('style-themeColor')).toBe(false)
-  })
-
-  it('paints the preview with the chosen style at once, and sends it', async () => {
-    const { saveAction } = renderForm()
-    fireEvent.click(screen.getByRole('button', { name: 'White' }))
-    fireEvent.change(screen.getByRole('slider', { name: 'Round corners' }), { target: { value: '8' } })
-    const widget = document.querySelector('.smooth-discounts') as HTMLElement
-    expect(widget.style.getPropertyValue('--smooth-discounts-cream')).toBe('#FFFFFF')
-    expect(widget.style.getPropertyValue('--smooth-discounts-radius')).toBe('8px')
-    await act(async () => { fireEvent.submit(theForm()) })
-    const formData = (saveAction.mock.calls[0] as unknown as [unknown, FormData])[1]
-    expect(formData.get('style-backgroundColor')).toBe('#FFFFFF')
-    expect(formData.get('style-cornerRadius')).toBe('8')
-  })
-
-  it('counts a changed style as an unsaved change, and Discard takes it back', () => {
-    renderForm()
-    expect(barShown).toBe(false)
-    fireEvent.click(screen.getByRole('button', { name: 'White' }))
-    expect(barShown).toBe(true)
-    fireEvent.click(saveBarButton('Discard'))
-    expect(screen.getByRole('button', { name: 'Warm Sand' })).toHaveAttribute('aria-pressed', 'true')
-    expect(barShown).toBe(false)
   })
 })
 

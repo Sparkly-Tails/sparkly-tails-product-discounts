@@ -149,28 +149,40 @@
 {%- endif -%}
 
 {%- comment -%}
-  The look of this widget. A discount's own style (saved with the discount, see src/lib/widgetStyle.ts) wins:
-  the background colour (#RRGGBB, or #RRGGBBAA when it is partly transparent) and the corner radius.
-  Where it has no usable value the theme editor's block setting applies, and below that the stylesheet's default.
-  The accent colour is the block setting only. A colour must pass the hex check (exactly six or eight hexadecimal
-  digits after a #) and a number is kept inside the ranges the admin form allows.
+  The look of this widget: the store-wide design saved on the Settings page (the shop metafield tier_settings, see
+  src/settings/design.ts). Where the store has not saved a design, or a value is missing or unusable, the default
+  applies: accent #434625, background #F5EFE1, radius 12, flash bar Olive Night. A colour must pass the hex check
+  (a # and exactly six hexadecimal digits for the accent, six or eight for the background) and the radius is kept
+  inside the range the Settings page allows. The sun colour stays a theme editor setting.
 {%- endcomment -%}
-{%- assign style_value = discount_metafield.value.style -%}
-{%- assign style_background = block.settings.cream_color -%}
-{%- assign style_radius = nil -%}
-{%- if discount_metafield != blank and style_value != blank -%}
-  {%- comment -%} The colour check is written out here, not in a snippet: Shopify wraps an app snippet's output in HTML comments, which would end up inside the style attribute and make the colour invalid. {%- endcomment -%}
-  {%- assign candidate = style_value.backgroundColor | strip | upcase -%}
+{%- assign design_value = shop.metafields['$app:smooth_discount'].tier_settings.value.design -%}
+{%- assign style_accent = '#434625' -%}
+{%- assign style_background = '#F5EFE1' -%}
+{%- assign style_radius = 12 -%}
+{%- assign style_flash = '#2B2D17' -%}
+{%- if design_value != blank -%}
+  {%- comment -%} The colour checks are written out here, not in a snippet: Shopify wraps an app snippet's output in HTML comments, which would end up inside the style attribute and make the colour invalid. {%- endcomment -%}
+  {%- assign accent_candidate = design_value.accentColor | strip | upcase -%}
+  {%- assign accent_first = accent_candidate | slice: 0, 1 -%}
+  {%- if accent_first == '#' and accent_candidate.size == 7 -%}
+    {%- assign accent_leftover = accent_candidate | slice: 1, 8 | remove: '0' | remove: '1' | remove: '2' | remove: '3' | remove: '4' | remove: '5' | remove: '6' | remove: '7' | remove: '8' | remove: '9' | remove: 'A' | remove: 'B' | remove: 'C' | remove: 'D' | remove: 'E' | remove: 'F' -%}
+    {%- if accent_leftover == blank -%}{%- assign style_accent = accent_candidate -%}{%- endif -%}
+  {%- endif -%}
+  {%- assign candidate = design_value.backgroundColor | strip | upcase -%}
   {%- assign first_character = candidate | slice: 0, 1 -%}
   {%- if first_character == '#' and candidate.size == 7 or first_character == '#' and candidate.size == 9 -%}
     {%- assign leftover = candidate | slice: 1, 8 | remove: '0' | remove: '1' | remove: '2' | remove: '3' | remove: '4' | remove: '5' | remove: '6' | remove: '7' | remove: '8' | remove: '9' | remove: 'A' | remove: 'B' | remove: 'C' | remove: 'D' | remove: 'E' | remove: 'F' -%}
     {%- if leftover == blank -%}{%- assign style_background = candidate -%}{%- endif -%}
   {%- endif -%}
-  {%- if style_value.cornerRadius != blank -%}{%- assign style_radius = style_value.cornerRadius | plus: 0 | at_least: 0 | at_most: 24 -%}{%- endif -%}
+  {%- if design_value.cornerRadius != blank -%}{%- assign style_radius = design_value.cornerRadius | plus: 0 | at_least: 0 | at_most: 24 -%}{%- endif -%}
+  {%- case design_value.flashTone -%}
+    {%- when 'pure-onyx' -%}{%- assign style_flash = '#111111' -%}
+    {%- when 'deep-pine' -%}{%- assign style_flash = '#1B3A2D' -%}
+    {%- when 'olive-night' -%}{%- assign style_flash = '#2B2D17' -%}
+  {%- endcase -%}
 {%- endif -%}
 {%- capture style_vars -%}
-  --smooth-discounts-moss: {{ block.settings.moss_color }}; --smooth-discounts-cream: {{ style_background }}; --smooth-discounts-sun: {{ block.settings.sun_color }};
-  {%- if style_radius != nil %} --smooth-discounts-radius: {{ style_radius }}px;{% endif -%}
+  --smooth-discounts-moss: {{ style_accent }}; --smooth-discounts-cream: {{ style_background }}; --smooth-discounts-sun: {{ block.settings.sun_color }}; --smooth-discounts-radius: {{ style_radius }}px; --smooth-discounts-flash-dark: {{ style_flash }};
 {%- endcapture -%}
 
 <div
@@ -265,18 +277,6 @@
   "stylesheet": "tier-pricing.css",
   "javascript": "tier-pricing.js",
   "settings": [
-    {
-      "type": "color",
-      "id": "moss_color",
-      "label": "t:moss_color_label",
-      "default": "#434625"
-    },
-    {
-      "type": "color",
-      "id": "cream_color",
-      "label": "t:cream_color_label",
-      "default": "#f3ecd9"
-    },
     {
       "type": "color",
       "id": "sun_color",

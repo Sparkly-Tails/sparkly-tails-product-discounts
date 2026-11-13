@@ -1,6 +1,6 @@
 import { CheckIcon } from '@/form/components/icons'
 
-const BACKGROUND_CHOSEN = 'border-2 border-form-primary ring-2 ring-form-secondary/30 text-form-primary'
+const BACKGROUND_CHOSEN = 'ring-2 ring-form-primary ring-offset-2 ring-offset-form-surface-container-lowest text-form-primary'
 const BACKGROUND_IDLE = 'border hover:scale-105 transition-transform'
 const DEFAULT_EDGE = 'border-form-outline-variant/40'
 
@@ -23,7 +23,7 @@ function SwatchButton({ label, hex, className, isSelected, onSelect }: SwatchPro
       aria-pressed={isSelected}
       onClick={onSelect}
       style={{ backgroundColor: hex }}
-      className={`w-8 h-8 rounded-full flex items-center justify-center ${className}`}
+      className={`w-9 h-9 rounded-full flex items-center justify-center ${className}`}
     >
       {isSelected ? <CheckIcon className="text-[16px]" /> : null}
     </button>
@@ -41,7 +41,7 @@ export function CurrentColour({ hex }: { hex: string }) {
     <span
       role="img"
       aria-label={`Current colour ${hex}`}
-      className="relative w-8 h-8 rounded-full flex-shrink-0 overflow-hidden border-2 border-form-primary ring-2 ring-form-secondary/30"
+      className="relative w-9 h-9 rounded-full flex-shrink-0 overflow-hidden border border-form-outline-variant/40 shadow-inner"
       style={{ backgroundImage: CHECKERBOARD, backgroundSize: '8px 8px', backgroundPosition: '0 0, 4px 4px' }}
     >
       <span data-colour="" className="absolute inset-0" style={{ backgroundColor: hex }} />

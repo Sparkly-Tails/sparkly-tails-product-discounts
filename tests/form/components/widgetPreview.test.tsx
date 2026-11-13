@@ -3,8 +3,9 @@ import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest'
 import { render, screen, cleanup, fireEvent, act } from '@testing-library/react'
 import '@testing-library/jest-dom/vitest'
 import WidgetPreview from '@/form/preview/components/WidgetPreview'
-import { DEFAULT_WIDGET_STYLE } from '@/lib/widgetStyle'
 import { stubChipLayout } from '../../helpers/chipLayout'
+
+const DEFAULT_PAINT = { backgroundColor: '#F5EFE1', cornerRadius: 12 }
 
 const NOW = 1_800_000_000
 const SALMON = { title: 'Wild Alaskan Salmon Oil for Dogs (16 fl oz)', price: 28, imageUrl: null }
@@ -12,7 +13,7 @@ const CHEWS = { title: 'Canine Vitality Joint Support Chews (90 Chews)', price: 
 const TIERS = [{ minQty: 3, percentOff: 10 }, { minQty: 5, percentOff: 15 }]
 
 function renderPreview(overrides: Partial<Parameters<typeof WidgetPreview>[0]> = {}) {
-  return render(<WidgetPreview products={[SALMON, CHEWS]} tiers={TIERS} flash={null} highDemand={false} style={DEFAULT_WIDGET_STYLE} timeZone="UTC" currencyCode="USD" initialNowSeconds={NOW} {...overrides} />)
+  return render(<WidgetPreview products={[SALMON, CHEWS]} tiers={TIERS} flash={null} highDemand={false} style={DEFAULT_PAINT} timeZone="UTC" currencyCode="USD" initialNowSeconds={NOW} {...overrides} />)
 }
 
 beforeEach(() => vi.useFakeTimers({ now: NOW * 1000 }))
@@ -55,7 +56,7 @@ describe('WidgetPreview', () => {
   it('keeps a product in view when the one being previewed is removed', () => {
     const { rerender } = renderPreview()
     fireEvent.change(screen.getByLabelText('Product previewing:'), { target: { value: '1' } })
-    rerender(<WidgetPreview products={[SALMON]} tiers={TIERS} flash={null} highDemand={false} style={DEFAULT_WIDGET_STYLE} timeZone="UTC" currencyCode="USD" initialNowSeconds={NOW} />)
+    rerender(<WidgetPreview products={[SALMON]} tiers={TIERS} flash={null} highDemand={false} style={DEFAULT_PAINT} timeZone="UTC" currencyCode="USD" initialNowSeconds={NOW} />)
     expect(screen.getByRole('button', { name: '3 × $75.60' })).toBeInTheDocument()
   })
 

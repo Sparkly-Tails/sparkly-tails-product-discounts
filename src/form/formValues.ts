@@ -5,21 +5,16 @@ import type { SelectedMember } from '@/form/memberSelection'
 import type { PreviewTier } from '@/form/tierRows'
 import type { PreviewProduct } from '@/form/preview/buildPreviewModel'
 import type { FlashInput } from '@/form/preview/previewModel'
-import type { WidgetStyle } from '@/lib/widgetStyle'
 
 export interface FormValues {
   name: string
   /** The customer-facing title (blank means the storefront shows the name). */
   title: string
-  /** How often the checkout pop-up shows the bundle. */
-  popupFrequency: 'session' | 'checkout'
   members: SelectedMember[]
   pricingMode: PricingMode
   /** The complete tiers of the chosen mode. */
   tiers: PreviewTier[]
   flash: FlashValues
-  /** The Design card's four values. */
-  style: WidgetStyle
 }
 
 /** The values reduced to what is saved, in a fixed order, as text: two forms are the same when this is the same. */
@@ -27,12 +22,10 @@ export function buildComparable({ values }: { values: FormValues }): string {
   return JSON.stringify({
     name: values.name,
     title: values.title,
-    popupFrequency: values.popupFrequency,
     members: values.members.map((member) => ({ productId: member.productId, variantId: member.variantId })),
     pricingMode: values.pricingMode,
     tiers: values.tiers.map((tier) => ({ minQty: tier.minQty, percentOff: tier.percentOff, fixedPrice: tier.fixedPrice, anchorPrice: tier.anchorPrice })),
     flash: values.flash.enabled ? values.flash : { enabled: false, highDemand: values.flash.highDemand },
-    style: values.style,
   })
 }
 

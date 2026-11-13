@@ -21,7 +21,7 @@ const lineOf = (variantId: number, quantity: number): Line => ({ product_id: 100
 const ITEMS = [itemOf(11, 'Tuna – Small'), itemOf(12, 'Tuna – Large'), itemOf(13, 'Salmon'), itemOf(14, 'Sold out one', 1.69, false)]
 
 function readFacts({ tiers = FIXED_TIERS, units, lines, items = ITEMS }: { tiers?: object[]; units: number; lines: Line[]; items?: Item[] }): Facts {
-  const box = { tiers, units, firstTierQty: (tiers[0] as { minQty: number }).minQty, items, basePrice: 1.69, flash: null, style: {}, members: [], lines, title: 'Mix', shownKey: 'k', popupFrequency: 'session' }
+  const box = { tiers, units, firstTierQty: (tiers[0] as { minQty: number }).minQty, items, basePrice: 1.69, flash: null, members: [], lines, title: 'Mix', shownKey: 'k' }
   const api = (window as unknown as { SmoothDiscounts: { components: { popupFacts: { readFacts: (input: object) => Facts } } } }).SmoothDiscounts.components.popupFacts
   return api.readFacts({ box, units, lines, moneyFormat: '£{{amount}}' })
 }

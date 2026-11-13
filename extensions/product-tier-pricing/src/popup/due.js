@@ -18,13 +18,9 @@ export function isDiscountRunning({ discount, nowSeconds, tools }) {
   return !discount.flash || tools.flashPhase({ nowSeconds, startsAtUnix: discount.flash.startsAtUnix, endsAtUnix: discount.flash.endsAtUnix }) === 'running'
 }
 
-/** True for "at every checkout press", or when this session has not seen the bundle yet. */
-export function isShowAgain({ discount, shownKey, storage, tools }) {
-  return discount.popupFrequency === 'checkout' || !tools.isShown({ storage, key: shownKey })
-}
-
+/** True when the bundle is one step from its tier, running, and this session has not seen it yet (a storage that remembers nothing, see readStorage in core.js, makes every press the first). */
 export function isDiscountDue({ discount, units, firstTierQty, shownKey, nowSeconds, storage, tools }) {
-  return tools.isBundleIncomplete({ units, firstTierQty }) && tools.isDiscountRunning({ discount, nowSeconds, tools }) && tools.isShowAgain({ discount, shownKey, storage, tools })
+  return tools.isBundleIncomplete({ units, firstTierQty }) && tools.isDiscountRunning({ discount, nowSeconds, tools }) && !tools.isShown({ storage, key: shownKey })
 }
 
 /** The discount as a one-item list with its units, first tier and "shown" key when it is due, else an empty list. */
@@ -41,5 +37,5 @@ export function listDueBundles({ discounts, lines, nowSeconds, storage, tools })
 }
 
 export const DUE_TOOLS = {
-  ...UNIT_TOOLS, readFirstTierQty, isBundleIncomplete, isDiscountRunning, isShowAgain, isDiscountDue, describeDueBundle, listDueBundles, buildShownKey, isShown, flashPhase,
+  ...UNIT_TOOLS, readFirstTierQty, isBundleIncomplete, isDiscountRunning, isDiscountDue, describeDueBundle, listDueBundles, buildShownKey, isShown, flashPhase,
 }

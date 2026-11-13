@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import CreateCards from '@/home/components/CreateCards'
 import DiscountsTable from '@/home/components/DiscountsTable'
 import HomeFooter from '@/home/components/HomeFooter'
@@ -22,7 +23,9 @@ export default function HomeView({ view, query, version, metricsUrl, range }: { 
               <h1 className="text-2xl font-bold tracking-tight text-home-on-surface">Discounts</h1>
             </div>
           </div>
-          <div className="flex items-center gap-2"></div>
+          <div className="flex items-center gap-2">
+            <Link href="/settings" className="text-sm font-medium text-home-on-surface border border-home-outline-variant/60 rounded-lg px-3 py-1.5 hover:bg-home-surface-container transition-colors">Settings</Link>
+          </div>
         </div>
         <LiveStatCards key={metricsUrl} metricsUrl={metricsUrl} range={range} />
         <CreateCards />

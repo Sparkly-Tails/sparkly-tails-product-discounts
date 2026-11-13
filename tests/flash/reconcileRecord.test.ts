@@ -21,7 +21,8 @@ function fakes() {
   const createRecord = vi.fn(async () => 'gid://shopify/DiscountAutomaticNode/NEW')
   const updateRecord = vi.fn(async () => undefined)
   const deleteRecord = vi.fn(async () => undefined)
-  return { createRecord, updateRecord, deleteRecord, tools: { ...RECORD_TOOLS, createRecord, updateRecord, deleteRecord } }
+  const readStacking = vi.fn(async () => ({ orderDiscounts: true, shippingDiscounts: false, productDiscounts: false }))
+  return { createRecord, updateRecord, deleteRecord, readStacking, tools: { ...RECORD_TOOLS, createRecord, updateRecord, deleteRecord, readStacking } }
 }
 
 const query = (() => undefined) as unknown as ShopifyQuery
@@ -38,6 +39,7 @@ describe('syncFlashRecord', () => {
     const call = createRecord.mock.calls[0] as unknown as [{ input: { title: string; startsAt: string; endsAt: string; metafields: { value: string }[] } }]
     expect(call[0].input).toMatchObject({ title: 'Spring Flash Sale', startsAt: '2026-11-27T09:00:00.000Z', endsAt: '2026-11-30T23:59:00.000Z' })
     expect(call[0].input.metafields[0].value).toBe('{"discountId":"disc_abc"}')
+    expect((call[0].input as unknown as { combinesWith: unknown }).combinesWith).toEqual({ orderDiscounts: true, shippingDiscounts: false, productDiscounts: true })
     expect(updateRecord).not.toHaveBeenCalled()
     expect(deleteRecord).not.toHaveBeenCalled()
   })

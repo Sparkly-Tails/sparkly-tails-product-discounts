@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { parseDiscountForm, findFormProblem, readName, readPricingMode, readTitle, readPopupFrequency } from '@/form/parseDiscountForm'
+import { parseDiscountForm, findFormProblem, readName, readPricingMode, readTitle } from '@/form/parseDiscountForm'
 import { PARSE_TOOLS } from '@/form/parseTools'
-import { DEFAULT_WIDGET_STYLE } from '@/lib/widgetStyle'
 
 function formWith(fields: Record<string, string | string[]>): FormData {
   const formData = new FormData()
@@ -30,30 +29,21 @@ describe('parseDiscountForm: a good form', () => {
       values: {
         name: 'Salmon Oil Volume Discount',
         title: '',
-        popupFrequency: 'session',
         members: [{ productId: 'gid://shopify/Product/1', variantId: 'gid://shopify/ProductVariant/10' }, { productId: 'gid://shopify/Product/2' }],
         pricingMode: 'percent',
         tiers: [{ minQty: 3, percentOff: 10, anchorPrice: 75.5 }, { minQty: 5, percentOff: 15 }],
         flash: null,
         highDemand: false,
-        style: DEFAULT_WIDGET_STYLE,
         goLive: false,
         takeOffline: false,
       },
     })
   })
 
-  it('reads the two style fields, and replaces bad ones by the defaults', () => {
-    const style = { 'style-backgroundColor': '#ffffff', 'style-cornerRadius': '0' }
-    const good = parse({ ...VALID, ...style })
-    expect('values' in good && good.values.style).toEqual({ backgroundColor: '#FFFFFF', cornerRadius: 0 })
-    const bad = parse({ ...VALID, 'style-backgroundColor': '', 'style-cornerRadius': '99' })
-    expect('values' in bad && bad.values.style).toEqual({ ...DEFAULT_WIDGET_STYLE, cornerRadius: 24 })
-  })
-
-  it('keeps the transparency of a background colour, and ignores a theme colour field an old form still sends', () => {
-    const parsed = parse({ ...VALID, 'style-backgroundColor': '#ffffffcc', 'style-themeColor': '#e63946' })
-    expect('values' in parsed && parsed.values.style).toEqual({ ...DEFAULT_WIDGET_STYLE, backgroundColor: '#FFFFFFCC' })
+  it('ignores the style and pop-up frequency fields an old form still sends', () => {
+    const parsed = parse({ ...VALID, 'style-backgroundColor': '#ffffffcc', 'style-cornerRadius': '4', popupFrequency: 'checkout' })
+    expect('values' in parsed && parsed.values).not.toHaveProperty('style')
+    expect('values' in parsed && parsed.values).not.toHaveProperty('popupFrequency')
   })
 
   it('reads fixed prices when the mode is fixed', () => {
@@ -106,16 +96,9 @@ describe('the small steps', () => {
     expect(readTitle({ formData: formWith({}) })).toBe('')
   })
 
-  it('readPopupFrequency is checkout only for checkout; anything else, or nothing, is session', () => {
-    expect(readPopupFrequency({ formData: formWith({ popupFrequency: 'checkout' }) })).toBe('checkout')
-    expect(readPopupFrequency({ formData: formWith({ popupFrequency: 'session' }) })).toBe('session')
-    expect(readPopupFrequency({ formData: formWith({}) })).toBe('session')
-    expect(readPopupFrequency({ formData: formWith({ popupFrequency: 'weekly' }) })).toBe('session')
-  })
-
-  it('parseDiscountForm carries the title and the frequency', () => {
-    const result = parse({ ...VALID, title: ' Tins mix ', popupFrequency: 'checkout' })
-    expect('values' in result && [result.values.title, result.values.popupFrequency]).toEqual(['Tins mix', 'checkout'])
+  it('parseDiscountForm carries the title', () => {
+    const result = parse({ ...VALID, title: ' Tins mix ' })
+    expect('values' in result && result.values.title).toBe('Tins mix')
   })
 
   it('readName trims and tolerates a missing name', () => {
@@ -130,6 +113,6 @@ describe('the small steps', () => {
   })
 
   it('findFormProblem finds nothing wrong with good values', () => {
-    expect(findFormProblem({ values: { name: 'x', title: '', popupFrequency: 'session', members: [{ productId: 'p' }], pricingMode: 'percent', tiers: [{ minQty: 1, percentOff: 5 }], flash: null, highDemand: false, style: DEFAULT_WIDGET_STYLE, goLive: false, takeOffline: false } })).toBeNull()
+    expect(findFormProblem({ values: { name: 'x', title: '', members: [{ productId: 'p' }], pricingMode: 'percent', tiers: [{ minQty: 1, percentOff: 5 }], flash: null, highDemand: false, goLive: false, takeOffline: false } })).toBeNull()
   })
 })
