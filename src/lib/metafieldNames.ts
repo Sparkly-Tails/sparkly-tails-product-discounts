@@ -19,4 +19,6 @@ export const METAFIELD_KEYS = {
   cardIndex: 'tier_card_index',
   /** Discount (the Shopify discount of a flash sale): which tier discount that record applies. */
   flashRecord: 'flash_record',
+  /** Shop: the store-wide design and pop-up frequency (see src/settings/storeSettings.ts); written by the Settings page. */
+  tierSettings: 'tier_settings',
 } as const
