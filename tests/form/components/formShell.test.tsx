@@ -51,10 +51,26 @@ describe('FormShell', () => {
     expect(header().querySelector('[data-testid="form-header-actions"]')).toBeNull()
   })
 
-  it('keeps the header in view while the form scrolls, white, out to the sides of the page and with 8px of padding above and below', () => {
+  it('keeps the header in view while the form scrolls, on the page background (not a white band), out to the sides of the page', () => {
     renderShell()
-    expect(header()).toHaveClass('sticky', 'top-0', 'bg-form-surface-container-lowest', '-mx-form-lg', 'px-form-lg', 'py-2')
+    expect(header()).toHaveClass('sticky', 'top-0', 'bg-form-surface', '-mx-form-lg', 'px-form-lg', 'py-2')
+    expect(header().className).not.toContain('bg-form-surface-container-lowest')
     expect(header().className).not.toMatch(/(^|\s)p[tb]-/)
+  })
+
+  it('has the homepage title (24px bold) and leaves 2rem above the header and 1.5rem between it and the cards, as the homepage does', () => {
+    const { container } = renderShell()
+    expect(screen.getByRole('heading', { level: 1 }).className).toMatch(/text-2xl/)
+    expect(screen.getByRole('heading', { level: 1 }).className).toMatch(/font-bold/)
+    expect(container.firstElementChild).toHaveClass('pt-8', 'gap-6')
+    expect(screen.getByText('form content').parentElement).toHaveClass('gap-6')
+  })
+
+  it('shows a line of help under the heading only when one is given', () => {
+    const { rerender } = render(<FormShell breadcrumbLabel="Settings" heading="Settings" subtitle="Global storefront settings" actions={null} notice={null} preview={null}><p>form</p></FormShell>)
+    expect(within(header()).getByText('Global storefront settings')).toBeInTheDocument()
+    rerender(<FormShell breadcrumbLabel="Settings" heading="Settings" actions={null} notice={null} preview={null}><p>form</p></FormShell>)
+    expect(screen.queryByText('Global storefront settings')).toBeNull()
   })
 
   it('puts the form in the 7-column column and the preview in the 5-column column', () => {
@@ -63,11 +79,11 @@ describe('FormShell', () => {
     expect(screen.getByText('preview content').parentElement).toHaveClass('lg:col-span-5')
   })
 
-  // The header is 72px (8 + 16 + 4 + 36 + 8) and cards are 16px apart, so the preview sticks at 88px, level with where the form's cards start.
-  it('keeps the preview column in view while the form scrolls, 16px below the header', () => {
+  // The header is about 68px (8 + 16 + 4 + 32 + 8) and a page with a line of help under its heading is 24px taller, so the preview sticks at 96px.
+  it('keeps the preview column in view while the form scrolls, just below the header', () => {
     renderShell()
     const previewColumn = screen.getByText('preview content').parentElement as HTMLElement
-    expect(previewColumn).toHaveClass('sticky', 'self-start', 'top-22')
+    expect(previewColumn).toHaveClass('sticky', 'self-start', 'top-24')
   })
 
   it('shows a notice between the header and the columns, and has no footer bar', () => {
