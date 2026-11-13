@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import AppNav from "@/components/AppNav";
 import { SavedToastProvider } from "@/components/SavedToast";
 import VersionLabel from "@/components/VersionLabel";
 import { ensureFreshInstall } from "@/lib/freshInstall";
@@ -35,6 +36,7 @@ export default async function RootLayout({
         <script src="https://cdn.shopify.com/shopifycloud/app-bridge.js"></script>
       </head>
       <body>
+        <AppNav />
         <SavedToastProvider>{children}</SavedToastProvider>
         <VersionLabel version={packageJson.version} />
       </body>
