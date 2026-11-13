@@ -35,6 +35,11 @@ describe('HomeView', () => {
     expect([...positions].sort((first, second) => first - second)).toEqual(positions)
   })
 
+  it('links to the Settings page from the top of the page', () => {
+    show()
+    expect(screen.getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/settings')
+  })
+
   it('has the page title as the one level-one heading and shows the real rows', () => {
     show()
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1)
