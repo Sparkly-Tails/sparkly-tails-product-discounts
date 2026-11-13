@@ -9,15 +9,24 @@ afterEach(cleanup)
 const PROPS = { shop: 'demo.myshopify.com', clientId: 'abc123' }
 
 describe('ThemePanel', () => {
-  it('shows the three blocks with Active or Not active and a link for each', async () => {
+  it('shows the three blocks with Active or Not active and a link only for the ones that are not active', async () => {
     const readBlocks = vi.fn(async () => [{ handle: 'tier-pricing', status: 'active' }, { handle: 'card-prices', status: 'available' }, { handle: 'bundle-popup', status: 'available' }])
     render(<ThemePanel {...PROPS} readBlocks={readBlocks} />)
     expect(screen.getByRole('heading', { level: 2, name: 'Shopify Theme Integration' })).toBeInTheDocument()
     await waitFor(() => expect(screen.getAllByText('Not active')).toHaveLength(2))
     expect(screen.getAllByText('Active')).toHaveLength(1)
-    expect(screen.getAllByRole('link')).toHaveLength(3)
-    expect(screen.getByRole('link', { name: /Product page widget/ })).toHaveAttribute('href', 'https://demo.myshopify.com/admin/themes/current/editor?template=product&addAppBlockId=abc123/tier-pricing&target=mainSection')
+    expect(screen.getAllByRole('link')).toHaveLength(2)
+    expect(screen.queryByRole('link', { name: /Product page widget/ })).toBeNull()
+    expect(screen.getByRole('link', { name: /Card prices/ })).toHaveAttribute('href', 'https://demo.myshopify.com/admin/themes/current/editor?context=apps&activateAppId=abc123/card-prices')
     expect(screen.getByRole('link', { name: /Pre-checkout pop-up/ })).toHaveAttribute('href', 'https://demo.myshopify.com/admin/themes/current/editor?context=apps&activateAppId=abc123/bundle-popup')
+  })
+
+  it('puts the status tag on the right of the row, apart from the name and help text', async () => {
+    render(<ThemePanel {...PROPS} readBlocks={async () => [{ handle: 'tier-pricing', status: 'active' }]} />)
+    const tag = await screen.findByText('Active')
+    const help = screen.getByText('The tier prices and the flash sale bar on the product page.')
+    expect(help.parentElement).not.toContainElement(tag)
+    expect(tag.closest('li')).toContainElement(help)
   })
 
   it('says the status could not be read and still shows the three links when the read fails', async () => {

@@ -17,24 +17,33 @@ const STATUS_TEXT: Record<BlockStatus, string> = { active: 'Active', inactive: '
 function StatusPill({ status }: { status: BlockStatus }) {
   const dotClass = status === 'active' ? 'bg-green-600' : 'bg-form-outline'
   return (
-    <span className="inline-flex items-center gap-1.5 mt-1 px-2 py-0.5 rounded-full bg-form-surface-container-lowest text-form-label-sm text-form-on-surface">
+    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-form-surface-container-lowest text-form-label-sm text-form-on-surface">
       <span aria-hidden="true" className={`w-1.5 h-1.5 rounded-full ${dotClass}`} />
       {STATUS_TEXT[status]}
     </span>
   )
 }
 
-// One block: its name and help, its status once it is read, and the link that adds it in the theme editor.
+// The link that adds a block (or turns an embed on) in the theme editor.
+function ThemeLink({ kind, label, link }: { kind: 'block' | 'embed'; label: string; link: string }) {
+  const action = kind === 'block' ? 'Add to theme' : 'Turn on'
+  return <a href={link} target="_top" aria-label={`${action}: ${label}`} className="text-form-label-md text-form-secondary hover:underline whitespace-nowrap">{action} →</a>
+}
+
+// One block: its name and help on the left; on the right, its status tag (once it is read) in the top corner and,
+// below it, the link that adds the block in the theme editor.
+// A block that is already active has no link: there is nothing to add or turn on.
 function ThemeRow({ row, status, link }: { row: (typeof ROWS)[number]; status: BlockStatus | null; link: string }) {
-  const action = row.kind === 'block' ? 'Add to theme' : 'Turn on'
   return (
-    <li className="flex items-center justify-between gap-3 p-4 rounded-2xl bg-form-surface-container-low">
+    <li className="flex items-start justify-between gap-3 p-4 rounded-2xl bg-form-surface-container-low">
       <span>
         <span className="block text-form-label-md text-form-on-surface font-medium">{row.label}</span>
         <span className="block text-form-body-sm text-form-on-surface-variant">{row.help}</span>
-        {status === null ? null : <StatusPill status={status} />}
       </span>
-      <a href={link} target="_top" aria-label={`${action}: ${row.label}`} className="text-form-label-md text-form-secondary hover:underline whitespace-nowrap">{action} →</a>
+      <span className="flex flex-col items-end gap-2 flex-shrink-0">
+        {status === null ? null : <StatusPill status={status} />}
+        {status === 'active' ? null : <ThemeLink kind={row.kind} label={row.label} link={link} />}
+      </span>
     </li>
   )
 }
