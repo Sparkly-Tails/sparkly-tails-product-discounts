@@ -18,7 +18,7 @@ function makeStorage(initial: Record<string, string> = {}) {
 
 const NOW_SECONDS = 1_800_000_000
 const TIERS = [{ minQty: 8, fixedPrice: 1.63 }, { minQty: 16, fixedPrice: 1.55 }]
-type Discount = { discountId?: string; tiers: object[]; members: { productId: string; handle: string; variantIds: string[] | null }[]; flash: { startsAtUnix: number; endsAtUnix: number } | null; popupFrequency?: 'session' | 'checkout' }
+type Discount = { discountId?: string; tiers: object[]; members: { productId: string; handle: string; variantIds: string[] | null }[]; flash: { startsAtUnix: number; endsAtUnix: number } | null }
 const discountOf = (overrides: Partial<Discount> = {}): Discount => ({ discountId: 'gid://shopify/DiscountAutomaticNode/1', tiers: TIERS, members: [{ productId: '100', handle: 'tuna', variantIds: null }], flash: null, ...overrides })
 
 describe('countBundleUnits', () => {
@@ -96,19 +96,11 @@ describe('listDueBundles', () => {
     expect(due({ discounts: [flash(NOW_SECONDS - 10, NOW_SECONDS + 100)] })).toHaveLength(1)
   })
 
-  it('shows a session bundle once, and a checkout bundle every time', () => {
-    const storage = makeStorage()
-    const session = discountOf({ popupFrequency: 'session' })
-    const checkout = discountOf({ popupFrequency: 'checkout' })
-    storage.setItem(buildShownKey({ discount: session }), '1')
-    expect(due({ discounts: [session], storage })).toEqual([])
-    expect(due({ discounts: [checkout], storage })).toHaveLength(1)
-  })
-
-  it('treats a missing frequency as once per session', () => {
+  it('does not list a bundle this session has already shown, and lists it again when the storage forgets', () => {
     const storage = makeStorage()
     storage.setItem(buildShownKey({ discount: discountOf() }), '1')
     expect(due({ discounts: [discountOf()], storage })).toEqual([])
+    expect(due({ discounts: [discountOf()], storage: null as never })).toHaveLength(1)
   })
 
   it('keys a stale-index discount by its first product when deciding it was shown (Review Focus 1)', () => {
