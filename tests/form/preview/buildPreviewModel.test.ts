@@ -120,3 +120,21 @@ describe('buildPreviewModel: flash sale', () => {
     expect(build({ flash: sale('2026-10-31T14:00', '2026-10-30T14:00') }).viewModel?.flashBar).toBeNull()
   })
 })
+
+import { buildWidgetStyleVars } from '@/form/preview/previewModel'
+
+describe('buildWidgetStyleVars', () => {
+  it('sets the surface, sun and radius variables for a style', () => {
+    expect(buildWidgetStyleVars({ style: { backgroundColor: '#F5EFE1', cornerRadius: 12 } })).toEqual({
+      '--smooth-discounts-cream': '#F5EFE1',
+      '--smooth-discounts-sun': '#ffdc4c',
+      '--smooth-discounts-radius': '12px',
+    })
+  })
+
+  it('also sets the accent and the flash bar colour when it is given them', () => {
+    const vars = buildWidgetStyleVars({ style: { backgroundColor: '#F5EFE1', cornerRadius: 12, accentColor: '#112233', flashColor: '#111111' } })
+    expect(vars['--smooth-discounts-moss']).toBe('#112233')
+    expect(vars['--smooth-discounts-flash-dark']).toBe('#111111')
+  })
+})

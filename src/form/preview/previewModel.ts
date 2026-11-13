@@ -1,6 +1,5 @@
 // Small steps of the preview model, gathered in PREVIEW_TOOLS (see previewTools.ts).
 import type { WidgetFlash, WidgetFlashBar, WidgetViewModel } from '@/form/preview/widgetTypes'
-import type { WidgetStyle } from '@/lib/widgetStyle'
 
 /** The flash sale as typed in the form: the shop's wall-clock times. */
 export interface FlashInput {
@@ -70,11 +69,23 @@ export function readQuantity({ text, tools }: { text: string; tools: { clampQuan
   return text.trim() === '' || Number.isNaN(value) ? null : tools.clampQuantity({ value })
 }
 
-/** The CSS variables the storefront block sets on the widget for a discount's style (the same names, so the same stylesheet paints it). */
-export function buildWidgetStyleVars({ style }: { style: WidgetStyle }): Record<string, string> {
+/** What the preview paints the widget with: the card's look, and (once the design is store-wide) the accent and the flash bar colours. */
+export interface WidgetPaint {
+  backgroundColor: string
+  cornerRadius: number
+  /** The accent (moss) colour; left out, the stylesheet's own default shows. */
+  accentColor?: string
+  /** The flash bar's background colour; left out, the stylesheet's own default shows. */
+  flashColor?: string
+}
+
+/** The CSS variables the storefront block sets on the widget for a look (the same names, so the same stylesheet paints it). */
+export function buildWidgetStyleVars({ style }: { style: WidgetPaint }): Record<string, string> {
   return {
     '--smooth-discounts-cream': style.backgroundColor,
     '--smooth-discounts-sun': '#ffdc4c',
     '--smooth-discounts-radius': `${style.cornerRadius}px`,
+    ...(style.accentColor ? { '--smooth-discounts-moss': style.accentColor } : {}),
+    ...(style.flashColor ? { '--smooth-discounts-flash-dark': style.flashColor } : {}),
   }
 }
