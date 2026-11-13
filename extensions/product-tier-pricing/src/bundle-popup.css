@@ -1,4 +1,4 @@
-/* The pre-checkout bundle pop-up. It reads the same custom properties as the widget (cream, moss, sun, radius), each with the
+/* The pre-checkout bundle pop-up. It reads the same custom properties as the widget (cream, moss, radius; the sun colour is worked out from the accent and the background), each with the
    widget's own default, so a discount's style reaches the pop-up too. The body text keeps the theme's font ("inherit"); only the heading and
    the box titles use a serif that every device already has. Nothing is loaded from outside. */
 
@@ -7,7 +7,7 @@
 .smooth-discounts-popup__box {
   --popup-cream: var(--smooth-discounts-cream, #f3ecd9);
   --popup-moss: var(--smooth-discounts-moss, #2c3822);
-  --popup-sun: var(--smooth-discounts-sun, #eae3d2);
+  --popup-sun: color-mix(in srgb, var(--popup-moss) 20%, var(--popup-cream));
   --popup-radius: var(--smooth-discounts-radius, 16px);
   --popup-sand: color-mix(in srgb, var(--popup-line) 60%, var(--popup-cream));
   --popup-night: var(--smooth-discounts-flash-dark, color-mix(in srgb, var(--popup-moss) 55%, #000));

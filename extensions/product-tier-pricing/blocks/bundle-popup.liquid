@@ -74,7 +74,6 @@
     data-night-color='{{ style_flash | json | escape }}'
     data-radius='{{ style_radius | json | escape }}'
     data-frequency='{{ style_frequency | json | escape }}'
-    data-sun-color='{{ block.settings.sun_color | json | escape }}'
   ></div>
 {%- endif -%}
 
@@ -84,13 +83,6 @@
   "target": "body",
   "stylesheet": "bundle-popup.css",
   "javascript": "bundle-popup.js",
-  "settings": [
-    {
-      "type": "color",
-      "id": "sun_color",
-      "label": "t:sun_color_label",
-      "default": "#ffdc4c"
-    }
-  ]
+  "settings": []
 }
 {% endschema %}

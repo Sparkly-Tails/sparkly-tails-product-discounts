@@ -37,7 +37,7 @@ describe('the look', () => {
   it('uses the widget\'s custom properties with the widget\'s defaults', () => {
     expect(css).toMatch(/var\(--smooth-discounts-cream,\s*#f3ecd9\)/i)
     expect(css).toMatch(/var\(--smooth-discounts-moss,\s*#2c3822\)/i)
-    expect(css).toMatch(/var\(--smooth-discounts-sun,\s*#eae3d2\)/i)
+    expect(css).not.toContain('--smooth-discounts-sun')
     expect(css).toMatch(/var\(--smooth-discounts-radius,\s*16px\)/i)
   })
 
@@ -82,6 +82,10 @@ describe('the look', () => {
     const phone = css.slice(css.search(/@media\s*\(max-width:\s*640px\)/))
     expect(phone).toMatch(/\.smooth-discounts-popup__milestones\s*\{[^}]*flex-wrap:\s*nowrap/)
     expect(phone).toMatch(/\.smooth-discounts-popup__milestone\s*\{[^}]*flex:\s*1 1 0/)
+  })
+
+  it('works out the sun colour from the accent and the background, so it follows the Settings design', () => {
+    expect(css).toMatch(/--popup-sun:\s*color-mix\(in srgb,\s*var\(--popup-moss\)\s*20%,\s*var\(--popup-cream\)\)/)
   })
 
   it('paints the pop-up window in the sun colour', () => {

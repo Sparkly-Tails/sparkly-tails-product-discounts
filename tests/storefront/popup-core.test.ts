@@ -30,7 +30,7 @@ const GBP_PAGE: CurrencyPage = { shopCurrency: 'GBP', activeCurrency: 'GBP', rat
 const attribute = (text: string) => text.replace(/&/g, '&amp;').replace(/'/g, '&#39;').replace(/"/g, '&quot;')
 
 function embedHtml({ discounts, rootUrl, currency, urls, frequency }: { discounts: Discount[]; rootUrl: string; currency: CurrencyPage; urls: object; frequency: string }) {
-  return `<div data-smooth-discounts-popup hidden data-index="${attribute(JSON.stringify({ discounts }))}" data-money-format="${attribute(JSON.stringify('£{{amount}}'))}" data-root-url="${attribute(JSON.stringify(rootUrl))}" data-shop-currency="${attribute(JSON.stringify(currency.shopCurrency))}" data-money-sample="${attribute(JSON.stringify(currency.sample))}" data-component-urls="${attribute(JSON.stringify(urls))}" data-moss-color="${attribute(JSON.stringify('#434625'))}" data-cream-color="${attribute(JSON.stringify('#f3ecd9'))}" data-night-color="${attribute(JSON.stringify('#2b2d17'))}" data-radius="12" data-frequency="${attribute(JSON.stringify(frequency))}" data-sun-color="${attribute(JSON.stringify('#ffdc4c'))}"></div>`
+  return `<div data-smooth-discounts-popup hidden data-index="${attribute(JSON.stringify({ discounts }))}" data-money-format="${attribute(JSON.stringify('£{{amount}}'))}" data-root-url="${attribute(JSON.stringify(rootUrl))}" data-shop-currency="${attribute(JSON.stringify(currency.shopCurrency))}" data-money-sample="${attribute(JSON.stringify(currency.sample))}" data-component-urls="${attribute(JSON.stringify(urls))}" data-moss-color="${attribute(JSON.stringify('#434625'))}" data-cream-color="${attribute(JSON.stringify('#f3ecd9'))}" data-night-color="${attribute(JSON.stringify('#2b2d17'))}" data-radius="12" data-frequency="${attribute(JSON.stringify(frequency))}"></div>`
 }
 
 const fetchMock = vi.fn()
@@ -164,7 +164,7 @@ describe('a bundle that is due', () => {
     expect(options.components.popupFacts).toBe(FACTS)
     expect(options.components.popupParts).toBe(PARTS)
     expect(options.moneyFormat).toBe('£{{amount}}')
-    expect(options.accents).toEqual({ moss: '#434625', cream: '#f3ecd9', sun: '#ffdc4c', night: '#2b2d17', radius: 12 })
+    expect(options.accents).toEqual({ moss: '#434625', cream: '#f3ecd9', night: '#2b2d17', radius: 12 })
     expect(options.opener).toBe(document.getElementById('checkout'))
     expect(options.boxes).toHaveLength(1)
     expect(options.boxes[0]).toMatchObject({ title: 'Tins mix', units: 3, firstTierQty: 8, basePrice: 1.69, flash: null })
