@@ -8,6 +8,8 @@ import FrequencyPanel from '@/settings/components/FrequencyPanel'
 import PopupPlaceholderPreview from '@/settings/components/PopupPlaceholderPreview'
 import SettingsWidgetPreview from '@/settings/components/SettingsWidgetPreview'
 import StackingPanel from '@/settings/components/StackingPanel'
+import ThemePanel from '@/settings/components/ThemePanel'
+import { readAppBridgeBlocks } from '@/settings/readAppBridgeBlocks'
 import type { SettingsSaveResult } from '@/settings/runSettingsSave'
 import { isSettingsDirty, type SettingsFormValues } from '@/settings/settingsFormValues'
 
@@ -25,10 +27,13 @@ function SettingsMessage({ result }: { result: SettingsSaveResult | null }) {
 
 // The Settings page: the panels in the left column, one Save bar for the whole page (as the discount form has).
 // It keeps the values to know when something is unsaved, and takes everything back on Discard.
-export default function SettingsForm({ initial, hasFlash, currencyCode, initialNowSeconds, saveAction }: {
+export default function SettingsForm({ initial, hasFlash, shop, clientId, currencyCode, initialNowSeconds, saveAction }: {
   initial: SettingsFormValues
   /** True when a flash sale exists: product-discount stacking is then locked on. */
   hasFlash: boolean
+  /** The shop's myshopify.com domain and the app's client id, for the theme editor links. */
+  shop: string
+  clientId: string
   currencyCode: string
   /** The time the page was made, so the preview's first paint matches the server's. */
   initialNowSeconds: number
@@ -93,6 +98,7 @@ export default function SettingsForm({ initial, hasFlash, currencyCode, initialN
             hasFlash={hasFlash}
             onChange={(field, checked) => setValues((current) => ({ ...current, [field]: checked }))}
           />
+          <ThemePanel shop={shop} clientId={clientId} readBlocks={readAppBridgeBlocks} />
         </FormShell>
       </form>
     </>

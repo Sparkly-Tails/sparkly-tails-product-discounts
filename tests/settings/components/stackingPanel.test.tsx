@@ -40,7 +40,7 @@ describe('StackingPanel', () => {
 
 describe('the Settings form with the stacking panel', () => {
   function renderForm({ hasFlash }: { hasFlash: boolean }) {
-    return render(<SettingsForm initial={flattenSettings({ settings: DEFAULT_SETTINGS, stacking: OFF })} hasFlash={hasFlash} currencyCode="USD" initialNowSeconds={1_800_000_000} saveAction={async () => ({ ok: true, message: '' })} />)
+    return render(<SettingsForm initial={flattenSettings({ settings: DEFAULT_SETTINGS, stacking: OFF })} hasFlash={hasFlash} shop="demo.myshopify.com" clientId="abc123" currencyCode="USD" initialNowSeconds={1_800_000_000} saveAction={async () => ({ ok: true, message: '' })} />)
   }
 
   it('sends each choice as true or false with the form, and sends nothing for the checkboxes themselves', () => {
