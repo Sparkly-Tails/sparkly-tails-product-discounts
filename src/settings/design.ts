@@ -68,3 +68,8 @@ export function buildDesignVars({ accentColor, backgroundColor, cornerRadius, fl
     `--smooth-discounts-flash-dark:${FLASH_TONE_COLOURS[flashTone]}`,
   ].join(';')
 }
+
+/** What the form's preview paints the widget with: the design's four values, the flash tone as its colour (the shape of WidgetPaint, src/form/preview/previewModel.ts). */
+export function buildDesignPaint({ accentColor, backgroundColor, cornerRadius, flashTone }: DesignSettings): { accentColor: string; backgroundColor: string; cornerRadius: number; flashColor: string } {
+  return { accentColor, backgroundColor, cornerRadius, flashColor: FLASH_TONE_COLOURS[flashTone] }
+}

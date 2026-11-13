@@ -1,6 +1,5 @@
 import { shopifyQuery } from '@/lib/shopify-client'
 import { METAFIELD_NAMESPACE, METAFIELD_KEYS } from '@/lib/metafieldNames'
-import type { WidgetStyle } from '@/lib/widgetStyle'
 import { CARD_INDEX_TOOLS, buildCardIndexValue } from '@/lib/cardIndex'
 import { getDb } from '@/lib/db'
 import { getRequestShop } from '@/lib/requestShop'
@@ -68,10 +67,14 @@ export interface Discount {
   flash?: FlashSale
   /** Show the "High Demand" tag in the storefront widget (switched on by hand). */
   highDemand?: boolean
-  /** The widget's look for this discount; absent on a discount saved before styles existed. */
-  style?: WidgetStyle
-  /** How often the checkout pop-up shows this bundle; absent (saved before the pop-up) means once per session. */
-  popupFrequency?: 'session' | 'checkout'
+}
+
+/** Fields a discount used to carry that the store-wide Settings replaced (the look and the pop-up frequency). */
+const RETIRED_DISCOUNT_FIELDS = ['style', 'popupFrequency']
+
+/** The discount without the fields it carried before the Settings page, so an old config loads, and is written back, without them. */
+export function dropRetiredFields({ discount }: { discount: Discount }): Discount {
+  return Object.fromEntries(Object.entries(discount).filter(([field]) => !RETIRED_DISCOUNT_FIELDS.includes(field))) as unknown as Discount
 }
 
 export interface Config {
@@ -102,7 +105,7 @@ export async function getConfig(): Promise<Config> {
   }
 
   const parsed = JSON.parse(data.shop.metafield.value) as Partial<Config>
-  return { discounts: Array.isArray(parsed.discounts) ? parsed.discounts : [] }
+  return { discounts: Array.isArray(parsed.discounts) ? parsed.discounts.map((discount) => dropRetiredFields({ discount })) : [] }
 }
 
 /** Writes the config, and with it the index of live discounts the product cards read, in one call so the two never differ. */
@@ -125,7 +128,7 @@ export async function saveConfig(config: Config): Promise<void> {
           namespace: METAFIELD_NAMESPACE,
           key: METAFIELD_KEYS.tierConfig,
           type: 'json',
-          value: JSON.stringify(config),
+          value: JSON.stringify({ ...config, discounts: config.discounts.map((discount) => dropRetiredFields({ discount })) }),
         },
         {
           ownerId: shopId,

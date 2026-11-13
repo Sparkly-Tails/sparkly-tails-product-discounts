@@ -5,6 +5,7 @@ import '@testing-library/jest-dom/vitest'
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }))
 vi.mock('@/lib/shop', () => ({ getShopTimezone: vi.fn(async () => 'Europe/London'), getShopCurrencyCode: vi.fn(async () => 'GBP') }))
+vi.mock('@/settings/settingsStore', () => ({ getStoreSettings: vi.fn(async () => ({ design: { accentColor: '#112233', backgroundColor: '#FFFFFF', cornerRadius: 8, flashTone: 'olive-night' }, popup: { frequency: 'session' } })) }))
 vi.mock('@/actions/saveDiscount', () => ({ saveDiscount: vi.fn(async () => ({ error: 'Shopify allows only 25 active discounts.' })) }))
 vi.mock('@/actions/memberPickerActions', () => ({
   searchProductsAction: vi.fn(async () => []),
