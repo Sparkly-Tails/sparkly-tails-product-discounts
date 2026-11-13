@@ -83,7 +83,6 @@ export interface WidgetPaint {
 export function buildWidgetStyleVars({ style }: { style: WidgetPaint }): Record<string, string> {
   return {
     '--smooth-discounts-cream': style.backgroundColor,
-    '--smooth-discounts-sun': '#ffdc4c',
     '--smooth-discounts-radius': `${style.cornerRadius}px`,
     ...(style.accentColor ? { '--smooth-discounts-moss': style.accentColor } : {}),
     ...(style.flashColor ? { '--smooth-discounts-flash-dark': style.flashColor } : {}),

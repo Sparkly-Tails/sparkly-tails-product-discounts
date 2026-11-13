@@ -100,8 +100,9 @@ describe('the bundle pop-up embed and its components', () => {
     }
   })
 
-  it('prints the sun colour setting, and the store-wide design and frequency, under the names the script reads', () => {
-    expect(block).toContain("data-sun-color='{{ block.settings.sun_color | json | escape }}'")
+  it('prints the store-wide design and frequency under the names the script reads, and has no sun colour setting', () => {
+    expect(block).not.toContain('sun_color')
+    expect(block).not.toContain('data-sun-color')
     for (const [attribute, variable] of [['data-moss-color', 'style_accent'], ['data-cream-color', 'style_background'], ['data-night-color', 'style_flash'], ['data-radius', 'style_radius'], ['data-frequency', 'style_frequency']]) {
       expect(block).toContain(`${attribute}='{{ ${variable} | json | escape }}'`)
     }

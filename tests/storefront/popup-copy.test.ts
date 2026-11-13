@@ -120,20 +120,20 @@ describe('readBoxLook', () => {
 })
 
 describe('applyBoxLook', () => {
-  const apply = (look: { background: string; radius: number | null }, accents: object = { moss: '#434625', sun: '#ffdc4c', night: '#2b2d17' }) => {
+  const apply = (look: { background: string; radius: number | null }, accents: object = { moss: '#434625', night: '#2b2d17' }) => {
     const box = document.createElement('div')
     applyBoxLook({ box, look, accents, tools: LOOK_TOOLS })
     return (name: string) => box.style.getPropertyValue(name)
   }
-  const NAMES = ['--smooth-discounts-cream', '--smooth-discounts-radius', '--smooth-discounts-moss', '--smooth-discounts-sun', '--smooth-discounts-flash-dark']
+  const NAMES = ['--smooth-discounts-cream', '--smooth-discounts-radius', '--smooth-discounts-moss', '--smooth-discounts-flash-dark']
 
-  it('sets the widget\'s five custom properties on the box, the flash tone included', () => {
+  it('sets the widget\'s four custom properties on the box, the flash tone included, and no sun colour', () => {
     const read = apply({ background: '#AABBCC', radius: 8 })
-    expect(NAMES.map(read)).toEqual(['#AABBCC', '8px', '#434625', '#FFDC4C', '#2B2D17'])
+    expect(NAMES.map(read)).toEqual(['#AABBCC', '8px', '#434625', '#2B2D17'])
   })
 
   it('sets no radius for a null radius, and nothing for a colour that is not a hex code', () => {
-    const read = apply({ background: '', radius: null }, { moss: 'red', sun: '#ffdc4c', night: 'blue' })
-    expect(NAMES.map(read)).toEqual(['', '', '', '#FFDC4C', ''])
+    const read = apply({ background: '', radius: null }, { moss: 'red', night: 'blue' })
+    expect(NAMES.map(read)).toEqual(['', '', '', ''])
   })
 })

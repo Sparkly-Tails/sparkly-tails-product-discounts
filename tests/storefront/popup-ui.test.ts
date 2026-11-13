@@ -82,7 +82,7 @@ async function settle() {
 type OpenOptions = { boxes?: Box[]; root?: string; moneyFormat?: string; accents?: object; cart?: Record<number, number> }
 type Opened = { promise: Promise<Answer>; dialog: HTMLDialogElement; opener: HTMLElement; answers: Answer[] }
 
-async function openBoxes({ boxes = [boxOf()], root = '/', moneyFormat = '£{{amount}}', accents = { moss: '#434625', cream: '#f3ecd9', sun: '#ffdc4c', night: '#2b2d17', radius: 12 }, cart = { 11: 3 } }: OpenOptions = {}): Promise<Opened> {
+async function openBoxes({ boxes = [boxOf()], root = '/', moneyFormat = '£{{amount}}', accents = { moss: '#434625', cream: '#f3ecd9', night: '#2b2d17', radius: 12 }, cart = { 11: 3 } }: OpenOptions = {}): Promise<Opened> {
   network = startNetwork({ ...cart })
   document.body.innerHTML = '<button name="checkout" type="submit">Check out</button>'
   const opener = document.querySelector('button[name="checkout"]') as HTMLElement
@@ -685,19 +685,19 @@ describe('the look and the words', () => {
   })
 
   it('gives every box the store\'s look: background, corner radius, accents and flash tone', async () => {
-    await openBoxes({ boxes: [boxOf(), secondBoxOf()], accents: { moss: '#434625', cream: '#aabbcc', sun: '#ffdc4c', night: '#1b3a2d', radius: 8 } })
+    await openBoxes({ boxes: [boxOf(), secondBoxOf()], accents: { moss: '#434625', cream: '#aabbcc', night: '#1b3a2d', radius: 8 } })
 
     for (const element of boxElements()) {
       expect(element.style.getPropertyValue('--smooth-discounts-cream')).toBe('#AABBCC')
       expect(element.style.getPropertyValue('--smooth-discounts-radius')).toBe('8px')
       expect(element.style.getPropertyValue('--smooth-discounts-moss')).toBe('#434625')
-      expect(element.style.getPropertyValue('--smooth-discounts-sun')).toBe('#FFDC4C')
+      expect(element.style.getPropertyValue('--smooth-discounts-sun')).toBe('')
       expect(element.style.getPropertyValue('--smooth-discounts-flash-dark')).toBe('#1B3A2D')
     }
   })
 
   it('leaves out an unsafe colour and a radius out of range, so the stylesheet default applies', async () => {
-    await openBoxes({ accents: { moss: '#434625', cream: 'red;}body{display:none', sun: '#ffdc4c', night: 'blue', radius: 99 } })
+    await openBoxes({ accents: { moss: '#434625', cream: 'red;}body{display:none', night: 'blue', radius: 99 } })
 
     const [element] = boxElements()
     expect(element.style.getPropertyValue('--smooth-discounts-cream')).toBe('')

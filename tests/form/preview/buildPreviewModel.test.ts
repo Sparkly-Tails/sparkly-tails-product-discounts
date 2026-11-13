@@ -124,10 +124,9 @@ describe('buildPreviewModel: flash sale', () => {
 import { buildWidgetStyleVars } from '@/form/preview/previewModel'
 
 describe('buildWidgetStyleVars', () => {
-  it('sets the surface, sun and radius variables for a style', () => {
+  it('sets the surface and radius variables for a style', () => {
     expect(buildWidgetStyleVars({ style: { backgroundColor: '#F5EFE1', cornerRadius: 12 } })).toEqual({
       '--smooth-discounts-cream': '#F5EFE1',
-      '--smooth-discounts-sun': '#ffdc4c',
       '--smooth-discounts-radius': '12px',
     })
   })

@@ -34,12 +34,11 @@ export function parseNumber(text) {
   }
 }
 
-/** The store-wide look the embed printed (colours as text, the radius as a number), and the sun colour from the embed's own setting. */
+/** The store-wide look the embed printed (colours as text, the radius as a number). */
 export function readAccents({ element, tools }) {
   return {
     moss: tools.parseText(element.dataset.mossColor),
     cream: tools.parseText(element.dataset.creamColor),
-    sun: tools.parseText(element.dataset.sunColor),
     night: tools.parseText(element.dataset.nightColor),
     radius: tools.parseNumber(element.dataset.radius),
   }

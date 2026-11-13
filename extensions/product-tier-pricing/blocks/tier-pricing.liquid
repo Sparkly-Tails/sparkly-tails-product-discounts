@@ -153,7 +153,7 @@
   src/settings/design.ts). Where the store has not saved a design, or a value is missing or unusable, the default
   applies: accent #434625, background #F5EFE1, radius 12, flash bar Olive Night. A colour must pass the hex check
   (a # and exactly six hexadecimal digits for the accent, six or eight for the background) and the radius is kept
-  inside the range the Settings page allows. The sun colour stays a theme editor setting.
+  inside the range the Settings page allows.
 {%- endcomment -%}
 {%- assign design_value = shop.metafields['$app:smooth_discount'].tier_settings.value.design -%}
 {%- assign style_accent = '#434625' -%}
@@ -182,7 +182,7 @@
   {%- endcase -%}
 {%- endif -%}
 {%- capture style_vars -%}
-  --smooth-discounts-moss: {{ style_accent }}; --smooth-discounts-cream: {{ style_background }}; --smooth-discounts-sun: {{ block.settings.sun_color }}; --smooth-discounts-radius: {{ style_radius }}px; --smooth-discounts-flash-dark: {{ style_flash }};
+  --smooth-discounts-moss: {{ style_accent }}; --smooth-discounts-cream: {{ style_background }}; --smooth-discounts-radius: {{ style_radius }}px; --smooth-discounts-flash-dark: {{ style_flash }};
 {%- endcapture -%}
 
 <div
@@ -277,12 +277,6 @@
   "stylesheet": "tier-pricing.css",
   "javascript": "tier-pricing.js",
   "settings": [
-    {
-      "type": "color",
-      "id": "sun_color",
-      "label": "t:sun_color_label",
-      "default": "#ffdc4c"
-    },
     {
       "type": "textarea",
       "id": "custom_css",

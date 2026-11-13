@@ -20,11 +20,11 @@ describe('tier-pricing.liquid: the store-wide design', () => {
     expect(block).not.toContain('style_value')
   })
 
-  it('has no accent or background setting in the theme editor any more, and keeps the sun colour and the custom CSS', () => {
-    expect(settingIds).toEqual(['sun_color', 'custom_css'])
+  it('has no accent or background setting in the theme editor any more, and no sun colour setting either, and keeps the custom CSS', () => {
+    expect(settingIds).toEqual(['custom_css'])
     expect(block).not.toContain('block.settings.moss_color')
     expect(block).not.toContain('block.settings.cream_color')
-    expect(block).toContain('block.settings.sun_color')
+    expect(block).not.toContain('sun_color')
   })
 
   it('falls back to the default design where the metafield or a value is missing or unusable', () => {

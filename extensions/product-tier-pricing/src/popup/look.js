@@ -41,7 +41,6 @@ export function applyBoxLook({ box, look, accents, tools }) {
     ['--smooth-discounts-cream', look.background],
     ['--smooth-discounts-radius', look.radius === null ? '' : look.radius + 'px'],
     ['--smooth-discounts-moss', tools.pickHexColor({ candidates: [accents.moss] })],
-    ['--smooth-discounts-sun', tools.pickHexColor({ candidates: [accents.sun] })],
     ['--smooth-discounts-flash-dark', tools.pickHexColor({ candidates: [accents.night] })],
   ]
   properties.filter(hasPropertyValue).forEach(tools.setBoxProperty.bind(null, { box }))
