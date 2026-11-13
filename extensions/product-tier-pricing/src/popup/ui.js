@@ -19,7 +19,7 @@ export function describeBox(box, index) {
 
 /** A box as the pop-up keeps it: its data, its element, the units and cart lines now, and whether an add failed or is on its way. */
 export function createView({ doc, options }, { box, index }) {
-  const look = options.components.popupFacts.readLook({ box, creamFallback: options.accents.cream })
+  const look = options.components.popupFacts.readLook({ accents: options.accents })
   return { box, element: options.components.popupView.createBox({ doc, index, look, accents: options.accents }), index, units: box.units, lines: box.lines, quantities: {}, showAll: false, failed: false, isBusy: false, isGone: false }
 }
 

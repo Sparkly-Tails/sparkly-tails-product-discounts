@@ -1,16 +1,13 @@
 import { describe, it, expect } from 'vitest'
-import { DEFAULT_WIDGET_STYLE } from '@/lib/widgetStyle'
 import { isFormDirty, buildComparable, buildPreviewProducts, canSaveValues, buildPreviewFlash, pickBasePrice, type FormValues } from '@/form/formValues'
 
 const SAVED: FormValues = {
   name: 'Salmon Oil Volume Discount',
   title: 'Salmon Oil bundle',
-  popupFrequency: 'session',
   members: [{ productId: 'p1', variantId: 'v1', productTitle: 'Salmon Oil', variantTitle: '16 fl oz', price: 28, imageUrl: null }],
   pricingMode: 'percent',
   tiers: [{ minQty: 3, percentOff: 10 }, { minQty: 5, percentOff: 15, anchorPrice: 100 }],
   flash: { enabled: true, startsAt: '2026-11-27T09:00', endsAt: '2026-11-30T23:59', showTeaser: true, highDemand: false },
-  style: DEFAULT_WIDGET_STYLE,
 }
 
 const dirty = (changes: Partial<FormValues>) => isFormDirty({ initial: SAVED, current: { ...SAVED, ...changes }, tools: { buildComparable } })
@@ -24,9 +21,8 @@ describe('isFormDirty', () => {
     expect(dirty({ name: 'Other' })).toBe(true)
   })
 
-  it('is dirty when the title or the pop-up frequency changes', () => {
+  it('is dirty when the title changes', () => {
     expect(dirty({ title: 'Other title' })).toBe(true)
-    expect(dirty({ popupFrequency: 'checkout' })).toBe(true)
   })
 
   it('is dirty when a product is added or removed', () => {
@@ -49,13 +45,6 @@ describe('isFormDirty', () => {
     expect(dirty({ flash: { ...SAVED.flash, showTeaser: false } })).toBe(true)
     expect(dirty({ flash: { ...SAVED.flash, highDemand: true } })).toBe(true)
     expect(dirty({ flash: { ...SAVED.flash, enabled: false } })).toBe(true)
-  })
-
-  it('is dirty when any of the style values changes', () => {
-    expect(dirty({ style: { ...SAVED.style, backgroundColor: '#FFFFFF80' } })).toBe(true)
-    expect(dirty({ style: { ...SAVED.style, backgroundColor: '#FFFFFF' } })).toBe(true)
-    expect(dirty({ style: { ...SAVED.style, cornerRadius: 0 } })).toBe(true)
-    expect(dirty({ style: { ...SAVED.style } })).toBe(false)
   })
 
   it('does not mind the product details the form does not send (titles, prices, images)', () => {

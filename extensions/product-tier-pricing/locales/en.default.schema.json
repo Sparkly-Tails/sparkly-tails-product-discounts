@@ -2,8 +2,6 @@
   "name": "Tier pricing",
   "card_prices_name": "Product card prices",
   "bundle_popup_name": "Bundle pop-up",
-  "moss_color_label": "Progress bar / accent color",
-  "cream_color_label": "Tier card background color",
   "sun_color_label": "\"Adding now\" bar segment color",
   "custom_css_label": "Custom CSS",
   "custom_css_info": "Advanced. Applies only to this block."

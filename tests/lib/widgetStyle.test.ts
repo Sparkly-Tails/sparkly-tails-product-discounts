@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import { DEFAULT_WIDGET_STYLE, WIDGET_STYLE_TOOLS, readHexColor, readWholeNumber, readWidgetStyle } from '@/lib/widgetStyle'
+import { CORNER_RADIUS_RANGE, readHexColor, readWholeNumber } from '@/lib/widgetStyle'
 
-describe('DEFAULT_WIDGET_STYLE', () => {
-  it('is what the Design card starts with', () => {
-    expect(DEFAULT_WIDGET_STYLE).toEqual({ backgroundColor: '#F5EFE1', cornerRadius: 12 })
+describe('CORNER_RADIUS_RANGE', () => {
+  it('is 0 to 24 px', () => {
+    expect(CORNER_RADIUS_RANGE).toEqual({ min: 0, max: 24 })
   })
 })
 
@@ -36,21 +36,5 @@ describe('readWholeNumber', () => {
 
   it('falls back for an empty or non-numeric value', () => {
     for (const text of ['', '  ', 'abc', 'null', 'NaN']) expect(readWholeNumber({ text, min: 12, max: 48, fallback: 24 })).toBe(24)
-  })
-})
-
-describe('readWidgetStyle', () => {
-  it('reads both values', () => {
-    expect(readWidgetStyle({ values: { backgroundColor: '#ffffff', cornerRadius: '0' }, tools: WIDGET_STYLE_TOOLS })).toEqual({
-      backgroundColor: '#FFFFFF', cornerRadius: 0,
-    })
-  })
-
-  it('keeps the transparency of the background colour', () => {
-    expect(readWidgetStyle({ values: { backgroundColor: '#ffffff80', cornerRadius: '4' }, tools: WIDGET_STYLE_TOOLS }).backgroundColor).toBe('#FFFFFF80')
-  })
-
-  it('replaces every bad value by its default', () => {
-    expect(readWidgetStyle({ values: { backgroundColor: '', cornerRadius: 'wide' }, tools: WIDGET_STYLE_TOOLS })).toEqual(DEFAULT_WIDGET_STYLE)
   })
 })

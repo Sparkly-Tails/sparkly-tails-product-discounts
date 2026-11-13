@@ -23,10 +23,6 @@ export interface CardIndexDiscount {
   discountId: string
   /** The customer-facing title (the discount's name when the title is blank). */
   title: string
-  /** How often the checkout pop-up shows the bundle. */
-  popupFrequency: 'session' | 'checkout'
-  /** The look of the discount's boxes; left out when the discount has none. */
-  style?: { backgroundColor: string; cornerRadius: number }
   tiers: Tier[]
   members: CardIndexMember[]
   /** The flash sale window in Unix seconds; null for a regular discount. */
@@ -75,8 +71,6 @@ export interface CardIndexTools {
   attachHandles: typeof attachHandles
   buildCardDiscount: typeof buildCardDiscount
   pickCardTitle: typeof pickCardTitle
-  pickPopupFrequency: typeof pickPopupFrequency
-  buildCardStyle: typeof buildCardStyle
   buildCardEntry: typeof buildCardEntry
   listFlashPair: typeof listFlashPair
   listFlashWindows: typeof listFlashWindows
@@ -125,23 +119,11 @@ export function pickCardTitle({ title, name }: { title: string; name: string }):
   return title || name
 }
 
-/** A discount saved before the pop-up has no frequency: once per session. */
-export function pickPopupFrequency({ popupFrequency }: { popupFrequency: Discount['popupFrequency'] }): 'session' | 'checkout' {
-  return popupFrequency === 'checkout' ? 'checkout' : 'session'
-}
-
-/** The `style` entry of an index discount: the two look values, or nothing for a discount without a look. */
-export function buildCardStyle({ style }: { style: Discount['style'] }): { style?: { backgroundColor: string; cornerRadius: number } } {
-  return style ? { style: { backgroundColor: style.backgroundColor, cornerRadius: style.cornerRadius } } : {}
-}
-
 export function buildCardDiscount({ discount, window, handles, tools }: { discount: Discount; window: FlashWindowUnix | null; handles: HandleList; tools: CardIndexTools }): CardIndexDiscount {
   const grouped = tools.groupMembers({ members: discount.members, tools })
   return {
     discountId: discount.discountId,
     title: tools.pickCardTitle({ title: discount.title, name: discount.name }),
-    popupFrequency: tools.pickPopupFrequency({ popupFrequency: discount.popupFrequency }),
-    ...tools.buildCardStyle({ style: discount.style }),
     tiers: discount.tiers,
     members: tools.attachHandles({ members: grouped, handles, tools }),
     flash: window,
@@ -238,8 +220,6 @@ export const CARD_INDEX_TOOLS: CardIndexTools = {
   attachHandles,
   buildCardDiscount,
   pickCardTitle,
-  pickPopupFrequency,
-  buildCardStyle,
   buildCardEntry,
   listFlashPair,
   listFlashWindows,

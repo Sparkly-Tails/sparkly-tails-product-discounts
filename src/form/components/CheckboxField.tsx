@@ -6,6 +6,7 @@ export default function CheckboxField({
   checked,
   onChange,
   isStrong,
+  isDisabled,
   className,
 }: {
   name: string
@@ -13,15 +14,18 @@ export default function CheckboxField({
   checked: boolean
   onChange: (checked: boolean) => void
   isStrong?: boolean
+  /** The box shows its state but cannot be changed. */
+  isDisabled?: boolean
   className?: string
 }) {
   const textClass = isStrong ? 'text-form-label-md text-form-on-surface font-medium' : 'text-form-body-md text-form-on-surface'
   return (
-    <label className={['flex items-center gap-2.5 cursor-pointer', className].join(' ')}>
+    <label className={['flex items-center gap-2.5', isDisabled ? 'cursor-not-allowed opacity-70' : 'cursor-pointer', className].join(' ')}>
       <input
         name={name}
         type="checkbox"
         checked={checked}
+        disabled={isDisabled}
         onChange={(event) => onChange(event.target.checked)}
         className="w-4 h-4 rounded text-form-secondary bg-form-surface-container-lowest border border-form-outline accent-form-secondary cursor-pointer"
       />

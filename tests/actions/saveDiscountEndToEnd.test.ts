@@ -72,23 +72,13 @@ beforeEach(() => {
 })
 afterEach(() => vi.useRealTimers())
 
-describe('the style of a discount', () => {
-  it('is saved with the discount from the two fields of the Design card', async () => {
+describe('the style and pop-up frequency of a discount', () => {
+  it('are not saved: the store-wide Settings decide both, even when an old form still sends them', async () => {
     const { saveSpy } = setup()
-    await save(form({ 'style-backgroundColor': '#ffffffcc', 'style-cornerRadius': '4' }))
-    expect(saveSpy.mock.calls[0][0].discounts[0].style).toEqual({ backgroundColor: '#FFFFFFCC', cornerRadius: 4 })
-  })
-
-  it('is saved with the Design card\'s defaults when the card was left alone (or the fields are missing)', async () => {
-    const { saveSpy } = setup()
-    await save(form())
-    expect(saveSpy.mock.calls[0][0].discounts[0].style).toEqual({ backgroundColor: '#F5EFE1', cornerRadius: 12 })
-  })
-
-  it('replaces a value that is not a colour or a number by its default instead of storing it', async () => {
-    const { saveSpy } = setup()
-    await save(form({ 'style-backgroundColor': 'red;}</style>', 'style-cornerRadius': 'huge' }))
-    expect(saveSpy.mock.calls[0][0].discounts[0].style).toMatchObject({ backgroundColor: '#F5EFE1', cornerRadius: 12 })
+    await save(form({ 'style-backgroundColor': '#ffffffcc', 'style-cornerRadius': '4', popupFrequency: 'checkout' }))
+    const saved = saveSpy.mock.calls[0][0].discounts[0]
+    expect(saved).not.toHaveProperty('style')
+    expect(saved).not.toHaveProperty('popupFrequency')
   })
 })
 
@@ -101,11 +91,11 @@ describe('saving a new discount', () => {
     expect(redirect).not.toHaveBeenCalled()
   })
 
-  it('creates a draft with the title of the form and the pop-up frequency, with the parsed tiers, and goes to its page', async () => {
+  it('creates a draft with the title of the form, with the parsed tiers, and goes to its page', async () => {
     const { saveSpy } = setup()
-    await save(form({ title: 'Soup sale', popupFrequency: 'checkout' }))
+    await save(form({ title: 'Soup sale' }))
     expect(saveSpy).toHaveBeenCalledWith({
-      discounts: [{ discountId: expect.stringMatching(/^disc_/), name: 'Soup', title: 'Soup sale', popupFrequency: 'checkout', status: 'draft', pricingMode: 'percent', members: [{ productId: P1 }], tiers: [{ minQty: 5, percentOff: 10 }], style: { backgroundColor: '#F5EFE1', cornerRadius: 12 } }],
+      discounts: [{ discountId: expect.stringMatching(/^disc_/), name: 'Soup', title: 'Soup sale', status: 'draft', pricingMode: 'percent', members: [{ productId: P1 }], tiers: [{ minQty: 5, percentOff: 10 }] }],
     })
     expect(redirect).toHaveBeenCalledWith(expect.stringMatching(/^\/discounts\/disc_/))
   })

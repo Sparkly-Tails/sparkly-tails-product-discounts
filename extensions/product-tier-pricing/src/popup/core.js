@@ -18,10 +18,10 @@ const PRESS_BUDGET_MS = 2000
 const PASS_ANSWER = { action: 'continue', didAdd: false }
 const CHECKOUT_SELECTOR = '[name="checkout"]'
 
-/** The page's sessionStorage, or null when the page does not allow it. */
-export function readStorage({ win }) {
+/** The page's sessionStorage, or null when the page does not allow it. Also null when the store shows the pop-up at every press: with no storage nothing is remembered, so a bundle is due again each time. */
+export function readStorage({ win, frequency }) {
   try {
-    return win.sessionStorage
+    return frequency === 'checkout' ? null : win.sessionStorage
   } catch {
     return null
   }
@@ -41,7 +41,7 @@ export function isCheckoutPress({ target, state }) {
 export async function readDueBundles({ win, config, tools }) {
   const cart = await tools.fetchJson({ win, path: tools.buildRootPath({ rootUrl: config.rootUrl, path: 'cart.js' }) })
   const nowSeconds = Math.floor(win.Date.now() / 1000)
-  const due = tools.listDueBundles({ discounts: config.index.discounts, lines: cart.items, nowSeconds, storage: tools.readStorage({ win }), tools })
+  const due = tools.listDueBundles({ discounts: config.index.discounts, lines: cart.items, nowSeconds, storage: tools.readStorage({ win, frequency: config.frequency }), tools })
   return { due, lines: cart.items }
 }
 
@@ -54,14 +54,14 @@ export async function prepareBoxes({ win, config, tools }) {
   return { ...prepared, ui: components.popupUi, components }
 }
 
-/** A bundle set to "once per session" is remembered as shown. */
+/** A bundle is remembered as shown (not at all when the store shows the pop-up at every press: the storage is then null). */
 export function recordBox({ storage, tools }, box) {
-  if (box.popupFrequency !== 'checkout') tools.recordShown({ storage, key: box.shownKey })
+  tools.recordShown({ storage, key: box.shownKey })
 }
 
 /** Opens the pop-up; each box is remembered as shown now, when it appears. Resolves with `{ action, didAdd }`. */
 export function showBoxes({ win, config, target, prepared, tools }) {
-  prepared.boxes.forEach(tools.recordBox.bind(null, { storage: tools.readStorage({ win }), tools }))
+  prepared.boxes.forEach(tools.recordBox.bind(null, { storage: tools.readStorage({ win, frequency: config.frequency }), tools }))
   return prepared.ui.openPopup({ win, boxes: prepared.boxes, root: config.rootUrl, accents: prepared.accents, moneyFormat: prepared.moneyFormat, opener: target, components: prepared.components })
 }
 

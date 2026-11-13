@@ -7,11 +7,10 @@ import QuantityPicker from '@/form/preview/components/QuantityPicker'
 import WidgetView from '@/form/preview/components/WidgetView'
 import { buildPreviewModel, type PreviewProduct } from '@/form/preview/buildPreviewModel'
 import { pickPreviewPrice } from '@/form/preview/pickPreviewPrice'
-import type { FlashInput } from '@/form/preview/previewModel'
+import type { FlashInput, WidgetPaint } from '@/form/preview/previewModel'
 import { PREVIEW_TOOLS } from '@/form/preview/previewTools'
 import { WIDGET_FUNCTIONS } from '@/form/preview/widgetFunctions'
 import { readCurrencySymbol, type PreviewTier } from '@/form/tierRows'
-import type { WidgetStyle } from '@/lib/widgetStyle'
 
 // The live preview: the storefront widget for the product chosen from the list,
 // with the form's tiers and flash sale. Clicking a tier sets the quantity, as on
@@ -22,7 +21,7 @@ export default function WidgetPreview({ products, tiers, flash, highDemand, styl
   flash: FlashInput | null
   highDemand: boolean
   /** The Design card's style, painted on the widget. */
-  style: WidgetStyle
+  style: WidgetPaint
   timeZone: string
   currencyCode: string
   /** The time the page was made, so the first paint matches the server's. */

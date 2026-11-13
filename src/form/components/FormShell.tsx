@@ -16,7 +16,8 @@ export default function FormShell({
 }: {
   breadcrumbLabel: string
   heading: string
-  badge: string
+  /** The status pill next to the heading; a page without a status leaves it out. */
+  badge?: string
   actions: ReactNode
   notice: ReactNode
   children: ReactNode
@@ -36,10 +37,12 @@ export default function FormShell({
         <div data-testid="form-header-row" className="flex flex-wrap items-center justify-between gap-form-sm">
           <div className="flex items-center gap-form-sm">
             <h1 className="text-form-headline-lg text-form-on-surface tracking-tight">{heading}</h1>
-            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-form-surface-container text-form-on-surface-variant text-form-label-sm font-medium">
-              <span className="w-1.5 h-1.5 rounded-full bg-form-outline"></span>
-              {badge}
-            </span>
+            {badge ? (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-form-surface-container text-form-on-surface-variant text-form-label-sm font-medium">
+                <span className="w-1.5 h-1.5 rounded-full bg-form-outline"></span>
+                {badge}
+              </span>
+            ) : null}
           </div>
           {actions ? <div data-testid="form-header-actions" className="flex items-center gap-form-sm">{actions}</div> : null}
         </div>

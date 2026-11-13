@@ -3,7 +3,6 @@
 import { Fragment, useActionState, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import DetailsCard from '@/form/components/DetailsCard'
-import DesignCard from '@/form/components/DesignCard'
 import FlashCard from '@/form/components/FlashCard'
 import FormActions from '@/form/components/FormActions'
 import FormShell from '@/form/components/FormShell'
@@ -14,6 +13,7 @@ import TiersCard, { type TiersInitial } from '@/form/components/TiersCard'
 import WidgetPreview from '@/form/preview/components/WidgetPreview'
 import { buildComparable, buildPreviewFlash, buildPreviewProducts, canSaveValues, isFormDirty, isTitleEdited, pickBasePrice, pickTitleAfterNameChange, type FormValues } from '@/form/formValues'
 import { pricesUniform } from '@/lib/pricesUniform'
+import { buildDesignPaint, type DesignSettings } from '@/settings/design'
 
 /** What a save sends back when it did not go through; a save that did go through leaves the page. */
 export type SaveState = { error: string } | null
@@ -24,7 +24,7 @@ export type SaveState = { error: string } | null
 // card to show the preview, to say when something is unsaved, to allow saving
 // only with a product and a complete tier, and to take everything back on Discard.
 export default function TierDiscountForm({
-  breadcrumbLabel, heading, badge, mode, status, initial, initialTiers, currencyCode, shopTimezone, nowLocal, initialNowSeconds, excludeDiscountId, saveAction, deleteAction,
+  breadcrumbLabel, heading, badge, mode, status, initial, initialTiers, currencyCode, shopTimezone, nowLocal, initialNowSeconds, design, excludeDiscountId, saveAction, deleteAction,
 }: {
   breadcrumbLabel: string
   heading: string
@@ -39,6 +39,8 @@ export default function TierDiscountForm({
   /** The shop's current local time, for refusing a flash sale that has already ended. */
   nowLocal: string
   initialNowSeconds: number
+  /** The store-wide design saved on the Settings page: the preview is painted with it. */
+  design: DesignSettings
   excludeDiscountId?: string
   saveAction: (state: SaveState, formData: FormData) => Promise<SaveState>
   /** Deletes the discount (Edit only); without it the header has no Delete. */
@@ -83,7 +85,7 @@ export default function TierDiscountForm({
               tiers={values.tiers}
               flash={buildPreviewFlash({ flash: values.flash })}
               highDemand={values.flash.highDemand}
-              style={values.style}
+              style={buildDesignPaint(design)}
               timeZone={shopTimezone}
               currencyCode={currencyCode}
               initialNowSeconds={initialNowSeconds}
@@ -96,8 +98,6 @@ export default function TierDiscountForm({
               onNameChange={(name) => setValues((current) => ({ ...current, name, title: pickTitleAfterNameChange({ name, title: current.title, isTitleEdited: hasEditedTitle }) }))}
               title={values.title}
               onTitleChange={(title) => { setHasEditedTitle(true); setValues((current) => ({ ...current, title })) }}
-              initialPopupFrequency={initial.popupFrequency}
-              onPopupFrequencyChange={(popupFrequency) => setValues((current) => ({ ...current, popupFrequency }))}
             />
             <ProductsCard initialMembers={initial.members} currencyCode={currencyCode} excludeDiscountId={excludeDiscountId} onMembersChange={(members) => setValues((current) => ({ ...current, members }))} />
             <TiersCard
@@ -108,7 +108,6 @@ export default function TierDiscountForm({
               onTiersChange={({ mode: pricingMode, tiers }) => setValues((current) => ({ ...current, pricingMode, tiers }))}
             />
             <FlashCard shopTimezone={shopTimezone} nowLocal={nowLocal} initial={initial.flash} onChange={(flashValues) => setValues((current) => ({ ...current, flash: flashValues }))} />
-            <DesignCard style={values.style} onChange={(style) => setValues((current) => ({ ...current, style }))} />
           </Fragment>
         </FormShell>
       </form>

@@ -5,10 +5,11 @@ import { computeLocalFlashStatus, describeFlashState, DISCOUNT_STATE_TOOLS } fro
 import { formatShopLocalNow } from '@/flash/schedule'
 import FormPage from '@/form/components/FormPage'
 import TierDiscountForm from '@/form/components/TierDiscountForm'
-import { buildFlashValues, buildFormValues, buildSelectedMembers, buildStyleValues, buildTiersInitial } from '@/form/loadFormValues'
+import { buildFlashValues, buildFormValues, buildSelectedMembers, buildTiersInitial } from '@/form/loadFormValues'
 import { getConfig } from '@/lib/config'
 import { getMemberInfo } from '@/lib/products'
 import { getShopCurrencyCode, getShopTimezone, zonedTimeToUtc } from '@/lib/shop'
+import { getStoreSettings } from '@/settings/settingsStore'
 
 export default async function DiscountPage({ params }: { params: Promise<{ discountId: string }> }) {
   const { discountId: encodedDiscountId } = await params
@@ -18,14 +19,14 @@ export default async function DiscountPage({ params }: { params: Promise<{ disco
   const discount = config.discounts.find((candidate) => candidate.discountId === discountId)
   if (!discount) notFound()
 
-  const [memberInfo, shopTimezone, currencyCode] = await Promise.all([getMemberInfo(discount.members), getShopTimezone(), getShopCurrencyCode()])
+  const [memberInfo, shopTimezone, currencyCode, settings] = await Promise.all([getMemberInfo(discount.members), getShopTimezone(), getShopCurrencyCode(), getStoreSettings()])
   const now = new Date()
   const flashStatus = discount.flash
     ? computeLocalFlashStatus({ startsAt: discount.flash.startsAt, endsAt: discount.flash.endsAt, timeZone: shopTimezone, nowMs: now.getTime(), convertToUtc: zonedTimeToUtc, tools: DISCOUNT_STATE_TOOLS })
     : null
   const flashState = describeFlashState({ discountStatus: discount.status, flashStatus })
   const badge = [discount.status === 'live' ? 'Live' : 'Draft', flashState].filter(Boolean).join(' · ')
-  const { values, initialTiers } = buildFormValues({ discount, memberInfo, tools: { buildSelectedMembers, buildFlashValues, buildStyleValues, buildTiersInitial } })
+  const { values, initialTiers } = buildFormValues({ discount, memberInfo, tools: { buildSelectedMembers, buildFlashValues, buildTiersInitial } })
 
   return (
     <FormPage>
@@ -41,6 +42,7 @@ export default async function DiscountPage({ params }: { params: Promise<{ disco
         shopTimezone={shopTimezone}
         nowLocal={formatShopLocalNow({ timeZone: shopTimezone, now })}
         initialNowSeconds={Math.floor(now.getTime() / 1000)}
+        design={settings.design}
         excludeDiscountId={discountId}
         saveAction={saveDiscount}
         deleteAction={deleteDiscount.bind(null, discountId)}

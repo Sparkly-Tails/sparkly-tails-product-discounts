@@ -12,6 +12,8 @@ const input = buildFlashRecordInput({
   discountId: 'disc_abc',
   startsAtUtc: '2026-11-27T09:00:00.000Z',
   endsAtUtc: '2026-11-30T23:59:00.000Z',
+  orderDiscounts: true,
+  shippingDiscounts: false,
 })
 
 describe('buildFlashRecordInput', () => {
@@ -26,7 +28,11 @@ describe('buildFlashRecordInput', () => {
   })
 
   it('allows product discounts to combine, because a dev-store cart showed that a flash product next to a regular tier product gets no flash discount otherwise', () => {
-    expect(input.combinesWith).toEqual({ productDiscounts: true })
+    expect(input.combinesWith.productDiscounts).toBe(true)
+  })
+
+  it('carries the order and shipping choices it is given, so a new flash record starts in step with the Settings', () => {
+    expect(input.combinesWith).toEqual({ orderDiscounts: true, shippingDiscounts: false, productDiscounts: true })
   })
 
   it('carries only the id of the tier discount as the record config, never any tier data', () => {

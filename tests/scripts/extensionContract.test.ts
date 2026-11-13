@@ -100,10 +100,16 @@ describe('the bundle pop-up embed and its components', () => {
     }
   })
 
-  it('prints the three colour settings under the names the script reads', () => {
-    for (const [attribute, setting] of [['data-moss-color', 'moss_color'], ['data-cream-color', 'cream_color'], ['data-sun-color', 'sun_color']]) {
-      expect(block).toContain(`${attribute}='{{ block.settings.${setting} | json | escape }}'`)
+  it('prints the sun colour setting, and the store-wide design and frequency, under the names the script reads', () => {
+    expect(block).toContain("data-sun-color='{{ block.settings.sun_color | json | escape }}'")
+    for (const [attribute, variable] of [['data-moss-color', 'style_accent'], ['data-cream-color', 'style_background'], ['data-night-color', 'style_flash'], ['data-radius', 'style_radius'], ['data-frequency', 'style_frequency']]) {
+      expect(block).toContain(`${attribute}='{{ ${variable} | json | escape }}'`)
     }
+  })
+
+  it('no longer offers the accent and background as embed settings (the Settings page owns them)', () => {
+    expect(block).not.toContain('block.settings.moss_color')
+    expect(block).not.toContain('block.settings.cream_color')
   })
 })
 

@@ -1,6 +1,7 @@
 // Keeps the Shopify discount of a flash sale in step with the tier discount.
 // The record exists only while the discount is live and a flash sale; every
 // call to Shopify is passed in, so each step here is a small pure decision.
+import { readSharedStacking } from '@/settings/stacking'
 import {
   buildFlashRecordInput,
   createFlashRecord,
@@ -33,21 +34,25 @@ export interface RecordContext {
   tools: RecordTools
 }
 
-export function buildWindowInput(context: RecordContext) {
+/** The Shopify input of the flash record; its order and shipping choices come from the shared record, so a new record starts in step with the Settings. */
+export async function buildWindowInput(context: RecordContext) {
+  const stacking = await context.tools.readStacking({ query: context.query })
   return context.tools.buildInput({
     title: context.title,
     discountId: context.discountId,
     startsAtUtc: context.convertToUtc(context.flash!.startsAt),
     endsAtUtc: context.convertToUtc(context.flash!.endsAt),
+    orderDiscounts: stacking.orderDiscounts,
+    shippingDiscounts: stacking.shippingDiscounts,
   })
 }
 
 // One handler per action; each returns the id of the Shopify discount to store (or undefined when there is none).
 export const RECORD_HANDLERS = {
   create: async (context: RecordContext): Promise<string | undefined> =>
-    context.tools.createRecord({ query: context.query, input: context.tools.buildWindowInput(context) }),
+    context.tools.createRecord({ query: context.query, input: await context.tools.buildWindowInput(context) }),
   update: async (context: RecordContext): Promise<string | undefined> => {
-    await context.tools.updateRecord({ query: context.query, shopifyDiscountId: context.shopifyDiscountId!, input: context.tools.buildWindowInput(context) })
+    await context.tools.updateRecord({ query: context.query, shopifyDiscountId: context.shopifyDiscountId!, input: await context.tools.buildWindowInput(context) })
     return context.shopifyDiscountId
   },
   delete: async (context: RecordContext): Promise<string | undefined> => {
@@ -62,6 +67,7 @@ export interface RecordTools {
   handlers: typeof RECORD_HANDLERS
   buildInput: typeof buildFlashRecordInput
   buildWindowInput: typeof buildWindowInput
+  readStacking: typeof readSharedStacking
   createRecord: typeof createFlashRecord
   updateRecord: typeof updateFlashRecord
   deleteRecord: typeof deleteFlashRecord
@@ -72,6 +78,7 @@ export const RECORD_TOOLS: RecordTools = {
   handlers: RECORD_HANDLERS,
   buildInput: buildFlashRecordInput,
   buildWindowInput,
+  readStacking: readSharedStacking,
   createRecord: createFlashRecord,
   updateRecord: updateFlashRecord,
   deleteRecord: deleteFlashRecord,

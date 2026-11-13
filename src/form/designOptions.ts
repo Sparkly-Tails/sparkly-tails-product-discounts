@@ -1,5 +1,5 @@
-// The colours the Design card offers, as in the design. The values the card starts with are
-// DEFAULT_WIDGET_STYLE (src/lib/widgetStyle.ts).
+// The colours the Settings page's colour pickers offer, as in the design. The values a store starts with are
+// DEFAULT_DESIGN (src/settings/design.ts).
 
 export interface ColorChoice {
   label: string

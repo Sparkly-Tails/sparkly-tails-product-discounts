@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { buildFormValues, buildSelectedMembers, buildFlashValues, buildStyleValues, buildTiersInitial } from '@/form/loadFormValues'
+import { buildFormValues, buildSelectedMembers, buildFlashValues, buildTiersInitial } from '@/form/loadFormValues'
 import type { Discount } from '@/lib/config'
-import { DEFAULT_WIDGET_STYLE } from '@/lib/widgetStyle'
 import type { MemberInfo } from '@/lib/products'
 
 const SALMON: MemberInfo = { productId: 'p1', variantId: 'v1', title: 'Salmon Oil – 16 fl oz', productTitle: 'Salmon Oil', variantTitle: '16 fl oz', price: 28, handle: 'salmon', imageUrl: 'https://cdn.example/s.png' }
@@ -52,7 +51,7 @@ describe('buildTiersInitial', () => {
 })
 
 describe('buildFormValues', () => {
-  const tools = { buildSelectedMembers, buildFlashValues, buildStyleValues, buildTiersInitial }
+  const tools = { buildSelectedMembers, buildFlashValues, buildTiersInitial }
 
   it('fills the form from the saved discount', () => {
     const { values, initialTiers } = buildFormValues({ discount: PERCENT, memberInfo: [SALMON], tools })
@@ -64,21 +63,15 @@ describe('buildFormValues', () => {
     expect(initialTiers.mode).toBe('percent')
   })
 
-  it('fills the title and the pop-up frequency; a discount saved before the pop-up gets once per session', () => {
-    const before = buildFormValues({ discount: PERCENT, memberInfo: [SALMON], tools }).values
-    expect([before.title, before.popupFrequency]).toEqual(['Old title', 'session'])
-    expect(buildFormValues({ discount: { ...PERCENT, popupFrequency: 'checkout' }, memberInfo: [SALMON], tools }).values.popupFrequency).toBe('checkout')
+  it('fills the title', () => {
+    expect(buildFormValues({ discount: PERCENT, memberInfo: [SALMON], tools }).values.title).toBe('Old title')
   })
 
-  it('fills the Design card from the saved style, or with its defaults for a discount saved before styles existed', () => {
-    const style = { backgroundColor: '#FFFFFF', cornerRadius: 4 }
-    expect(buildFormValues({ discount: { ...PERCENT, style }, memberInfo: [SALMON], tools }).values.style).toEqual(style)
-    expect(buildFormValues({ discount: PERCENT, memberInfo: [SALMON], tools }).values.style).toEqual(DEFAULT_WIDGET_STYLE)
-  })
-
-  it('leaves out the theme colour and the price size a style saved before they were removed still carries', () => {
-    const saved = { themeColor: '#E63946', backgroundColor: '#FFFFFF', cornerRadius: 4, priceSize: 30 } as unknown as Discount['style']
-    expect(buildFormValues({ discount: { ...PERCENT, style: saved }, memberInfo: [SALMON], tools }).values.style).toEqual({ backgroundColor: '#FFFFFF', cornerRadius: 4 })
+  it('leaves out the look and the pop-up frequency a discount saved before the Settings page still carries', () => {
+    const old = { ...PERCENT, style: { backgroundColor: '#FFFFFF', cornerRadius: 4 }, popupFrequency: 'checkout' } as unknown as Discount
+    const { values } = buildFormValues({ discount: old, memberInfo: [SALMON], tools })
+    expect(values).not.toHaveProperty('style')
+    expect(values).not.toHaveProperty('popupFrequency')
   })
 
   it('skips a product that no longer exists in the shop, as the old page did', () => {

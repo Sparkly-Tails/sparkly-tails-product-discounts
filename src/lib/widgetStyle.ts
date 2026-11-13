@@ -1,15 +1,5 @@
-// The look of one discount's widget: two values, saved with the discount and carried to the storefront
-// in the product's metafield. Pure and client-safe (the form and the server both use it).
-
-export interface WidgetStyle {
-  /** The tier card's background colour: #RRGGBB, or #RRGGBBAA when it is partly transparent. */
-  backgroundColor: string
-  /** The card's corner radius in px; the inner corners are derived from it. */
-  cornerRadius: number
-}
-
-/** What the Design card starts with, and what a missing or bad value falls back to. */
-export const DEFAULT_WIDGET_STYLE: WidgetStyle = { backgroundColor: '#F5EFE1', cornerRadius: 12 }
+// Readers for the design's two number-and-colour values, shared by the Settings page and its tests.
+// Pure and client-safe (the form and the server both use it).
 
 export const CORNER_RADIUS_RANGE = { min: 0, max: 24 }
 
@@ -22,17 +12,4 @@ export function readHexColor({ text, fallback }: { text: string; fallback: strin
 export function readWholeNumber({ text, min, max, fallback }: { text: string; min: number; max: number; fallback: number }): number {
   const value = Number(text)
   return text.trim() === '' || Number.isNaN(value) ? fallback : Math.min(Math.max(Math.round(value), min), max)
-}
-
-export const WIDGET_STYLE_TOOLS = { readHexColor, readWholeNumber }
-
-/** The style of the two values as text (a form's fields); each bad one is replaced by its default. */
-export function readWidgetStyle({ values, tools }: {
-  values: { backgroundColor: string; cornerRadius: string }
-  tools: { readHexColor: typeof readHexColor; readWholeNumber: typeof readWholeNumber }
-}): WidgetStyle {
-  return {
-    backgroundColor: tools.readHexColor({ text: values.backgroundColor, fallback: DEFAULT_WIDGET_STYLE.backgroundColor }),
-    cornerRadius: tools.readWholeNumber({ text: values.cornerRadius, ...CORNER_RADIUS_RANGE, fallback: DEFAULT_WIDGET_STYLE.cornerRadius }),
-  }
 }
