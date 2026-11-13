@@ -1,5 +1,8 @@
 'use server'
 
+import { getConfig, saveConfig } from '@/lib/config'
+import { syncDiscountMetafields } from '@/lib/product-tiers'
+import { cleanOldValues } from '@/settings/cleanOldValues'
 import { parseSettingsForm, readFormFields } from '@/settings/parseSettingsForm'
 import { runSettingsSave, type SettingsSaveResult } from '@/settings/runSettingsSave'
 import { saveStoreSettings } from '@/settings/settingsStore'
@@ -14,6 +17,9 @@ export async function saveSettingsAction(_state: SettingsSaveResult | null, form
     steps: {
       writeShopify: async () => {},
       writeSettings: (next) => saveStoreSettings({ settings: next }),
+      cleanOldValues: async () => {
+        await cleanOldValues({ tools: { readConfig: getConfig, writeConfig: saveConfig, syncProducts: syncDiscountMetafields } })
+      },
     },
   })
   /* eslint-enable guidelines/no-outer-scope-calls */
