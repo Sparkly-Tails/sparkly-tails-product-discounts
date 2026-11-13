@@ -21,6 +21,14 @@ describe('ThemePanel', () => {
     expect(screen.getByRole('link', { name: /Pre-checkout pop-up/ })).toHaveAttribute('href', 'https://demo.myshopify.com/admin/themes/current/editor?context=apps&activateAppId=abc123/bundle-popup')
   })
 
+  it('puts the status tag on the right of the row, apart from the name and help text', async () => {
+    render(<ThemePanel {...PROPS} readBlocks={async () => [{ handle: 'tier-pricing', status: 'active' }]} />)
+    const tag = await screen.findByText('Active')
+    const help = screen.getByText('The tier prices and the flash sale bar on the product page.')
+    expect(help.parentElement).not.toContainElement(tag)
+    expect(tag.closest('li')).toContainElement(help)
+  })
+
   it('says the status could not be read and still shows the three links when the read fails', async () => {
     render(<ThemePanel {...PROPS} readBlocks={async () => { throw new Error('no bridge') }} />)
     expect(await screen.findByText('Status could not be read')).toBeInTheDocument()
