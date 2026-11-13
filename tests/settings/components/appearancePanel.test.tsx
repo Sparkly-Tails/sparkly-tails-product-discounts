@@ -14,8 +14,8 @@ describe('AppearancePanel', () => {
     expect(screen.getByRole('heading', { level: 2, name: 'Storefront Appearance & Theme' })).toBeInTheDocument()
     expect(screen.getByText('Accent colour')).toBeInTheDocument()
     expect(screen.getByText('Background colour')).toBeInTheDocument()
-    expect(screen.getByText('Flash sale bar tone')).toBeInTheDocument()
-    expect(screen.getByText('Round corners')).toBeInTheDocument()
+    expect(screen.getByText('Flash sale urgency bar tone')).toBeInTheDocument()
+    expect(screen.getByText('Corner roundness')).toBeInTheDocument()
   })
 
   it('offers the three flash tones and reports the one chosen', () => {
@@ -28,10 +28,18 @@ describe('AppearancePanel', () => {
     expect(onChange).toHaveBeenCalledWith('flashTone', 'pure-onyx')
   })
 
+  it('names the three stops under the slider and shows the chosen radius', () => {
+    render(<AppearancePanel {...VALUES} onChange={() => {}} />)
+    expect(screen.getByText('0px (Sharp modern)')).toBeInTheDocument()
+    expect(screen.getByText('12px (Smooth default)')).toBeInTheDocument()
+    expect(screen.getByText('24px (Soft pill)')).toBeInTheDocument()
+    expect(screen.getByText('12 px')).toBeInTheDocument()
+  })
+
   it('reports the radius from a slider that goes from 0 to 24', () => {
     const onChange = vi.fn()
     render(<AppearancePanel {...VALUES} onChange={onChange} />)
-    const slider = screen.getByRole('slider', { name: 'Round corners' })
+    const slider = screen.getByRole('slider', { name: 'Corner roundness' })
     expect(slider).toHaveAttribute('min', '0')
     expect(slider).toHaveAttribute('max', '24')
     fireEvent.change(slider, { target: { value: '8' } })

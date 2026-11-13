@@ -2,6 +2,24 @@ import Link from 'next/link'
 import type { ReactNode } from 'react'
 import { ArrowBackIcon } from '@/form/components/icons'
 
+// The heading with its status pill (when the page has a status) and, under it, a line of help (when it has one).
+function FormHeading({ heading, badge, subtitle }: { heading: string; badge?: string; subtitle?: string }) {
+  return (
+    <div className="flex flex-col">
+      <div className="flex items-center gap-form-sm">
+        <h1 className="text-form-headline-lg text-form-on-surface tracking-tight">{heading}</h1>
+        {badge ? (
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-form-surface-container text-form-on-surface-variant text-form-label-sm font-medium">
+            <span className="w-1.5 h-1.5 rounded-full bg-form-outline"></span>
+            {badge}
+          </span>
+        ) : null}
+      </div>
+      {subtitle ? <p className="text-form-body-md text-form-on-surface-variant">{subtitle}</p> : null}
+    </div>
+  )
+}
+
 // The page frame of the tier discount form (Create and Edit): a header that stays in view while the form scrolls
 // (breadcrumb, then the heading with its status badge and, on the right, the actions when there are any), a notice
 // under it, and the form column (58%) next to the preview column (42%, which stays in view below the header).
@@ -9,6 +27,7 @@ export default function FormShell({
   breadcrumbLabel,
   heading,
   badge,
+  subtitle,
   actions,
   notice,
   children,
@@ -18,6 +37,8 @@ export default function FormShell({
   heading: string
   /** The status pill next to the heading; a page without a status leaves it out. */
   badge?: string
+  /** A line of help under the heading; a page without one leaves it out. */
+  subtitle?: string
   actions: ReactNode
   notice: ReactNode
   children: ReactNode
@@ -35,15 +56,7 @@ export default function FormShell({
           <span className="text-form-label-sm text-form-on-surface-variant">{breadcrumbLabel}</span>
         </nav>
         <div data-testid="form-header-row" className="flex flex-wrap items-center justify-between gap-form-sm">
-          <div className="flex items-center gap-form-sm">
-            <h1 className="text-form-headline-lg text-form-on-surface tracking-tight">{heading}</h1>
-            {badge ? (
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-form-surface-container text-form-on-surface-variant text-form-label-sm font-medium">
-                <span className="w-1.5 h-1.5 rounded-full bg-form-outline"></span>
-                {badge}
-              </span>
-            ) : null}
-          </div>
+          <FormHeading heading={heading} badge={badge} subtitle={subtitle} />
           {actions ? <div data-testid="form-header-actions" className="flex items-center gap-form-sm">{actions}</div> : null}
         </div>
       </header>

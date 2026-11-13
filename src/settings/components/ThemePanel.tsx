@@ -13,17 +13,28 @@ const ROWS: { handle: string; kind: 'block' | 'embed'; label: string; help: stri
 
 const STATUS_TEXT: Record<BlockStatus, string> = { active: 'Active', inactive: 'Not active', unknown: 'Not active' }
 
+// The pill of a block's status: green dot for active, grey for the rest.
+function StatusPill({ status }: { status: BlockStatus }) {
+  const dotClass = status === 'active' ? 'bg-green-600' : 'bg-form-outline'
+  return (
+    <span className="inline-flex items-center gap-1.5 mt-1 px-2 py-0.5 rounded-full bg-form-surface-container-lowest text-form-label-sm text-form-on-surface">
+      <span aria-hidden="true" className={`w-1.5 h-1.5 rounded-full ${dotClass}`} />
+      {STATUS_TEXT[status]}
+    </span>
+  )
+}
+
 // One block: its name and help, its status once it is read, and the link that adds it in the theme editor.
 function ThemeRow({ row, status, link }: { row: (typeof ROWS)[number]; status: BlockStatus | null; link: string }) {
   const action = row.kind === 'block' ? 'Add to theme' : 'Turn on'
   return (
-    <li className="flex items-start justify-between gap-3">
+    <li className="flex items-center justify-between gap-3 p-4 rounded-2xl bg-form-surface-container-low">
       <span>
         <span className="block text-form-label-md text-form-on-surface font-medium">{row.label}</span>
         <span className="block text-form-body-sm text-form-on-surface-variant">{row.help}</span>
-        {status === null ? null : <span className="block text-form-body-sm text-form-on-surface">{STATUS_TEXT[status]}</span>}
+        {status === null ? null : <StatusPill status={status} />}
       </span>
-      <a href={link} target="_top" aria-label={`${action}: ${row.label}`} className="text-form-label-md text-form-secondary underline whitespace-nowrap">{action}</a>
+      <a href={link} target="_top" aria-label={`${action}: ${row.label}`} className="text-form-label-md text-form-secondary hover:underline whitespace-nowrap">{action} →</a>
     </li>
   )
 }

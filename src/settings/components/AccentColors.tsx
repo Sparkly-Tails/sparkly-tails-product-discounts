@@ -19,11 +19,11 @@ export default function AccentColors({ hex, onPick }: { hex: string; onPick: (he
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <span className="text-form-label-sm text-form-on-surface font-medium block">Accent colour</span>
-        <span className="text-form-body-sm text-form-on-surface-variant font-mono">{hex}</span>
+      <div>
+        <span className="text-form-label-md text-form-on-surface font-medium block">Accent colour</span>
+        <p className="text-form-body-sm text-form-on-surface-variant">The main colour of buttons, highlights and the progress rail.</p>
       </div>
-      <div className="flex items-center gap-2 flex-wrap">
+      <div className="flex items-center gap-3 flex-wrap">
         <CurrentColour hex={hex} />
         {ACCENT_COLORS.map((color) => (
           <BackgroundSwatch key={color.hex} label={color.label} hex={color.hex} isSelected={color.hex === hex} onSelect={() => pickSwatch(color.hex)} />
@@ -34,7 +34,7 @@ export default function AccentColors({ hex, onPick }: { hex: string; onPick: (he
           maxLength={7}
           value={text}
           onChange={(event) => updateText(formatHexColor({ text: event.target.value }))}
-          className="w-28 h-8 px-2 rounded-lg bg-form-surface-container-low border border-form-outline-variant/60 font-mono text-[12px] text-form-on-surface uppercase focus:outline-none focus:border-form-secondary transition-colors"
+          className="w-28 h-9 px-3 rounded-full bg-form-surface-container-low border border-form-outline-variant/40 font-mono text-[12px] text-form-on-surface uppercase focus:outline-none focus:border-form-secondary transition-colors"
         />
       </div>
     </div>

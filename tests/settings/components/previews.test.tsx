@@ -55,6 +55,7 @@ describe('PopupPlaceholderPreview', () => {
     const { container } = render(<PopupPlaceholderPreview {...DESIGN} />)
     expect(screen.getByRole('heading', { level: 2, name: 'Pre-checkout pop-up' })).toBeInTheDocument()
     expect(container.querySelectorAll('[data-placeholder]').length).toBeGreaterThanOrEqual(8)
+    expect(screen.getByText('Wireframe preview')).toBeInTheDocument()
     expect(container.querySelector('script')).toBeNull()
     expect(container.textContent).not.toMatch(/Dog harness|Chew toy|Travel bowl/)
   })

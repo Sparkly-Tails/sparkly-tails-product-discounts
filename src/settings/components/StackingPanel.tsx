@@ -21,7 +21,7 @@ function StackingOption({ label, help, field, checked, isLocked, onChange }: {
   onChange: (field: keyof StackingFlags, checked: boolean) => void
 }) {
   return (
-    <div>
+    <div className="p-4 rounded-2xl bg-form-surface-container-low space-y-1">
       <CheckboxField name={`stack-${field}`} label={label} checked={checked} isStrong isDisabled={isLocked} onChange={(next) => onChange(field, next)} />
       <p className="ml-6.5 text-form-body-sm text-form-on-surface-variant">{isLocked ? `${help} ${FLASH_LOCK_NOTE}` : help}</p>
     </div>
@@ -41,7 +41,7 @@ export default function StackingPanel({ orderDiscounts, shippingDiscounts, produ
       <div className="flex items-center gap-2.5">
         <TouchAppIcon className="text-[20px] text-form-secondary" />
         <div>
-          <h2 className="text-form-headline-sm text-form-on-surface">Stacking</h2>
+          <h2 className="text-form-headline-sm text-form-on-surface">Discount Combination &amp; Stacking</h2>
           <p className="text-form-body-sm text-form-on-surface-variant">Which other discounts may apply together with your tier discounts</p>
         </div>
       </div>
