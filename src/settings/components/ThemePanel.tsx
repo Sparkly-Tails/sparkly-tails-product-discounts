@@ -24,9 +24,15 @@ function StatusPill({ status }: { status: BlockStatus }) {
   )
 }
 
+// The link that adds a block (or turns an embed on) in the theme editor.
+function ThemeLink({ kind, label, link }: { kind: 'block' | 'embed'; label: string; link: string }) {
+  const action = kind === 'block' ? 'Add to theme' : 'Turn on'
+  return <a href={link} target="_top" aria-label={`${action}: ${label}`} className="text-form-label-md text-form-secondary hover:underline whitespace-nowrap">{action} →</a>
+}
+
 // One block: its name and help, its status once it is read, and the link that adds it in the theme editor.
+// A block that is already active has no link: there is nothing to add or turn on.
 function ThemeRow({ row, status, link }: { row: (typeof ROWS)[number]; status: BlockStatus | null; link: string }) {
-  const action = row.kind === 'block' ? 'Add to theme' : 'Turn on'
   return (
     <li className="flex items-center justify-between gap-3 p-4 rounded-2xl bg-form-surface-container-low">
       <span>
@@ -34,7 +40,7 @@ function ThemeRow({ row, status, link }: { row: (typeof ROWS)[number]; status: B
         <span className="block text-form-body-sm text-form-on-surface-variant">{row.help}</span>
         {status === null ? null : <StatusPill status={status} />}
       </span>
-      <a href={link} target="_top" aria-label={`${action}: ${row.label}`} className="text-form-label-md text-form-secondary hover:underline whitespace-nowrap">{action} →</a>
+      {status === 'active' ? null : <ThemeLink kind={row.kind} label={row.label} link={link} />}
     </li>
   )
 }

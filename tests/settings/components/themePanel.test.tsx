@@ -9,14 +9,15 @@ afterEach(cleanup)
 const PROPS = { shop: 'demo.myshopify.com', clientId: 'abc123' }
 
 describe('ThemePanel', () => {
-  it('shows the three blocks with Active or Not active and a link for each', async () => {
+  it('shows the three blocks with Active or Not active and a link only for the ones that are not active', async () => {
     const readBlocks = vi.fn(async () => [{ handle: 'tier-pricing', status: 'active' }, { handle: 'card-prices', status: 'available' }, { handle: 'bundle-popup', status: 'available' }])
     render(<ThemePanel {...PROPS} readBlocks={readBlocks} />)
     expect(screen.getByRole('heading', { level: 2, name: 'Shopify Theme Integration' })).toBeInTheDocument()
     await waitFor(() => expect(screen.getAllByText('Not active')).toHaveLength(2))
     expect(screen.getAllByText('Active')).toHaveLength(1)
-    expect(screen.getAllByRole('link')).toHaveLength(3)
-    expect(screen.getByRole('link', { name: /Product page widget/ })).toHaveAttribute('href', 'https://demo.myshopify.com/admin/themes/current/editor?template=product&addAppBlockId=abc123/tier-pricing&target=mainSection')
+    expect(screen.getAllByRole('link')).toHaveLength(2)
+    expect(screen.queryByRole('link', { name: /Product page widget/ })).toBeNull()
+    expect(screen.getByRole('link', { name: /Card prices/ })).toHaveAttribute('href', 'https://demo.myshopify.com/admin/themes/current/editor?context=apps&activateAppId=abc123/card-prices')
     expect(screen.getByRole('link', { name: /Pre-checkout pop-up/ })).toHaveAttribute('href', 'https://demo.myshopify.com/admin/themes/current/editor?context=apps&activateAppId=abc123/bundle-popup')
   })
 
