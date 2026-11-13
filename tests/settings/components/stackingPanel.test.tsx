@@ -16,7 +16,7 @@ const OFF = { orderDiscounts: false, shippingDiscounts: false, productDiscounts:
 describe('StackingPanel', () => {
   it('has the heading, the three choices with their help and the note that both discounts must allow it', () => {
     render(<StackingPanel {...OFF} hasFlash={false} onChange={() => {}} />)
-    expect(screen.getByRole('heading', { level: 2, name: 'Stacking' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 2, name: 'Discount Combination & Stacking' })).toBeInTheDocument()
     for (const label of ['Order discounts', 'Shipping discounts', 'Product discounts']) expect(screen.getByRole('checkbox', { name: label })).not.toBeChecked()
     expect(screen.getByText(/Free or reduced shipping/)).toBeInTheDocument()
     expect(screen.getByText(/only when both allow it/i)).toBeInTheDocument()

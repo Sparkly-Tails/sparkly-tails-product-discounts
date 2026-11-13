@@ -37,17 +37,11 @@ export default function AppearancePanel({ accentColor, backgroundColor, cornerRa
           <p className="text-form-body-sm text-form-on-surface-variant">One look for the product-page widget and the pre-checkout pop-up</p>
         </div>
       </div>
-      <div className="space-y-4">
+      <div className="space-y-6">
         <AccentColors hex={accentColor} onPick={(hex) => onChange('accentColor', hex)} />
-        <div className="pt-3 border-t border-form-outline-variant/20">
-          <BackgroundColors hex={backgroundColor} text={backgroundText} onTextChange={updateBackgroundText} onPick={pickBackground} />
-        </div>
-        <div className="pt-3 border-t border-form-outline-variant/20">
-          <FlashToneField value={flashTone} onChange={(tone) => onChange('flashTone', tone)} />
-        </div>
-        <div className="pt-3 border-t border-form-outline-variant/20">
-          <CornerRadius value={cornerRadius} onChange={(radius) => onChange('cornerRadius', radius)} />
-        </div>
+        <BackgroundColors hex={backgroundColor} text={backgroundText} onTextChange={updateBackgroundText} onPick={pickBackground} />
+        <FlashToneField value={flashTone} onChange={(tone) => onChange('flashTone', tone)} />
+        <CornerRadius value={cornerRadius} onChange={(radius) => onChange('cornerRadius', radius)} />
       </div>
     </Card>
   )

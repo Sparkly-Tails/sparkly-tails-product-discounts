@@ -63,7 +63,7 @@ export default function SettingsForm({ initial, hasFlash, shop, clientId, curren
       <SaveBar id="settings-save-bar" isVisible={isDirty} canSave={!isSaving} onSave={() => document.forms.namedItem('settings')?.requestSubmit()} onDiscard={resetChanges} />
       <form name="settings" action={formAction}>
         {Object.entries(values).map(([name, value]) => <input key={name} type="hidden" name={name} value={String(value)} />)}
-        <FormShell breadcrumbLabel="Settings" heading="Settings" actions={null}
+        <FormShell breadcrumbLabel="Settings" heading="Settings" subtitle="Customize global storefront appearance, bundle trigger thresholds, and discount stacking logic." actions={null}
           notice={<SettingsMessage result={result} />}
           preview={
             <>

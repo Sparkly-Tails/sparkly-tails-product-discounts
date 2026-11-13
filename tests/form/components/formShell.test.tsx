@@ -31,6 +31,13 @@ describe('FormShell', () => {
     expect(screen.getByText('Live')).toBeInTheDocument()
   })
 
+  it('shows a line of help under the heading only when one is given', () => {
+    const { rerender } = render(<FormShell breadcrumbLabel="Settings" heading="Settings" subtitle="Global storefront settings" actions={null} notice={null} preview={null}><p>form</p></FormShell>)
+    expect(within(header()).getByText('Global storefront settings')).toBeInTheDocument()
+    rerender(<FormShell breadcrumbLabel="Settings" heading="Settings" actions={null} notice={null} preview={null}><p>form</p></FormShell>)
+    expect(screen.queryByText('Global storefront settings')).toBeNull()
+  })
+
   it('puts the actions in the header, on the right of the heading and its badge', () => {
     renderShell()
     const actions = within(header()).getByRole('button', { name: 'Go live' })

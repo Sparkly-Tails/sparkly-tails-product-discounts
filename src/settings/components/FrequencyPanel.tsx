@@ -20,7 +20,7 @@ export default function FrequencyPanel({ frequency, onChange }: { frequency: Pop
       </div>
       <div className="space-y-3">
         {OPTIONS.map((option) => (
-          <label key={option.value} className="flex items-start gap-2.5 cursor-pointer">
+          <label key={option.value} className={`flex items-start gap-3 p-4 rounded-2xl cursor-pointer transition-colors ${frequency === option.value ? 'bg-form-surface-container' : 'bg-form-surface-container-low hover:bg-form-surface-container'}`}>
             <input type="radio" name="frequencyOption" aria-label={option.label} value={option.value} checked={frequency === option.value} onChange={() => onChange(option.value)} className="mt-1 accent-form-secondary" />
             <span>
               <span className="block text-form-label-md text-form-on-surface font-medium">{option.label}</span>
