@@ -3,6 +3,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { readBuiltWidget, runWidgetScripts } from '../helpers/builtWidget'
+import { trackListeners } from '../helpers/trackedListeners'
 import { isVariantAvailable, parseSoldOutVariantIds } from '../../extensions/product-tier-pricing/src/config.js'
 import { readSelectedVariantId } from '../../extensions/product-tier-pricing/src/core/wiring.js'
 
@@ -39,10 +40,12 @@ describe('parseSoldOutVariantIds and isVariantAvailable', () => {
 })
 
 describe('the widget with and without stock', () => {
+  let removeListeners: () => void
   beforeEach(() => {
+    removeListeners = trackListeners({ target: document })
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({ items: [] }) })))
   })
-  afterEach(() => { vi.clearAllTimers(); vi.useRealTimers(); vi.unstubAllGlobals(); document.body.innerHTML = '' })
+  afterEach(() => { removeListeners(); vi.clearAllTimers(); vi.useRealTimers(); vi.unstubAllGlobals(); document.body.innerHTML = '' })
 
   const discount = {
     title: 'Tins',
@@ -149,10 +152,12 @@ describe('readSelectedVariantId', () => {
 })
 
 describe('the widget on a theme without the theme\'s own variant event', () => {
+  let removeListeners: () => void
   beforeEach(() => {
+    removeListeners = trackListeners({ target: document })
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({ items: [] }) })))
   })
-  afterEach(() => { vi.clearAllTimers(); vi.useRealTimers(); vi.unstubAllGlobals(); document.body.innerHTML = '' })
+  afterEach(() => { removeListeners(); vi.clearAllTimers(); vi.useRealTimers(); vi.unstubAllGlobals(); document.body.innerHTML = '' })
 
   async function mountPlain() {
     vi.useFakeTimers({ now: 1_800_000_000_000 })
