@@ -37,14 +37,22 @@ describe('StatCards', () => {
 describe('CreateCards', () => {
   it('links the create button to the new-discount page', () => {
     render(<CreateCards />)
-    expect(screen.getByRole('link', { name: /Create tier discount/ })).toHaveAttribute('href', '/discounts/new')
+    expect(screen.getByRole('link', { name: /Create Discount/ })).toHaveAttribute('href', '/discounts/new')
   })
 
-  it('leaves the "More information" link without a destination', () => {
+  it('is one row: the illustration, the title and one line of description, and the button, with no tag and no "More information" link', () => {
     render(<CreateCards />)
-    const links = screen.getAllByRole('link', { name: 'More information' })
-    expect(links).toHaveLength(1)
-    expect(links[0]).toHaveAttribute('href', '#')
+    expect(screen.getByRole('heading', { level: 2, name: 'Tier-based Discount' })).toBeInTheDocument()
+    expect(screen.getAllByRole('link')).toHaveLength(1)
+    expect(screen.queryByText('More information')).toBeNull()
+    expect(screen.getAllByText(/Tier-based/i)).toHaveLength(1)
+  })
+
+  it('cuts the description to one line with an ellipsis, and keeps the button from shrinking', () => {
+    render(<CreateCards />)
+    const description = screen.getByText('Reward bigger orders. Offer percentage off or a fixed price as customers add more units of a product.')
+    expect(description).toHaveClass('truncate')
+    expect(screen.getByRole('link', { name: /Create Discount/ })).toHaveClass('shrink-0')
   })
 
   it('uses the illustration of the design as it is, at its real size', () => {
@@ -53,11 +61,6 @@ describe('CreateCards', () => {
     expect(tier).toHaveAttribute('src', '/assets/home/tier-illustration.jpg')
     expect(tier).toHaveAttribute('width', '512')
     expect(tier).toHaveAttribute('height', '286')
-  })
-
-  it('has the copy of the design', () => {
-    render(<CreateCards />)
-    expect(screen.getByText('Reward bigger orders. Offer percentage off or a fixed price as customers add more units of a product.')).toBeInTheDocument()
   })
 })
 
