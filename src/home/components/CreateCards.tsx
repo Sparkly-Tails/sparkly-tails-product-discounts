@@ -18,7 +18,7 @@ export default function CreateCards() {
         </div>
         <div className="min-w-0 flex-1">
           <h2 className="text-base font-bold text-home-on-surface tracking-tight mb-1">Tier-based Discount</h2>
-          <p className="truncate text-sm text-home-on-surface-variant">
+          <p className="max-w-md line-clamp-2 text-sm text-home-on-surface-variant">
             Reward bigger orders. Offer percentage off or a fixed price as customers add more units of a product.
           </p>
         </div>

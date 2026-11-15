@@ -48,10 +48,12 @@ describe('CreateCards', () => {
     expect(screen.getAllByText(/Tier-based/i)).toHaveLength(1)
   })
 
-  it('cuts the description to one line with an ellipsis, and keeps the button from shrinking', () => {
+  it('breaks the description into two lines (cut after two), and keeps the button from shrinking', () => {
     render(<CreateCards />)
     const description = screen.getByText('Reward bigger orders. Offer percentage off or a fixed price as customers add more units of a product.')
-    expect(description).toHaveClass('truncate')
+    expect(description).toHaveClass('line-clamp-2')
+    expect(description).toHaveClass('max-w-md')
+    expect(description).not.toHaveClass('truncate')
     expect(screen.getByRole('link', { name: /Create Discount/ })).toHaveClass('shrink-0')
   })
 
