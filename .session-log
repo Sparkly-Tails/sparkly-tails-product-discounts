@@ -561,3 +561,26 @@ Assistant understood the rule intellectually but failed to internalize and execu
 
 **For next session:** Review this entry. Widget fix still pending deployment. Use feature branches for ALL work.
 
+
+---
+
+## 🧪 Unhandled rejections in storefront tests fixed — 2026-11-13
+
+**Project:** sparkly-tails-product-discounts (worktree `claude/gracious-cray-e4ed6a`, reset to `origin/dev` at 51bdb8b because the old base lacked the widget tests)
+
+**What happened:** `npx vitest run tests/storefront tests/scripts` passed all tests but exited 1 with 2 "Unhandled Rejection" errors (`Cannot read properties of null (reading 'querySelectorAll')` in `findThemePrice`). Running the two describes of `sold-out-widget.test.ts` separately showed each is clean alone, so the cause is a leak between tests: `wireSelectedVariantField` adds a capturing `change` listener on `document`, which outlives each test, and widgets from earlier tests (now detached) re-rendered when later tests fired `change`. The fix is test-side only; the command now exits 0 (379 tests, 3 runs).
+
+**Key changes:**
+- New `tests/helpers/trackedListeners.ts`: `trackListeners({ target })` records listeners added to the target and returns a function that removes them.
+- `tests/storefront/sold-out-widget.test.ts`: both widget-mounting describes start tracking in `beforeEach` and remove the listeners in `afterEach`.
+- Storefront script untouched. Nothing committed yet (no branch commit, no version bump).
+
+**Artifacts:**
+- [D] The unhandled rejections come from document-level listeners leaking across tests, not from feature work — invalidates if the errors return with `trackListeners` in place [SETTLED] 2026-11-13
+- [E] Full `npx vitest run` shows 21 failing files in this worktree because `@prisma/client` and `@shopify/shopify-api` are not installed; unrelated to this change [SETTLED] 2026-11-13
+- [S] Make `findThemePrice`/`findSearchRoot` safe when the widget's container has left the page (a detached widget throws on every poll and change event) — activates if a real theme is seen replacing the product section [LOW] 2026-11-13
+
+**Next steps:**
+- [ ] Owner decides: commit on a feature branch (bump `package.json` version), open PR into `dev`.
+- [ ] Optional: switch `tests/storefront/popup-core.test.ts` to the shared helper.
+- [ ] Run `npm install` / prisma generate in this worktree if the full suite is needed here.
