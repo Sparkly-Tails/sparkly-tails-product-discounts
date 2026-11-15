@@ -5,8 +5,7 @@ import FormShell from '@/form/components/FormShell'
 import SaveBar from '@/form/components/SaveBar'
 import AppearancePanel from '@/settings/components/AppearancePanel'
 import FrequencyPanel from '@/settings/components/FrequencyPanel'
-import PopupPlaceholderPreview from '@/settings/components/PopupPlaceholderPreview'
-import SettingsWidgetPreview from '@/settings/components/SettingsWidgetPreview'
+import SettingsPreview from '@/settings/components/SettingsPreview'
 import StackingPanel from '@/settings/components/StackingPanel'
 import ThemePanel from '@/settings/components/ThemePanel'
 import { readAppBridgeBlocks } from '@/settings/readAppBridgeBlocks'
@@ -66,19 +65,16 @@ export default function SettingsForm({ initial, hasFlash, shop, clientId, curren
         <FormShell breadcrumbLabel="Settings" heading="Settings" subtitle="Customize global storefront appearance, bundle trigger thresholds, and discount stacking logic." actions={null}
           notice={<SettingsMessage result={result} />}
           preview={
-            <>
-              <SettingsWidgetPreview
-                accentColor={values.accentColor}
-                backgroundColor={values.backgroundColor}
-                cornerRadius={values.cornerRadius}
-                flashTone={values.flashTone}
-                isFlashShown={isFlashShown}
-                onFlashShownChange={setIsFlashShown}
-                currencyCode={currencyCode}
-                initialNowSeconds={initialNowSeconds}
-              />
-              <PopupPlaceholderPreview accentColor={values.accentColor} backgroundColor={values.backgroundColor} cornerRadius={values.cornerRadius} flashTone={values.flashTone} />
-            </>
+            <SettingsPreview
+              accentColor={values.accentColor}
+              backgroundColor={values.backgroundColor}
+              cornerRadius={values.cornerRadius}
+              flashTone={values.flashTone}
+              isFlashShown={isFlashShown}
+              onFlashShownChange={setIsFlashShown}
+              currencyCode={currencyCode}
+              initialNowSeconds={initialNowSeconds}
+            />
           }
         >
           <AppearancePanel
