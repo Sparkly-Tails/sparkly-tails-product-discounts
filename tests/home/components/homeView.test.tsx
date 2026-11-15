@@ -28,7 +28,7 @@ describe('HomeView', () => {
 
   it('shows the sections of the design in order: title, number cards, create cards, table, tip, footer', () => {
     const { container } = show()
-    const order = ['Discounts', 'Visitors', 'Create tier discount', 'All discounts', 'Did you know?', 'Smooth Discounts v9.8.7']
+    const order = ['Discounts', 'Visitors', 'Create Discount', 'All discounts', 'Did you know?', 'Smooth Discounts v9.8.7']
     const text = container.textContent ?? ''
     const positions = order.map((part) => text.indexOf(part))
     expect(positions.every((position) => position >= 0)).toBe(true)
